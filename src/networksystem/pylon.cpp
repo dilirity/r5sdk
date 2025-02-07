@@ -48,7 +48,8 @@ static bool GetServerListingFromJSON(const rapidjson::Value& value, NetGameServe
 
 //-----------------------------------------------------------------------------
 // Purpose: gets a vector of hosted servers.
-// Input  : &outMessage - 
+// Input  : &outServerList - 
+//          &outMessage - 
 // Output : true on success, false on failure.
 //-----------------------------------------------------------------------------
 bool CPylon::GetServerList(vector<NetGameServer_t>& outServerList, string& outMessage) const
@@ -156,6 +157,7 @@ bool CPylon::GetServerByToken(NetGameServer_t& outGameServer,
 // Purpose: Sends host server POST request.
 // Input  : &outMessage - 
 //			&outToken - 
+//			&outHostIp - 
 //			&netGameServer - 
 // Output : Returns true on success, false on failure.
 //-----------------------------------------------------------------------------
@@ -296,6 +298,7 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
 // Purpose: Checks if client is banned on the comp server.
 // Input  : &ipAddress - 
 //			nucleusId  - 
+//			&personaName - 
 //			&outReason - <- contains banned reason if any.
 // Output : True if banned, false if not banned.
 //-----------------------------------------------------------------------------
