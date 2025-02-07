@@ -122,8 +122,8 @@ bool CPylon::GetServerByToken(NetGameServer_t& outGameServer,
     requestJson.SetObject();
 
     rapidjson::Document::AllocatorType& allocator = requestJson.GetAllocator();
-    requestJson.AddMember("version", rapidjson::Value(SDK_VERSION, requestJson.GetAllocator()), allocator);
-    requestJson.AddMember("token", rapidjson::Value(token.c_str(), requestJson.GetAllocator()), allocator);
+    requestJson.AddMember("version", rapidjson::Value(SDK_VERSION, sizeof(SDK_VERSION)-1, requestJson.GetAllocator()), allocator);
+    requestJson.AddMember("token", rapidjson::Value(token.c_str(), token.length(), requestJson.GetAllocator()), allocator);
 
     rapidjson::Document responseJson;
     CURLINFO status;
@@ -174,16 +174,16 @@ bool CPylon::PostServerHost(string& outMessage, string& outToken, string& outHos
 
     rapidjson::Document::AllocatorType& allocator = requestJson.GetAllocator();
 
-    requestJson.AddMember("name",        rapidjson::Value(netGameServer.name.c_str(),        allocator), allocator);
-    requestJson.AddMember("description", rapidjson::Value(netGameServer.description.c_str(), allocator), allocator);
+    requestJson.AddMember("name",        rapidjson::Value(netGameServer.name.c_str(),        netGameServer.name.length(),        allocator), allocator);
+    requestJson.AddMember("description", rapidjson::Value(netGameServer.description.c_str(), netGameServer.description.length(), allocator), allocator);
     requestJson.AddMember("hidden",      netGameServer.hidden,                               allocator);
-    requestJson.AddMember("map",         rapidjson::Value(netGameServer.map.c_str(),         allocator), allocator);
-    requestJson.AddMember("playlist",    rapidjson::Value(netGameServer.playlist.c_str(),    allocator), allocator);
-    requestJson.AddMember("ip",          rapidjson::Value(netGameServer.address.c_str(),     allocator), allocator);
+    requestJson.AddMember("map",         rapidjson::Value(netGameServer.map.c_str(),         netGameServer.map.length(),         allocator), allocator);
+    requestJson.AddMember("playlist",    rapidjson::Value(netGameServer.playlist.c_str(),    netGameServer.playlist.length(),    allocator), allocator);
+    requestJson.AddMember("ip",          rapidjson::Value(netGameServer.address.c_str(),     netGameServer.address.length(),     allocator), allocator);
     requestJson.AddMember("port",        netGameServer.port,                                 allocator);
-    requestJson.AddMember("key",         rapidjson::Value(netGameServer.netKey.c_str(),      allocator), allocator);
+    requestJson.AddMember("key",         rapidjson::Value(netGameServer.netKey.c_str(),      netGameServer.netKey.length(),      allocator), allocator);
     requestJson.AddMember("checksum",    netGameServer.checksum,                             allocator);
-    requestJson.AddMember("version",     rapidjson::Value(netGameServer.versionId.c_str(),   allocator), allocator);
+    requestJson.AddMember("version",     rapidjson::Value(netGameServer.versionId.c_str(),   netGameServer.versionId.length(),   allocator), allocator);
     requestJson.AddMember("numPlayers",  netGameServer.numPlayers,                           allocator);
     requestJson.AddMember("maxPlayers",  netGameServer.maxPlayers,                           allocator);
     requestJson.AddMember("timeStamp",   netGameServer.timeStamp,                            allocator);
@@ -246,7 +246,7 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
         rapidjson::Value player(rapidjson::kObjectType);
 
         player.AddMember("id", banned.m_NucleusID, allocator);
-        player.AddMember("ip", rapidjson::Value(banned.m_Address.String(), allocator), allocator);
+        player.AddMember("ip", rapidjson::Value(banned.m_Address.String(), banned.m_Address.Length(), allocator), allocator);
 
         playersArray.PushBack(player, allocator);
     }
