@@ -107,7 +107,7 @@ void CBanSystem::SaveList(void) const
 
 		rapidjson::Value obj(rapidjson::kObjectType);
 
-		obj.AddMember("ipAddress", rapidjson::Value(banned.m_Address.String(), allocator), allocator);
+		obj.AddMember("ipAddress", rapidjson::Value(banned.m_Address.String(), banned.m_Address.Length(), allocator), allocator);
 		obj.AddMember("nucleusId", banned.m_NucleusID, allocator);
 
 		document.AddMember(rapidjson::Value(idx, allocator), obj, allocator);
