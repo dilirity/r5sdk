@@ -96,7 +96,7 @@ bool CPylon::GetServerList(vector<NetGameServer_t>& outServerList, string& outMe
             continue;
         }
 
-        outServerList.push_back(gameServer);
+        outServerList.emplace_back(std::move(gameServer));
     }
 
     return true;
