@@ -144,7 +144,7 @@ namespace VScriptCode
                 else
                 {
                     hiddenServerRequestMessage = Format("Request failed: %s", hiddenServerRequestMessage.c_str());
-                    sq_pushstring(v, hiddenServerRequestMessage.c_str(), -1);
+                    sq_pushstring(v, hiddenServerRequestMessage.c_str(), (SQInteger)hiddenServerRequestMessage.length());
                 }
 
                 SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -157,12 +157,12 @@ namespace VScriptCode
                 else
                     hiddenServerRequestMessage = Format("Server listing empty: %s", hiddenServerRequestMessage.c_str());
 
-                sq_pushstring(v, hiddenServerRequestMessage.c_str(), -1);
+                sq_pushstring(v, hiddenServerRequestMessage.c_str(), (SQInteger)hiddenServerRequestMessage.length());
             }
             else
             {
                 hiddenServerRequestMessage = Format("Found server: %s", serverListing.name.c_str());
-                sq_pushstring(v, hiddenServerRequestMessage.c_str(), -1);
+                sq_pushstring(v, hiddenServerRequestMessage.c_str(), (SQInteger)hiddenServerRequestMessage.length());
             }
 
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -182,7 +182,7 @@ namespace VScriptCode
                 SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 
             const string& serverName = g_ServerListManager.m_vServerList[iServer].name;
-            sq_pushstring(v, serverName.c_str(), -1);
+            sq_pushstring(v, serverName.c_str(), (SQInteger)serverName.length());
 
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
         }
@@ -201,7 +201,7 @@ namespace VScriptCode
                 SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 
             const string& serverDescription = g_ServerListManager.m_vServerList[iServer].description;
-            sq_pushstring(v, serverDescription.c_str(), -1);
+            sq_pushstring(v, serverDescription.c_str(), (SQInteger)serverDescription.length());
 
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
         }
@@ -219,8 +219,8 @@ namespace VScriptCode
             if (!Script_CheckServerIndexAndFailure(v, iServer))
                 SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 
-            const string& svServerMapName = g_ServerListManager.m_vServerList[iServer].map;
-            sq_pushstring(v, svServerMapName.c_str(), -1);
+            const string& serverMapName = g_ServerListManager.m_vServerList[iServer].map;
+            sq_pushstring(v, serverMapName.c_str(), (SQInteger)serverMapName.length());
 
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
         }
@@ -239,7 +239,7 @@ namespace VScriptCode
                 SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 
             const string& serverPlaylist = g_ServerListManager.m_vServerList[iServer].playlist;
-            sq_pushstring(v, serverPlaylist.c_str(), -1);
+            sq_pushstring(v, serverPlaylist.c_str(), (SQInteger)serverPlaylist.length());
 
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
         }
@@ -356,14 +356,14 @@ namespace VScriptCode
                 // set EULA version cvar to the newly fetched EULA version
                 eula_version->SetValue(eulaData.version);
 
-                sq_pushstring(v, eulaData.contents.c_str(), -1);
+                sq_pushstring(v, eulaData.contents.c_str(), (SQInteger)eulaData.contents.length());
             }
             else
             {
-                string error = Format("Failed to load EULA Data: %s", eulaRequestMessage.c_str());
+                const string error = Format("Failed to load EULA Data: %s", eulaRequestMessage.c_str());
 
                 Warning(eDLL_T::UI, "%s\n", error.c_str());
-                sq_pushstring(v, error.c_str(), -1);
+                sq_pushstring(v, error.c_str(), (SQInteger)error.length());
             }
 
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
