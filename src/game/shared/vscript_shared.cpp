@@ -27,7 +27,7 @@ namespace VScriptCode
         //-----------------------------------------------------------------------------
         SQRESULT GetSDKVersion(HSQUIRRELVM v)
         {
-            sq_pushstring(v, SDK_VERSION, -1);
+            sq_pushstring(v, SDK_VERSION, sizeof(SDK_VERSION)-1);
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
         }
 
@@ -47,7 +47,7 @@ namespace VScriptCode
             {
                 const CUtlString& mapName = g_InstalledMaps[i];
 
-                sq_pushstring(v, mapName.String(), -1);
+                sq_pushstring(v, mapName.String(), (SQInteger)mapName.Length());
                 sq_arrayappend(v, -2);
             }
 
@@ -65,7 +65,7 @@ namespace VScriptCode
             sq_newarray(v, 0);
             for (const CUtlString& it : g_vecAllPlaylists)
             {
-                sq_pushstring(v, it.String(), -1);
+                sq_pushstring(v, it.String(), (SQInteger)it.Length());
                 sq_arrayappend(v, -2);
             }
 
