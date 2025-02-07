@@ -62,7 +62,7 @@ void CBanSystem::LoadList(void)
 
 		rapidjson::Value::ConstMemberIterator entryIt;
 
-		if (JSON_GetIterator(document, idx, JSONFieldType_e::kObject, entryIt))
+		if (JSON_GetIterator(document, rapidjson::StringRef(idx, strlen(idx)), JSONFieldType_e::kObject, entryIt))
 		{
 			const rapidjson::Value& entry = entryIt->value;
 
