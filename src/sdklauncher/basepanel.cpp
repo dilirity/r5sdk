@@ -871,7 +871,7 @@ void CSurface::ReloadPlaylists(Forms::Control* pSender)
 //-----------------------------------------------------------------------------
 void CSurface::AddLog(const LogType_t type, const char* const pszText)
 {
-	m_LogList.push_back(LogList_t(type, pszText));
+	m_LogList.emplace_back(type, pszText);
 
 	// Clamp the log list size, as we cannot fit more elements than
 	// 8 in the console window.
