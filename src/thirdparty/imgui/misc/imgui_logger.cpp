@@ -340,7 +340,7 @@ CTextLogger::Coordinates CTextLogger::ScreenPosToCoordinates(const ImVec2& aPosi
 					buf[i++] = line.buffer[columnIndex++];
 
 				buf[i] = '\0';
-				columnWidth = ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, buf).x;
+				columnWidth = ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, buf, &buf[i]).x;
 
 				if (columnX + columnWidth * 0.5f > local.x)
 					break;
@@ -859,17 +859,20 @@ void CTextLogger::Render()
 
 			if (!line.buffer.empty())
 			{
+				const char* const text = line.buffer.c_str();
+				const char* const textEnd = &text[line.buffer.length()];
+
 				ImU32 color = line.color;
 
 				if (m_itFilter.IsActive())
 				{
 					// Make line dark if it isn't found by the filter
-					if (!m_itFilter.PassFilter(line.buffer.c_str()))
+					if (!m_itFilter.PassFilter(text, textEnd))
 						color = 0xff605040;
 				}
 
 				const ImVec2 newOffset(textScreenPos.x, textScreenPos.y);
-				drawList->AddText(newOffset, color, line.buffer.c_str());
+				drawList->AddText(newOffset, color, text, textEnd);
 			}
 
 			++lineNo;
@@ -1485,7 +1488,7 @@ float CTextLogger::TextDistanceToLineStart(const Coordinates& aFrom) const
 				tempCString[i] = line.buffer[it];
 
 			tempCString[i] = '\0';
-			distance += ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, tempCString, nullptr, nullptr).x;
+			distance += ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, tempCString, &tempCString[i], nullptr).x;
 		}
 	}
 
