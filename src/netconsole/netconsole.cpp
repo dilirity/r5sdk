@@ -511,27 +511,23 @@ int main(int argc, char* argv[])
 
 	bool bEnableColor = false;
 
-	for (int i = 0; i < argc; i++)
+	if (argc >= 2)
 	{
-		if (V_strcmp(argv[i], "-ansicolor") == NULL)
-		{
-			bEnableColor = true;
-			break;
-		}
+		bEnableColor = V_strcmp(argv[1], "-ansicolor") == NULL;
 	}
 
 	// The address and key from command line if passed in.
 	const char* pAdr = nullptr;
 	const char* pKey = nullptr;
 
-	if (argc >= 2)
+	if (argc >= 2 + bEnableColor)
 	{
-		pAdr = argv[1];
+		pAdr = argv[1 + bEnableColor];
 	}
 
-	if (argc >= 3)
+	if (argc >= 3 + bEnableColor)
 	{
-		pKey = argv[2];
+		pKey = argv[2 + bEnableColor];
 	}
 
 	if (!NetConsole()->Init(bEnableColor, pAdr, pKey))
