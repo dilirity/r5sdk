@@ -247,12 +247,7 @@ void NET_PrintFunc(const char* fmt, ...)
 	result = FormatV(fmt, args);
 	va_end(args);
 
-	if (result.back() != '\n')
-	{
-		result.push_back('\n');
-	}
-
-	Msg(context, "%s", result.c_str());
+	Msg(context, result.back() == '\n' ? "%s" : "%s\n", result.c_str());
 }
 
 //-----------------------------------------------------------------------------
