@@ -30,7 +30,7 @@ private:
     void CreateSuggestionsFromPartial(void);
     void ProcessCommand(const char* const inputText);
 
-    void BuildSummaryText(const char* const inputText);
+    void BuildSummaryText(const char* const inputText, const size_t textLen);
 
     struct ConAutoCompleteSuggest_s;
     void DetermineInputTextFromSelectedSuggestion(const ConAutoCompleteSuggest_s& suggest, string& svInput);
@@ -81,6 +81,11 @@ private:
         ConAutoCompleteSuggest_s(const string& inText, const int inFlags)
         {
             text = inText;
+            flags = inFlags;
+        }
+        ConAutoCompleteSuggest_s(const char* inText, const size_t len, const int inFlags)
+        {
+            text.assign(inText, len);
             flags = inFlags;
         }
         bool operator==(const string& a) const

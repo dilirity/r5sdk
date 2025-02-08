@@ -31,8 +31,8 @@ public:
     void DrawHostPanel(void);
 
     void UpdateHostingStatus(void);
-    void InstallHostingDetails(const bool postFailed, const char* const hostMessage, const char* const hostToken, const string& hostIp);
-    void SendHostingPostRequest(const NetGameServer_t& gameServer);
+    void InstallHostingDetails(const bool postFailed, const string& hostMessage, const string& hostToken, const string& hostIp);
+    void SendHostingPostRequest(NetGameServer_t& gameServer);
 
     void ProcessCommand(const char* pszCommand) const;
 

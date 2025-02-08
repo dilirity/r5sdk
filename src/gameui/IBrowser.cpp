@@ -281,9 +281,9 @@ void CBrowser::DrawBrowserPanel(void)
             const char* pszHostMap = server.map.c_str();
             const char* pszPlaylist = server.playlist.c_str();
 
-            if (m_serverBrowserTextFilter.PassFilter(pszHostName)
-                || m_serverBrowserTextFilter.PassFilter(pszHostMap)
-                || m_serverBrowserTextFilter.PassFilter(pszPlaylist))
+            if (m_serverBrowserTextFilter.PassFilter(pszHostName, &pszHostName[server.name.length()])
+                || m_serverBrowserTextFilter.PassFilter(pszHostMap, &pszHostMap[server.map.length()])
+                || m_serverBrowserTextFilter.PassFilter(pszPlaylist, &pszPlaylist[server.playlist.length()]))
             {
                 filteredServers.push_back(&server);
             }
@@ -297,28 +297,32 @@ void CBrowser::DrawBrowserPanel(void)
             for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
             {
                 const NetGameServer_t* const server = filteredServers[i];
-
-                const char* pszHostName = server->name.c_str();
-                const char* pszHostMap = server->map.c_str();
-                const char* pszPlaylist = server->playlist.c_str();
-
-                char pszHostPort[32];
-                sprintf(pszHostPort, "%d", server->port);
+                const ImGuiTextFlags textFlags = ImGuiTextFlags_NoWidthForLargeClippedText;
 
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", pszHostName);
+
+                const char* const pszHostName = server->name.c_str();
+                ImGui::TextEx(pszHostName, &pszHostName[server->name.length()], textFlags);
 
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", pszHostMap);
+
+                const char* const pszHostMap = server->map.c_str();
+                ImGui::TextEx(pszHostMap, &pszHostMap[server->map.length()], textFlags);
 
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", pszPlaylist);
+
+                const char* const pszPlaylist = server->playlist.c_str();
+                ImGui::TextEx(pszPlaylist, &pszPlaylist[server->playlist.length()], textFlags);
 
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", Format("%3d/%3d", server->numPlayers, server->maxPlayers).c_str());
+
+                const std::string playerNums = Format("%3d/%3d", server->numPlayers, server->maxPlayers);
+
+                const char* const pszPlayerNums = playerNums.c_str();
+                ImGui::TextEx(pszPlayerNums, &pszPlayerNums[playerNums.length()], textFlags);
 
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", pszHostPort);
+                ImGui::Text("%d", server->port);
 
                 ImGui::TableNextColumn();
                 string svConnectBtn = "Connect##";
@@ -814,7 +818,7 @@ void CBrowser::UpdateHostingStatus(void)
             break;
         }
 
-        const NetGameServer_t netGameServer
+        NetGameServer_t netGameServer
         {
             hostname->GetString(),
             hostdesc.GetString(),
@@ -847,10 +851,10 @@ void CBrowser::UpdateHostingStatus(void)
 //          host data on the server browser
 // Input  : &gameServer - 
 //-----------------------------------------------------------------------------
-void CBrowser::SendHostingPostRequest(const NetGameServer_t& gameServer)
+void CBrowser::SendHostingPostRequest(NetGameServer_t& gameServer)
 {
 #ifndef CLIENT_DLL
-    std::thread request([&, gameServer]
+    std::thread request([&, gameServer = std::move(gameServer)]
         {
             string hostRequestMessage;
             string hostToken;
@@ -860,7 +864,7 @@ void CBrowser::SendHostingPostRequest(const NetGameServer_t& gameServer)
 
             g_TaskQueue.Dispatch([&, result, hostRequestMessage, hostToken, hostIp]
                 {
-                    InstallHostingDetails(result, hostRequestMessage.c_str(), hostToken.c_str(), hostIp);
+                    InstallHostingDetails(result, hostRequestMessage, hostToken, hostIp);
                 }, 0);
         }
     );
@@ -875,7 +879,7 @@ void CBrowser::SendHostingPostRequest(const NetGameServer_t& gameServer)
 //          *hostToken - 
 //          &hostIp - 
 //-----------------------------------------------------------------------------
-void CBrowser::InstallHostingDetails(const bool postFailed, const char* const hostMessage, const char* const hostToken, const string& hostIp)
+void CBrowser::InstallHostingDetails(const bool postFailed, const string& hostMessage, const string& hostToken, const string& hostIp)
 {
 #ifndef CLIENT_DLL
     m_hostMessage = hostMessage;
@@ -889,14 +893,10 @@ void CBrowser::InstallHostingDetails(const bool postFailed, const char* const ho
     if (postFailed)
     {
         m_hostMessageColor = ImVec4(0.00f, 1.00f, 0.00f, 1.00f);
-        stringstream ssMessage;
-        ssMessage << "Broadcasting";
-        if (!m_hostToken.empty())
-        {
-            ssMessage << ": share the following token for clients to connect: ";
-        }
 
-        m_hostMessage = ssMessage.str();
+        m_hostMessage = m_hostToken.empty()
+            ? "Broadcasting"
+            : "Broadcasting: share the following token for clients to connect: ";
     }
     else
     {

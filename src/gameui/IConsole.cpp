@@ -360,7 +360,7 @@ void CConsole::DrawOptionsPanel(void)
         m_colorTextLogger.Copy(true);
     }
 
-    ImGui::Text("Console HotKey:");
+    ImGui::TextEx("Console HotKey:", nullptr, ImGuiTextFlags_NoWidthForLargeClippedText);
     ImGui::SameLine();
 
     int selected = g_ImGuiConfig.m_ConsoleConfig.m_nBind0;
@@ -382,7 +382,7 @@ void CConsole::DrawOptionsPanel(void)
         g_ImGuiConfig.Save();
     }
 
-    ImGui::Text("Browser HotKey:");
+    ImGui::TextEx("Browser HotKey:", nullptr, ImGuiTextFlags_NoWidthForLargeClippedText);
     ImGui::SameLine();
 
     selected = g_ImGuiConfig.m_BrowserConfig.m_nBind0;
@@ -508,7 +508,7 @@ static void AddHint(const ConVarFlags::FlagDesc_t& cvarInfo, const vector<MODULE
 
     ImGui::Image(hintRes.m_idIcon, ImVec2(float(hintRes.m_nWidth), float(hintRes.m_nHeight)));
     ImGui::SameLine();
-    ImGui::Text("%s", cvarInfo.shortdesc);
+    ImGui::TextEx(cvarInfo.shortdesc, nullptr, ImGuiTextFlags_NoWidthForLargeClippedText);
 };
 
 //-----------------------------------------------------------------------------
@@ -590,7 +590,7 @@ void CConsole::DrawAutoCompletePanel(void)
             m_canAutoComplete = true;
             m_reclaimFocus = true;
 
-            BuildSummaryText(newInputText.c_str());
+            BuildSummaryText(newInputText.c_str(), newInputText.size());
         }
 
         ImGui::PopID();
@@ -688,7 +688,8 @@ bool CConsole::RunAutoComplete(void)
 
             for (int j = 0; j < iret; ++j)
             {
-                m_vecSuggest.push_back(ConAutoCompleteSuggest_s(commands[j].String(), COMMAND_COMPLETION_MARKER));
+                const CUtlString& cmdToAdd = commands[j];
+                m_vecSuggest.emplace_back(cmdToAdd.String(), cmdToAdd.Length(), COMMAND_COMPLETION_MARKER);
             }
         }
         else
@@ -718,14 +719,25 @@ void CConsole::ResetAutoCompleteData(void)
     m_vecSuggest.clear();
 }
 
+template <size_t N1, size_t N2>
+static void EncaseAppendString(string& targetString, const char* toEncase, const char(&open)[N1], const char(&close)[N2])
+{
+    const size_t appLen = strlen(toEncase);
+    const size_t newLen = targetString.length() + (N1-1) + (N2-1) + appLen+1;
+
+    targetString.reserve(newLen);
+
+    targetString.append(open, N1-1);
+    targetString.append(toEncase, appLen);
+    targetString.append(close, N2-1);
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: format appends the value string
 //-----------------------------------------------------------------------------
 static void AppendValueString(string& targetString, const char* const toAppend)
 {
-    targetString.append(" = ["); // Assign current value to string if its a ConVar.
-    targetString.append(toAppend);
-    targetString.append("]");
+    EncaseAppendString(targetString, toAppend, " = [", "]");
 }
 
 //-----------------------------------------------------------------------------
@@ -733,12 +745,12 @@ static void AppendValueString(string& targetString, const char* const toAppend)
 //-----------------------------------------------------------------------------
 static void AppendDocString(string& targetString, const char* const toAppend)
 {
-    if (VALID_CHARSTAR(toAppend))
+    if (!VALID_CHARSTAR(toAppend))
     {
-        targetString.append(" - \"");
-        targetString.append(toAppend);
-        targetString.append("\"");
+        return;
     }
+
+    EncaseAppendString(targetString, toAppend, " - \"", "\"");
 }
 
 //-----------------------------------------------------------------------------
@@ -787,7 +799,7 @@ void CConsole::CreateSuggestionsFromPartial(void)
                 AppendDocString(docString, commandBase->GetHelpText());
                 AppendDocString(docString, commandBase->GetUsageText());
             }
-            m_vecSuggest.push_back(ConAutoCompleteSuggest_s(commandName + docString, commandBase->GetFlags()));
+            m_vecSuggest.emplace_back(commandName + docString, commandBase->GetFlags());
         }
         else
         {
@@ -827,11 +839,11 @@ void CConsole::ProcessCommand(const char* const inputText)
 //          formats the number of history items instead
 // Input  : inputText - 
 //-----------------------------------------------------------------------------
-void CConsole::BuildSummaryText(const char* const inputText)
+void CConsole::BuildSummaryText(const char* const inputText, const size_t textLen)
 {
-    if (*inputText)
+    if (textLen > 0)
     {
-        string conVarFormatted(inputText);
+        string conVarFormatted(inputText, textLen);
 
         // Remove trailing space and/or semicolon before we call 'g_pCVar->FindVar(..)'.
         StringRTrim(conVarFormatted, " ;", true);
@@ -918,7 +930,7 @@ bool CConsole::LoadFlagIcons(void)
     // Get all flag image resources for displaying flags.
     for (int i = IDB_PNG3, k = NULL; i <= IDB_PNG32; i++, k++)
     {
-        m_vecFlagIcons.push_back(MODULERESOURCE(GetModuleResource(sdkModule, i)));
+        m_vecFlagIcons.emplace_back(GetModuleResource(sdkModule, i));
         MODULERESOURCE& rFlagIcon = m_vecFlagIcons[k];
 
         ret = LoadTextureBuffer(reinterpret_cast<unsigned char*>(rFlagIcon.m_pData), // !TODO: Fall-back texture.
@@ -1021,7 +1033,7 @@ int CConsole::TextEditCallback(ImGuiInputTextCallbackData* iData)
             }
         }
 
-        BuildSummaryText(iData->Buf);
+        BuildSummaryText(iData->Buf, iData->BufTextLen);
         break;
     }
     case ImGuiInputTextFlags_CallbackAlways:
@@ -1086,7 +1098,7 @@ int CConsole::TextEditCallback(ImGuiInputTextCallbackData* iData)
             ResetAutoCompleteData();
         }
 
-        BuildSummaryText(iData->Buf);
+        BuildSummaryText(iData->Buf, iData->BufTextLen);
         break;
     }
     }
@@ -1118,7 +1130,7 @@ void CConsole::HandleCommand()
         m_inputTextBufModified = true;
     }
 
-    BuildSummaryText("");
+    BuildSummaryText("", 0);
     m_reclaimFocus = true;
 }
 
@@ -1143,7 +1155,7 @@ void CConsole::HandleSuggest()
     const int vecIndex = parked ? 0 : m_suggestPos;
 
     DetermineInputTextFromSelectedSuggestion(m_vecSuggest[vecIndex], m_selectedSuggestionText);
-    BuildSummaryText(m_selectedSuggestionText.c_str());
+    BuildSummaryText(m_selectedSuggestionText.c_str(), m_selectedSuggestionText.size());
 
     m_inputTextBufModified = true;
     m_reclaimFocus = true;
@@ -1265,7 +1277,7 @@ void CConsole::ClampLogSize(void)
 
 //-----------------------------------------------------------------------------
 // Purpose: adds a command to the history vector; this is the only place text 
-// is added to the vector, do not call 'm_History.push_back' elsewhere as we
+// is added to the vector, do not call 'm_History.emplace_back' elsewhere as we
 // also manage the size of the vector here !!!
 //-----------------------------------------------------------------------------
 void CConsole::AddHistory(const char* const command)
@@ -1281,7 +1293,7 @@ void CConsole::AddHistory(const char* const command)
         }
     }
 
-    m_vecHistory.push_back(command);
+    m_vecHistory.emplace_back(command);
     ClampHistorySize();
 }
 
@@ -1300,7 +1312,7 @@ const vector<string>& CConsole::GetHistory(void) const
 void CConsole::ClearHistory(void)
 {
     m_vecHistory.clear();
-    BuildSummaryText("");
+    BuildSummaryText("", 0);
 }
 
 //-----------------------------------------------------------------------------
