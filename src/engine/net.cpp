@@ -388,7 +388,7 @@ const char* NET_ErrorString(int iCode)
 		case WSA_QOS_EFILTERCOUNT       : return "WSA_QOS_EFILTERCOUNT";
 		case WSA_QOS_EOBJLENGTH         : return "WSA_QOS_EOBJLENGTH";
 		case WSA_QOS_EFLOWCOUNT         : return "WSA_QOS_EFLOWCOUNT";
-		case WSA_QOS_EUNKOWNPSOBJ       : return "WSA_QOS_EUNKOWNPSOBJ";
+		case WSA_QOS_EUNKOWNPSOBJ       : return "WSA_QOS_EUNKNOWNPSOBJ";
 		case WSA_QOS_EPOLICYOBJ         : return "WSA_QOS_EPOLICYOBJ";
 		case WSA_QOS_EFLOWDESC          : return "WSA_QOS_EFLOWDESC";
 		case WSA_QOS_EPSFLOWSPEC        : return "WSA_QOS_EPSFLOWSPEC";
