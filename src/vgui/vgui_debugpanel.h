@@ -2,21 +2,23 @@
 #include "core/stdafx.h"
 #include "mathlib/color.h"
 
-struct CTextNotify
-{
-	CTextNotify(const eDLL_T type, const float flTime, const char* pszText)
-	{
-		this->m_Text = pszText;
-		this->m_flLifeRemaining = flTime;
-		this->m_Type = type;
-	}
-	eDLL_T m_Type;
-	float m_flLifeRemaining;
-	CUtlString m_Text;
-};
-
 class CTextOverlay
 {
+private:
+	struct TextNotify_s
+	{
+		void Init(const eDLL_T type, const float flTime, const char* pszText, const ssize_t textLen)
+		{
+			this->m_Type = type;
+			this->m_flLifeRemaining = flTime;
+			this->m_Text.SetDirect(pszText, textLen);
+		}
+
+		eDLL_T m_Type;
+		float m_flLifeRemaining;
+		CUtlString m_Text;
+	};
+
 public:
 	CTextOverlay()
 	{
@@ -26,7 +28,7 @@ public:
 	}
 
 	void Update(void);
-	void AddLog(const eDLL_T context, const char* pszText);
+	void AddLog(const eDLL_T context, const char* pszText, const ssize_t textLen);
 	void DrawNotify(void);
 	void DrawFormat(const int x, const int y, const Color c, const char* pszFormat, ...) const;
 	void ShouldDraw(const float flFrameTime);
@@ -38,7 +40,7 @@ public:
 
 private:
 	Color GetLogColorForType(const eDLL_T type) const;
-	CUtlVector<CTextNotify> m_NotifyLines;
+	CUtlVector<TextNotify_s> m_NotifyLines;
 	int m_nFontHeight; // Hardcoded to 16 in this engine.
 
 	mutable CThreadFastMutex m_Mutex;

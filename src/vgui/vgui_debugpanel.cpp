@@ -111,7 +111,7 @@ void CTextOverlay::Update(void)
 //-----------------------------------------------------------------------------
 // Purpose: add a log to the vector.
 //-----------------------------------------------------------------------------
-void CTextOverlay::AddLog(const eDLL_T context, const char* pszText)
+void CTextOverlay::AddLog(const eDLL_T context, const char* pszText, const ssize_t textLen)
 {
 	Assert(pszText);
 
@@ -121,7 +121,11 @@ void CTextOverlay::AddLog(const eDLL_T context, const char* pszText)
 	}
 
 	AUTO_LOCK(m_Mutex);
-	m_NotifyLines.AddToTail(CTextNotify{ context, con_notifytime.GetFloat() , pszText });
+
+	const int newLine = m_NotifyLines.AddToTail();
+	TextNotify_s& notify = m_NotifyLines[newLine];
+
+	notify.Init(context, con_notifytime.GetFloat(), pszText, textLen);
 
 	while (m_NotifyLines.Count() > 0 &&
 		(m_NotifyLines.Count() > con_notifylines.GetInt()))
@@ -145,7 +149,7 @@ void CTextOverlay::DrawNotify(void)
 
 	for (int i = 0, j = m_NotifyLines.Count(); i < j; i++)
 	{
-		const CTextNotify& notify = m_NotifyLines[i];
+		const TextNotify_s& notify = m_NotifyLines[i];
 		Color c = GetLogColorForType(notify.m_Type);
 
 		const float flTimeleft = notify.m_flLifeRemaining;
@@ -214,10 +218,10 @@ void CTextOverlay::ShouldDraw(const float flFrameTime)
 
 		FOR_EACH_VEC_BACK(m_NotifyLines, i)
 		{
-			CTextNotify* pNotify = &m_NotifyLines[i];
-			pNotify->m_flLifeRemaining -= flFrameTime;
+			TextNotify_s& notify = m_NotifyLines[i];
+			notify.m_flLifeRemaining -= flFrameTime;
 
-			if (pNotify->m_flLifeRemaining <= 0.0f)
+			if (notify.m_flLifeRemaining <= 0.0f)
 			{
 				m_NotifyLines.Remove(i);
 				continue;

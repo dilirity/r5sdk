@@ -352,7 +352,7 @@ void EngineLoggerSink(LogType_t logType, LogLevel_t logLevel, eDLL_T context,
 		if (g_bSdkInitialized && logLevel >= LogLevel_t::LEVEL_NOTIFY)
 		{
 			// Draw to mini console.
-			g_TextOverlay.AddLog(overlayContext, message.c_str());
+			g_TextOverlay.AddLog(overlayContext, message.c_str(), (ssize_t)message.length());
 		}
 #endif // !DEDICATED
 	}
