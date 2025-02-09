@@ -35,7 +35,7 @@ void scanDirectoryAppend(const string& path, const string& ext, vector<string>& 
 	
 	do
 	{
-		filelist.push_back(dir.name);
+		filelist.emplace_back(dir.name);
 	}
 	while (_findnext(fh, &dir) == 0);
 	_findclose(fh);
@@ -53,7 +53,7 @@ void scanDirectoryAppend(const string& path, const string& ext, vector<string>& 
 		int len = strlen(current->d_name);
 		if (len > extLen && strncmp(current->d_name + len - extLen, ext.c_str(), extLen) == 0)
 		{
-			filelist.push_back(current->d_name);
+			filelist.emplace_back(current->d_name);
 		}
 	}
 	closedir(dp);
