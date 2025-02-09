@@ -23,7 +23,7 @@
 //			bDebug - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool NetconServer_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, 
+bool NetconServer_Serialize(const CNetConBase* pBase, vector<byte>& vecBuf,
 	const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 	const netcon::response_e responseType, const int nMessageId, const int nMessageType, const bool bEncrypt, const bool bDebug)
 {
@@ -35,7 +35,7 @@ bool NetconServer_Serialize(const CNetConBase* pBase, vector<char>& vecBuf,
 	response.set_responsemsg(pResponseMsg, nResponseMsgLen);
 	response.set_responseval(pResponseVal, nResponseValLen);
 
-	if (!NetconShared_PackEnvelope(pBase, vecBuf, response.ByteSizeLong(), &response, bEncrypt, bDebug))
+	if (!NetconShared_PackEnvelope(pBase, vecBuf, (u32)response.ByteSizeLong(), &response, bEncrypt, bDebug))
 	{
 		return false;
 	}
@@ -56,7 +56,7 @@ bool NetconServer_Serialize(const CNetConBase* pBase, vector<char>& vecBuf,
 //			bDebug - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool NetconClient_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
+bool NetconClient_Serialize(const CNetConBase* pBase, vector<byte>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
 	const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType, const bool bEncrypt, const bool bDebug)
 {
 	netcon::request request;
@@ -66,7 +66,7 @@ bool NetconClient_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, cons
 	request.set_requestmsg(szReqBuf, nReqMsgLen);
 	request.set_requestval(szReqVal, nReqValLen);
 
-	if (!NetconShared_PackEnvelope(pBase, vecBuf, request.ByteSizeLong(), &request, bEncrypt, bDebug))
+	if (!NetconShared_PackEnvelope(pBase, vecBuf, (u32)request.ByteSizeLong(), &request, bEncrypt, bDebug))
 	{
 		return false;
 	}
@@ -129,11 +129,11 @@ bool NetconClient_Connect(CNetConBase* pBase, const char* pHostAdr, const int nH
 //			bDebug - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<char>& outMsgBuf, const size_t nMsgLen,
-	google::protobuf::MessageLite* inMsg, const bool bEncrypt, const bool bDebug)
+bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<byte>& outMsgBuf, const u32 nMsgLen,
+	google::protobuf::MessageLite* const inMsg, const bool bEncrypt, const bool bDebug)
 {
-	char* encodeBuf = new char[nMsgLen];
-	std::unique_ptr<char[]> encodedContainer(encodeBuf);
+	byte* const encodeBuf = new byte[nMsgLen];
+	std::unique_ptr<byte[]> encodedContainer(encodeBuf);
 
 	if (!pBase->Encode(inMsg, encodeBuf, nMsgLen))
 	{
@@ -148,12 +148,12 @@ bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<char>& outMsgBuf
 	netcon::envelope envelope;
 	envelope.set_encrypted(bEncrypt);
 
-	const char* dataBuf = encodeBuf;
-	std::unique_ptr<char[]> container;
+	const byte* dataBuf = encodeBuf;
+	std::unique_ptr<byte[]> container;
 
 	if (bEncrypt)
 	{
-		char* encryptBuf = new char[nMsgLen];
+		byte* encryptBuf = new byte[nMsgLen];
 		container.reset(encryptBuf);
 
 		CryptoContext_s ctx;
@@ -172,10 +172,10 @@ bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<char>& outMsgBuf
 	}
 
 	envelope.set_data(dataBuf, nMsgLen);
-	const size_t envelopeSize = envelope.ByteSizeLong();
+	const u32 envelopeSize = (u32)envelope.ByteSizeLong();
 
 	outMsgBuf.resize(sizeof(NetConFrameHeader_s) + envelopeSize);
-	char* const scratch = outMsgBuf.data();
+	byte* const scratch = outMsgBuf.data();
 
 	if (!pBase->Encode(&envelope, &scratch[sizeof(NetConFrameHeader_s)], envelopeSize))
 	{
@@ -206,8 +206,8 @@ bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<char>& outMsgBuf
 //			bDebug - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const char* pMsgBuf, const size_t nMsgLen,
-	google::protobuf::MessageLite* outMsg, const bool bDebug)
+bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const byte* pMsgBuf, const u32 nMsgLen,
+	google::protobuf::MessageLite* const outMsg, const bool bDebug)
 {
 	netcon::envelope envelope;
 
@@ -221,33 +221,33 @@ bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const char* pMsgBuf, 
 		return false;
 	}
 
-	const size_t msgLen = envelope.data().size();
+	const u32 msgLen = (u32)envelope.data().size();
 
 	if (msgLen > RCON_FRAME_MAX_SIZE)
 	{
-		Error(eDLL_T::ENGINE, NO_ERROR, "Data in RCON message envelope is too large (%zu > %zu)\n",
+		Error(eDLL_T::ENGINE, NO_ERROR, "Data in RCON message envelope is too large (%u > %u)\n",
 			msgLen, RCON_FRAME_MAX_SIZE);
 
 		return false;
 	}
 
-	const char* netMsg = envelope.data().c_str();
-	const char* dataBuf = netMsg;
+	const byte* netMsg = reinterpret_cast<const byte*>(envelope.data().c_str());
+	const byte* dataBuf = netMsg;
 
-	std::unique_ptr<char[]> container;
+	std::unique_ptr<byte[]> container;
 
 	if (envelope.encrypted())
 	{
-		char* decryptBuf = new char[msgLen];
+		byte* decryptBuf = new byte[msgLen];
 		container.reset(decryptBuf);
 
-		const size_t ivLen = envelope.nonce().size();
+		const u32 ivLen = (u32)envelope.nonce().size();
 
 		if (ivLen != sizeof(CryptoIV_t))
 		{
 			if (bDebug)
 			{
-				Error(eDLL_T::ENGINE, NO_ERROR, "Nonce in RCON message envelope is invalid (%zu != %zu)\n",
+				Error(eDLL_T::ENGINE, NO_ERROR, "Nonce in RCON message envelope is invalid (%u != %u)\n",
 					ivLen, sizeof(CryptoIV_t));
 			}
 

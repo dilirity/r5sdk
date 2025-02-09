@@ -31,10 +31,10 @@ enum class ServerDataResponseType_e : int
 struct ConnectedNetConsoleData_s
 {
 	SocketHandle_t m_hSocket;
-	int  m_nPayloadLen;     // Num bytes for this message.
-	int  m_nPayloadRead;    // Num read bytes from input buffer.
-	int  m_nFailedAttempts; // Num failed authentication attempts.
-	int  m_nIgnoredMessage; // Count how many times client ignored the no-auth message.
+	u32  m_nPayloadLen;     // Num bytes for this message.
+	u32  m_nPayloadRead;    // Num read bytes from input buffer.
+	u32  m_nFailedAttempts; // Num failed authentication attempts.
+	u32  m_nIgnoredMessage; // Count how many times client ignored the no-auth message.
 	bool m_bValidated;      // Revalidates netconsole if false.
 	bool m_bAuthorized;     // Set to true after successful netconsole auth.
 	bool m_bInputOnly;      // If set, don't send spew to this netconsole.
@@ -51,6 +51,8 @@ struct ConnectedNetConsoleData_s
 		m_bValidated = false;
 		m_bAuthorized = false;
 		m_bInputOnly = true;
+		m_FrameHeader.magic = 0;
+		m_FrameHeader.length = 0;
 	}
 };
 

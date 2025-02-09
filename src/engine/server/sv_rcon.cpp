@@ -270,7 +270,7 @@ void CRConServer::RunFrame(void)
 //			nMsgLen - 
 // Output: true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CRConServer::SendToAll(const char* pMsgBuf, const int nMsgLen) const
+bool CRConServer::SendToAll(const byte* pMsgBuf, const u32 nMsgLen) const
 {
 	const int nCount = m_Socket.GetAcceptedSocketCount();
 	bool bSuccess = true;
@@ -281,7 +281,7 @@ bool CRConServer::SendToAll(const char* pMsgBuf, const int nMsgLen) const
 
 		if (data.m_bAuthorized && !data.m_bInputOnly)
 		{
-			const int ret = ::send(data.m_hSocket, pMsgBuf, nMsgLen, MSG_NOSIGNAL);
+			const int ret = ::send(data.m_hSocket, (const char*)pMsgBuf, (i32)nMsgLen, MSG_NOSIGNAL);
 
 			if (ret == SOCKET_ERROR)
 			{
@@ -310,7 +310,7 @@ bool CRConServer::SendToAll(const char* pMsgBuf, const int nMsgLen) const
 bool CRConServer::SendEncoded(const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 	const netcon::response_e responseType, const int nMessageId, const int nMessageType) const
 {
-	vector<char> vecMsg;
+	vector<byte> vecMsg;
 	if (!Serialize(vecMsg, pResponseMsg, nResponseMsgLen, pResponseVal, nResponseValLen,
 		responseType, nMessageId, nMessageType))
 	{
@@ -341,7 +341,7 @@ bool CRConServer::SendEncoded(const SocketHandle_t hSocket,
 	const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 	const netcon::response_e responseType, const int nMessageId, const int nMessageType) const
 {
-	vector<char> vecMsg;
+	vector<byte> vecMsg;
 	if (!Serialize(vecMsg, pResponseMsg, nResponseMsgLen, pResponseVal, nResponseValLen,
 		responseType, nMessageId, nMessageType))
 	{
@@ -368,7 +368,7 @@ bool CRConServer::SendEncoded(const SocketHandle_t hSocket,
 //			nMessageType - 
 // Output : serialized results as string
 //-----------------------------------------------------------------------------
-bool CRConServer::Serialize(vector<char>& vecBuf, 
+bool CRConServer::Serialize(vector<byte>& vecBuf, 
 	const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 	const netcon::response_e responseType, const int nMessageId, const int nMessageType) const
 {
@@ -445,7 +445,7 @@ bool CRConServer::Comparator(const string& svPassword) const
 //			nMsgLen - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CRConServer::ProcessMessage(const char* pMsgBuf, const int nMsgLen)
+bool CRConServer::ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen)
 {
 	netcon::request request;
 

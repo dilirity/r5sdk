@@ -105,7 +105,7 @@ void CRConClient::Disconnect(const char* szReason)
 // Input  : *pMsgBug - 
 //			nMsgLen - 
 //-----------------------------------------------------------------------------
-bool CRConClient::ProcessMessage(const char* pMsgBuf, const int nMsgLen)
+bool CRConClient::ProcessMessage(const byte* const pMsgBuf, const u32 nMsgLen)
 {
 	netcon::response response;
 
@@ -165,10 +165,10 @@ void CRConClient::RequestConsoleLog(const bool bWantLog)
 	const char* const szEnable = bWantLog ? "1" : "0";
 	const SocketHandle_t hSocket = GetSocket();
 
-	vector<char> vecMsg;
+	vector<byte> vecMsg;
 	const bool ret = Serialize(vecMsg, "", 0, szEnable, 1, netcon::request_e::SERVERDATA_REQUEST_SEND_CONSOLE_LOG);
 
-	if (ret && !Send(hSocket, vecMsg.data(), int(vecMsg.size())))
+	if (ret && !Send(hSocket, vecMsg.data(), (u32)vecMsg.size()))
 	{
 		Error(eDLL_T::CLIENT, NO_ERROR, "Failed to send RCON message: (%s)\n", "SOCKET_ERROR");
 	}
@@ -183,7 +183,7 @@ void CRConClient::RequestConsoleLog(const bool bWantLog)
 //			request_t - 
 // Output : serialized results as string
 //-----------------------------------------------------------------------------
-bool CRConClient::Serialize(vector<char>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
+bool CRConClient::Serialize(vector<byte>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
 	const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType) const
 {
 	return NetconClient_Serialize(this, vecBuf, szReqBuf, nReqMsgLen, szReqVal, nReqValLen, requestType,
@@ -323,7 +323,7 @@ static void RCON_CmdQuery_f(const CCommand& args)
 		}
 		else if (RCONClient()->IsConnected())
 		{
-			vector<char> vecMsg;
+			vector<byte> vecMsg;
 			bool bSuccess = false;
 			const SocketHandle_t hSocket = RCONClient()->GetSocket();
 
@@ -344,7 +344,7 @@ static void RCON_CmdQuery_f(const CCommand& args)
 
 				if (bSuccess)
 				{
-					RCONClient()->Send(hSocket, vecMsg.data(), int(vecMsg.size()));
+					RCONClient()->Send(hSocket, vecMsg.data(), (u32)vecMsg.size());
 				}
 
 				return;
@@ -364,7 +364,7 @@ static void RCON_CmdQuery_f(const CCommand& args)
 			bSuccess = RCONClient()->Serialize(vecMsg, request, requestLen, value, valueLen, netcon::request_e::SERVERDATA_REQUEST_EXECCOMMAND);
 			if (bSuccess)
 			{
-				RCONClient()->Send(hSocket, vecMsg.data(), int(vecMsg.size()));
+				RCONClient()->Send(hSocket, vecMsg.data(), (u32)vecMsg.size());
 			}
 			return;
 		}

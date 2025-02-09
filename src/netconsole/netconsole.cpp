@@ -233,7 +233,7 @@ void CNetCon::RunInput(const string& lineInput)
 			return;
 		}
 
-		vector<char> vecMsg;
+		vector<byte> vecMsg;
 
 		const SocketHandle_t hSocket = GetSocket();
 		bool bSend = false;
@@ -422,7 +422,7 @@ void CNetCon::Disconnect(const char* szReason)
 //			nMsgLen - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CNetCon::ProcessMessage(const char* pMsgBuf, const int nMsgLen)
+bool CNetCon::ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen)
 {
 	netcon::response response;
 
@@ -441,10 +441,10 @@ bool CNetCon::ProcessMessage(const char* pMsgBuf, const int nMsgLen)
 			const long i = strtol(response.responseval().c_str(), NULL, NULL);
 			if (!i) // Means we are marked 'input only' on the rcon server.
 			{
-				vector<char> vecMsg;
-				bool ret = Serialize(vecMsg, "", 0, "1", 1, netcon::request_e::SERVERDATA_REQUEST_SEND_CONSOLE_LOG);
+				vector<byte> vecMsg;
+				const bool ret = Serialize(vecMsg, "", 0, "1", 1, netcon::request_e::SERVERDATA_REQUEST_SEND_CONSOLE_LOG);
 
-				if (ret && !Send(GetSocket(), vecMsg.data(), int(vecMsg.size())))
+				if (ret && !Send(GetSocket(), vecMsg.data(), (u32)vecMsg.size()))
 				{
 					Error(eDLL_T::CLIENT, NO_ERROR, "Failed to send RCON message: (%s)\n", "SOCKET_ERROR");
 				}
@@ -480,7 +480,7 @@ bool CNetCon::ProcessMessage(const char* pMsgBuf, const int nMsgLen)
 //			requestType - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CNetCon::Serialize(vector<char>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
+bool CNetCon::Serialize(vector<byte>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
 	const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType) const
 {
 	return NetconClient_Serialize(this, vecBuf, szReqBuf, nReqMsgLen, szReqVal, nReqValLen, requestType, m_bEncryptFrames, true);
