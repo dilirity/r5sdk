@@ -147,7 +147,6 @@ bool CNetConBase::Connect(const char* pHostName, const int nPort)
 bool CNetConBase::ProcessBuffer(CConnectedNetConsoleData& data, 
 	const char* pRecvBuf, int nRecvLen, const int nMaxLen)
 {
-	bool bSuccess = true;
 	byte prefix[sizeof(u_long)] = {};
 
 	while (nRecvLen > 0)
@@ -164,10 +163,9 @@ bool CNetConBase::ProcessBuffer(CConnectedNetConsoleData& data,
 			if (data.m_nPayloadRead == data.m_nPayloadLen)
 			{
 				if (!ProcessMessage(
-					reinterpret_cast<const char*>(data.m_RecvBuffer.data()), data.m_nPayloadLen)
-					&& bSuccess)
+					reinterpret_cast<const char*>(data.m_RecvBuffer.data()), data.m_nPayloadLen))
 				{
-					bSuccess = false;
+					return false;
 				}
 
 				data.m_nPayloadLen = 0;
@@ -214,7 +212,7 @@ bool CNetConBase::ProcessBuffer(CConnectedNetConsoleData& data,
 		}
 	}
 
-	return bSuccess;
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -342,7 +340,9 @@ void CNetConBase::Recv(CConnectedNetConsoleData& data, const int nMaxLen)
 		}
 
 		nReadLen -= nRecvLen; // Process what we've got.
-		ProcessBuffer(data, szRecvBuf, nRecvLen, nMaxLen);
+
+		if (!ProcessBuffer(data, szRecvBuf, nRecvLen, nMaxLen))
+			break;
 	}
 
 	return;
