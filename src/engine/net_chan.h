@@ -60,7 +60,7 @@ typedef struct netflow_s
 	int currentindex;
 	netframe_header_t frame_headers[NET_FRAMES_BACKUP];
 	netframe_t frames[NET_FRAMES_BACKUP];
-	netframe_t* current_frame;
+	netframe_t* currentframe;
 } netflow_t;
 
 //-----------------------------------------------------------------------------
@@ -155,7 +155,7 @@ public:
 	static void _Shutdown(CNetChan* pChan, const char* szReason, uint8_t bBadRep, bool bRemoveNow);
 	static bool _ProcessMessages(CNetChan* pChan, bf_read* pMsg);
 
-	static void _FlowNewPacket(CNetChan* pChan, int flow, int outSeqNr, int inSeqNr, int nChoked, int nDropped, int nSize);
+	static void _FlowNewPacket(CNetChan* const pChan, const int flow, const int outSeqNr, const int inSeqNr, const int nChoked, const int nDropped, const int nSize);
 
 	void SetChoked();
 	void SetRemoteFramerate(float flFrameTime, float flFrameTimeStdDeviation);
