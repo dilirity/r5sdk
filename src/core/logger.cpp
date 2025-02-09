@@ -155,6 +155,7 @@ void EngineLoggerSink(LogType_t logType, LogLevel_t logLevel, eDLL_T context,
 	const char* pszUpTime = pszUptimeOverride ? pszUptimeOverride : Plat_GetProcessUpTime();
 	string message(pszUpTime);
 
+	// Also represents the length of the up time string (the "[0.000] " prefix before each log).
 	const size_t contextTextStartIndex = message.length();
 
 	const bool bToConsole = (logLevel >= LogLevel_t::LEVEL_CONSOLE);
