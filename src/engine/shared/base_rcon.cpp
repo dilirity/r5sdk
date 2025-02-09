@@ -298,14 +298,14 @@ void CNetConBase::Recv(CConnectedNetConsoleData& data, const int nMaxLen)
 	static char szRecvBuf[1024];
 
 	{//////////////////////////////////////////////
-		const int nPendingLen = ::recv(data.m_hSocket, szRecvBuf, sizeof(char), MSG_PEEK);
+		const int nPendingLen = ::recv(data.m_hSocket, szRecvBuf, sizeof(szRecvBuf), MSG_PEEK);
 		if (nPendingLen == SOCKET_ERROR && m_Socket.IsSocketBlocking())
 		{
 			return;
 		}
 		else if (nPendingLen == 0) // Socket was closed.
 		{
-			Disconnect("remote closed socket");
+			Disconnect("socket closed prematurely");
 			return;
 		}
 		else if (nPendingLen < 0)
@@ -315,8 +315,8 @@ void CNetConBase::Recv(CConnectedNetConsoleData& data, const int nMaxLen)
 		}
 	}//////////////////////////////////////////////
 
-	int nReadLen = 0; // Find out how much we have to read.
-	int iResult = ::ioctlsocket(data.m_hSocket, FIONREAD, reinterpret_cast<u_long*>(&nReadLen));
+	u_long nReadLen = 0; // Find out how much we have to read.
+	const int iResult = ::ioctlsocket(data.m_hSocket, FIONREAD, &nReadLen);
 
 	if (iResult == SOCKET_ERROR)
 	{
