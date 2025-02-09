@@ -1095,25 +1095,11 @@ void VPKDir_t::CTreeBuilder::BuildTree(const CUtlVector<VPKEntryBlock_t>& entryB
 		* - A file path is only written once per extension tree.
 		* - A file name is only written once per file path tree.
 		**********************************************************************/
-		const char* pFileExt = fileExt.Get();
-		auto extIt = m_FileTree.find(pFileExt);
-
-		if (extIt == m_FileTree.end())
-		{
-			extIt = m_FileTree.insert({ pFileExt, PathContainer_t() }).first;
-		}
-
+		const auto& extIt = m_FileTree.try_emplace({ fileExt.String(), (size_t)fileExt.Length() }, PathContainer_t()).first;
 		PathContainer_t& pathTree = extIt->second;
 
-		const char* pFilePath = filePath.Get();
-		auto pathIt = pathTree.find(pFilePath);
-
-		if (pathIt == pathTree.end())
-		{
-			pathIt = pathTree.insert({ pFilePath, std::list<VPKEntryBlock_t>() }).first;
-		}
-
-		pathIt->second.push_back(entryBlock);
+		const auto& pathIt = pathTree.try_emplace({ filePath.String(), (size_t)filePath.Length() }, std::list<const VPKEntryBlock_t*>()).first;
+		pathIt->second.emplace_back(&entryBlock);
 	}
 }
 
@@ -1134,17 +1120,17 @@ int VPKDir_t::CTreeBuilder::WriteTree(FileHandle_t hDirectoryFile) const
 			FileSystem()->Write(jKeyValue.first.c_str(), jKeyValue.first.length() + 1, hDirectoryFile);
 			for (auto& vEntry : jKeyValue.second)
 			{
-				const CUtlString entryPath = vEntry.m_EntryPath.UnqualifiedFilename().StripExtension();
+				const CUtlString entryPath = vEntry->m_EntryPath.UnqualifiedFilename().StripExtension();
 				FileSystem()->Write(entryPath.Get(), entryPath.Length() + 1, hDirectoryFile);
 
-				FileSystem()->Write(&vEntry.m_nFileCRC, sizeof(uint32_t), hDirectoryFile);
-				FileSystem()->Write(&vEntry.m_iPreloadSize, sizeof(uint16_t), hDirectoryFile);
-				FileSystem()->Write(&vEntry.m_iPackFileIndex, sizeof(uint16_t), hDirectoryFile);
+				FileSystem()->Write(&vEntry->m_nFileCRC, sizeof(uint32_t), hDirectoryFile);
+				FileSystem()->Write(&vEntry->m_iPreloadSize, sizeof(uint16_t), hDirectoryFile);
+				FileSystem()->Write(&vEntry->m_iPackFileIndex, sizeof(uint16_t), hDirectoryFile);
 
-				FOR_EACH_VEC(vEntry.m_Fragments, i)
+				FOR_EACH_VEC(vEntry->m_Fragments, i)
 				{
 					/*Write chunk descriptor*/
-					const VPKChunkDescriptor_t& descriptor = vEntry.m_Fragments[i];
+					const VPKChunkDescriptor_t& descriptor = vEntry->m_Fragments[i];
 
 					FileSystem()->Write(&descriptor.m_nLoadFlags, sizeof(uint32_t), hDirectoryFile);
 					FileSystem()->Write(&descriptor.m_nTextureFlags, sizeof(uint16_t), hDirectoryFile);
@@ -1152,7 +1138,7 @@ int VPKDir_t::CTreeBuilder::WriteTree(FileHandle_t hDirectoryFile) const
 					FileSystem()->Write(&descriptor.m_nCompressedSize, sizeof(uint64_t), hDirectoryFile);
 					FileSystem()->Write(&descriptor.m_nUncompressedSize, sizeof(uint64_t), hDirectoryFile);
 
-					if (i != (vEntry.m_Fragments.Count() - 1))
+					if (i != (vEntry->m_Fragments.Count() - 1))
 					{
 						FileSystem()->Write(&PACKFILEINDEX_SEP, sizeof(uint16_t), hDirectoryFile);
 					}

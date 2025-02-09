@@ -158,7 +158,7 @@ struct VPKDir_t
 	class CTreeBuilder
 	{
 	public:
-		typedef std::map<std::string, std::list<VPKEntryBlock_t>> PathContainer_t;
+		typedef std::map<std::string, std::list<const VPKEntryBlock_t*>> PathContainer_t;
 		typedef std::map<std::string, PathContainer_t> TypeContainer_t;
 
 		void BuildTree(const CUtlVector<VPKEntryBlock_t>& entryBlocks);
