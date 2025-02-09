@@ -73,7 +73,7 @@ void CRConClient::RunFrame(void)
 {
 	if (IsInitialized() && IsConnected())
 	{
-		CConnectedNetConsoleData* pData = GetData();
+		ConnectedNetConsoleData_s* pData = GetData();
 		Assert(pData != nullptr);
 
 		if (pData)
@@ -194,7 +194,7 @@ bool CRConClient::Serialize(vector<char>& vecBuf, const char* szReqBuf, const si
 // Purpose: retrieves the remote socket
 // Output : SOCKET_ERROR (-1) on failure
 //-----------------------------------------------------------------------------
-CConnectedNetConsoleData* CRConClient::GetData(void)
+ConnectedNetConsoleData_s* CRConClient::GetData(void)
 {
 	return NetconShared_GetConnData(this, 0);
 }

@@ -379,7 +379,7 @@ const netadr_t& CSocketCreator::GetAcceptedSocketAddress(int nIndex) const
 // Input  : nIndex - 
 // Output : CConnectedNetConsoleData*
 //-----------------------------------------------------------------------------
-CConnectedNetConsoleData& CSocketCreator::GetAcceptedSocketData(int nIndex)
+ConnectedNetConsoleData_s& CSocketCreator::GetAcceptedSocketData(int nIndex)
 {
 	Assert(nIndex >= 0 && nIndex < m_AcceptedSockets.Count());
 	return m_AcceptedSockets[nIndex].m_Data;
@@ -390,7 +390,7 @@ CConnectedNetConsoleData& CSocketCreator::GetAcceptedSocketData(int nIndex)
 // Input  : nIndex - 
 // Output : CConnectedNetConsoleData*
 //-----------------------------------------------------------------------------
-const CConnectedNetConsoleData& CSocketCreator::GetAcceptedSocketData(int nIndex) const
+const ConnectedNetConsoleData_s& CSocketCreator::GetAcceptedSocketData(int nIndex) const
 {
 	Assert(nIndex >= 0 && nIndex < m_AcceptedSockets.Count());
 	return m_AcceptedSockets[nIndex].m_Data;

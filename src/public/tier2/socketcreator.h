@@ -35,8 +35,8 @@ public:
 
 	SocketHandle_t GetAcceptedSocketHandle(int nIndex) const;
 	const netadr_t& GetAcceptedSocketAddress(int nIndex) const;
-	CConnectedNetConsoleData& GetAcceptedSocketData(int nIndex);
-	const CConnectedNetConsoleData& GetAcceptedSocketData(int nIndex) const;
+	ConnectedNetConsoleData_s& GetAcceptedSocketData(int nIndex);
+	const ConnectedNetConsoleData_s& GetAcceptedSocketData(int nIndex) const;
 
 public:
 	struct AcceptedSocket_t
@@ -48,7 +48,7 @@ public:
 
 		SocketHandle_t            m_hSocket;
 		netadr_t                  m_Address;
-		CConnectedNetConsoleData  m_Data;
+		ConnectedNetConsoleData_s m_Data;
 	};
 
 private:

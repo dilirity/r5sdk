@@ -324,7 +324,7 @@ bool CNetCon::RunFrame(void)
 
 		if (IsConnected())
 		{
-			CConnectedNetConsoleData& pData = GetSocketCreator()->GetAcceptedSocketData(0);
+			ConnectedNetConsoleData_s& pData = GetSocketCreator()->GetAcceptedSocketData(0);
 			Recv(pData);
 		}
 		else if (GetPrompting())

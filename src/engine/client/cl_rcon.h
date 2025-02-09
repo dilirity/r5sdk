@@ -27,7 +27,7 @@ public:
 	bool IsInitialized(void) const;
 	bool IsConnected(void);
 
-	CConnectedNetConsoleData* GetData(void);
+	ConnectedNetConsoleData_s* GetData(void);
 	SocketHandle_t GetSocket(void);
 
 private:

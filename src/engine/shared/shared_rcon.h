@@ -27,7 +27,7 @@ bool NetconClient_Connect(CNetConBase* pBase, const char* pHostAdr, const int nH
 bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<char>& outMsgBuf, const size_t nMsgLen, google::protobuf::MessageLite* inMsg, const bool bEncrypt, const bool bDebug);
 bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const char* pMsgBuf, const size_t nMsgLen, google::protobuf::MessageLite* outMsg, const bool bDebug);
 
-CConnectedNetConsoleData* NetconShared_GetConnData(CNetConBase* pBase, const int iSocket);
+ConnectedNetConsoleData_s* NetconShared_GetConnData(CNetConBase* pBase, const int iSocket);
 SocketHandle_t NetconShared_GetSocketHandle(CNetConBase* pBase, const int iSocket);
 
 #endif // SHARED_RCON_H

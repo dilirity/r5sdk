@@ -155,7 +155,7 @@ void CRConServer::Think(void)
 			const netadr_t& netAdr = m_Socket.GetAcceptedSocketAddress(m_nConnIndex);
 			if (!m_WhiteListAddress.CompareAdr(netAdr))
 			{
-				const CConnectedNetConsoleData& data = m_Socket.GetAcceptedSocketData(m_nConnIndex);
+				const ConnectedNetConsoleData_s& data = m_Socket.GetAcceptedSocketData(m_nConnIndex);
 				if (!data.m_bAuthorized)
 				{
 					Disconnect("redundant");
@@ -248,7 +248,7 @@ void CRConServer::RunFrame(void)
 		const int nCount = m_Socket.GetAcceptedSocketCount();
 		for (m_nConnIndex = nCount - 1; m_nConnIndex >= 0; m_nConnIndex--)
 		{
-			CConnectedNetConsoleData& data = m_Socket.GetAcceptedSocketData(m_nConnIndex);
+			ConnectedNetConsoleData_s& data = m_Socket.GetAcceptedSocketData(m_nConnIndex);
 
 			if (CheckForBan(data))
 			{
@@ -277,7 +277,7 @@ bool CRConServer::SendToAll(const char* pMsgBuf, const int nMsgLen) const
 
 	for (int i = nCount - 1; i >= 0; i--)
 	{
-		const CConnectedNetConsoleData& data = m_Socket.GetAcceptedSocketData(i);
+		const ConnectedNetConsoleData_s& data = m_Socket.GetAcceptedSocketData(i);
 
 		if (data.m_bAuthorized && !data.m_bInputOnly)
 		{
@@ -381,7 +381,7 @@ bool CRConServer::Serialize(vector<char>& vecBuf,
 // Input  : &request - 
 //			&data - 
 //-----------------------------------------------------------------------------
-void CRConServer::Authenticate(const netcon::request& request, CConnectedNetConsoleData& data)
+void CRConServer::Authenticate(const netcon::request& request, ConnectedNetConsoleData_s& data)
 {
 	if (data.m_bAuthorized)
 	{
@@ -455,7 +455,7 @@ bool CRConServer::ProcessMessage(const char* pMsgBuf, const int nMsgLen)
 		return false;
 	}
 
-	CConnectedNetConsoleData& data = m_Socket.GetAcceptedSocketData(m_nConnIndex);
+	ConnectedNetConsoleData_s& data = m_Socket.GetAcceptedSocketData(m_nConnIndex);
 
 	if (!data.m_bAuthorized &&
 		request.requesttype() != netcon::request_e::SERVERDATA_REQUEST_AUTH)
@@ -522,7 +522,7 @@ void CRConServer::Execute(const netcon::request& request) const
 // Purpose: checks for amount of failed attempts and bans netconsole accordingly
 // Input  : &data - 
 //-----------------------------------------------------------------------------
-bool CRConServer::CheckForBan(CConnectedNetConsoleData& data)
+bool CRConServer::CheckForBan(ConnectedNetConsoleData_s& data)
 {
 	if (data.m_bValidated)
 	{
@@ -597,7 +597,7 @@ void CRConServer::Disconnect(const char* szReason) // NETMGR
 //-----------------------------------------------------------------------------
 void CRConServer::Disconnect(const int nIndex, const char* szReason) // NETMGR
 {
-	CConnectedNetConsoleData& data = m_Socket.GetAcceptedSocketData(nIndex);
+	ConnectedNetConsoleData_s& data = m_Socket.GetAcceptedSocketData(nIndex);
 	if (data.m_bAuthorized)
 	{
 		// Inform server owner when authenticated connection has been closed.
@@ -622,7 +622,7 @@ void CRConServer::CloseNonAuthConnection(void)
 	int nCount = m_Socket.GetAcceptedSocketCount();
 	for (int i = nCount - 1; i >= 0; i--)
 	{
-		CConnectedNetConsoleData& data = m_Socket.GetAcceptedSocketData(i);
+		ConnectedNetConsoleData_s& data = m_Socket.GetAcceptedSocketData(i);
 
 		if (!data.m_bAuthorized)
 		{

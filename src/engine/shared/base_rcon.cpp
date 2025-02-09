@@ -144,7 +144,7 @@ bool CNetConBase::Connect(const char* pHostName, const int nPort)
 //			nMaxLen - 
 // Output: true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CNetConBase::ProcessBuffer(CConnectedNetConsoleData& data, const char* pRecvBuf, int nRecvLen, const int nMaxLen)
+bool CNetConBase::ProcessBuffer(ConnectedNetConsoleData_s& data, const char* pRecvBuf, int nRecvLen, const int nMaxLen)
 {
 	while (nRecvLen > 0)
 	{
@@ -307,7 +307,7 @@ bool CNetConBase::Send(const SocketHandle_t hSocket, const char* pMsgBuf,
 //			nMaxLen - 
 // Output: true on success, false otherwise
 //-----------------------------------------------------------------------------
-void CNetConBase::Recv(CConnectedNetConsoleData& data, const int nMaxLen)
+void CNetConBase::Recv(ConnectedNetConsoleData_s& data, const int nMaxLen)
 {
 	static char szRecvBuf[1024];
 

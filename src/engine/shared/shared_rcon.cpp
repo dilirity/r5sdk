@@ -291,7 +291,7 @@ bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const char* pMsgBuf, 
 //			iSocket - 
 // Output : nullptr on failure
 //-----------------------------------------------------------------------------
-CConnectedNetConsoleData* NetconShared_GetConnData(CNetConBase* pBase, const int iSocket)
+ConnectedNetConsoleData_s* NetconShared_GetConnData(CNetConBase* pBase, const int iSocket)
 {
 	CSocketCreator* pCreator = pBase->GetSocketCreator();
 	Assert(iSocket >= 0 && (pCreator->GetAcceptedSocketCount() == 0
@@ -313,7 +313,7 @@ CConnectedNetConsoleData* NetconShared_GetConnData(CNetConBase* pBase, const int
 //-----------------------------------------------------------------------------
 SocketHandle_t NetconShared_GetSocketHandle(CNetConBase* pBase, const int iSocket)
 {
-	const CConnectedNetConsoleData* pData = NetconShared_GetConnData(pBase, iSocket);
+	const ConnectedNetConsoleData_s* pData = NetconShared_GetConnData(pBase, iSocket);
 	if (!pData)
 	{
 		return SOCKET_ERROR;

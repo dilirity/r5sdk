@@ -28,9 +28,8 @@ enum class ServerDataResponseType_e : int
 	SERVERDATA_RESPONSE_REMOTEBUG,
 };
 
-class CConnectedNetConsoleData
+struct ConnectedNetConsoleData_s
 {
-public:
 	SocketHandle_t m_hSocket;
 	int  m_nPayloadLen;     // Num bytes for this message.
 	int  m_nPayloadRead;    // Num read bytes from input buffer.
@@ -42,7 +41,7 @@ public:
 	NetConFrameHeader_s m_FrameHeader; // Current frame header.
 	vector<byte> m_RecvBuffer;
 
-	CConnectedNetConsoleData(SocketHandle_t hSocket = -1)
+	ConnectedNetConsoleData_s(SocketHandle_t hSocket = -1)
 	{
 		m_hSocket = hSocket;
 		m_nPayloadLen = 0;
