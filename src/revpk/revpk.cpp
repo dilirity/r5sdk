@@ -233,7 +233,12 @@ static void ReVPK_Unpack(const CCommand& args)
     }
 
     CUtlString baseName;
-    PackedStore_GetDirBaseName(vpk.m_DirFilePath, baseName);
+
+    if (!PackedStore_GetDirBaseName(vpk.m_DirFilePath, baseName))
+    {
+        Error(eDLL_T::FS, NO_ERROR, "Failed to retrieve directory file stem from \"%s\"!\n", vpk.m_DirFilePath.String());
+        return;
+    }
 
     // Write the unpack log to a file.
     CFmtStr1024 textFileName("%s%s%s.log", outPath, UNPACK_LOG_DIR, baseName.String());
