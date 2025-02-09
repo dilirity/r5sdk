@@ -113,10 +113,6 @@ static_assert(sizeof(CServer) == 0x25264C0);
 extern CServer* g_pServer;
 
 extern ConVar sv_showconnecting;
-
-extern ConVar sv_pylonVisibility;
-extern ConVar sv_pylonRefreshRate;
-
 extern ConVar sv_globalBanlist;
 extern ConVar sv_banlistRefreshRate;
 

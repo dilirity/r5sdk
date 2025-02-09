@@ -72,7 +72,7 @@ ConVar hostdesc("hostdesc", "", FCVAR_RELEASE, "Host game server description.");
 //-----------------------------------------------------------------------------
 static void HostState_KeepAlive()
 {
-	if (!g_pServer->IsActive() || !sv_pylonVisibility.GetBool()) // Check for active game.
+	if (!g_pServer->IsActive() || !pylon_host_visibility.GetBool()) // Check for active game.
 	{
 		return;
 	}
@@ -81,7 +81,7 @@ static void HostState_KeepAlive()
 	{
 		hostname->GetString(),
 		hostdesc.GetString(),
-		sv_pylonVisibility.GetInt() == ServerVisibility_e::HIDDEN,
+		pylon_host_visibility.GetInt() == ServerVisibility_e::HIDDEN,
 		g_pHostState->m_levelName,
 		v_Playlists_GetCurrent(),
 		hostip->GetString(),
@@ -382,7 +382,7 @@ void CHostState::Think(void) const
 		banListTimer.Start();
 	}
 #ifdef DEDICATED
-	if (pylonTimer.GetDurationInProgress().GetSeconds() > sv_pylonRefreshRate.GetFloat())
+	if (pylonTimer.GetDurationInProgress().GetSeconds() > pylon_host_update_interval.GetFloat())
 	{
 		HostState_KeepAlive();
 		pylonTimer.Start();

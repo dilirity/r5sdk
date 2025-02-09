@@ -26,9 +26,6 @@ public:
 	inline HostStatus_e GetHostStatus(void) const { return m_HostingStatus; }
 	inline void SetHostStatus(const HostStatus_e hostStatus) { m_HostingStatus = hostStatus; }
 
-	inline ServerVisibility_e GetVisibility(void) const { return m_ServerVisibility; }
-	inline void SetVisibility(const ServerVisibility_e visibility) { m_ServerVisibility = visibility; }
-
 	inline void SetCurrentToken(const string& token) { m_Token = token; }
 	inline const string& GetCurrentToken() const { return m_Token; }
 
@@ -40,7 +37,6 @@ public:
 
 private:
 	HostStatus_e m_HostingStatus;
-	ServerVisibility_e m_ServerVisibility;
 
 	string m_Token;
 	string m_ErrorMsg;

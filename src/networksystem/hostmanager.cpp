@@ -16,7 +16,6 @@
 //-----------------------------------------------------------------------------
 CServerHostManager::CServerHostManager(void)
     : m_HostingStatus(HostStatus_e::NOT_HOSTING)
-    , m_ServerVisibility(ServerVisibility_e::OFFLINE)
 {
 }
 

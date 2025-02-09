@@ -479,8 +479,9 @@ namespace VScriptCode
             hostname->SetValue(serverName);
             hostdesc.SetValue(serverDescription);
 
+            pylon_host_visibility.SetValue((int)serverVisibility);
+
             // Launch server.
-            g_ServerHostManager.SetVisibility(ServerVisibility_e(serverVisibility));
             g_ServerHostManager.LaunchServer(serverMapName, serverPlaylist);
 
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);

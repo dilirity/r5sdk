@@ -6,6 +6,7 @@
 
 extern ConVar pylon_matchmaking_hostname;
 extern ConVar pylon_host_update_interval;
+extern ConVar pylon_host_visibility;
 extern ConVar pylon_showdebuginfo;
 
 struct MSEulaData_t

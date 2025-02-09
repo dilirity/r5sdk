@@ -609,17 +609,17 @@ void CBrowser::DrawHostPanel(void)
 
     ImGui::Text("Server visibility");
 
-    if (ImGui::SameLine(); ImGui::RadioButton("offline", g_ServerHostManager.GetVisibility() == ServerVisibility_e::OFFLINE))
+    if (ImGui::SameLine(); ImGui::RadioButton("offline", pylon_host_visibility.GetInt() == ServerVisibility_e::OFFLINE))
     {
-        g_ServerHostManager.SetVisibility(ServerVisibility_e::OFFLINE);
+        pylon_host_visibility.SetValue(ServerVisibility_e::OFFLINE);
     }
-    if (ImGui::SameLine(); ImGui::RadioButton("hidden", g_ServerHostManager.GetVisibility() == ServerVisibility_e::HIDDEN))
+    if (ImGui::SameLine(); ImGui::RadioButton("hidden", pylon_host_visibility.GetInt() == ServerVisibility_e::HIDDEN))
     {
-        g_ServerHostManager.SetVisibility(ServerVisibility_e::HIDDEN);
+        pylon_host_visibility.SetValue(ServerVisibility_e::HIDDEN);
     }
-    if (ImGui::SameLine(); ImGui::RadioButton("public", g_ServerHostManager.GetVisibility() == ServerVisibility_e::PUBLIC))
+    if (ImGui::SameLine(); ImGui::RadioButton("public", pylon_host_visibility.GetInt() == ServerVisibility_e::PUBLIC))
     {
-        g_ServerHostManager.SetVisibility(ServerVisibility_e::PUBLIC);
+        pylon_host_visibility.SetValue(ServerVisibility_e::PUBLIC);
     }
 
     ImGui::TextColored(m_hostMessageColor, "%s", m_hostMessage.c_str());
@@ -635,7 +635,7 @@ void CBrowser::DrawHostPanel(void)
     const bool serverActive = g_pServer->IsActive();
     const bool clientActive = g_pClientState->IsActive();
 
-    const bool isOffline = g_ServerHostManager.GetVisibility() == ServerVisibility_e::OFFLINE;
+    const bool isOffline = pylon_host_visibility.GetInt() == (int)ServerVisibility_e::OFFLINE;
     const bool hasName = isOffline ? true : !m_serverName.empty();
 
     if (!g_pHostState->m_bActiveGame)
@@ -780,7 +780,7 @@ void CBrowser::UpdateHostingStatus(void)
 #ifndef CLIENT_DLL
     assert(g_pHostState && g_pCVar);
 
-    const HostStatus_e hostStatus = (g_ServerHostManager.GetVisibility() != ServerVisibility_e::OFFLINE && g_pServer->IsActive())
+    const HostStatus_e hostStatus = (pylon_host_visibility.GetInt() != ServerVisibility_e::OFFLINE && g_pServer->IsActive())
         ? HostStatus_e::HOSTING 
         : HostStatus_e::NOT_HOSTING;
 
@@ -811,7 +811,7 @@ void CBrowser::UpdateHostingStatus(void)
             break;
         }
 
-        const ServerVisibility_e serverVisibility = g_ServerHostManager.GetVisibility();
+        const ServerVisibility_e serverVisibility = (ServerVisibility_e)pylon_host_visibility.GetInt();
 
         if (serverVisibility == ServerVisibility_e::OFFLINE)
         {
@@ -822,7 +822,7 @@ void CBrowser::UpdateHostingStatus(void)
         {
             hostname->GetString(),
             hostdesc.GetString(),
-            serverVisibility == ServerVisibility_e::HIDDEN,
+            pylon_host_visibility.GetInt() == ServerVisibility_e::HIDDEN,
             g_pHostState->m_levelName,
             v_Playlists_GetCurrent(),
             hostip->GetString(),
