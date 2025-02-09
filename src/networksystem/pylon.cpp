@@ -480,7 +480,7 @@ bool CPylon::SendRequest(const char* endpoint, const rapidjson::Document& reques
 
     if (status == 200) // STATUS_OK
     {
-        responseJson.Parse(responseBody.c_str(), responseBody.length()+1);
+        responseJson.Parse(responseBody.c_str(), responseBody.length());
 
         if (responseJson.HasParseError())
         {
@@ -620,7 +620,7 @@ void CPylon::ExtractError(const string& response, string& outMessage,
     if (!response.empty())
     {
         rapidjson::Document resultBody;
-        resultBody.Parse(response.c_str(), response.length()+1);
+        resultBody.Parse(response.c_str(), response.length());
 
         ExtractError(resultBody, outMessage, status, errorText);
     }
