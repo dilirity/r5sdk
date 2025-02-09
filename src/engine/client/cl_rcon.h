@@ -17,8 +17,8 @@ public:
 	virtual void Disconnect(const char* szReason = nullptr) override;
 	virtual bool ProcessMessage(const char* pMsgBuf, const int nMsgLen) override;
 
-	bool Serialize(vector<char>& vecBuf, const char* szReqBuf,
-		const char* szReqVal, const netcon::request_e requestType) const;
+	bool Serialize(vector<char>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
+		const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType) const;
 
 	void RequestConsoleLog(const bool bWantLog);
 	bool ShouldReceive(void);

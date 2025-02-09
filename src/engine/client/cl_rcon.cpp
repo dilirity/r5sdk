@@ -162,11 +162,11 @@ void CRConClient::RequestConsoleLog(const bool bWantLog)
 	// sending logs will cause the print func to get called recursively forever.
 	Assert(!(bWantLog && IsRemoteLocal()));
 
-	const char* szEnable = bWantLog ? "1" : "0";
+	const char* const szEnable = bWantLog ? "1" : "0";
 	const SocketHandle_t hSocket = GetSocket();
 
 	vector<char> vecMsg;
-	bool ret = Serialize(vecMsg, "", szEnable, netcon::request_e::SERVERDATA_REQUEST_SEND_CONSOLE_LOG);
+	const bool ret = Serialize(vecMsg, "", 0, szEnable, 1, netcon::request_e::SERVERDATA_REQUEST_SEND_CONSOLE_LOG);
 
 	if (ret && !Send(hSocket, vecMsg.data(), int(vecMsg.size())))
 	{
@@ -177,14 +177,16 @@ void CRConClient::RequestConsoleLog(const bool bWantLog)
 //-----------------------------------------------------------------------------
 // Purpose: serializes input
 // Input  : *svReqBuf - 
+//			nReqMsgLen - 
 //			*svReqVal - 
+//			nReqValLen -
 //			request_t - 
 // Output : serialized results as string
 //-----------------------------------------------------------------------------
-bool CRConClient::Serialize(vector<char>& vecBuf, const char* szReqBuf,
-	const char* szReqVal, const netcon::request_e requestType) const
+bool CRConClient::Serialize(vector<char>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
+	const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType) const
 {
-	return NetconClient_Serialize(this, vecBuf, szReqBuf, szReqVal, requestType,
+	return NetconClient_Serialize(this, vecBuf, szReqBuf, nReqMsgLen, szReqVal, nReqValLen, requestType,
 		rcon_encryptframes.GetBool(), rcon_debug.GetBool());
 }
 
@@ -329,7 +331,10 @@ static void RCON_CmdQuery_f(const CCommand& args)
 			{
 				if (argCount > 2)
 				{
-					bSuccess = RCONClient()->Serialize(vecMsg, args.Arg(2), "", netcon::request_e::SERVERDATA_REQUEST_AUTH);
+					const char* const pass = args.Arg(2);
+					const size_t passLen = strlen(pass);
+
+					bSuccess = RCONClient()->Serialize(vecMsg, pass, passLen, "", 0, netcon::request_e::SERVERDATA_REQUEST_AUTH);
 				}
 				else // Need at least 3 arguments for a password in PASS command (rcon PASS <password>)
 				{
@@ -350,7 +355,13 @@ static void RCON_CmdQuery_f(const CCommand& args)
 				return;
 			}
 
-			bSuccess = RCONClient()->Serialize(vecMsg, args.Arg(1), args.ArgS(), netcon::request_e::SERVERDATA_REQUEST_EXECCOMMAND);
+			const char* const request = args.Arg(1);
+			const size_t requestLen = strlen(request);
+
+			const char* const value = args.ArgS();
+			const size_t valueLen = strlen(value);
+
+			bSuccess = RCONClient()->Serialize(vecMsg, request, requestLen, value, valueLen, netcon::request_e::SERVERDATA_REQUEST_EXECCOMMAND);
 			if (bSuccess)
 			{
 				RCONClient()->Send(hSocket, vecMsg.data(), int(vecMsg.size()));

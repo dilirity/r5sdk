@@ -13,7 +13,9 @@
 // Input  : *pBase - 
 //			&vecBuf - 
 //			*pResponseMsg - 
+//			nResponseMsgLen - 
 //			*pResponseVal - 
+//			nResponseValLen - 
 //			responseType - 
 //			nMessageId - 
 //			nMessageType - 
@@ -21,7 +23,8 @@
 //			bDebug - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool NetconServer_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, const char* pResponseMsg, const char* pResponseVal,
+bool NetconServer_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, 
+	const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 	const netcon::response_e responseType, const int nMessageId, const int nMessageType, const bool bEncrypt, const bool bDebug)
 {
 	netcon::response response;
@@ -29,8 +32,8 @@ bool NetconServer_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, cons
 	response.set_messageid(nMessageId);
 	response.set_messagetype(nMessageType);
 	response.set_responsetype(responseType);
-	response.set_responsemsg(pResponseMsg);
-	response.set_responseval(pResponseVal);
+	response.set_responsemsg(pResponseMsg, nResponseMsgLen);
+	response.set_responseval(pResponseVal, nResponseValLen);
 
 	if (!NetconShared_PackEnvelope(pBase, vecBuf, response.ByteSizeLong(), &response, bEncrypt, bDebug))
 	{
@@ -45,21 +48,23 @@ bool NetconServer_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, cons
 // Input  : *pBase - 
 //			&vecBuf - 
 //			*szReqBuf - 
+//			nReqMsgLen - 
 //			*szReqVal - 
+//			nReqValLen - 
 //			*requestType - 
 //			bEncrypt - 
 //			bDebug - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool NetconClient_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, const char* szReqBuf,
-	const char* szReqVal, const netcon::request_e requestType, const bool bEncrypt, const bool bDebug)
+bool NetconClient_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
+	const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType, const bool bEncrypt, const bool bDebug)
 {
 	netcon::request request;
 
 	request.set_messageid(-1);
 	request.set_requesttype(requestType);
-	request.set_requestmsg(szReqBuf);
-	request.set_requestval(szReqVal);
+	request.set_requestmsg(szReqBuf, nReqMsgLen);
+	request.set_requestval(szReqVal, nReqValLen);
 
 	if (!NetconShared_PackEnvelope(pBase, vecBuf, request.ByteSizeLong(), &request, bEncrypt, bDebug))
 	{
@@ -169,9 +174,13 @@ bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<char>& outMsgBuf
 	envelope.set_data(dataBuf, nMsgLen);
 	const size_t envelopeSize = envelope.ByteSizeLong();
 
-	outMsgBuf.resize(envelopeSize);
+	outMsgBuf.resize(envelopeSize + sizeof(u_long));
+	char* const scratch = outMsgBuf.data();
 
-	if (!pBase->Encode(&envelope, &outMsgBuf[0], envelopeSize))
+	// Write out frame size in network byte order.
+	*reinterpret_cast<u_long*>(scratch) = htonl(u_long(envelopeSize));
+
+	if (!pBase->Encode(&envelope, &scratch[sizeof(u_long)], envelopeSize))
 	{
 		if (bDebug)
 		{

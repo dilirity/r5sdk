@@ -16,11 +16,12 @@ extern void RCON_InitClientAndTrySyncKeys();
 #endif // !DEDICATED
 #endif // _TOOLS
 
-bool NetconServer_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, const char* pResponseMsg, const char* pResponseVal,
+bool NetconServer_Serialize(const CNetConBase* pBase, vector<char>& vecBuf,
+	const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 	const netcon::response_e responseType, const int nMessageId, const int nMessageType, const bool bEncrypt, const bool bDebug);
 
-bool NetconClient_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, const char* szReqBuf,
-	const char* szReqVal, const netcon::request_e requestType, const bool bEncrypt, const bool bDebug);
+bool NetconClient_Serialize(const CNetConBase* pBase, vector<char>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
+	const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType, const bool bEncrypt, const bool bDebug);
 bool NetconClient_Connect(CNetConBase* pBase, const char* pHostAdr, const int nHostPort);
 
 bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<char>& outMsgBuf, const size_t nMsgLen, google::protobuf::MessageLite* inMsg, const bool bEncrypt, const bool bDebug);

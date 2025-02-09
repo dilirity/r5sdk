@@ -25,19 +25,19 @@ public:
 	void Think(void);
 	void RunFrame(void);
 
-	bool SendEncoded(const char* pResponseMsg, const char* pResponseVal,
+	bool SendEncoded(const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 		const netcon::response_e responseType,
 		const int nMessageId = static_cast<int>(eDLL_T::NETCON),
 		const int nMessageType = static_cast<int>(LogType_t::LOG_NET)) const;
 
-	bool SendEncoded(const SocketHandle_t hSocket, const char* pResponseMsg,
-		const char* pResponseVal, const netcon::response_e responseType,
+	bool SendEncoded(const SocketHandle_t hSocket, const char* pResponseMsg, const size_t nResponseMsgLen,
+		const char* pResponseVal, const size_t nResponseValLen, const netcon::response_e responseType,
 		const int nMessageId = static_cast<int>(eDLL_T::NETCON),
 		const int nMessageType = static_cast<int>(LogType_t::LOG_NET)) const;
 
 	bool SendToAll(const char* pMsgBuf, const int nMsgLen) const;
-	bool Serialize(vector<char>& vecBuf, const char* pResponseMsg, const char* pResponseVal, const netcon::response_e responseType,
-		const int nMessageId = static_cast<int>(eDLL_T::NETCON), const int nMessageType = static_cast<int>(LogType_t::LOG_NET)) const;
+	bool Serialize(vector<char>& vecBuf, const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
+		const netcon::response_e responseType, const int nMessageId = static_cast<int>(eDLL_T::NETCON), const int nMessageType = static_cast<int>(LogType_t::LOG_NET)) const;
 
 	void Authenticate(const netcon::request& request, CConnectedNetConsoleData& data);
 	bool Comparator(const string& svPassword) const;

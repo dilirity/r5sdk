@@ -252,7 +252,7 @@ void CRConServer::RunFrame(void)
 
 			if (CheckForBan(data))
 			{
-				SendEncoded(data.m_hSocket, s_BannedMessage, "",
+				SendEncoded(data.m_hSocket, s_BannedMessage, sizeof(s_BannedMessage)-1, "", 0,
 					netcon::response_e::SERVERDATA_RESPONSE_AUTH, int(eDLL_T::NETCON));
 
 				Disconnect("banned");
@@ -272,23 +272,16 @@ void CRConServer::RunFrame(void)
 //-----------------------------------------------------------------------------
 bool CRConServer::SendToAll(const char* pMsgBuf, const int nMsgLen) const
 {
-	ostringstream sendbuf;
-	const u_long nLen = htonl(u_long(nMsgLen));
-
+	const int nCount = m_Socket.GetAcceptedSocketCount();
 	bool bSuccess = true;
 
-	sendbuf.write(reinterpret_cast<const char*>(&nLen), sizeof(u_long));
-	sendbuf.write(pMsgBuf, nMsgLen);
-
-	const int nCount = m_Socket.GetAcceptedSocketCount();
 	for (int i = nCount - 1; i >= 0; i--)
 	{
 		const CConnectedNetConsoleData& data = m_Socket.GetAcceptedSocketData(i);
 
 		if (data.m_bAuthorized && !data.m_bInputOnly)
 		{
-			int ret = ::send(data.m_hSocket, sendbuf.str().data(),
-				int(sendbuf.str().size()), MSG_NOSIGNAL);
+			const int ret = ::send(data.m_hSocket, pMsgBuf, nMsgLen, MSG_NOSIGNAL);
 
 			if (ret == SOCKET_ERROR)
 			{
@@ -306,17 +299,19 @@ bool CRConServer::SendToAll(const char* pMsgBuf, const int nMsgLen) const
 //-----------------------------------------------------------------------------
 // Purpose: encode and send message to all connected sockets
 // Input  : *pResponseMsg - 
+//			nResponseMsgLen - 
 //			*pResponseVal - 
+//			nResponseValLen - 
 //			responseType - 
 //			nMessageId - 
 //			nMessageType - 
 // Output: true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CRConServer::SendEncoded(const char* pResponseMsg, const char* pResponseVal,
+bool CRConServer::SendEncoded(const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 	const netcon::response_e responseType, const int nMessageId, const int nMessageType) const
 {
 	vector<char> vecMsg;
-	if (!Serialize(vecMsg, pResponseMsg, pResponseVal,
+	if (!Serialize(vecMsg, pResponseMsg, nResponseMsgLen, pResponseVal, nResponseValLen,
 		responseType, nMessageId, nMessageType))
 	{
 		return false;
@@ -334,17 +329,20 @@ bool CRConServer::SendEncoded(const char* pResponseMsg, const char* pResponseVal
 // Purpose: encode and send message to specific socket
 // Input  : hSocket - 
 //			*pResponseMsg - 
+//			nResponseMsgLen - 
 //			*pResponseVal - 
+//			nResponseValLen - 
 //			responseType - 
 //			nMessageId - 
 //			nMessageType - 
 // Output: true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CRConServer::SendEncoded(const SocketHandle_t hSocket, const char* pResponseMsg, const char* pResponseVal,
+bool CRConServer::SendEncoded(const SocketHandle_t hSocket, 
+	const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 	const netcon::response_e responseType, const int nMessageId, const int nMessageType) const
 {
 	vector<char> vecMsg;
-	if (!Serialize(vecMsg, pResponseMsg, pResponseVal,
+	if (!Serialize(vecMsg, pResponseMsg, nResponseMsgLen, pResponseVal, nResponseValLen,
 		responseType, nMessageId, nMessageType))
 	{
 		return false;
@@ -362,16 +360,19 @@ bool CRConServer::SendEncoded(const SocketHandle_t hSocket, const char* pRespons
 // Purpose: serializes input
 // Input  : &vecBuf - 
 //			*responseMsg - 
+//			nResponseMsgLen - 
 //			*responseVal - 
+//			nResponseValLen - 
 //			responseType - 
 //			nMessageId - 
 //			nMessageType - 
 // Output : serialized results as string
 //-----------------------------------------------------------------------------
-bool CRConServer::Serialize(vector<char>& vecBuf, const char* pResponseMsg, const char* pResponseVal,
+bool CRConServer::Serialize(vector<char>& vecBuf, 
+	const char* pResponseMsg, const size_t nResponseMsgLen, const char* pResponseVal, const size_t nResponseValLen,
 	const netcon::response_e responseType, const int nMessageId, const int nMessageType) const
 {
-	return NetconServer_Serialize(this, vecBuf, pResponseMsg, pResponseVal, responseType, nMessageId, nMessageType,
+	return NetconServer_Serialize(this, vecBuf, pResponseMsg, nResponseMsgLen, pResponseVal, nResponseValLen, responseType, nMessageId, nMessageType,
 		rcon_encryptframes.GetBool(), rcon_debug.GetBool());
 }
 
@@ -399,7 +400,7 @@ void CRConServer::Authenticate(const netcon::request& request, CConnectedNetCons
 
 		const char* pSendLogs = (!sv_rcon_sendlogs.GetBool() || data.m_bInputOnly) ? "0" : "1";
 
-		SendEncoded(data.m_hSocket, s_AuthMessage, pSendLogs,
+		SendEncoded(data.m_hSocket, s_AuthMessage, sizeof(s_AuthMessage)-1, pSendLogs, 1,
 			netcon::response_e::SERVERDATA_RESPONSE_AUTH, static_cast<int>(eDLL_T::NETCON));
 	}
 	else // Bad password.
@@ -410,7 +411,7 @@ void CRConServer::Authenticate(const netcon::request& request, CConnectedNetCons
 			Msg(eDLL_T::SERVER, "Bad RCON password attempt from '%s'\n", netAdr.ToString());
 		}
 
-		SendEncoded(data.m_hSocket, s_WrongPwMessage, "",
+		SendEncoded(data.m_hSocket, s_WrongPwMessage, sizeof(s_WrongPwMessage)-1, "", 0,
 			netcon::response_e::SERVERDATA_RESPONSE_AUTH, static_cast<int>(eDLL_T::NETCON));
 
 		data.m_bAuthorized = false;
@@ -460,7 +461,7 @@ bool CRConServer::ProcessMessage(const char* pMsgBuf, const int nMsgLen)
 		request.requesttype() != netcon::request_e::SERVERDATA_REQUEST_AUTH)
 	{
 		// Notify netconsole that authentication is required.
-		SendEncoded(data.m_hSocket, s_NoAuthMessage, "",
+		SendEncoded(data.m_hSocket, s_NoAuthMessage, sizeof(s_NoAuthMessage)-1, "", 0,
 			netcon::response_e::SERVERDATA_RESPONSE_AUTH, static_cast<int>(eDLL_T::NETCON));
 
 		data.m_bValidated = false;

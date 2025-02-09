@@ -148,6 +148,7 @@ bool CNetConBase::ProcessBuffer(CConnectedNetConsoleData& data,
 	const char* pRecvBuf, int nRecvLen, const int nMaxLen)
 {
 	bool bSuccess = true;
+	byte prefix[sizeof(u_long)] = {};
 
 	while (nRecvLen > 0)
 	{
@@ -173,17 +174,21 @@ bool CNetConBase::ProcessBuffer(CConnectedNetConsoleData& data,
 				data.m_nPayloadRead = 0;
 			}
 		}
-		else if (data.m_nPayloadRead < sizeof(int)) // Read size field.
+		else if (data.m_nPayloadRead < sizeof(u_long)) // Read size field.
 		{
-			data.m_RecvBuffer[data.m_nPayloadRead++] = *pRecvBuf;
+			prefix[data.m_nPayloadRead++] = *pRecvBuf;
 
 			pRecvBuf++;
 			nRecvLen--;
 		}
 		else // Build prefix.
 		{
-			data.m_nPayloadLen = int(ntohl(*reinterpret_cast<u_long*>(&data.m_RecvBuffer[0])));
+			u_long* const pPrefix = reinterpret_cast<u_long*>(&prefix[0]);
+
+			data.m_nPayloadLen = int(ntohl(*pPrefix));
 			data.m_nPayloadRead = 0;
+
+			*pPrefix = 0;
 
 			if (!data.m_bAuthorized && nMaxLen > -1)
 			{
@@ -281,15 +286,7 @@ bool CNetConBase::Decode(google::protobuf::MessageLite* pMsg,
 bool CNetConBase::Send(const SocketHandle_t hSocket, const char* pMsgBuf,
 	const int nMsgLen) const
 {
-	std::ostringstream sendbuf;
-	const u_long nLen = htonl(u_long(nMsgLen));
-
-	sendbuf.write(reinterpret_cast<const char*>(&nLen), sizeof(u_long));
-	sendbuf.write(pMsgBuf, nMsgLen);
-
-	int ret = ::send(hSocket, sendbuf.str().data(), int(sendbuf.str().size()),
-		MSG_NOSIGNAL);
-
+	const int ret = ::send(hSocket, pMsgBuf, nMsgLen, MSG_NOSIGNAL);
 	return (ret != SOCKET_ERROR);
 }
 
