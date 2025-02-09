@@ -220,8 +220,8 @@ private:
 	std::unordered_map<string, const VPKChunkDescriptor_t&> m_ChunkHashMap;
 };
 
-CUtlString PackedStore_GetDirBaseName(const CUtlString& dirFileName);
-CUtlString PackedStore_GetDirNameParts(const CUtlString& dirFileName, const int nCaptureGroup);
+bool PackedStore_GetDirBaseName(const CUtlString& dirFileName, CUtlString& dirBaseName);
+bool PackedStore_GetDirNameParts(const CUtlString& dirFileName, const size_t nCaptureGroup, CUtlString& dirNameParts);
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif // PACKEDSTORE_H

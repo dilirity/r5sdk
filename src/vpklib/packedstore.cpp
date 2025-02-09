@@ -88,35 +88,44 @@ void CPackedStoreBuilder::InitLzDecoder(void)
 //-----------------------------------------------------------------------------
 // Purpose: gets the level name from the directory file name
 // Input  : &dirFileName - 
-// Output : level name as string (e.g. "englishclient_mp_rr_box")
+//          &dirBaseName - <- level name as string (e.g. "englishclient_mp_rr_box")
+// Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-CUtlString PackedStore_GetDirBaseName(const CUtlString& dirFileName)
+bool PackedStore_GetDirBaseName(const CUtlString& dirFileName, CUtlString& dirBaseName)
 {
 	const char* baseFileName = V_UnqualifiedFileName(dirFileName.String());
 
 	std::cmatch regexMatches;
-	std::regex_search(baseFileName, regexMatches, g_VpkDirFileRegex);
+	const bool result = std::regex_search(baseFileName, regexMatches, g_VpkDirFileRegex);
 
-	CUtlString result;
-	result.Format("%s_%s", regexMatches[1].str().c_str(), regexMatches[2].str().c_str());
+	if (!result || regexMatches.size() < 3)
+		return false;
 
-	return result;
+	dirBaseName.Format("%s_%s", regexMatches[1].str().c_str(), regexMatches[2].str().c_str());
+	return true;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: gets the parts of the directory file name
-// Input  : &dirFileName   - 
-//          nCaptureGroup  - (1 = locale + target, 2 = level)
-// Output : part of directory file name as string
+// Input  : &dirFileName  - 
+//          nCaptureGroup - <- (1 = locale + target, 2 = level)
+//          &dirBaseName  - <- part of directory file name as string
+// Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-CUtlString PackedStore_GetDirNameParts(const CUtlString& dirFileName, const int nCaptureGroup)
+bool PackedStore_GetDirNameParts(const CUtlString& dirFileName, const size_t nCaptureGroup, CUtlString& dirNameParts)
 {
 	const char* baseFileName = V_UnqualifiedFileName(dirFileName.String());
 
 	std::cmatch regexMatches;
-	std::regex_search(baseFileName, regexMatches, g_VpkDirFileRegex);
+	const bool result = std::regex_search(baseFileName, regexMatches, g_VpkDirFileRegex);
 
-	return regexMatches[nCaptureGroup].str().c_str();
+	if (!result || regexMatches.size() < (nCaptureGroup + 1))
+		return false;
+
+	const std::string capture = regexMatches[nCaptureGroup].str();
+	dirNameParts.SetDirect(capture.c_str(), static_cast<ssize_t>(capture.length()));
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -293,7 +302,15 @@ static void GetEntryBlocks(CUtlVector<VPKEntryBlock_t>& entryBlocks, FileHandle_
 static bool GetEntryValues(CUtlVector<VPKKeyValues_t>& entryValues, 
 	const CUtlString& workspacePath, const CUtlString& dirFileName)
 {
-	KeyValues* pManifestKV = GetManifest(workspacePath, PackedStore_GetDirBaseName(dirFileName));
+	CUtlString dirBase;
+
+	if (!PackedStore_GetDirBaseName(dirFileName, dirBase))
+	{
+		Error(eDLL_T::FS, NO_ERROR, "Invalid VPK directory name; unable to retrieve stem from '%s'\n", dirFileName.String());
+		return false;
+	}
+
+	KeyValues* pManifestKV = GetManifest(workspacePath, dirBase);
 
 	if (!pManifestKV)
 	{
@@ -593,7 +610,15 @@ void CPackedStoreBuilder::UnpackStore(const VPKDir_t& vpkDir, const char* worksp
 		return;
 	}
 
-	BuildManifest(vpkDir.m_EntryBlocks, workspacePath, PackedStore_GetDirBaseName(vpkDir.m_DirFilePath));
+	CUtlString dirStem;
+
+	if (!PackedStore_GetDirBaseName(vpkDir.m_DirFilePath, dirStem))
+	{
+		Error(eDLL_T::FS, NO_ERROR, "%s - Unable to retrieve directory stem from '%s'!\n", __FUNCTION__, vpkDir.m_DirFilePath.String());
+		return;
+	}
+
+	BuildManifest(vpkDir.m_EntryBlocks, workspacePath, dirStem);
 	const CUtlString basePath = vpkDir.m_DirFilePath.StripFilename(false);
 
 	for (uint16_t packFileIndex : vpkDir.m_PakFileIndices)
@@ -843,9 +868,9 @@ VPKDir_t::VPKDir_t(const CUtlString& dirFilePath, bool bSanitizeName)
 	}
 
 	std::cmatch regexMatches;
-	std::regex_search(dirFilePath.String(), regexMatches, g_VpkPackFileRegex);
+	const bool result = std::regex_search(dirFilePath.String(), regexMatches, g_VpkPackFileRegex);
 
-	if (regexMatches.empty()) // Not a block file, or not following the naming scheme.
+	if (!result || regexMatches.empty()) // Not a block file, or not following the naming scheme.
 	{
 		Init(dirFilePath);
 		return;

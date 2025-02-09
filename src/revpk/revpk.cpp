@@ -232,7 +232,8 @@ static void ReVPK_Unpack(const CCommand& args)
         return;
     }
 
-    CUtlString baseName = PackedStore_GetDirBaseName(vpk.m_DirFilePath);
+    CUtlString baseName;
+    PackedStore_GetDirBaseName(vpk.m_DirFilePath, baseName);
 
     // Write the unpack log to a file.
     CFmtStr1024 textFileName("%s%s%s.log", outPath, UNPACK_LOG_DIR, baseName.String());
