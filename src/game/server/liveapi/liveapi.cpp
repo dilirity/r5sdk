@@ -360,10 +360,10 @@ static void LiveAPI_SetVector3D(rtech::liveapi::Vector3* const msgVec, const Vec
 	msgVec->set_z(dataVec->z);
 }
 
-static void LiveAPI_SetDataCenter(rtech::liveapi::Datacenter* const msg, const char* const name)
+static void LiveAPI_SetDataCenter(rtech::liveapi::Datacenter* const msg, const SQString* const name)
 {
 	LiveAPI_SetCommonMessageFields(msg, eLiveAPI_EventTypes::datacenter);
-	msg->set_name(name);
+	msg->set_name(name->_val, name->_len);
 }
 
 static void LiveAPI_SetVersion(rtech::liveapi::Version* const msg)
@@ -371,7 +371,7 @@ static void LiveAPI_SetVersion(rtech::liveapi::Version* const msg)
 	msg->set_major_num(LIVEAPI_MAJOR_VERSION);
 	msg->set_minor_num(LIVEAPI_MINOR_VERSION);
 	msg->set_build_stamp(g_SDKDll.GetNTHeaders()->FileHeader.TimeDateStamp);
-	msg->set_revision(LIVEAPI_REVISION);
+	msg->set_revision(LIVEAPI_REVISION, sizeof(LIVEAPI_REVISION)-1);
 }
 
 static void LiveAPI_SetNucleusHash(std::string* const msg, const SQString* const nucleusId)
@@ -419,7 +419,9 @@ static bool LiveAPI_SetPlayerIdentityFields(HSQUIRRELVM const v, const SQTable* 
 		case rtech::liveapi::Player::kNameFieldNumber:
 		{
 			LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, playerMsg, fieldNum);
-			playerMsg->set_name(_stringval(obj));
+
+			const SQString* str = _string(obj);
+			playerMsg->set_name(str->_val, str->_len);
 
 			break;
 		}
@@ -482,14 +484,18 @@ static bool LiveAPI_SetPlayerIdentityFields(HSQUIRRELVM const v, const SQTable* 
 		case rtech::liveapi::Player::kHardwareNameFieldNumber:
 		{
 			LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, playerMsg, fieldNum);
-			playerMsg->set_hardwarename(_stringval(obj));
+
+			const SQString* const str = _string(obj);
+			playerMsg->set_hardwarename(str->_val, str->_len);
 
 			break;
 		}
 		case rtech::liveapi::Player::kTeamNameFieldNumber:
 		{
 			LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, playerMsg, fieldNum);
-			playerMsg->set_teamname(_stringval(obj));
+
+			const SQString* const str = _string(obj);
+			playerMsg->set_teamname(str->_val, str->_len);
 
 			break;
 		}
@@ -503,14 +509,18 @@ static bool LiveAPI_SetPlayerIdentityFields(HSQUIRRELVM const v, const SQTable* 
 		case rtech::liveapi::Player::kCharacterFieldNumber:
 		{
 			LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, playerMsg, fieldNum);
-			playerMsg->set_character(_stringval(obj));
+
+			const SQString* const str = _string(obj);
+			playerMsg->set_character(str->_val, str->_len);
 
 			break;
 		}
 		case rtech::liveapi::Player::kSkinFieldNumber:
 		{
 			LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, playerMsg, fieldNum);
-			playerMsg->set_skin(_stringval(obj));
+
+			const SQString* const str = _string(obj);
+			playerMsg->set_skin(str->_val, str->_len);
 
 			break;
 		}
@@ -556,14 +566,18 @@ static bool LiveAPI_SetInventoryItem(HSQUIRRELVM const v, const SQTable* const t
 		case rtech::liveapi::InventoryItem::kItemFieldNumber:
 		{
 			LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-			event->set_item(_stringval(obj));
+
+			const SQString* const str = _string(obj);
+			event->set_item(str->_val, str->_len);
 
 			break;
 		}
 		case rtech::liveapi::InventoryItem::kExtraDataFieldNumber:
 		{
 			LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-			event->set_extradata(_stringval(obj));
+
+			const SQString* const str = _string(obj);
+			event->set_extradata(str->_val, str->_len);
 
 			break;
 		}
@@ -676,28 +690,34 @@ static bool LiveAPI_HandleMatchSetup(HSQUIRRELVM const v, const SQObject& obj, r
 	case rtech::liveapi::MatchSetup::kMapFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_map(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_map(str->_val, str->_len);
 
 		break;
 	}
 	case rtech::liveapi::MatchSetup::kPlaylistNameFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_playlistname(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_playlistname(str->_val, str->_len);
 
 		break;
 	}
 	case rtech::liveapi::MatchSetup::kPlaylistDescFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_playlistdesc(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_playlistdesc(str->_val, str->_len);
 
 		break;
 	}
 	case rtech::liveapi::MatchSetup::kDatacenterFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		LiveAPI_SetDataCenter(event->mutable_datacenter(), _stringval(obj));
+		LiveAPI_SetDataCenter(event->mutable_datacenter(), _string(obj));
 
 		break;
 	}
@@ -718,7 +738,9 @@ static bool LiveAPI_HandleMatchSetup(HSQUIRRELVM const v, const SQObject& obj, r
 	case rtech::liveapi::MatchSetup::kServerIdFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_serverid(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_serverid(str->_val, str->_len);
 
 		break;
 	}
@@ -756,7 +778,9 @@ static bool LiveAPI_HandleAmmoUsed(HSQUIRRELVM const v, const SQObject& obj, rte
 	case rtech::liveapi::AmmoUsed::kAmmoTypeFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_ammotype(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_ammotype(str->_val, str->_len);
 
 		break;
 	}
@@ -807,7 +831,9 @@ static bool LiveAPI_HandleInventoryChange(HSQUIRRELVM const v, const SQObject& o
 	case event->kItemFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_item(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_item(str->_val, str->_len);
 
 		break;
 	}
@@ -843,7 +869,9 @@ static bool LiveAPI_HandleInventoryDrop(HSQUIRRELVM const v, const SQObject& obj
 	case rtech::liveapi::InventoryDrop::kItemFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_item(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_item(str->_val, str->_len);
 
 		break;
 	}
@@ -867,7 +895,9 @@ static bool LiveAPI_HandleInventoryDrop(HSQUIRRELVM const v, const SQObject& obj
 				continue;
 
 			LIVEAPI_ENSURE_TYPE(v, fieldObj, OT_STRING, event, fieldNum);
-			event->add_extradata(_stringval(fieldObj));
+
+			const SQString* const str = _string(obj);
+			event->add_extradata(str->_val, str->_len);
 		}
 
 		break;
@@ -889,7 +919,9 @@ static bool LiveAPI_HandleGameStateChanged(HSQUIRRELVM const v, const SQObject& 
 	case rtech::liveapi::GameStateChanged::kStateFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_state(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_state(str->_val, str->_len);
 
 		break;
 	}
@@ -910,7 +942,9 @@ static bool LiveAPI_HandleMatchStateEnd(HSQUIRRELVM const v, const SQObject& obj
 	case rtech::liveapi::MatchStateEnd::kStateFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_state(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_state(str->_val, str->_len);
 
 		break;
 	}
@@ -1167,7 +1201,9 @@ static bool LiveAPI_HandlePlayerDowned(HSQUIRRELVM const v, const SQObject& obj,
 	case rtech::liveapi::PlayerDowned::kWeaponFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_weapon(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_weapon(str->_val, str->_len);
 
 		break;
 	}
@@ -1212,7 +1248,9 @@ static bool LiveAPI_HandlePlayerKilled(HSQUIRRELVM const v, const SQObject& obj,
 	case rtech::liveapi::PlayerKilled::kWeaponFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_weapon(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_weapon(str->_val, str->_len);
 
 		break;
 	}
@@ -1287,7 +1325,9 @@ static bool LiveAPI_HandlePlayerDamaged(HSQUIRRELVM const v, const SQObject& obj
 	case rtech::liveapi::PlayerDamaged::kWeaponFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_weapon(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_weapon(str->_val, str->_len);
 
 		break;
 	}
@@ -1331,7 +1371,9 @@ static bool LiveAPI_HandlePlayerAssist(HSQUIRRELVM const v, const SQObject& obj,
 	case rtech::liveapi::PlayerAssist::kWeaponFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_weapon(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_weapon(str->_val, str->_len);
 
 		break;
 	}
@@ -1514,7 +1556,9 @@ static bool LiveAPI_HandleLinkedEntityEvent(HSQUIRRELVM const v, const SQObject&
 	case event->kLinkedEntityFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_linkedentity(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_linkedentity(str->_val, str->_len);
 
 		break;
 	}
@@ -1543,14 +1587,18 @@ static bool LiveAPI_HandleWeaponSwitchedEvent(HSQUIRRELVM const v, const SQObjec
 	case rtech::liveapi::WeaponSwitched::kOldWeaponFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_oldweapon(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_oldweapon(str->_val, str->_len);
 
 		break;
 	}
 	case rtech::liveapi::WeaponSwitched::kNewWeaponFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_newweapon(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_newweapon(str->_val, str->_len);
 
 		break;
 	}
@@ -1579,7 +1627,9 @@ static bool LiveAPI_HandleBlackMarketActionEvent(HSQUIRRELVM const v, const SQOb
 	case rtech::liveapi::BlackMarketAction::kItemFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_item(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_item(str->_val, str->_len);
 
 		break;
 	}
@@ -1637,14 +1687,18 @@ static bool LiveAPI_HandleLegendUpgradeSelected(HSQUIRRELVM const v, const SQObj
 	case rtech::liveapi::LegendUpgradeSelected::kUpgradeNameFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_upgradename(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_upgradename(str->_val, str->_len);
 
 		break;
 	}
 	case rtech::liveapi::LegendUpgradeSelected::kUpgradeDescFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_upgradedesc(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_upgradedesc(str->_val, str->_len);
 
 		break;
 	}
@@ -1723,7 +1777,9 @@ static bool LiveAPI_HandlePlayerStatChanged(HSQUIRRELVM const v, const SQObject&
 	case  rtech::liveapi::PlayerStatChanged::kStatNameFieldNumber:
 	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_statname(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_statname(str->_val, str->_len);
 
 		break;
 	}
@@ -1806,7 +1862,7 @@ static bool LiveAPI_SetCustomArrayFields(HSQUIRRELVM const v, google::protobuf::
 			listData->add_values()->set_number_value(_float(valueObj));
 			break;
 		case OT_STRING:
-			listData->add_values()->set_string_value(_stringval(valueObj));
+			listData->add_values()->set_string_value(_string(valueObj)->_val, _string(valueObj)->_len);
 			break;
 		case OT_VECTOR:
 			LiveAPI_SetCustomVectorField(listData->add_values()->mutable_struct_value(), _vector3d(valueObj));
@@ -1867,28 +1923,31 @@ static bool LiveAPI_SetCustomTableFields(HSQUIRRELVM const v, google::protobuf::
 		}
 
 		const SQObjectType valueType = sq_type(node.val);
+		const SQString* const key = _string(node.key);
+
+		const std::string_view keyView(key->_val, key->_len);
 
 		switch (valueType)
 		{
 		case OT_BOOL:
-			(*structData->mutable_fields())[_stringval(node.key)].set_bool_value(_bool(node.val));
+			(*structData->mutable_fields())[keyView].set_bool_value(_bool(node.val));
 			break;
 		case OT_INTEGER:
-			(*structData->mutable_fields())[_stringval(node.key)].set_number_value(_integer(node.val));
+			(*structData->mutable_fields())[keyView].set_number_value(_integer(node.val));
 			break;
 		case OT_FLOAT:
-			(*structData->mutable_fields())[_stringval(node.key)].set_number_value(_float(node.val));
+			(*structData->mutable_fields())[keyView].set_number_value(_float(node.val));
 			break;
 		case OT_STRING:
-			(*structData->mutable_fields())[_stringval(node.key)].set_string_value(_stringval(node.val));
+			(*structData->mutable_fields())[keyView].set_string_value(_string(node.val)->_val, _string(node.val)->_len);
 			break;
 		case OT_VECTOR:
-			LiveAPI_SetCustomVectorField((*structData->mutable_fields())[_stringval(node.key)].mutable_struct_value(), _vector3d(node.val));
+			LiveAPI_SetCustomVectorField((*structData->mutable_fields())[keyView].mutable_struct_value(), _vector3d(node.val));
 			break;
 		case OT_ARRAY:
 			LIVEAPI_CHECK_RECURSION_DEPTH(v, counter.Get());
 
-			if (!LiveAPI_SetCustomArrayFields(v, (*structData->mutable_fields())[_stringval(node.key)].mutable_list_value(), _array(node.val)))
+			if (!LiveAPI_SetCustomArrayFields(v, (*structData->mutable_fields())[keyView].mutable_list_value(), _array(node.val)))
 				return false;
 
 			break;
@@ -1901,7 +1960,7 @@ static bool LiveAPI_SetCustomTableFields(HSQUIRRELVM const v, google::protobuf::
 				return false;
 			}
 
-			if (!LiveAPI_SetCustomTableFields(v, (*structData->mutable_fields())[_stringval(node.key)].mutable_struct_value(), _table(node.val)))
+			if (!LiveAPI_SetCustomTableFields(v, (*structData->mutable_fields())[keyView].mutable_struct_value(), _table(node.val)))
 				return false;
 
 			break;
@@ -1924,16 +1983,22 @@ static bool LiveAPI_HandleCustomEvent(HSQUIRRELVM const v, const SQObject& obj, 
 	switch (fieldNum)
 	{
 	case rtech::liveapi::CustomEvent::kNameFieldNumber:
+	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, event, fieldNum);
-		event->set_name(_stringval(obj));
+
+		const SQString* const str = _string(obj);
+		event->set_name(str->_val, str->_len);
 
 		break;
+	}
 	case rtech::liveapi::CustomEvent::kDataFieldNumber:
+	{
 		LIVEAPI_ENSURE_TYPE(v, obj, OT_TABLE, event, fieldNum);
 		if (!LiveAPI_SetCustomTableFields(v, event->mutable_data(), _table(obj)))
 			return false;
 
 		break;
+	}
 	default:
 		LIVEAPI_FIELD_ERROR(v, fieldNum, event);
 	}
