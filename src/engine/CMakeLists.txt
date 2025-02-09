@@ -229,6 +229,8 @@ add_sources( SOURCE_GROUP "Public"
     "${ENGINE_SOURCE_DIR}/public/networkvar.h"
     "${ENGINE_SOURCE_DIR}/public/playerstate.h"
 
+    "${ENGINE_SOURCE_DIR}/public/netcon/INetCon.h"
+
     # These probably need to go to 'bsplib' if we ever create that project.
     "${ENGINE_SOURCE_DIR}/public/bspflags.h"
     "${ENGINE_SOURCE_DIR}/public/bspfile.h"

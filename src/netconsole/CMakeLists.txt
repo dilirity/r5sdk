@@ -24,6 +24,10 @@ add_sources( SOURCE_GROUP "Engine"
     "${ENGINE_SOURCE_DIR}/engine/shared/shared_rcon.h"
 )
 
+add_sources( SOURCE_GROUP "Public"
+    "${ENGINE_SOURCE_DIR}/public/netcon/INetCon.h"
+)
+
 add_sources( SOURCE_GROUP "Windows"
     "${ENGINE_SOURCE_DIR}/windows/console.cpp"
     "${ENGINE_SOURCE_DIR}/windows/console.h"
