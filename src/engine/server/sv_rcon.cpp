@@ -43,7 +43,6 @@ static ConVar sv_rcon_maxignores("sv_rcon_maxignores", "15", FCVAR_RELEASE, "Max
 static ConVar sv_rcon_maxsockets("sv_rcon_maxsockets", "32", FCVAR_RELEASE, "Max number of accepted sockets before the server starts closing redundant sockets", true, 1.f, true, MAX_PLAYERS);
 
 static ConVar sv_rcon_maxconnections("sv_rcon_maxconnections", "1", FCVAR_RELEASE, "Max number of authenticated connections before the server closes the listen socket", true, 1.f, true, MAX_PLAYERS, &RCON_ConnectionCountChanged_f);
-static ConVar sv_rcon_maxframesize("sv_rcon_maxframesize", "1024", FCVAR_RELEASE, "Max number of bytes allowed in a message frame from a non-authenticated netconsole", true, 0.f, true, 4096.f);
 static ConVar sv_rcon_whitelistaddress("sv_rcon_whitelistaddress", "", FCVAR_RELEASE, "This address is not considered a 'redundant' socket and will never be banned for failed authentication attempts", &RCON_WhiteListAddresChanged_f, "Format: '::ffff:127.0.0.1'");
 
 static ConVar sv_rcon_useloopbacksocket("sv_rcon_useloopbacksocket", "0", FCVAR_RELEASE, "Whether to bind rcon server to the loopback socket", &RCON_UseLoopbackSocketChanged_f);
@@ -259,7 +258,7 @@ void CRConServer::RunFrame(void)
 				continue;
 			}
 
-			Recv(data, sv_rcon_maxframesize.GetInt());
+			Recv(data, (u32)rcon_maxframesize.GetInt());
 		}
 	}
 }
@@ -443,13 +442,14 @@ bool CRConServer::Comparator(const string& svPassword) const
 // Purpose: processes received message
 // Input  : *pMsgBuf - 
 //			nMsgLen - 
+//			nMaxLen - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CRConServer::ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen)
+bool CRConServer::ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen, const u32 nMaxLen)
 {
 	netcon::request request;
 
-	if (!NetconShared_UnpackEnvelope(this, pMsgBuf, nMsgLen, &request, rcon_debug.GetBool()))
+	if (!NetconShared_UnpackEnvelope(this, pMsgBuf, nMsgLen, nMaxLen, &request, rcon_debug.GetBool()))
 	{
 		Disconnect("received invalid message");
 		return false;

@@ -33,8 +33,8 @@ struct ConnectedNetConsoleData_s
 	SocketHandle_t m_hSocket;
 	u32  m_nPayloadLen;     // Num bytes for this message.
 	u32  m_nPayloadRead;    // Num read bytes from input buffer.
-	u32  m_nFailedAttempts; // Num failed authentication attempts.
-	u32  m_nIgnoredMessage; // Count how many times client ignored the no-auth message.
+	s32  m_nFailedAttempts; // Num failed authentication attempts.
+	s32  m_nIgnoredMessage; // Count how many times client ignored the no-auth message.
 	bool m_bValidated;      // Revalidates netconsole if false.
 	bool m_bAuthorized;     // Set to true after successful netconsole auth.
 	bool m_bInputOnly;      // If set, don't send spew to this netconsole.

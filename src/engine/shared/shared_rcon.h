@@ -7,6 +7,7 @@
 extern ConVar rcon_debug;
 extern ConVar rcon_encryptframes;
 extern ConVar rcon_key;
+extern ConVar rcon_maxframesize;
 
 #ifndef CLIENT_DLL
 extern void RCON_InitServerAndTrySyncKeys(const char* pPassword);
@@ -25,7 +26,7 @@ bool NetconClient_Serialize(const CNetConBase* pBase, vector<byte>& vecBuf, cons
 bool NetconClient_Connect(CNetConBase* pBase, const char* pHostAdr, const int nHostPort);
 
 bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<byte>& outMsgBuf, const u32 nMsgLen, google::protobuf::MessageLite* const inMsg, const bool bEncrypt, const bool bDebug);
-bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const byte* pMsgBuf, const u32 nMsgLen, google::protobuf::MessageLite* const outMsg, const bool bDebug);
+bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const byte* pMsgBuf, const u32 nMsgLen, const u32 nMaxLen, google::protobuf::MessageLite* const outMsg, const bool bDebug);
 
 ConnectedNetConsoleData_s* NetconShared_GetConnData(CNetConBase* pBase, const int iSocket);
 SocketHandle_t NetconShared_GetSocketHandle(CNetConBase* pBase, const int iSocket);

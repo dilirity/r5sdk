@@ -9,6 +9,7 @@
 #include "engine/shared/base_rcon.h"
 
 constexpr const char* NETCON_VERSION = "2.0.0.1";
+constexpr const u32 NETCON_MAX_FRAME_SIZE = 4096;
 
 class CNetCon : public CNetConBase
 {
@@ -35,7 +36,7 @@ public:
 	virtual bool Connect(const char* pHostName, const int nHostPort = SOCKET_ERROR) override;
 	virtual void Disconnect(const char* szReason = nullptr) override;
 
-	virtual bool ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen) override;
+	virtual bool ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen, const u32 nMaxLen) override;
 
 	void TrySetKey(const char* const pKey);
 	bool Serialize(vector<byte>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,

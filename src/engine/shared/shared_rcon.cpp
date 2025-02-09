@@ -201,13 +201,14 @@ bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<byte>& outMsgBuf
 // Input  : *pBase - 
 //			*pMsgBuf - 
 //			nMsgLen - 
+//			nMaxLen - 
 //			*outMsg - 
 //			bEncrypt - 
 //			bDebug - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
 bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const byte* pMsgBuf, const u32 nMsgLen,
-	google::protobuf::MessageLite* const outMsg, const bool bDebug)
+	const u32 nMaxLen, google::protobuf::MessageLite* const outMsg, const bool bDebug)
 {
 	netcon::envelope envelope;
 
@@ -223,10 +224,10 @@ bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const byte* pMsgBuf, 
 
 	const u32 msgLen = (u32)envelope.data().size();
 
-	if (msgLen > RCON_FRAME_MAX_SIZE)
+	if (msgLen > nMaxLen)
 	{
 		Error(eDLL_T::ENGINE, NO_ERROR, "Data in RCON message envelope is too large (%u > %u)\n",
-			msgLen, RCON_FRAME_MAX_SIZE);
+			msgLen, nMaxLen);
 
 		return false;
 	}
@@ -337,6 +338,7 @@ void RCON_PasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOl
 ConVar rcon_debug("rcon_debug", "0", FCVAR_RELEASE, "Show rcon debug information ( !slower! )");
 ConVar rcon_encryptframes("rcon_encryptframes", "1", FCVAR_RELEASE, "Whether to encrypt RCON messages");
 ConVar rcon_key("rcon_key", "", FCVAR_SERVER_CANNOT_QUERY | FCVAR_DONTRECORD | FCVAR_RELEASE, "Base64 remote server access encryption key (random if empty or invalid)", &RCON_KeyChanged_f);
+ConVar rcon_maxframesize("rcon_maxframesize", "2048", FCVAR_RELEASE, "Max number of bytes allowed in a RCON message", true, 128.f, true, 4096.f);
 
 //-----------------------------------------------------------------------------
 // Purpose: change RCON key on server and client

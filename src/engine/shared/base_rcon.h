@@ -21,8 +21,8 @@ public:
 	virtual bool Connect(const char* pHostName, const int nHostPort = SOCKET_ERROR);
 	virtual void Disconnect(const char* szReason = nullptr) { NOTE_UNUSED(szReason); };
 
-	virtual bool ProcessBuffer(ConnectedNetConsoleData_s& data, const byte* pRecvBuf, u32 nRecvLen, const int nMaxLen = SOCKET_ERROR);
-	virtual bool ProcessMessage(const byte* /*pMsgBuf*/, const u32 /*nMsgLen*/) { return true; };
+	virtual bool ProcessBuffer(ConnectedNetConsoleData_s& data, const byte* pRecvBuf, u32 nRecvLen, const u32 nMaxLen);
+	virtual bool ProcessMessage(const byte* /*pMsgBuf*/, const u32 /*nMsgLen*/, const u32 /*nMaxLen*/) { return true; };
 
 	virtual bool Encrypt(CryptoContext_s& ctx, const byte* pInBuf, byte* pOutBuf, const u32 nDataLen) const;
 	virtual bool Decrypt(CryptoContext_s& ctx, const byte* pInBuf, byte* pOutBuf, const u32 nDataLen) const;
@@ -31,7 +31,7 @@ public:
 	virtual bool Decode(google::protobuf::MessageLite* pMsg, const byte* pMsgBuf, const u32 nMsgLen) const;
 
 	virtual bool Send(const SocketHandle_t hSocket, const byte* pMsgBuf, const u32 nMsgLen) const;
-	virtual void Recv(ConnectedNetConsoleData_s& data, const int nMaxLen = SOCKET_ERROR);
+	virtual void Recv(ConnectedNetConsoleData_s& data, const u32 nMaxLen);
 
 	CSocketCreator* GetSocketCreator(void) { return &m_Socket; }
 	netadr_t* GetNetAddress(void) { return &m_Address; }

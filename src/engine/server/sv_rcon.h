@@ -42,7 +42,7 @@ public:
 	void Authenticate(const netcon::request& request, ConnectedNetConsoleData_s& data);
 	bool Comparator(const string& svPassword) const;
 
-	virtual bool ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen) override;
+	virtual bool ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen, const u32 nMaxLen) override;
 
 	void Execute(const netcon::request& request) const;
 	bool CheckForBan(ConnectedNetConsoleData_s& data);

@@ -78,7 +78,7 @@ void CRConClient::RunFrame(void)
 
 		if (pData)
 		{
-			Recv(*pData);
+			Recv(*pData, (u32)rcon_maxframesize.GetInt());
 		}
 	}
 }
@@ -104,12 +104,13 @@ void CRConClient::Disconnect(const char* szReason)
 // Purpose: processes received message
 // Input  : *pMsgBug - 
 //			nMsgLen - 
+//			nMaxLen - 
 //-----------------------------------------------------------------------------
-bool CRConClient::ProcessMessage(const byte* const pMsgBuf, const u32 nMsgLen)
+bool CRConClient::ProcessMessage(const byte* const pMsgBuf, const u32 nMsgLen, const u32 nMaxLen)
 {
 	netcon::response response;
 
-	if (!NetconShared_UnpackEnvelope(this, pMsgBuf, nMsgLen, &response, rcon_debug.GetBool()))
+	if (!NetconShared_UnpackEnvelope(this, pMsgBuf, nMsgLen, nMaxLen, &response, rcon_debug.GetBool()))
 	{
 		Disconnect("received invalid message");
 		return false;

@@ -144,7 +144,7 @@ bool CNetConBase::Connect(const char* pHostName, const int nPort)
 //			nMaxLen - 
 // Output: true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CNetConBase::ProcessBuffer(ConnectedNetConsoleData_s& data, const byte* pRecvBuf, u32 nRecvLen, const int nMaxLen)
+bool CNetConBase::ProcessBuffer(ConnectedNetConsoleData_s& data, const byte* pRecvBuf, u32 nRecvLen, const u32 nMaxLen)
 {
 	while (nRecvLen > 0)
 	{
@@ -161,7 +161,7 @@ bool CNetConBase::ProcessBuffer(ConnectedNetConsoleData_s& data, const byte* pRe
 
 			if (data.m_nPayloadRead == data.m_nPayloadLen)
 			{
-				if (!ProcessMessage(data.m_RecvBuffer.data(), data.m_nPayloadLen))
+				if (!ProcessMessage(data.m_RecvBuffer.data(), data.m_nPayloadLen, nMaxLen))
 					return false;
 
 				// Reset state.
@@ -210,8 +210,7 @@ bool CNetConBase::ProcessBuffer(ConnectedNetConsoleData_s& data, const byte* pRe
 					return false;
 				}
 
-				if ((!data.m_bAuthorized && nMaxLen > -1 && header.length > (u32)nMaxLen) ||
-					header.length > RCON_FRAME_MAX_SIZE)
+				if (header.length > nMaxLen)
 				{
 					Disconnect("overflow");
 					return false;
@@ -301,7 +300,7 @@ bool CNetConBase::Send(const SocketHandle_t hSocket, const byte* pMsgBuf, const 
 //			nMaxLen - 
 // Output: true on success, false otherwise
 //-----------------------------------------------------------------------------
-void CNetConBase::Recv(ConnectedNetConsoleData_s& data, const int nMaxLen)
+void CNetConBase::Recv(ConnectedNetConsoleData_s& data, const u32 nMaxLen)
 {
 	static char szRecvBuf[1024];
 

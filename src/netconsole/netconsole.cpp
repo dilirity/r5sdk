@@ -327,7 +327,7 @@ bool CNetCon::RunFrame(void)
 		if (IsConnected())
 		{
 			ConnectedNetConsoleData_s& pData = GetSocketCreator()->GetAcceptedSocketData(0);
-			Recv(pData);
+			Recv(pData, NETCON_MAX_FRAME_SIZE);
 		}
 		else if (GetPrompting())
 		{
@@ -422,13 +422,14 @@ void CNetCon::Disconnect(const char* szReason)
 // Purpose: processes received message
 // Input  : *pMsgBuf - 
 //			nMsgLen - 
+//			nMaxLen - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CNetCon::ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen)
+bool CNetCon::ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen, const u32 nMaxLen)
 {
 	netcon::response response;
 
-	if (!NetconShared_UnpackEnvelope(this, pMsgBuf, nMsgLen, &response, true))
+	if (!NetconShared_UnpackEnvelope(this, pMsgBuf, nMsgLen, nMaxLen, &response, true))
 	{
 		Disconnect("received invalid message");
 		return false;

@@ -15,7 +15,7 @@ public:
 	void RunFrame(void);
 
 	virtual void Disconnect(const char* szReason = nullptr) override;
-	virtual bool ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen) override;
+	virtual bool ProcessMessage(const byte* pMsgBuf, const u32 nMsgLen, const u32 nMaxLen) override;
 
 	bool Serialize(vector<byte>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
 		const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType) const;

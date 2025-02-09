@@ -7,7 +7,6 @@
 #define INETCON_H
 
 #define RCON_FRAME_MAGIC ('R'+('C'<<8)+('o'<<16)+('n'<<24))
-#define RCON_FRAME_MAX_SIZE 1024*1024 // Max size of envelope and its payload.
 
 // Wire struct for each individual net console frame. Fields are transmitted in
 // network byte order and must be flipped to platform's endianness on receive.
