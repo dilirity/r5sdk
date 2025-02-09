@@ -197,8 +197,7 @@ bool CNetConBase::ProcessBuffer(CConnectedNetConsoleData& data,
 				}
 			}
 
-			if (data.m_nPayloadLen < 0 ||
-				data.m_nPayloadLen > data.m_RecvBuffer.max_size())
+			if (data.m_nPayloadLen <= 0 || data.m_nPayloadLen > RCON_MAX_PAYLOAD_SIZE)
 			{
 				Error(eDLL_T::ENGINE, NO_ERROR, "RCON Cmd: sync error (%d)\n", data.m_nPayloadLen);
 				Disconnect("desync"); // Out of sync (irrecoverable).
