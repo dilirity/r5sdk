@@ -4,10 +4,11 @@
 //
 //===========================================================================//
 #pragma once
+#include "netcon/INetCon.h"
 
 typedef int SocketHandle_t;
 
-enum class ServerDataRequestType_t : int
+enum class ServerDataRequestType_e : int
 {
 	SERVERDATA_REQUEST_VALUE = 0,
 	SERVERDATA_REQUEST_SETVALUE,
@@ -17,7 +18,7 @@ enum class ServerDataRequestType_t : int
 	SERVERDATA_REQUEST_SEND_REMOTEBUG,
 };
 
-enum class ServerDataResponseType_t : int
+enum class ServerDataResponseType_e : int
 {
 	SERVERDATA_RESPONSE_VALUE = 0,
 	SERVERDATA_RESPONSE_UPDATE,
@@ -38,7 +39,8 @@ public:
 	bool m_bValidated;      // Revalidates netconsole if false.
 	bool m_bAuthorized;     // Set to true after successful netconsole auth.
 	bool m_bInputOnly;      // If set, don't send spew to this netconsole.
-	vector<uint8_t> m_RecvBuffer;
+	NetConFrameHeader_s m_FrameHeader; // Current frame header.
+	vector<byte> m_RecvBuffer;
 
 	CConnectedNetConsoleData(SocketHandle_t hSocket = -1)
 	{
@@ -56,15 +58,11 @@ public:
 /* PACKET FORMAT **********************************
 
 REQUEST:
-  int requestID;
-  int ServerDataRequestType_t;
-  NullTerminatedString (variable or command)
-  NullTerminatedString (value)
+  NetConFrameHeader_s header;
+  byte* data;
 
 RESPONSE:
-  int requestID;
-  int ServerDataResponseType_t;
-  NullTerminatedString (variable)
-  NullTerminatedString (value)
+  NetConFrameHeader_s header;
+  byte* data;
 
 ***************************************************/

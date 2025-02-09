@@ -174,13 +174,10 @@ bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<char>& outMsgBuf
 	envelope.set_data(dataBuf, nMsgLen);
 	const size_t envelopeSize = envelope.ByteSizeLong();
 
-	outMsgBuf.resize(envelopeSize + sizeof(u_long));
+	outMsgBuf.resize(sizeof(NetConFrameHeader_s) + envelopeSize);
 	char* const scratch = outMsgBuf.data();
 
-	// Write out frame size in network byte order.
-	*reinterpret_cast<u_long*>(scratch) = htonl(u_long(envelopeSize));
-
-	if (!pBase->Encode(&envelope, &scratch[sizeof(u_long)], envelopeSize))
+	if (!pBase->Encode(&envelope, &scratch[sizeof(NetConFrameHeader_s)], envelopeSize))
 	{
 		if (bDebug)
 		{
@@ -189,6 +186,12 @@ bool NetconShared_PackEnvelope(const CNetConBase* pBase, vector<char>& outMsgBuf
 
 		return false;
 	}
+
+	NetConFrameHeader_s* const header = reinterpret_cast<NetConFrameHeader_s*>(scratch);
+
+	// Write out magic and frame size in network byte order.
+	header->magic = htonl(RCON_FRAME_MAGIC);
+	header->length = htonl(u32(envelopeSize));
 
 	return true;
 }
@@ -220,10 +223,10 @@ bool NetconShared_UnpackEnvelope(const CNetConBase* pBase, const char* pMsgBuf, 
 
 	const size_t msgLen = envelope.data().size();
 
-	if (msgLen > RCON_MAX_PAYLOAD_SIZE)
+	if (msgLen > RCON_FRAME_MAX_SIZE)
 	{
 		Error(eDLL_T::ENGINE, NO_ERROR, "Data in RCON message envelope is too large (%zu > %zu)\n",
-			msgLen, RCON_MAX_PAYLOAD_SIZE);
+			msgLen, RCON_FRAME_MAX_SIZE);
 
 		return false;
 	}

@@ -144,69 +144,83 @@ bool CNetConBase::Connect(const char* pHostName, const int nPort)
 //			nMaxLen - 
 // Output: true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CNetConBase::ProcessBuffer(CConnectedNetConsoleData& data, 
-	const char* pRecvBuf, int nRecvLen, const int nMaxLen)
+bool CNetConBase::ProcessBuffer(CConnectedNetConsoleData& data, const char* pRecvBuf, int nRecvLen, const int nMaxLen)
 {
-	byte prefix[sizeof(u_long)] = {};
-
 	while (nRecvLen > 0)
 	{
+		// Read payload if it's already in progress.
 		if (data.m_nPayloadLen)
 		{
-			if (data.m_nPayloadRead < data.m_nPayloadLen)
-			{
-				data.m_RecvBuffer[data.m_nPayloadRead++] = *pRecvBuf;
+			const int bytesToCopy = Min(nRecvLen, data.m_nPayloadLen - data.m_nPayloadRead);
+			memcpy(&data.m_RecvBuffer[data.m_nPayloadRead], pRecvBuf, bytesToCopy);
 
-				pRecvBuf++;
-				nRecvLen--;
-			}
+			data.m_nPayloadRead += bytesToCopy;
+
+			pRecvBuf += bytesToCopy;
+			nRecvLen -= bytesToCopy;
+
 			if (data.m_nPayloadRead == data.m_nPayloadLen)
 			{
-				if (!ProcessMessage(
-					reinterpret_cast<const char*>(data.m_RecvBuffer.data()), data.m_nPayloadLen))
-				{
+				if (!ProcessMessage(reinterpret_cast<const char*>(data.m_RecvBuffer.data()), data.m_nPayloadLen))
 					return false;
-				}
 
+				// Reset state.
 				data.m_nPayloadLen = 0;
 				data.m_nPayloadRead = 0;
 			}
 		}
-		else if (data.m_nPayloadRead < sizeof(u_long)) // Read size field.
+		else if (data.m_nPayloadRead < sizeof(NetConFrameHeader_s)) // Read the header if we haven't fully recv'd it.
 		{
-			prefix[data.m_nPayloadRead++] = *pRecvBuf;
+			const int bytesToCopy = Min(nRecvLen, int(sizeof(NetConFrameHeader_s)) - data.m_nPayloadRead);
+			memcpy(reinterpret_cast<char*>(&data.m_FrameHeader) + data.m_nPayloadRead, pRecvBuf, bytesToCopy);
 
-			pRecvBuf++;
-			nRecvLen--;
-		}
-		else // Build prefix.
-		{
-			u_long* const pPrefix = reinterpret_cast<u_long*>(&prefix[0]);
+			data.m_nPayloadRead += bytesToCopy;
 
-			data.m_nPayloadLen = int(ntohl(*pPrefix));
-			data.m_nPayloadRead = 0;
+			pRecvBuf += bytesToCopy;
+			nRecvLen -= bytesToCopy;
 
-			*pPrefix = 0;
-
-			if (!data.m_bAuthorized && nMaxLen > -1)
+			if (data.m_nPayloadRead == sizeof(NetConFrameHeader_s))
 			{
-				if (data.m_nPayloadLen > nMaxLen)
+				NetConFrameHeader_s& header = data.m_FrameHeader;
+
+				// Convert byte order and check for desync.
+				header.magic = ntohl(header.magic);
+				const char* desyncReason = nullptr;
+
+				if (header.magic != RCON_FRAME_MAGIC)
 				{
-					Disconnect("overflow"); // Sending large messages while not authenticated.
+					desyncReason = "invalid magic";
+				}
+
+				if (!desyncReason)
+				{
+					header.length = ntohl(header.length);
+
+					if (header.length == 0)
+					{
+						desyncReason = "empty frame";
+					}
+				}
+
+				if (desyncReason)
+				{
+					Error(eDLL_T::ENGINE, NO_ERROR, "RCON Cmd: sync error (%s)\n", desyncReason);
+					Disconnect("desync");
+
 					return false;
 				}
-			}
 
-			if (data.m_nPayloadLen <= 0 || data.m_nPayloadLen > RCON_MAX_PAYLOAD_SIZE)
-			{
-				Error(eDLL_T::ENGINE, NO_ERROR, "RCON Cmd: sync error (%d)\n", data.m_nPayloadLen);
-				Disconnect("desync"); // Out of sync (irrecoverable).
+				if ((!data.m_bAuthorized && nMaxLen > -1 && header.length > (u32)nMaxLen) ||
+					header.length > RCON_FRAME_MAX_SIZE)
+				{
+					Disconnect("overflow");
+					return false;
+				}
 
-				return false;
-			}
-			else
-			{
-				data.m_RecvBuffer.resize(data.m_nPayloadLen);
+				data.m_nPayloadLen = header.length;
+				data.m_nPayloadRead = 0;
+
+				data.m_RecvBuffer.resize(header.length);
 			}
 		}
 	}
@@ -338,7 +352,7 @@ void CNetConBase::Recv(CConnectedNetConsoleData& data, const int nMaxLen)
 			break;
 		}
 
-		nReadLen -= nRecvLen; // Process what we've got.
+		nReadLen -= static_cast<u_long>(nRecvLen); // Process what we've got.
 
 		if (!ProcessBuffer(data, szRecvBuf, nRecvLen, nMaxLen))
 			break;

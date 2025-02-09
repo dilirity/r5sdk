@@ -1,13 +1,11 @@
 #ifndef BASE_RCON_H
 #define BASE_RCON_H
 
+#include "netcon/INetCon.h"
 #include "tier1/NetAdr.h"
 #include "tier2/cryptutils.h"
 #include "tier2/socketcreator.h"
 #include "protobuf/message_lite.h"
-
-// Max size of the payload in the envelope frame
-#define RCON_MAX_PAYLOAD_SIZE 1024*1024
 
 class CNetConBase
 {
