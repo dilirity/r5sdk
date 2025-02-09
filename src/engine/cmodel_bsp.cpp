@@ -179,28 +179,45 @@ void Mod_GetAllInstalledMaps()
         // slash, as the files are loaded from 'vpk/'.
         Assert(pFileName);
 
-        std::regex_search(pFileName, regexMatches, g_VpkDirFileRegex);
+        const bool result = std::regex_search(pFileName, regexMatches, g_VpkDirFileRegex);
 
-        if (!regexMatches.empty())
+        if (!result || regexMatches.empty())
+            continue;
+
+        const std::sub_match<const char*>& match = regexMatches[2];
+
+        if (match.compare("frontend") == 0)
+            continue; // Frontend contains no BSP's.
+
+        else if (match.compare("mp_common") == 0)
         {
-            const std::sub_match<const char*>& match = regexMatches[2];
+            if (!g_InstalledMaps.HasElement("mp_lobby"))
+                g_InstalledMaps.AddToTail("mp_lobby");
 
-            if (match.compare("frontend") == 0)
-                continue; // Frontend contains no BSP's.
+            continue; // Common contains mp_lobby.
+        }
+        else
+        {
+            const string mapName = match.str();
+            bool found = false;
 
-            else if (match.compare("mp_common") == 0)
+            FOR_EACH_VEC(g_InstalledMaps, j)
             {
-                if (!g_InstalledMaps.HasElement("mp_lobby"))
-                    g_InstalledMaps.AddToTail("mp_lobby");
+                const CUtlString& installedMap = g_InstalledMaps[j];
 
-                continue; // Common contains mp_lobby.
+                if (installedMap.IsEqual_CaseSensitive(mapName.c_str()))
+                {
+                    found = true;
+                    break;
+                }
             }
-            else
-            {
-                const string mapName = match.str();
 
-                if (!g_InstalledMaps.HasElement(mapName.c_str()))
-                    g_InstalledMaps.AddToTail(mapName.c_str());
+            if (!found)
+            {
+                const int index = g_InstalledMaps.AddToTail();
+                CUtlString& entry = g_InstalledMaps.Element(index);
+
+                entry.SetDirect(mapName.c_str(), (ssize_t)mapName.length());
             }
         }
     }
