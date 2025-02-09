@@ -39,7 +39,7 @@ void SV_CheckForBanAndDisconnect(CClient* const pClient, const string& svIPAddr,
 				{
 					const int nUserID = pClient->GetUserID();
 
-					pClient->Disconnect(Reputation_t::REP_MARK_BAD, svError.c_str());
+					pClient->Disconnect(Reputation_t::REP_MARK_BAD, "%s", svError.c_str());
 					Warning(eDLL_T::SERVER, "Removed client '[%s]:%i' from slot #%i ('%llu' is banned globally!)\n",
 						svIPAddr.c_str(), nPort, nUserID, nNucleusID);
 				}
