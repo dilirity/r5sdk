@@ -1109,7 +1109,7 @@ void CSurface::AppendHostParameters(string& svParameters)
 		}
 		}
 
-		AppendParameterInternal(svParameters, "+sv_pylonVisibility", szMode);
+		AppendParameterInternal(svParameters, "+pylon_host_visibility", szMode);
 	}
 }
 
