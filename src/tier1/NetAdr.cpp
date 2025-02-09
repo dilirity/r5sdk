@@ -83,7 +83,7 @@ void CNetAdr::ToString(char* pchBuffer, size_t unBufferSize, bool bOnlyBase) con
 		}
 		else
 		{
-			snprintf(pchBuffer, unBufferSize, "[%s]:%i", pStringBuf, ntohs(port));
+			snprintf(pchBuffer, unBufferSize, "[%s]:%i", pStringBuf, (int)ntohs(port));
 		}
 	}
 	else
