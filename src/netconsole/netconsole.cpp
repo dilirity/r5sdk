@@ -172,8 +172,10 @@ BOOL WINAPI CNetCon::CloseHandler(DWORD eventCode)
 //-----------------------------------------------------------------------------
 void CNetCon::TermSetup(const bool bAnsiColor)
 {
+	if (bAnsiColor)
+		Console_ColorInit();
+
 	SpdLog_Init(bAnsiColor);
-	Console_Init(bAnsiColor);
 
 	// Handle ctrl+x or X close events, give the application time to shutdown
 	// properly and flush all logging buffers.
