@@ -13,6 +13,8 @@
 #define TEXTURESTREAMING_H
 #include "public/rtech/istreamdb.h"
 
+#define TEXTURE_MAX_STREAMING_TEXTURE_HANDLES 0x4000
+
 struct MaterialGlue_s;
 struct TextureAsset_s;
 
@@ -102,7 +104,13 @@ struct TextureStreamMgr_s
 	Vector3D streamBspCameraPos;
 	float streamBspHalfFovX;
 	float streamBspViewWidth;
-	TextureAsset_s* streamableTextures[4];
+	TextureAsset_s* streamingTextures[TEXTURE_MAX_STREAMING_TEXTURE_HANDLES];
+	uint32_t numLoadedStreamingTextures;
+	void* unkHandle0;
+	void* unkHandle1;
+	void* unkHandle2;
+	void* unkHandle3;
+	RTL_SRWLOCK textureStreamMgrMutex;
 };
 
 enum TextureStreamMemory_e
