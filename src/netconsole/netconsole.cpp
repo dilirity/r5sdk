@@ -242,18 +242,27 @@ void CNetCon::RunInput(const string& lineInput)
 		{
 			if (V_strcmp(cmd.Arg(0), "PASS") == 0) // Auth with RCON server.
 			{
-				bSend = Serialize(vecMsg, cmd.Arg(1), "",
+				const char* const pass = cmd.Arg(1);
+				const size_t passLen = strlen(pass);
+
+				bSend = Serialize(vecMsg, pass, passLen, "", 0,
 					netcon::request_e::SERVERDATA_REQUEST_AUTH);
 			}
 			else // Execute command query.
 			{
-				bSend = Serialize(vecMsg, cmd.Arg(0), cmd.GetCommandString(),
+				const char* const request = cmd.Arg(0);
+				const size_t requestLen = strlen(request);
+
+				const char* const command = cmd.GetCommandString();
+				const size_t commandLen = strlen(command);
+
+				bSend = Serialize(vecMsg, request, requestLen, command, commandLen,
 					netcon::request_e::SERVERDATA_REQUEST_EXECCOMMAND);
 			}
 		}
 		else // Single arg command query.
 		{
-			bSend = Serialize(vecMsg, lineInput.c_str(), "", netcon::request_e::SERVERDATA_REQUEST_EXECCOMMAND);
+			bSend = Serialize(vecMsg, lineInput.c_str(), lineInput.length(), "", 0, netcon::request_e::SERVERDATA_REQUEST_EXECCOMMAND);
 		}
 
 		if (bSend) // Only send if serialization process was successful.
@@ -433,7 +442,7 @@ bool CNetCon::ProcessMessage(const char* pMsgBuf, const int nMsgLen)
 			if (!i) // Means we are marked 'input only' on the rcon server.
 			{
 				vector<char> vecMsg;
-				bool ret = Serialize(vecMsg, "", "1", netcon::request_e::SERVERDATA_REQUEST_SEND_CONSOLE_LOG);
+				bool ret = Serialize(vecMsg, "", 0, "1", 1, netcon::request_e::SERVERDATA_REQUEST_SEND_CONSOLE_LOG);
 
 				if (ret && !Send(GetSocket(), vecMsg.data(), int(vecMsg.size())))
 				{
@@ -465,14 +474,16 @@ bool CNetCon::ProcessMessage(const char* pMsgBuf, const int nMsgLen)
 // Purpose: serializes message to vector
 // Input  : &vecBuf - 
 //			*szReqBuf - 
+//			nReqMsgLen - 
 //			*svReqVal - 
+//			nReqValLen - 
 //			requestType - 
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool CNetCon::Serialize(vector<char>& vecBuf, const char* szReqBuf,
-	const char* szReqVal, const netcon::request_e requestType) const
+bool CNetCon::Serialize(vector<char>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
+	const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType) const
 {
-	return NetconClient_Serialize(this, vecBuf, szReqBuf, szReqVal, requestType, m_bEncryptFrames, true);
+	return NetconClient_Serialize(this, vecBuf, szReqBuf, nReqMsgLen, szReqVal, nReqValLen, requestType, m_bEncryptFrames, true);
 }
 
 //-----------------------------------------------------------------------------

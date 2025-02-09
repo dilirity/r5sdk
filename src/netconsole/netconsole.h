@@ -38,8 +38,8 @@ public:
 	virtual bool ProcessMessage(const char* pMsgBuf, const int nMsgLen) override;
 
 	void TrySetKey(const char* const pKey);
-	bool Serialize(vector<char>& vecBuf, const char* szReqBuf,
-		const char* szReqVal, const netcon::request_e requestType) const;
+	bool Serialize(vector<char>& vecBuf, const char* szReqBuf, const size_t nReqMsgLen,
+		const char* szReqVal, const size_t nReqValLen, const netcon::request_e requestType) const;
 
 	SocketHandle_t GetSocket(void);
 	bool IsInitialized(void) const;
