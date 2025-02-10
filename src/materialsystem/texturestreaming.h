@@ -13,7 +13,8 @@
 #define TEXTURESTREAMING_H
 #include "public/rtech/istreamdb.h"
 
-#define TEXTURE_MAX_STREAMING_TEXTURE_HANDLES 0x4000
+#define TEXTURE_MAX_STREAMING_TEXTURE_HANDLES 0x4000 // Used for TextureStreamMgr_s::streamingTextures (deprecated).
+#define TEXTURE_MAX_STREAMING_TEXTURE_HANDLES_NEW 0x8000 // Used for s_streamingTextureHandles.
 
 struct MaterialGlue_s;
 struct TextureAsset_s;
@@ -104,7 +105,23 @@ struct TextureStreamMgr_s
 	Vector3D streamBspCameraPos;
 	float streamBspHalfFovX;
 	float streamBspViewWidth;
-	TextureAsset_s* streamingTextures[TEXTURE_MAX_STREAMING_TEXTURE_HANDLES];
+
+	union
+	{
+		// Points to the new streaming texture array 's_streamingTextureHandles'.
+		// Which has a size of TEXTURE_MAX_STREAMING_TEXTURE_HANDLES_NEW See
+		// 's_streamingTextureHandles' for more information regarding this change.
+		TextureAsset_s** pStreamingTextures;
+
+		// This is the old streaming texture array, which has been replaced by
+		// 's_streamingTextureHandles'. It is no longer used, but its still in
+		// this struct as this array is still in the static runtime data of the
+		// game executable and we must dedicate this space to this array in
+		// order to maintain correct offsets for all the members of this struct
+		// that come after this array member.
+		TextureAsset_s* streamingTextures[TEXTURE_MAX_STREAMING_TEXTURE_HANDLES];
+	};
+
 	uint32_t numLoadedStreamingTextures;
 	void* unkHandle0;
 	void* unkHandle1;

@@ -28,7 +28,7 @@
 	uint8 streamedMipLevels;
 	uint8 unkPerMip[13];
 	uint64 texelCount;
-	uint16 streamedTextureIndex;
+	sint16 streamedTextureIndex; // Index into s_streamingTextureHandles, -1 if the texture doesn't have streaming mips.
 	uint8 loadedStreamedMipLevelCount;
 	uint8 totalStreamedMipLevelCount; // Does not get set until after RTech::CreateDXTexture.
 

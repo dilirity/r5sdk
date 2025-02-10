@@ -60,6 +60,55 @@
 // file wasn't provided for the level. We turn the conditional jump to an unconditional jump here to skip this code.
 0x3E0363: "jmp 0Fh"
 
+// -- TextureStreamMgr_FillItems
+0x3E97AF: mov rax, ds:[0x00000001635A7918] // Dereference pointer in old static array to access new static array.
+
+// -- Pak_UpdateTextureAsset
+// Previously, this LEA'd the address of 's_textureStreamMgr', and used the instructions below to offset into the
+// 'streamingTextures' member. But now we dereference and load the address of our new array directly into r14.
+0x3EC4DA: mov r14, ds:[0x00000001635A7918]
+
+// The following instruction patches remove the immediate '0x388' which is the actual offset to 'streamingTextures'
+// from the start of the struct 'TextureStreamMgr_s', since we store the address of our new array directly into r14
+// from the lea -> mov patch above, so we don't need to add that on top of the address.
+0x3EC551: mov rdx, qword ptr ds:[r14+rax*8]
+0x3EC559: mov qword ptr ds:[r14+rax*8], r10
+0x3EC56D: mov qword ptr ds:[r14+rax*8], rdx
+
+// -- TextureStreamMgr_GetStreamOverlay
+// Previously, this LEA'd the base address of our module, and used the instructions below to offset into the
+// 'streamingTextures' member using an immediate. But now we load the address of our new array directly into r12.
+0x3EA627: mov r12, qword ptr ds:[0x00000001635A7918]
+
+// The following patch removes the immediate '0x235A7918' which is the actual offset to 'streamingTextures'
+// from the base address of our module. Since we store the address of our new array directly into r12 from
+// the lea -> mov patch above, so we don't need to add that on top of the address.
+0x3EA632: mov r9, qword ptr ds:[r12+rax*8]
+
+// -- TextureStreamMgr_AddOrDrop
+0x3E9AFD: mov r15, qword ptr ds:[0x00000001635A7918] // Swap LEA module base with MOV 's_textureStreamMgr.streamingTextures'.
+0x3E9B8A: mov r15, qword ptr ds:[0x00000001635A7918] // Same as above.
+
+0x3E9B0B: mov r8, qword ptr ds:[r15+rax*8] // Remove immediate '0x235A7918'.
+0x3E9D5B: mov rcx, qword ptr ds:[r15+rax*8]
+0x3E9DC1: mov rcx, qword ptr ds:[r15+rax*8]
+0x3E9E30: mov r11, qword ptr ds:[r15+rax*8]
+
+// Dereference old array to get pointer to new array for the call to TextureStreamMgr_FillItems
+0x3E9C6B: mov r9, ds:[0x00000001635A7918]
+0x3E9CB0: mov rcx, qword ptr ds:[0x00000001635A7918]
+
+// r15 originally contained the module base, but this now contains the address of the new array,
+// the job_JT_RegisteredTypes array took advantage of the module base being in r15 and used that
+// to obtain JobType_s::field_2c at given array index. Since there wasn't enough space left inside
+// the current block, a jump had to be created to an empty section at the end of the .text segment
+// to recreate this logic. The module base is stored in r13 which will be clobbered directly after
+// the call to this function (TextureStreamMgr_AddOrDrop).
+0x3E9C7B: jmp 0x0000000141295119
+0x1294519: lea r13, ds:[0x0000000140000000]
+0x1294520: mov eax, dword ptr ds:[rax+r13*1+0x27EE1E2C]
+0x1294528: jmp 0x00000001403EA883
+
 /////////////////////////////
 /////////////////////////////
 ////    Code defects     ////
