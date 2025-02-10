@@ -18,6 +18,7 @@ History:
 // Console variables
 //-----------------------------------------------------------------------------
 static ConVar stream_overlay_memory("stream_overlay_memory", "524288", FCVAR_DEVELOPMENTONLY, "Total string memory to allocate for the texture streaming debug overlay.", true, 1.f, false, 0.0f);
+static ConVar stream_overlay_update_ticks("stream_overlay_update_ticks", "3", FCVAR_DEVELOPMENTONLY, "The number of ticks to skip before updating the texture streaming debug overlay.", true, 0.f, true, UINT8_MAX-1);
 
 //-----------------------------------------------------------------------------
 // Console commands
@@ -32,6 +33,8 @@ CStreamOverlay::CStreamOverlay(void)
 	m_surfaceLabel = "Stream Overlay";
 	m_scratchBuffer = nullptr;
 	m_scratchBufferSize = 0;
+	m_currentTextLength = 0;
+	m_numTicksSinceUpdate = 0;
 	m_lastAvailability = false;
 }
 CStreamOverlay::~CStreamOverlay(void)
@@ -128,10 +131,18 @@ bool CStreamOverlay::DrawSurface(void)
 
 	if (ImGui::BeginChild("##StreamReport", ImVec2(-1, -1), ImGuiChildFlags_Border, ImGuiWindowFlags_None))
 	{
-		ResizeScratchBuffer(stream_overlay_memory.GetInt());
+		const bool resized = ResizeScratchBuffer(stream_overlay_memory.GetInt());
 
-		TextureStreamMgr_GetStreamOverlay(stream_overlay_mode->GetString(), m_scratchBuffer, m_scratchBufferSize);
-		ImGui::TextUnformatted(m_scratchBuffer);
+		if (resized || m_numTicksSinceUpdate > stream_overlay_update_ticks.GetInt())
+		{
+			TextureStreamMgr_GetStreamOverlay(stream_overlay_mode->GetString(), m_scratchBuffer, m_scratchBufferSize);
+			m_currentTextLength = strlen(m_scratchBuffer);
+
+			m_numTicksSinceUpdate = 0;
+		}
+
+		ImGui::TextUnformatted(m_scratchBuffer, &m_scratchBuffer[m_currentTextLength]);
+		m_numTicksSinceUpdate++;
 	}
 
 	ImGui::EndChild();
@@ -143,18 +154,20 @@ bool CStreamOverlay::DrawSurface(void)
 //-----------------------------------------------------------------------------
 // Purpose: dynamically scale the scratch buffer if it became smaller or larger
 //-----------------------------------------------------------------------------
-void CStreamOverlay::ResizeScratchBuffer(const size_t newSize)
+bool CStreamOverlay::ResizeScratchBuffer(const size_t newSize)
 {
 	Assert(newSize > 0);
 
 	if (newSize == m_scratchBufferSize)
-		return; // Same size.
+		return false; // Same size.
 
 	if (m_scratchBuffer)
 		delete[] m_scratchBuffer;
 
 	m_scratchBuffer = new char[newSize];
 	m_scratchBufferSize = newSize;
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -168,6 +181,7 @@ void CStreamOverlay::FreeScratchBuffer(void)
 
 		m_scratchBuffer = nullptr;
 		m_scratchBufferSize = 0;
+		m_currentTextLength = 0;
 	}
 	else
 		Assert(m_scratchBufferSize == 0);
@@ -191,6 +205,10 @@ void CStreamOverlay::RenderToConsole(const char* const mode)
 	}
 
 	TextureStreamMgr_GetStreamOverlay(mode ? mode : stream_overlay_mode->GetString(), m_scratchBuffer, m_scratchBufferSize);
+	m_currentTextLength = strlen(m_scratchBuffer);
+
+	m_numTicksSinceUpdate = 0;
+
 	Msg(eDLL_T::MS, "%s\n", m_scratchBuffer);
 
 	if (isTemp)
@@ -199,6 +217,7 @@ void CStreamOverlay::RenderToConsole(const char* const mode)
 
 		m_scratchBuffer = nullptr;
 		m_scratchBufferSize = 0;
+		m_currentTextLength = 0;
 	}
 }
 

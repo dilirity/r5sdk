@@ -18,7 +18,7 @@ public:
 
 	void UpdateWindowAvailability(void);
 
-	void ResizeScratchBuffer(const size_t newSize);
+	bool ResizeScratchBuffer(const size_t newSize);
 	void FreeScratchBuffer(void);
 
 	void RenderToConsole(const char* const mode);
@@ -29,7 +29,9 @@ public:
 private:
 	char* m_scratchBuffer;
 	size_t m_scratchBufferSize;
+	size_t m_currentTextLength;
 
+	u8 m_numTicksSinceUpdate;
 	bool m_lastAvailability;
 };
 
