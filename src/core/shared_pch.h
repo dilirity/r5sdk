@@ -51,6 +51,10 @@
 
 #include <smmintrin.h>
 
+// Boost includes.
+#include "boost/charconv.hpp"
+#include "boost/regex.hpp"
+
 // Core includes.
 #include "core/assert.h"
 #include "core/termutil.h"
