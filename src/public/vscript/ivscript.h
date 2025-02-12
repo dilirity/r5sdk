@@ -32,7 +32,6 @@ enum ExtendedFieldType
 	FIELD_TYPEUNKNOWN1, // Unknown field from R2
 	FIELD_CSTRING,
 	FIELD_HSCRIPT,
-	FIELD_TYPEUNKNOWN2, // Unknown field from R5
 	FIELD_VARIANT,
 	FIELD_TYPEUNKNOWN3,
 	FIELD_TYPEUNKNOWN4,
@@ -51,12 +50,13 @@ inline const char* ScriptFieldTypeName(int16 eType)
 	case FIELD_CSTRING:	return "cstring";
 	case FIELD_VECTOR:	return "vector";
 	case FIELD_INTEGER:	return "integer";
+	case FIELD_EHANDLE: return "entity";
 	case FIELD_BOOLEAN:	return "boolean";
 	case FIELD_CHARACTER: return "character";
 	case FIELD_HSCRIPT:	return "hscript";
 	case FIELD_VARIANT:	return "variant";
 	case FIELD_ASSET: return "asset";
-	case FIELD_OSTRING: return "ostring";
+	case FIELD_OSTRING: return "string ornull";
 	default:	return "unknown_script_type";
 	}
 }
