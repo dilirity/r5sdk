@@ -769,7 +769,7 @@ void CSurface::ParseMaps()
 
 		const bool result = boost::regex_search(pFileName, &pFileName[fileName.length()], regexMatches, g_VpkDirFileRegex);
 
-		if (!result || !regexMatches.empty())
+		if (!result || regexMatches.empty())
 		{
 			continue;
 		}
