@@ -29,19 +29,19 @@ enum ScriptStatus_t
 enum ExtendedFieldType
 {
 	FIELD_TYPEUNKNOWN = FIELD_TYPECOUNT,
-	FIELD_TYPEUNKNOWN1, // Unknown field from R2
+	FIELD_NULL, // Seems to indicate that this binding is empty (see [r5apex.exe + 0x5DC183]).
 	FIELD_CSTRING,
 	FIELD_HSCRIPT,
 	FIELD_VARIANT,
 	FIELD_TYPEUNKNOWN3,
-	FIELD_TYPEUNKNOWN4,
-	FIELD_TYPEUNKNOWN5,
+	FIELD_ARRAY,
+	FIELD_TABLE,
 	FIELD_TYPEUNKNOWN6,
 	FIELD_ASSET,
 	FIELD_OSTRING
 };
 
-inline const char* ScriptFieldTypeName(int16 eType)
+inline const char* ScriptFieldTypeName(const int16 eType)
 {
 	switch (eType)
 	{
@@ -57,7 +57,7 @@ inline const char* ScriptFieldTypeName(int16 eType)
 	case FIELD_VARIANT:	return "variant";
 	case FIELD_ASSET: return "asset";
 	case FIELD_OSTRING: return "string ornull";
-	default:	return "unknown_script_type";
+	default: Assert(0); return "unknown_script_type";
 	}
 }
 
