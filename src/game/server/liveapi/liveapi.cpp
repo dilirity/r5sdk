@@ -2304,7 +2304,7 @@ void Script_RegisterLiveAPIFunctions(CSquirrelVM* const s)
 
 void Script_RegisterLiveAPIEnums(CSquirrelVM* const s)
 {
-	DEFINE_SCRIPTENUM_NAMED(s, "eLiveAPI_EventTypes", 0,
+	Script_RegisterEnumTable(s, "eLiveAPI_EventTypes", 0,
 		"ammoUsed",
 		"arenasItemDeselected",
 		"arenasItemSelected",

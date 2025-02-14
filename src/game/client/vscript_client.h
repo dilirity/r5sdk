@@ -36,15 +36,13 @@ void Script_RegisterUIFunctions(CSquirrelVM* s);
 void Script_RegisterUIServerFunctions(CSquirrelVM* s);
 void Script_RegisterCoreClientFunctions(CSquirrelVM* s);
 
-#define DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, functionName, helpString,     \
-	returnType, parameters)                                             \
-	s->RegisterFunction(#functionName, MKSTRING(Script_##functionName), \
-	helpString, returnType, parameters, VScriptCode::Client::##functionName);   \
+#define DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...) \
+	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(Client_Script_##functionName),  \
+	helpString, returnType, parameters, VScriptCode::Client::##functionName, __VA_ARGS__)        \
 
-#define DEFINE_UI_SCRIPTFUNC_NAMED(s, functionName, helpString,     \
-	returnType, parameters)                                             \
-	s->RegisterFunction(#functionName, MKSTRING(Script_##functionName), \
-	helpString, returnType, parameters, VScriptCode::Ui::##functionName);   \
+#define DEFINE_UI_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...)     \
+	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(UI_Script_##functionName),      \
+	helpString, returnType, parameters, VScriptCode::Ui::##functionName, __VA_ARGS__)            \
 
 inline void (*v_Script_RegisterClientEntityClassFuncs)();
 inline void (*v_Script_RegisterClientPlayerClassFuncs)();

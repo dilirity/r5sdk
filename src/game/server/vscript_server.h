@@ -33,10 +33,9 @@ void Script_RegisterAdminServerFunctions(CSquirrelVM* s);
 
 void Script_RegisterServerEnums(CSquirrelVM* const s);
 
-#define DEFINE_SERVER_SCRIPTFUNC_NAMED(s, functionName, helpString,     \
-	returnType, parameters)                                             \
-	s->RegisterFunction(#functionName, MKSTRING(Script_##functionName), \
-	helpString, returnType, parameters, VScriptCode::Server::##functionName);   \
+#define DEFINE_SERVER_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...) \
+	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(Server_Script_##functionName),  \
+	helpString, returnType, parameters, VScriptCode::Server::##functionName, __VA_ARGS__)        \
 
 inline void (*v_Script_RegisterServerEntityClassFuncs)();
 inline void (*v_Script_RegisterServerPlayerClassFuncs)();

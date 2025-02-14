@@ -70,14 +70,14 @@ struct ScriptFuncDescriptor_t
 		const SQChar* parameters)
 	{
 		m_ScriptName = scriptName;
-		m_Function = nativeName;
+		m_NativeName = nativeName;
 		m_Description = description;
 		m_ReturnType = returnType;
 		m_Parameters = parameters;
 	}
 
 	const SQChar* m_ScriptName;
-	const SQChar* m_Function;
+	const SQChar* m_NativeName;
 	const SQChar* m_Description;
 	const SQChar* m_ReturnType;
 	const SQChar* m_Parameters;
@@ -89,11 +89,11 @@ struct ScriptFunctionBinding_t
 {
 	ScriptFuncDescriptor_t m_Descriptor;
 	bool m_bCheckParams;
-	bool unk29; // 5th (new) parameter to 'sq_setparamscheck', see [r5apex_ds+10584F2]
+	bool m_bHasVariadicArgs; // True if we have variadic arguments (i.e. "[param1, param2, param3...]") 5th (new) parameter to 'sq_setparamscheck', see [r5apex_ds+10584F2]
 
 	SQInteger m_nDevLevel; // TODO: confirm, this is a guess.
 	const SQChar* m_pszCodeHook;
-	int unk38; // 4th (new) parameter to 'sq_setparamscheck', see [r5apex_ds+10584F2]
+	int m_nCodeHookFlags; // Has a value if m_pszCodeHook != NULL, 4th (new) parameter to 'sq_setparamscheck', see [r5apex_ds+10584F2]
 
 	ScriptDataType_t m_ReturnType;
 	CUtlVector<ScriptDataType_t> m_Parameters;
@@ -101,19 +101,18 @@ struct ScriptFunctionBinding_t
 
 	void Init(
 		const SQChar* scriptName, const SQChar* nativeName,
-		const SQChar* helpString, const SQChar* returnString,
-		const SQChar* parameters, const ScriptDataType_t returnType,
-		const ScriptFunctionBindingStorageType_t function)
+		const SQChar* helpString, const SQChar* returnType,
+		const SQChar* parameters, const ScriptFunctionBindingStorageType_t function)
 	{
-		m_Descriptor.Init(scriptName, nativeName, helpString, returnString, parameters);
+		m_Descriptor.Init(scriptName, nativeName, helpString, returnType, parameters);
 		m_bCheckParams = false;
-		unk29 = false;
+		m_bHasVariadicArgs = false;
 
 		m_nDevLevel = 0;
 		m_pszCodeHook = nullptr;
-		unk38 = 0;
+		m_nCodeHookFlags = 0;
 
-		m_ReturnType = returnType;
+		m_ReturnType = FIELD_NULL;
 		m_pFunction = function;
 	}
 };
@@ -258,14 +257,11 @@ static_assert(sizeof(ScriptVariant_t) == 0x10);
 struct ScriptClassDescriptor_t
 {
 	void AddFunction(const SQChar* scriptName, const SQChar* nativeName,
-		const SQChar* helpString, const SQChar* returnString,
-		const SQChar* parameters, const ScriptDataType_t returnType,
-		const ScriptFunctionBindingStorageType_t function)
+		const SQChar* helpString, const SQChar* returnType,
+		const SQChar* parameters, const ScriptFunctionBindingStorageType_t function)
 	{
-		const int index = m_FunctionBindings.AddToTail();
-		ScriptFunctionBinding_t& binding = m_FunctionBindings.Element(index);
-
-		binding.Init(scriptName, nativeName, helpString, returnString, parameters, returnType, function);
+		ScriptFunctionBinding_t* const binding = m_StrTypedFunctions.AddToTailGetPtr();
+		binding->Init(scriptName, nativeName, helpString, returnType, parameters, function);
 	}
 
 	const char* m_ScriptName;
@@ -273,14 +269,15 @@ struct ScriptClassDescriptor_t
 	const char* m_Description;
 
 	ScriptClassDescriptor_t* m_BaseDesc;
-	CUtlVector<ScriptFunctionBinding_t> m_FunctionBindings;
 
-	// TODO: CUtlMemory?
-	ssize_t m_Unk1;
-	ssize_t m_Unk2;
-	void* m_Unk3;
+	// Used for script functions that have their return and parameters types
+	// typed using the numeric field data (see fieldtype_t, ExtendedFieldType).
+	CUtlVector<ScriptFunctionBinding_t> m_NumTypedFunctions;
 
-	ScriptClassDescriptor_t* m_NextDesc;
+	// Used for script functions that have their return and parameter types
+	// typed as string, these go through the type compiler in the code
+	// function CSquirrelVM::RegisterFunctionGuts().
+	CUtlVector<ScriptFunctionBinding_t> m_StrTypedFunctions;
 };
 
 static_assert(sizeof(ScriptClassDescriptor_t) == 0x60);

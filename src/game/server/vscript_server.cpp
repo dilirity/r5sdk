@@ -347,7 +347,6 @@ static void Script_RegisterServerPlayerClassFuncs()
         "Change a variable in the player's class settings",
         "bool",
         "string, string",
-        5,
         VScriptCode::PlayerEntity::ScriptSetClassVar);
 }
 //---------------------------------------------------------------------------------

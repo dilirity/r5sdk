@@ -205,21 +205,12 @@ bool CSquirrelVM::ExecuteCodeCallback(const SQChar* const name)
 
 //---------------------------------------------------------------------------------
 // Purpose: registers a code function
-// Input  : *s - 
-//			*scriptName - 
-//			*nativeName - 
-//			*helpString - 
-//			*returnString - 
-//			*parameters - 
-//			*function - 
+// Input  : *binding - 
+//			useTypeCompiler - 
 //---------------------------------------------------------------------------------
-SQRESULT CSquirrelVM::RegisterFunction(const SQChar* scriptName, const SQChar* nativeName,
-	const SQChar* helpString, const SQChar* returnString, const SQChar* parameters, void* function)
+SQRESULT CSquirrelVM::RegisterFunction(ScriptFunctionBinding_t* const binding, const bool useTypeCompiler)
 {
-	ScriptFunctionBinding_t binding;
-	binding.Init(scriptName, nativeName, helpString, returnString, parameters, 5, function);
-
-	SQRESULT results = CSquirrelVM__RegisterFunction(this, &binding, 1);
+	SQRESULT results = CSquirrelVM__RegisterFunction(this, binding, useTypeCompiler);
 	return results;
 }
 
