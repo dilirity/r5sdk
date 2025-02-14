@@ -775,12 +775,13 @@ void CSurface::ParseMaps()
 		}
 
 		const boost::sub_match<const char*>& match = regexMatches[2];
+		const std::string mapName = match.str();
 
-		if (match.compare("frontend") == 0)
+		if (mapName.compare("frontend") == 0)
 		{
 			continue;
 		}
-		else if (match.compare("mp_common") == 0)
+		else if (mapName.compare("mp_common") == 0)
 		{
 			if (!this->m_MapCombo->Items.Contains("mp_lobby"))
 			{
@@ -790,11 +791,9 @@ void CSurface::ParseMaps()
 		}
 		else
 		{
-			const string mapName = match.str();
-
-			if (!this->m_MapCombo->Items.Contains(match.str().c_str()))
+			if (!this->m_MapCombo->Items.Contains(mapName.c_str()))
 			{
-				this->m_MapCombo->Items.Add(match.str().c_str());
+				this->m_MapCombo->Items.Add(mapName.c_str());
 			}
 		}
 	}
