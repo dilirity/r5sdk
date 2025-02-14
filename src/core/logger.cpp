@@ -15,7 +15,7 @@
 #ifndef _TOOLS
 #include "vscript/languages/squirrel_re/include/sqstdaux.h"
 #endif // !_TOOLS
-static const boost::regex s_AnsiRowRegex("\\\033\\[.*?m");
+static const boost::regex s_AnsiRowRegex(R"(\x1b\[[\d;]+m)");
 static std::mutex s_LogMutex;
 
 #if !defined (DEDICATED) && !defined (_TOOLS)
