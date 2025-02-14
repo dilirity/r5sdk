@@ -311,7 +311,10 @@ void CLauncher::SetupLaunchContext(const char* szConfig, const char* szGameDll, 
             }
             else
             {
-                commandLine.SetLength(strlen(commandLine.String()));
+                const size_t len = strlen(commandLine.String());
+
+                commandLine.SetLength(len);
+                commandLine.Access()[len] = '\0';
             }
         }
         else // Failed to open config file.
