@@ -197,11 +197,12 @@ void Mod_GetAllInstalledMaps()
             continue;
 
         const boost::csub_match& match = regexMatches[2];
+        const std::string mapName = match.str();
 
-        if (match.compare("frontend") == 0)
+        if (mapName.compare("frontend") == 0)
             continue; // Frontend contains no BSP's.
 
-        else if (match.compare("mp_common") == 0)
+        else if (mapName.compare("mp_common") == 0)
         {
             if (!g_InstalledMaps.HasElement("mp_lobby"))
                 g_InstalledMaps.AddToTail("mp_lobby");
@@ -210,7 +211,6 @@ void Mod_GetAllInstalledMaps()
         }
         else
         {
-            const string mapName = match.str();
             bool found = false;
 
             FOR_EACH_VEC(g_InstalledMaps, j)
