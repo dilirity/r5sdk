@@ -185,11 +185,11 @@ CMemory CModule::FindPatternSIMD(const uint8_t* pPattern, const char* szMask,
 //          *moduleSection - 
 // Output : CMemory
 //-----------------------------------------------------------------------------
-CMemory CModule::FindPatternSIMD(const char* szPattern,
+CMemory CModule::FindPatternSIMD_Impl(const char* szPattern, const size_t patternLen,
 	const ModuleSections_t* moduleSection) const
 {
 	uint64_t nRVA;
-	if (g_SigCache.FindEntry(szPattern, nRVA))
+	if (g_SigCache.FindEntry(szPattern, patternLen, nRVA))
 	{
 		return CMemory(nRVA + GetModuleBase());
 	}
@@ -200,7 +200,7 @@ CMemory CModule::FindPatternSIMD(const char* szPattern,
 	const CMemory memory = FindPatternSIMD(patternInfo.first.data(),
 		patternInfo.second.c_str(), moduleSection);
 
-	g_SigCache.AddEntry(szPattern, GetRVA(memory.GetPtr()));
+	g_SigCache.AddEntry(szPattern, patternLen, GetRVA(memory.GetPtr()));
 	return memory;
 }
 
@@ -221,7 +221,7 @@ CMemory CModule::FindString(const char* szString, const ptrdiff_t nOccurrence,
 	uint64_t nRVA;
 	string svPackedString = szString + std::to_string(nOccurrence);
 
-	if (g_SigCache.FindEntry(svPackedString.c_str(), nRVA))
+	if (g_SigCache.FindEntry(svPackedString.c_str(), svPackedString.length(), nRVA))
 	{
 		return CMemory(nRVA + GetModuleBase());
 	}
@@ -260,7 +260,7 @@ CMemory CModule::FindString(const char* szString, const ptrdiff_t nOccurrence,
 				if (nOccurrence == dOccurrencesFound)
 				{
 					resultAddress = CMemory(&pTextStart[i]);
-					g_SigCache.AddEntry(svPackedString.c_str(), GetRVA(resultAddress.GetPtr()));
+					g_SigCache.AddEntry(svPackedString.c_str(), svPackedString.length(), GetRVA(resultAddress.GetPtr()));
 
 					return resultAddress;
 				}
@@ -271,7 +271,7 @@ CMemory CModule::FindString(const char* szString, const ptrdiff_t nOccurrence,
 	}
 
 	resultAddress = CMemory(pLatestOccurrence);
-	g_SigCache.AddEntry(svPackedString.c_str(), GetRVA(resultAddress.GetPtr()));
+	g_SigCache.AddEntry(svPackedString.c_str(), svPackedString.length(), GetRVA(resultAddress.GetPtr()));
 
 	return resultAddress;
 }
@@ -289,8 +289,10 @@ CMemory CModule::FindStringReadOnly(const char* szString, bool bNullTerminator) 
 	if (!readOnlyData.IsSectionValid())
 		return nullptr;
 
+	const size_t stringLength = strlen(szString);
+
 	uint64_t nRVA;
-	if (g_SigCache.FindEntry(szString, nRVA))
+	if (g_SigCache.FindEntry(szString, stringLength, nRVA))
 	{
 		return CMemory(nRVA + GetModuleBase());
 	}
@@ -321,7 +323,7 @@ CMemory CModule::FindStringReadOnly(const char* szString, bool bNullTerminator) 
 		if (bFound)
 		{
 			CMemory result = CMemory(&pBase[i]);
-			g_SigCache.AddEntry(szString, GetRVA(result.GetPtr()));
+			g_SigCache.AddEntry(szString, stringLength, GetRVA(result.GetPtr()));
 
 			return result;
 		}
@@ -406,7 +408,7 @@ CMemory CModule::GetVirtualMethodTable(const char* szTableName, const size_t nRe
 	uint64_t nRVA;
 	string svPackedTableName = szTableName + std::to_string(nRefIndex);
 
-	if (g_SigCache.FindEntry(svPackedTableName.c_str(), nRVA))
+	if (g_SigCache.FindEntry(svPackedTableName.c_str(), svPackedTableName.length(), nRVA))
 	{
 		return CMemory(nRVA + GetModuleBase());
 	}
@@ -457,7 +459,7 @@ CMemory CModule::GetVirtualMethodTable(const char* szTableName, const size_t nRe
 		CMemory vfTable = FindPatternSIMD(reinterpret_cast<rsig_t>(
 			&referenceOffset), "xxxxxxxx", &moduleSection).OffsetSelf(0x8);
 
-		g_SigCache.AddEntry(svPackedTableName.c_str(), GetRVA(vfTable.GetPtr()));
+		g_SigCache.AddEntry(svPackedTableName.c_str(), svPackedTableName.length(), GetRVA(vfTable.GetPtr()));
 		return vfTable;
 	}
 
