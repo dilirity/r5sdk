@@ -99,12 +99,13 @@ void CModule::LoadSections()
 // Purpose: find array of bytes in process memory using SIMD instructions
 // Input  : *pPattern      - 
 //          *szMask        - 
+//          nPatternLen    - 
 //          *moduleSection - 
 //          nOccurrence    - 
 // Output : CMemory
 //-----------------------------------------------------------------------------
-CMemory CModule::FindPatternSIMD(const uint8_t* pPattern, const char* szMask,
-	const ModuleSections_t* moduleSection, const size_t nOccurrence) const
+CMemory CModule::FindPatternSIMD(const uint8_t* pPattern, const char* szMask, const size_t nPatternLen,
+								 const ModuleSections_t* moduleSection, const size_t nOccurrence) const
 {
 	const ModuleSections_t& executableCode = GetSectionByName(".text");
 
@@ -118,18 +119,19 @@ CMemory CModule::FindPatternSIMD(const uint8_t* pPattern, const char* szMask,
 	const QWORD nSize = bSectionValid ?
 		moduleSection->m_nSectionSize : executableCode.m_nSectionSize;
 
-	const size_t nMaskLen = strlen(szMask);
 	const uint8_t* pData = reinterpret_cast<uint8_t*>(nBase);
-	const uint8_t* pEnd = pData + nSize - nMaskLen;
+	const uint8_t* pEnd = pData + nSize - nPatternLen;
 
 	size_t nOccurrenceCount = 0;
 	int nMasks[128]; // 128*16 = enough masks for 2048 bytes.
-	const int iNumMasks = static_cast<int>(ceil(static_cast<float>(nMaskLen) / 16.f));
+	const int iNumMasks = static_cast<int>(ceil(static_cast<float>(nPatternLen) / 16.f));
 
 	memset(nMasks, '\0', iNumMasks * sizeof(int));
 	for (intptr_t i = 0; i < iNumMasks; ++i)
 	{
-		for (intptr_t j = strnlen(szMask + i * 16, 16) - 1; j >= 0; --j)
+		const size_t chunkLen = Min(nPatternLen - i * 16, 16llu);
+
+		for (intptr_t j = chunkLen - 1; j >= 0; --j)
 		{
 			if (szMask[i * 16 + j] == 'x')
 			{
@@ -198,7 +200,7 @@ CMemory CModule::FindPatternSIMD_Impl(const char* szPattern, const size_t patter
 		patternInfo = PatternToMaskedBytes(szPattern);
 
 	const CMemory memory = FindPatternSIMD(patternInfo.first.data(),
-		patternInfo.second.c_str(), moduleSection);
+		patternInfo.second.c_str(), patternInfo.second.length(), moduleSection);
 
 	g_SigCache.AddEntry(szPattern, patternLen, GetRVA(memory.GetPtr()));
 	return memory;
@@ -418,7 +420,7 @@ CMemory CModule::GetVirtualMethodTable(const char* szTableName, const size_t nRe
 
 	const auto tableNameInfo = StringToMaskedBytes(szTableName, false);
 	CMemory rttiTypeDescriptor = FindPatternSIMD(tableNameInfo.first.data(),
-		tableNameInfo.second.c_str(), &dataSection).OffsetSelf(-0x10);
+		tableNameInfo.second.c_str(), tableNameInfo.second.length(), &dataSection).OffsetSelf(-0x10);
 
 	if (!rttiTypeDescriptor)
 		return nullptr;
@@ -436,7 +438,7 @@ CMemory CModule::GetVirtualMethodTable(const char* szTableName, const size_t nRe
 		moduleSection = { scanStart, readOnlyData.m_nSectionSize };
 
 		CMemory reference = FindPatternSIMD(reinterpret_cast<rsig_t>(
-			&rttiTDRva), "xxxx", &moduleSection, nRefIndex);
+			&rttiTDRva), "xxxx", sizeof("xxxx")-1, &moduleSection, nRefIndex);
 
 		if (!reference)
 			break;
@@ -457,7 +459,7 @@ CMemory CModule::GetVirtualMethodTable(const char* szTableName, const size_t nRe
 		moduleSection = {readOnlyData.m_pSectionBase, readOnlyData.m_nSectionSize };
 
 		CMemory vfTable = FindPatternSIMD(reinterpret_cast<rsig_t>(
-			&referenceOffset), "xxxxxxxx", &moduleSection).OffsetSelf(0x8);
+			&referenceOffset), "xxxxxxxx", sizeof("xxxxxxxx")-1, &moduleSection).OffsetSelf(0x8);
 
 		g_SigCache.AddEntry(svPackedTableName.c_str(), svPackedTableName.length(), GetRVA(vfTable.GetPtr()));
 		return vfTable;

@@ -75,7 +75,7 @@ public:
 	void                 UnlinkFromPEB(void) const;
 
 private:
-	CMemory FindPatternSIMD(const uint8_t* pPattern, const char* szMask,
+	CMemory FindPatternSIMD(const uint8_t* pPattern, const char* szMask, const size_t nPatternLen,
 		const ModuleSections_t* moduleSection = nullptr, const size_t nOccurrence = 0) const;
 
 	QWORD                m_pModuleBase;
