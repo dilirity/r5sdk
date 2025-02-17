@@ -9,14 +9,15 @@
 
 #include "public/appframework/IAppSystem.h"
 
+class CAppSystemGroup;
+
 struct StartupInfo_t
 {
 	void* m_pInstance;
-	const char m_szBaseDirectory[260];
-	const char m_szInitialMod[260];
-	const char m_szInitialGame[260];
-	uint8_t m_pParentAppSystemGroup[236];
-	bool m_bTextMode;
+	char m_szBaseDirectory[MAX_OSPATH];
+	char m_szInitialMod[MAX_OSPATH];
+	char m_szInitialGame[MAX_OSPATH];
+	CAppSystemGroup* m_pParentAppSystemGroup;
 };
 
 //-----------------------------------------------------------------------------

@@ -134,26 +134,7 @@ void CEngineAPI::VSetStartupInfo(CEngineAPI* pEngineAPI, StartupInfo_t* pStartup
     g_pEngineParms->baseDirectory = g_szBaseDir;
     g_szBaseDir[nBufLen-1] = '\0';
 
-    void** pCurrentInstance = &pEngineAPI->m_StartupInfo.m_pInstance;
-    size_t nInstances = 6;
-    do
-    {
-        pCurrentInstance += 16;
-        uint64_t pInstance = *(_QWORD*)&pStartupInfo->m_pInstance;
-        pStartupInfo = (StartupInfo_t*)((char*)pStartupInfo + 128);
-        *((_QWORD*)pCurrentInstance - 8) = pInstance;
-        *((_QWORD*)pCurrentInstance - 7) = *(_QWORD*)&pStartupInfo[-1].m_pParentAppSystemGroup[132];
-        *((_QWORD*)pCurrentInstance - 6) = *(_QWORD*)&pStartupInfo[-1].m_pParentAppSystemGroup[148];
-        *((_QWORD*)pCurrentInstance - 5) = *(_QWORD*)&pStartupInfo[-1].m_pParentAppSystemGroup[164];
-        *((_QWORD*)pCurrentInstance - 4) = *(_QWORD*)&pStartupInfo[-1].m_pParentAppSystemGroup[180];
-        *((_QWORD*)pCurrentInstance - 3) = *(_QWORD*)&pStartupInfo[-1].m_pParentAppSystemGroup[196];
-        *((_QWORD*)pCurrentInstance - 2) = *(_QWORD*)&pStartupInfo[-1].m_pParentAppSystemGroup[212];
-        *((_QWORD*)pCurrentInstance - 1) = *(_QWORD*)&pStartupInfo[-1].m_pParentAppSystemGroup[228];
-        --nInstances;
-    } while (nInstances);
-    *(_QWORD*)pCurrentInstance = *(_QWORD*)&pStartupInfo->m_pInstance;
-    *((_QWORD*)pCurrentInstance + 1) = *(_QWORD*)&pStartupInfo->m_szBaseDirectory[8];
-
+    pEngineAPI->m_StartupInfo = *pStartupInfo;
     InitVPKSystem();
 
     v_TRACEINIT(NULL, "COM_InitFilesystem( m_StartupInfo.m_szInitialMod )", "COM_ShutdownFileSystem()");
