@@ -74,7 +74,7 @@ struct TextureStreamMgr_s
 {
 	bool initialised;
 	bool hasResidentPages;
-	char filePath[260]; // size=MAX_PATH.
+	char filePath[MAX_OSPATH];
 	char gap_105[2];
 	int fileHandle; // STBSP file handle.
 	char gap_10b[4];
