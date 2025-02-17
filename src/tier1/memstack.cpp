@@ -477,7 +477,7 @@ void CMemoryStack::PrintContents() const
 	}
 
 	MEMORY_BASIC_INFORMATION info;
-	char moduleName[260];
+	char moduleName[ MAX_OSPATH ];
 	strcpy( moduleName, "unknown module" );
 	// Because this code is statically linked into each DLL, this function and the PrintStatus
 	// function will be in the DLL that constructed the CMemoryStack object. We can then
