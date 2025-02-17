@@ -56,13 +56,13 @@ static bool IsRespawnMod(const char* pModName)
 //-----------------------------------------------------------------------------
 static void InitVPKSystem()
 {
-    char szCacheEnableFilePath[260]; // [rsp+20h] [rbp-118h] BYREF
+    char szCacheEnableFilePath[MAX_OSPATH];
     char bFixSlashes = FileSystem()->GetCurrentDirectory(szCacheEnableFilePath, sizeof(szCacheEnableFilePath)) ? szCacheEnableFilePath[0] : '\0';
 
     size_t nCachePathLen = strlen(szCacheEnableFilePath);
     size_t nCacheFileLen = sizeof(DFS_ENABLE_PATH)-1;
 
-    if ((nCachePathLen + nCacheFileLen) < 0x104 || (nCacheFileLen = (sizeof(szCacheEnableFilePath)-1) - nCachePathLen, nCachePathLen != (sizeof(szCacheEnableFilePath)-1)))
+    if ((nCachePathLen + nCacheFileLen) < MAX_OSPATH || (nCacheFileLen = (MAX_OSPATH-1) - nCachePathLen, nCachePathLen != (MAX_OSPATH-1)))
     {
         strncat(szCacheEnableFilePath, DFS_ENABLE_PATH, nCacheFileLen)[sizeof(szCacheEnableFilePath)-1] = '\0';
         bFixSlashes = szCacheEnableFilePath[0];

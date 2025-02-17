@@ -68,7 +68,7 @@ public:
 	bool m_bExternal;
 	bool m_bUnk;
 	int m_nLumpID;
-	char m_szLumpFilename[260];
+	char m_szLumpFilename[MAX_OSPATH];
 };
 
 inline void*(*CModelLoader__FindModel)(CModelLoader* loader, const char* pszModelName);
