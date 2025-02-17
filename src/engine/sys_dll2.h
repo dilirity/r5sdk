@@ -32,7 +32,7 @@ public:
 	static void UpdateLowLatencyParameters();
 
 	static bool MainLoop();
-//private:
+private:
 	void* m_hEditorHWnd;
 	bool m_bRunningSimulation;
 	StartupInfo_t m_StartupInfo;
