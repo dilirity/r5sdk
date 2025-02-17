@@ -108,11 +108,23 @@ bool CClient::Authenticate(const char* const playerName, char* const reasonBuf, 
 	KeyValues* const cl_onlineAuthTokenSignature1Kv = this->m_ConVars->FindKey("cl_onlineAuthTokenSignature1");
 	KeyValues* const cl_onlineAuthTokenSignature2Kv = this->m_ConVars->FindKey("cl_onlineAuthTokenSignature2");
 
-	if (!cl_onlineAuthTokenKv || !cl_onlineAuthTokenSignature1Kv)
+	if (!cl_onlineAuthTokenKv)
 		ERROR_AND_RETURN("Missing token");
+
+	if (!cl_onlineAuthTokenSignature1Kv)
+		ERROR_AND_RETURN("Missing signature");
 
 	const char* const onlineAuthToken = cl_onlineAuthTokenKv->GetString();
 	const char* const onlineAuthTokenSignature1 = cl_onlineAuthTokenSignature1Kv->GetString();
+
+	if (!*onlineAuthToken)
+		ERROR_AND_RETURN("Empty token");
+
+	if (!*onlineAuthTokenSignature1)
+		ERROR_AND_RETURN("Empty signature");
+
+	// Note: don't check on this as this part is optional, and only used if the
+	// token signature length is > 255 characters.
 	const char* const onlineAuthTokenSignature2 = cl_onlineAuthTokenSignature2Kv->GetString();
 
 	char fullToken[1024]; // enough buffer for 3x255, which is cvar count * userinfo str limit.
@@ -156,10 +168,12 @@ bool CClient::Authenticate(const char* const playerName, char* const reasonBuf, 
 	bool foundSessionId = false;
 	for (size_t i = 0; i < numClaims; ++i)
 	{
+		const l8w8jwt_claim& claim = claims[i];
+
 		// session id
-		if (!strcmp(claims[i].key, "sessionId"))
+		if (!strcmp(claim.key, "sessionId"))
 		{
-			const char* const sessionId = claims[i].value;
+			const char* const sessionId = claim.value;
 
 			char newId[256];
 			const int idLen = snprintf(newId, sizeof(newId), "%llu-%s-%s",
@@ -171,7 +185,7 @@ bool CClient::Authenticate(const char* const playerName, char* const reasonBuf, 
 				ERROR_AND_RETURN("Session ID stitching failed");
 
 			uint8_t sessionHash[32]; // hash decoded from JWT token
-			V_hextobinary(sessionId, strlen(sessionId), sessionHash, sizeof(sessionHash));
+			V_hextobinary(sessionId, claim.value_length, sessionHash, sizeof(sessionHash));
 
 			uint8_t oobHash[32]; // hash of data collected from out of band packet
 			const int shRet = mbedtls_sha256((const uint8_t*)newId, idLen, oobHash, NULL);
@@ -226,7 +240,7 @@ bool CClient::Connect(const char* szName, CNetChan* pNetChan, bool bFakePlayer,
 		char authFailReason[512];
 		if (!Authenticate(szName, authFailReason, sizeof(authFailReason)))
 		{
-			REJECT_CONNECTION("Failed to verify authentication token [%s]", authFailReason);
+			REJECT_CONNECTION("Failed to verify authentication token! [%s]", authFailReason);
 
 			const bool bEnableLogging = sv_showconnecting.GetBool();
 			if (bEnableLogging)
