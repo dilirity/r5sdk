@@ -382,24 +382,26 @@ bool CLauncher::LaunchProcess() const
             {
                 // Just print the result, don't return, as
                 // the process was created successfully.
-                PrintLastError();
+                Warning(eDLL_T::COMMON, "Failed to set process affinity mask: [%s]\n", 
+                    std::system_category().message((int)(::GetLastError())).c_str());
             }
         }
+
+        ///////////////////////////////////////////////////////////////////////
+        // Resume the process.
+        ResumeThread(ProcInfo.hThread);
+
+        ///////////////////////////////////////////////////////////////////////
+        // Close the process and thread handles.
+        CloseHandle(ProcInfo.hProcess);
+        CloseHandle(ProcInfo.hThread);
     }
     else
     {
-        PrintLastError();
+        Error(eDLL_T::COMMON, 0, "Failed to create process: [%s]\n",
+            std::system_category().message((int)(::GetLastError())).c_str());
         return false;
     }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Resume the process.
-    ResumeThread(ProcInfo.hThread);
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Close the process and thread handles.
-    CloseHandle(ProcInfo.hProcess);
-    CloseHandle(ProcInfo.hThread);
 
     return true;
 }
