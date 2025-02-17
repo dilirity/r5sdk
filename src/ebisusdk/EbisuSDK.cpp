@@ -105,8 +105,12 @@ bool IsOriginInitialized()
 		&& (*g_EbisuSDKInit)
 		&& (*g_NucleusID)
 		&& (*g_EbisuProfileInit)))
+	// Note(amos): checks on these are disabled because we should be able to
+	// load into the game without an origin or nucleus token. There won't be
+	// a token if the game is launched with -offline for example, these are
+	// only used for the platform system and online server authentication.
 	//	&& (*g_OriginAuthCode)
-	//		&& (g_NucleusToken[0])))
+	//	&& (g_NucleusToken[0])))
 	{
 		return true;
 	}
