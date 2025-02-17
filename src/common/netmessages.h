@@ -215,7 +215,7 @@ public:
 	bf_read m_DataIn;
 	bf_write m_DataOut;
 	char m_bDataCompressed;
-	char m_szTableNameBuffer[260];
+	char m_szTableNameBuffer[256];
 };
 
 class SVC_Print : public CNetMessage
