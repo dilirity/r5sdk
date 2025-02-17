@@ -190,6 +190,7 @@ void SDK_Shutdown()
     Winsock_Shutdown();
 
     curl_global_cleanup();
+    google::protobuf::ShutdownProtobufLibrary();
 
     SpdLog_Shutdown();
 
