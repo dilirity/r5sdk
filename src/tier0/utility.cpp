@@ -136,31 +136,6 @@ void DbgPrint(const char* const sFormat, ...)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// For printing the last error to the console if any.
-void PrintLastError(void)
-{
-    const DWORD errorMessageID = ::GetLastError();
-
-    if (errorMessageID != NULL)
-    {
-        LPSTR messageBuffer;
-        const DWORD size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
-
-        if (size > 0)
-        {
-            spdlog::error("{:s}\n", messageBuffer);
-            LocalFree(messageBuffer);
-        }
-        else // FormatMessageA failed.
-        {
-            spdlog::error("{:s}: Failed: {:s}\n", __FUNCTION__, 
-                std::system_category().message(static_cast<int>(::GetLastError())));
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // For dumping data from a buffer to a file on the disk.
 void HexDump(const char* const szHeader, const char* const szLogger, const void* const pData, const size_t nSize)
 {

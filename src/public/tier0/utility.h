@@ -12,7 +12,6 @@ MODULEINFO GetModuleInfo(const char* const szModule);
 /////////////////////////////////////////////////////////////////////////////
 // Debug
 void DbgPrint(const char* const sFormat, ...);
-void PrintLastError(void);
 void HexDump(const char* const szHeader, const char* const szLogger, const void* const pData, const size_t nSize);
 
 /////////////////////////////////////////////////////////////////////////////
