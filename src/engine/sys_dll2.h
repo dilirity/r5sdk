@@ -49,8 +49,8 @@ inline void(*CEngineAPI__SetStartupInfo)(CEngineAPI* pEngineAPI, StartupInfo_t* 
 inline void*(*v_ResetMTVFTaskItem)(void);
 inline void(*v_PakFile_Init)(char* buffer, char* source, char vpk_file);
 
-inline bool* g_bTextMode = nullptr;
-inline char* g_szBaseDir = nullptr; // static size = 260
+inline bool* g_bStartupInfoSet = nullptr;
+inline char* g_szBaseDir = nullptr; // static size = MAX_OSPATH
 inline int64_t* g_pMTVFTaskItem = nullptr; // struct.
 inline char* g_szMTVFItemName = nullptr;
 
@@ -69,7 +69,7 @@ class VSys_Dll2 : public IDetour
 		LogFunAdr("CEngineAPI::SetStartupInfo", CEngineAPI__SetStartupInfo);
 		LogFunAdr("ResetMTVFTaskItem", v_ResetMTVFTaskItem);
 		LogFunAdr("PakFile_Init", v_PakFile_Init);
-		LogVarAdr("g_bTextMode", g_bTextMode);
+		LogVarAdr("g_bStartupInfoSet", g_bStartupInfoSet);
 		LogVarAdr("g_szBaseDir", g_szBaseDir);
 		LogVarAdr("g_pMTVFTaskItem", g_pMTVFTaskItem);
 		LogVarAdr("g_szMTVFItemName", g_szMTVFItemName);
@@ -89,7 +89,7 @@ class VSys_Dll2 : public IDetour
 	}
 	virtual void GetVar(void) const
 	{
-		g_bTextMode = CMemory(CEngineAPI__SetStartupInfo).FindPattern("80 3D", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x2, 0x7).RCast<bool*>();
+		g_bStartupInfoSet = CMemory(CEngineAPI__SetStartupInfo).FindPattern("80 3D", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x2, 0x7).RCast<bool*>();
 		g_szBaseDir = CMemory(CEngineAPI__SetStartupInfo).FindPattern("48 8D", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x3, 0x7).RCast<char*>();
 
 		g_pMTVFTaskItem = CMemory(v_ResetMTVFTaskItem).FindPattern("48 8B", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x3, 0x7).RCast<int64_t*>();

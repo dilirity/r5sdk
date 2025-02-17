@@ -123,7 +123,7 @@ bool CEngineAPI::OnStartup(CEngineAPI* pEngineAPI, void* pInstance, const char* 
 //-----------------------------------------------------------------------------
 void CEngineAPI::VSetStartupInfo(CEngineAPI* pEngineAPI, StartupInfo_t* pStartupInfo)
 {
-    if (*g_bTextMode)
+    if (*g_bStartupInfoSet)
     {
         return;
     }
@@ -140,7 +140,7 @@ void CEngineAPI::VSetStartupInfo(CEngineAPI* pEngineAPI, StartupInfo_t* pStartup
     v_TRACEINIT(NULL, "COM_InitFilesystem( m_StartupInfo.m_szInitialMod )", "COM_ShutdownFileSystem()");
     v_COM_InitFilesystem(pEngineAPI->m_StartupInfo.m_szInitialMod);
 
-    *g_bTextMode = true;
+    *g_bStartupInfoSet = true;
 }
 
 //-----------------------------------------------------------------------------
