@@ -97,4 +97,7 @@ namespace rapidjson { typedef ::std::size_t SizeType; }
 #include "tier1/tier1.h"
 #include "tier1/cvar.h"
 #include "tier1/cmd.h"
+
+// Common includes.
 #include "common/global.h"
+#include "common/qlimits.h"
