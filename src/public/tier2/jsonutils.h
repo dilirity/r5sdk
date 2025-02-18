@@ -289,11 +289,13 @@ inline bool JSON_GetValue(const T& data, typename T::StringRefType member, V& ou
 template <class T>
 inline bool JSON_GetValue(const T& data, typename T::StringRefType member, std::string& out)
 {
-    const char* stringVal;
+    rapidjson::Document::ConstMemberIterator it;
 
-    if (JSON_GetValue(data, member, JSONFieldType_e::kString, stringVal))
+    if (JSON_GetIterator(data, member, JSONFieldType_e::kString, it))
     {
-        out = stringVal;
+        const rapidjson::Value& val = it->value;
+        out.assign(val.GetString(), val.GetStringLength());
+
         return true;
     }
 
