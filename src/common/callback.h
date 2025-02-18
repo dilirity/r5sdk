@@ -3,7 +3,9 @@
 inline bool(*v_SetupGamemode)(const char* pszPlayList);
 
 /* ==== CONCOMMANDCALLBACK ============================================================================================================================================== */
+#ifndef CLIENT_DLL
 inline void(*v__Host_ChangeLevel_f)(const CCommand& args);
+#endif // !CLIENT_DLL
 inline void(*v__Cmd_Exec_f)(const CCommand& args);
 inline void(*v__setClassVarServer_f)(const CCommand& args);
 inline void(*v__setClassVarClient_f)(const CCommand& args);
@@ -49,7 +51,9 @@ class VCallback : public IDetour
 	virtual void GetAdr(void) const
 	{
 		LogFunAdr("SetupGamemode", v_SetupGamemode);
+#ifndef CLIENT_DLL
 		LogFunAdr("Host_ChangeLevel_f", v__Host_ChangeLevel_f);
+#endif // !CLIENT_DLL
 		LogFunAdr("Cmd_Exec_f", v__Cmd_Exec_f);
 		LogFunAdr("SetClassVarServer_f", v__setClassVarServer_f);
 		LogFunAdr("SetClassVarClient_f", v__setClassVarClient_f);
@@ -60,7 +64,9 @@ class VCallback : public IDetour
 	virtual void GetFun(void) const
 	{
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC 20 48 8B D9 48 C7 C0 ?? ?? ?? ??").GetPtr(v_SetupGamemode);
+#ifndef CLIENT_DLL
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 83 79 ?? ?? 48 8B D9 7C ?? 83 3D").GetPtr(v__Host_ChangeLevel_f);
+#endif // !CLIENT_DLL
 		Module_FindPattern(g_GameDll, "40 55 53 48 8D AC 24 ?? ?? ?? ?? B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 2B E0 48 8B D9").GetPtr(v__Cmd_Exec_f);
 		Module_FindPattern(g_GameDll, "41 56 48 83 EC ?? 8B 05 ?? ?? ?? ?? 4C 8B F1 FF C0").GetPtr(v__setClassVarServer_f);
 		Module_FindPattern(g_GameDll, "4C 8B DC 57 48 81 EC ?? ?? ?? ?? 8B 05").GetPtr(v__setClassVarClient_f);

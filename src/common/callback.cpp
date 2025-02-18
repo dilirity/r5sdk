@@ -607,7 +607,9 @@ void UIScript_Reset_f()
 
 void VCallback::Detour(const bool bAttach) const
 {
+#ifndef CLIENT_DLL
 	DetourSetup(&v__Host_ChangeLevel_f, &Host_Changelevel_f, bAttach);
+#endif // !CLIENT_DLL
 	DetourSetup(&v__Cmd_Exec_f, &Cmd_Exec_f, bAttach);
 #ifndef DEDICATED
 	DetourSetup(&v__UIScript_Reset_f, &UIScript_Reset_f, bAttach);
