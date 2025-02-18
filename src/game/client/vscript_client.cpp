@@ -107,7 +107,8 @@ namespace VScriptCode
                     if (!g_pUIScript)
                         return;
 
-                    HSCRIPT onRequestComplete = g_pUIScript->FindFunction("UICodeCallback_OnServerListRequestCompleted", "void functionref( bool success, string errorMsg, int serverCount )", nullptr);
+                    HSCRIPT onRequestComplete = g_pUIScript->FindFunction("UICodeCallback_OnServerListRequestCompleted",
+                        "void functionref( bool success, string errorMsg, int serverCount )", nullptr);
 
                     if (!onRequestComplete)
                         return;
@@ -365,26 +366,40 @@ namespace VScriptCode
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
         }
 
-        SQRESULT GetEULAContents(HSQUIRRELVM v)
+        static void RequestEULAThreaded()
         {
-            MSEulaData_t eulaData;
-            string eulaRequestMessage;
+            MSEulaData_t eulaDataMs;
+            string responseMsg;
 
-            if (g_MasterServer.GetEULA(eulaData, eulaRequestMessage))
-            {
-                // set EULA version cvar to the newly fetched EULA version
-                eula_version->SetValue(eulaData.version);
+            const bool success = g_MasterServer.GetEULA(eulaDataMs, responseMsg);
 
-                sq_pushstring(v, eulaData.contents.c_str(), (SQInteger)eulaData.contents.length());
-            }
-            else
-            {
-                const string error = Format("Failed to load EULA Data: %s", eulaRequestMessage.c_str());
+            g_TaskQueue.Dispatch([success, errorMsg = std::move(responseMsg), eulaData = std::move(eulaDataMs)]
+                {
+                    if (success)
+                    {
+                        // set EULA version cvar to the newly fetched EULA version
+                        eula_version->SetValue(eulaData.version);
+                    }
 
-                Warning(eDLL_T::UI, "%s\n", error.c_str());
-                sq_pushstring(v, error.c_str(), (SQInteger)error.length());
-            }
+                    if (!g_pUIScript)
+                        return;
 
+                    HSCRIPT onRequestComplete = g_pUIScript->FindFunction("UICodeCallback_OnEULARequestCompleted", 
+                        "void functionref( bool success, string errorMsg, string language, string eulaData )", nullptr);
+
+                    if (!onRequestComplete)
+                        return;
+
+                    ScriptVariant_t args[4] = { success, errorMsg.c_str(), eulaData.language.c_str(), eulaData.contents.c_str() };
+                    g_pUIScript->ExecuteFunction(onRequestComplete, args, SDK_ARRAYSIZE(args), nullptr, 0);
+
+                    free(onRequestComplete);
+                }, 0);
+        }
+
+        SQRESULT RequestEULAContents(HSQUIRRELVM v)
+        {
+            std::thread(RequestEULAThreaded).detach();
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
         }
 
@@ -562,8 +577,8 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerMaxPlayers, "Gets the max player count of the server at the specified index of the server list", "int", "int index");
 
     // Misc main menu functions
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, RequestEULAContents, "Requests the latest online EULA contents, calls UICodeCallback_OnEULARequestCompleted on completion", "void", "");
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetPromoData, "Gets promo data for specified slot type", "string", "int slotType");
-    DEFINE_UI_SCRIPTFUNC_NAMED(s, GetEULAContents, "Gets EULA contents from the master server", "string", "");
 
     // Functions for connecting to servers
     DEFINE_UI_SCRIPTFUNC_NAMED(s, ConnectToServer, "Joins server by ip address and encryption key", "void", "string address, string key");
