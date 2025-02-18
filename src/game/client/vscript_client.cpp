@@ -95,31 +95,37 @@ namespace VScriptCode
     }
     namespace Ui
     {
+        static void RequestForServerBrowserListThreaded()
+        {
+            string responseMsg;
+            size_t serverCount;
+
+            const bool success = g_ServerListManager.RefreshServerList(responseMsg, serverCount);
+
+            g_TaskQueue.Dispatch([success, errorMsg = std::move(responseMsg), serverCount]
+                {
+                    if (!g_pUIScript)
+                        return;
+
+                    HSCRIPT onRequestComplete = g_pUIScript->FindFunction("UICodeCallback_OnServerListRequestCompleted", "void functionref( bool success, string errorMsg, int serverCount )", nullptr);
+
+                    if (!onRequestComplete)
+                        return;
+
+                    ScriptVariant_t args[3] = { success, errorMsg.c_str(), (int)serverCount };
+                    g_pUIScript->ExecuteFunction(onRequestComplete, args, SDK_ARRAYSIZE(args), nullptr, 0);
+
+                    free(onRequestComplete);
+                }, 0);
+        }
+
         //-----------------------------------------------------------------------------
         // Purpose: refreshes the server list
         //-----------------------------------------------------------------------------
-        SQRESULT RequestServerBrowserList(HSQUIRRELVM v)
+        SQRESULT RequestServerList(HSQUIRRELVM v)
         {
             std::thread(RequestForServerBrowserListThreaded).detach();
-
             SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        static void RequestForServerBrowserListThreaded()
-        {
-            string serverMessage; // Refresh list.
-            size_t iCount;
-
-            HSCRIPT onRequestComplete = g_pUIScript->FindFunction("CodeCallback_OnServerListRequestCompleted", "void functionref(bool)", nullptr);
-
-            // TODO: return error string on failure?
-            g_ServerListManager.RefreshServerList(serverMessage, iCount);
-
-            g_TaskQueue.Dispatch([onRequestComplete] {
-                Assert(ThreadInMainThread());
-                ScriptVariant_t args[1] = { true };
-                g_pUIScript->ExecuteFunction(onRequestComplete, args, SDK_ARRAYSIZE(args), nullptr, 0);
-                }, 0);
         }
 
         //-----------------------------------------------------------------------------
@@ -541,7 +547,7 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     Script_RegisterCommonAbstractions(s);
     Script_RegisterCoreClientFunctions(s);
 
-    DEFINE_UI_SCRIPTFUNC_NAMED(s, RequestServerBrowserList, "Refreshes the public server list and returns the count", "void", "");
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, RequestServerList, "Requests the latest public server list, calls UICodeCallback_OnServerListRequestCompleted on completion", "void", "");
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerCount, "Gets the number of public servers", "int", "");
 
     // Functions for retrieving server browser data

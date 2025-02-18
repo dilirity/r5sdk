@@ -10,9 +10,7 @@ namespace VScriptCode
 
 	namespace Ui
 	{
-		static void RequestForServerBrowserListThreaded();
-
-		SQRESULT RequestServerBrowserList(HSQUIRRELVM v);
+		SQRESULT RequestServerList(HSQUIRRELVM v);
 		SQRESULT GetServerCount(HSQUIRRELVM v);
 
 		SQRESULT GetHiddenServerName(HSQUIRRELVM v);
