@@ -42,7 +42,7 @@ bool CServerListManager::RefreshServerList(string& outMessage, size_t& numServer
         return false;
 
     AUTO_LOCK(m_Mutex);
-    m_vServerList = serverList;
+    m_vServerList = std::move(serverList);
 
     numServers = m_vServerList.size();
     return true;
