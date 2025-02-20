@@ -35,6 +35,7 @@ macro( apply_project_settings )
     # Set common defines
     add_compile_definitions(
         "_CRT_SECURE_NO_WARNINGS"
+        "FMT_UNICODE=0"
         "SPDLOG_COMPILED_LIB"
         "SPDLOG_NO_EXCEPTIONS"
         "CURL_STATICLIB"
