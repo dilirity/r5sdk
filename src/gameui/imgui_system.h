@@ -8,6 +8,9 @@
 #include "imgui/misc/imgui_snapshot.h"
 #include "imgui_surface.h"
 
+// Max number of fonts to be loaded and merged.
+#define IMGUI_SYSTEM_MAX_FONTS 16
+
 class CImguiSystem
 {
 public:
@@ -15,6 +18,11 @@ public:
 
 	bool Init();
 	void Shutdown();
+
+	void SetupIO() const;
+	void SetupFonts() const;
+
+	void LoadFont(const char* const fontPath, const bool mergeMode, const float sizePixels, ImWchar* const ranges) const;
 
 	void AddSurface(CImguiSurface* const surface);
 	void RemoveSurface(CImguiSurface* const surface);

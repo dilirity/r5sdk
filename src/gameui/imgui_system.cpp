@@ -8,6 +8,8 @@
 #include "engine/sys_mainwind.h"
 #include "windows/id3dx.h"
 
+#include "tier1/keyvalues.h"
+#include "filesystem/filesystem.h"
 #include "imgui_system.h"
 
 //-----------------------------------------------------------------------------
@@ -52,8 +54,7 @@ bool CImguiSystem::Init()
 	ImGuiViewport* const vp = ImGui::GetMainViewport();
 	vp->PlatformHandleRaw = g_pGame->GetWindow();
 
-	ImGuiIO& io = ImGui::GetIO();
-	io.ConfigFlags |= ImGuiConfigFlags_IsSRGB;
+	SetupIO();
 
 	if (!ImGui_ImplWin32_Init(g_pGame->GetWindow()) || 
 		!ImGui_ImplDX11_Init(D3D11Device(), D3D11DeviceContext()))
@@ -93,6 +94,127 @@ void CImguiSystem::Shutdown()
 	m_hasNewFrame = false;
 
 	m_surfaceList.Purge();
+}
+
+//-----------------------------------------------------------------------------
+// Sets the imgui system IO up.
+//-----------------------------------------------------------------------------
+void CImguiSystem::SetupIO() const
+{
+	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_IsSRGB;
+
+	SetupFonts();
+}
+
+//-----------------------------------------------------------------------------
+// Retrieves glyph range by name
+//-----------------------------------------------------------------------------
+static const ImWchar* ImguiSystem_GetGlyphRangeForName(const char* const range, ImGuiIO& io)
+{
+	if (V_strcmp(range, "latin") == 0)
+		return io.Fonts->GetGlyphRangesDefault();
+	if (V_strcmp(range, "greek") == 0)
+		return io.Fonts->GetGlyphRangesGreek();
+	if (V_strcmp(range, "korean") == 0)
+		return io.Fonts->GetGlyphRangesKorean();
+	if (V_strcmp(range, "japanese") == 0)
+		return io.Fonts->GetGlyphRangesJapanese();
+	if (V_strcmp(range, "tchinese") == 0)
+		return io.Fonts->GetGlyphRangesChineseFull();
+	if (V_strcmp(range, "schinese") == 0)
+		return io.Fonts->GetGlyphRangesChineseSimplifiedCommon();
+	if (V_strcmp(range, "cyrillic") == 0)
+		return io.Fonts->GetGlyphRangesCyrillic();
+	if (V_strcmp(range, "thai") == 0)
+		return io.Fonts->GetGlyphRangesThai();
+	if (V_strcmp(range, "vietnamese") == 0)
+		return io.Fonts->GetGlyphRangesVietnamese();
+
+	return nullptr;
+}
+
+//-----------------------------------------------------------------------------
+// Parses the font configuration and sets it up for the imgui system
+//-----------------------------------------------------------------------------
+void CImguiSystem::SetupFonts() const
+{
+	static const char* const configFilePath = "resource/imgui_fonts.txt";
+	KeyValues configKV("ImguiFonts");
+
+	if (!configKV.LoadFromFile(FileSystem(), configFilePath, "GAME"))
+		return;
+
+	ImVector<ImWchar> rangesArray[IMGUI_SYSTEM_MAX_FONTS];
+	ImGuiIO& io = ImGui::GetIO();
+
+	int i = 0;
+	bool ranFirst = false; // First is always the base, subsequent fonts get merged into base.
+
+	for (KeyValues* pSubKey = configKV.GetFirstSubKey(); pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
+	{
+		if (i >= IMGUI_SYSTEM_MAX_FONTS)
+			Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: file \"%s\" lists too many fonts; increase IMGUI_SYSTEM_MAX_FONTS!\n", __FUNCTION__);
+
+		const char* const fontFileName = pSubKey->GetName();
+		const float fontSizePixels = pSubKey->GetFloat("size", 13);
+
+		ImVector<ImWchar>& ranges = rangesArray[i++]; bool hasRange = false;
+		KeyValues* const rangesKV = pSubKey->FindKey("ranges");
+
+		if (rangesKV)
+		{
+			ImFontGlyphRangesBuilder builder;
+
+			for (KeyValues* pSubRange = rangesKV->GetFirstSubKey(); pSubRange != nullptr; pSubRange = pSubRange->GetNextKey())
+			{
+				const char* const rangeName = pSubRange->GetString();
+				const ImWchar* const range = ImguiSystem_GetGlyphRangeForName(rangeName, io);
+
+				if (!range)
+					Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: glyph range \"%s\" doesn't exist!\n", __FUNCTION__, rangeName);
+
+				builder.AddRanges(range);
+				hasRange = true;
+			}
+
+			if (hasRange)
+				builder.BuildRanges(&ranges);
+		}
+
+		LoadFont(fontFileName, ranFirst, fontSizePixels, hasRange ? ranges.Data : nullptr);
+		ranFirst = true;
+	}
+
+	io.Fonts->Build();
+}
+
+//-----------------------------------------------------------------------------
+// Loads the font to be used for the imgui system.
+//-----------------------------------------------------------------------------
+void CImguiSystem::LoadFont(const char* const fontPath, const bool mergeMode, const float sizePixels, ImWchar* const ranges) const
+{
+	FileHandle_t fontFile = FileSystem()->Open(fontPath, "rb", "GAME");
+
+	if (fontFile == FILESYSTEM_INVALID_HANDLE)
+		Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: font file \"%s\" couldn't be opened!\n", __FUNCTION__, fontPath);
+
+	const ssize_t fontSize = FileSystem()->Size(fontFile);
+
+	if (fontSize <= 100) // See assert in ImFontAtlas::AddFontFromMemoryTTF( ... )
+		Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: font file \"%s\" appears truncated!\n", __FUNCTION__, fontPath);
+
+	// NOTE: shouldn't be deleted! Dear ImGui needs it internally.
+	u8* const fontBuf = new u8[fontSize];
+
+	FileSystem()->Read(fontBuf, fontSize, fontFile);
+	FileSystem()->Close(fontFile);
+
+	ImFontConfig config;
+	config.MergeMode = mergeMode;
+
+	ImGuiIO& io = ImGui::GetIO();
+	io.Fonts->AddFontFromMemoryTTF(fontBuf, (int)fontSize, sizePixels, &config, ranges);
 }
 
 //-----------------------------------------------------------------------------
