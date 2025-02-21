@@ -36,6 +36,8 @@ LRESULT CGame::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return CGame__WindowProc(hWnd, uMsg, wParam, lParam);
 }
 
+ImGuiKey ImGui_ImplWin32_KeyEventToImGuiKey(WPARAM wParam, LPARAM lParam);
+
 //-----------------------------------------------------------------------------
 // Purpose: imgui windows procedure
 //-----------------------------------------------------------------------------
@@ -45,15 +47,17 @@ LRESULT CGame::ImguiWindowProc(HWND hWnd, UINT& uMsg, WPARAM wParam, LPARAM lPar
 
 	if (uMsg == WM_KEYDOWN || uMsg == WM_SYSKEYDOWN)
 	{
-		if (wParam == g_ImGuiConfig.m_ConsoleConfig.m_nBind0 ||
-			wParam == g_ImGuiConfig.m_ConsoleConfig.m_nBind1)
+		const ImGuiKey imParam = ImGui_ImplWin32_KeyEventToImGuiKey(wParam, lParam);
+
+		if (imParam == g_ImGuiConfig.m_ConsoleConfig.m_nBind0 ||
+			imParam == g_ImGuiConfig.m_ConsoleConfig.m_nBind1)
 		{
 			g_Console.ToggleActive();
 			ResetInput(); // Disable input to game when console is drawn.
 		}
 
-		if (wParam == g_ImGuiConfig.m_BrowserConfig.m_nBind0 ||
-			wParam == g_ImGuiConfig.m_BrowserConfig.m_nBind1)
+		if (imParam == g_ImGuiConfig.m_BrowserConfig.m_nBind0 ||
+			imParam == g_ImGuiConfig.m_BrowserConfig.m_nBind1)
 		{
 			g_Browser.ToggleActive();
 			ResetInput(); // Disable input to game when browser is drawn.
