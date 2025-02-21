@@ -1296,7 +1296,7 @@ int not_main(int argc, char** argv)
 		// Log
 		if (showLog && showMenu)
 		{
-			ImGui::SetNextWindowPos(ImVec2(250.f+30.f, height-450.f-10.f), ImGuiCond_Once);
+			ImGui::SetNextWindowPos(ImVec2(270.f+30.f, height-450.f-10.f), ImGuiCond_Once);
 			ImGui::SetNextWindowSize(ImVec2(200.f, 450.f), ImGuiCond_Once);
 
 			if (ImGui::Begin("Log"))
