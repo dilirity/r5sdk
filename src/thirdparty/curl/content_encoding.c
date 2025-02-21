@@ -34,7 +34,9 @@
 
 /* Comment this out if zlib is always going to be at least ver. 1.2.0.4
    (doing so will reduce code size slightly). */
-#define OLD_ZLIB_SUPPORT 1
+/* NOTE: disabled by default due to a vulnerability, see:
+   https://curl.se/docs/CVE-2025-0725.html */
+#define OLD_ZLIB_SUPPORT 0
 
 #define DSIZ CURL_MAX_WRITE_SIZE /* buffer size for decompressed data */
 
