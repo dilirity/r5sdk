@@ -38,7 +38,7 @@ void NetDataBlockSender::ResetBlockSender(void)
 
 	m_TimeLastSend = 0.0;
 	m_szDebugName[0] = '\0';
-	m_bDumbDataBlockInfo = false;
+	m_bAbnormalSend = false;
 	m_nCurrentBlock = DATABLOCK_INVALID_BLOCK_NR;
 	m_nBlockSendsAttempted = 0;
 
