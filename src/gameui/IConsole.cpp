@@ -506,7 +506,7 @@ static void AddHint(const ConVarFlags::FlagDesc_t& cvarInfo, const vector<MODULE
     const int hintTexIdx = GetFlagTextureIndex(cvarInfo.bit);
     const MODULERESOURCE& hintRes = flagIconHandles[hintTexIdx];
 
-    ImGui::Image(hintRes.m_idIcon, ImVec2(float(hintRes.m_nWidth), float(hintRes.m_nHeight)));
+    ImGui::Image((ImTextureID)(intptr_t)hintRes.m_idIcon, ImVec2(float(hintRes.m_nWidth), float(hintRes.m_nHeight)));
     ImGui::SameLine();
     ImGui::TextEx(cvarInfo.shortdesc, nullptr, ImGuiTextFlags_NoWidthForLargeClippedText);
 };
@@ -549,7 +549,7 @@ void CConsole::DrawAutoCompletePanel(void)
             const int mainTexIdx = GetFlagTextureIndex(suggest.flags);
             const MODULERESOURCE& mainRes = m_vecFlagIcons[mainTexIdx];
 
-            ImGui::Image(mainRes.m_idIcon, ImVec2(float(mainRes.m_nWidth), float(mainRes.m_nHeight)));
+            ImGui::Image((ImTextureID)(intptr_t)mainRes.m_idIcon, ImVec2(float(mainRes.m_nWidth), float(mainRes.m_nHeight)));
 
             // Show a more detailed description of the flag when user hovers over the texture.
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly) &&

@@ -441,7 +441,7 @@ void CBrowser::HiddenServersModal(void)
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.00f, 0.00f, 0.00f, 0.00f)); // Override the style color for child bg.
 
         ImGui::BeginChild("##HiddenServersConnectModal_IconParent", ImVec2(float(m_lockedIconDataResource.m_nWidth), float(m_lockedIconDataResource.m_nHeight)));
-        ImGui::Image(m_lockedIconShaderResource, ImVec2(float(m_lockedIconDataResource.m_nWidth), float(m_lockedIconDataResource.m_nHeight))); // Display texture.
+        ImGui::Image((ImTextureID)(intptr_t)m_lockedIconShaderResource, ImVec2(float(m_lockedIconDataResource.m_nWidth), float(m_lockedIconDataResource.m_nHeight))); // Display texture.
         ImGui::EndChild();
 
         ImGui::PopStyleColor(); // Pop the override for the child bg.
