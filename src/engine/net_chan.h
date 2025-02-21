@@ -142,7 +142,7 @@ public:
 	bool SendNetMsg(INetMessage& msg, const bool bForceReliable, const bool bVoice);
 	bool SendData(bf_write& msg, const bool bReliable);
 
-	INetMessage* FindMessage(int type);
+	INetMessage* FindMessage(const int type);
 	bool RegisterMessage(INetMessage* msg);
 
 	inline void Clear(bool bStopProcessing) { CNetChan__Clear(this, bStopProcessing); }

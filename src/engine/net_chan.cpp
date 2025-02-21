@@ -504,14 +504,16 @@ bool CNetChan::SendData(bf_write& msg, const bool bReliable)
 // Input  : type - 
 // Output : net message pointer on success, NULL otherwise
 //-----------------------------------------------------------------------------
-INetMessage* CNetChan::FindMessage(int type)
+INetMessage* CNetChan::FindMessage(const int type)
 {
-    int numtypes = m_NetMessages.Count();
+    const int numtypes = m_NetMessages.Count();
 
     for (int i = 0; i < numtypes; i++)
     {
-        if (m_NetMessages[i]->GetType() == type)
-            return m_NetMessages[i];
+        INetMessage* const message = m_NetMessages[i];
+
+        if (message->GetType() == type)
+            return message;
     }
 
     return NULL;
