@@ -214,11 +214,11 @@ private:
 	int                 m_nSplitPacketSequence;
 	int64_t             m_StreamSendBuffer;
 	bf_write            m_StreamSend;
-	uint8_t             m_bInMatch_maybe;
+	bool                m_bConnecting; // true if SetSignonState() is called with signon < SIGNONSTATE_FULL.
 	netflow_t           m_DataFlow[MAX_FLOWS];
 	int                 m_nLifetimePacketsDropped;
 	int                 m_nSessionPacketsDropped;
-	int                 m_nSequencesSkipped_MAYBE;
+	int                 m_nSequencesSkipped;
 	int                 m_nSessionRecvs;
 	uint32_t            m_nLiftimeRecvs;
 	bool                m_bRetrySendLong;

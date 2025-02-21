@@ -30,15 +30,15 @@ float CNetChan::GetResendRate() const
 {
 	const int64_t totalupdates = this->m_DataFlow[FLOW_INCOMING].totalupdates;
 
-	if (!totalupdates && !this->m_nSequencesSkipped_MAYBE)
+	if (!totalupdates && !this->m_nSequencesSkipped)
 		return 0.0f;
 
-	float lossRate = (float)(totalupdates + m_nSequencesSkipped_MAYBE);
+	float lossRate = (float)(totalupdates + m_nSequencesSkipped);
 
-	if (totalupdates + m_nSequencesSkipped_MAYBE < 0.0f)
+	if (totalupdates + m_nSequencesSkipped < 0.0f)
 		lossRate += float(2 ^ 64);
 
-	return m_nSequencesSkipped_MAYBE / lossRate;
+	return m_nSequencesSkipped / lossRate;
 }
 
 //-----------------------------------------------------------------------------
