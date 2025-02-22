@@ -59,6 +59,8 @@ add_sources( SOURCE_GROUP "Compress"
 	"compress/zstd_ldm_geartab.h"
 	"compress/zstd_opt.c"
 	"compress/zstd_opt.h"
+	"compress/zstd_preSplit.c"
+	"compress/zstd_preSplit.h"
 )
 
 add_sources( SOURCE_GROUP "Decompress"
