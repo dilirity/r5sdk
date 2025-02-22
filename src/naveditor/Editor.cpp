@@ -63,7 +63,7 @@ unsigned int EditorDebugDraw::areaToEdgeCol(const unsigned int area) const
 	}
 }
 
-static int s_traverseAnimTraverseFlags[TraverseAnimType_e::ANIMTYPE_COUNT];
+static unsigned int s_traverseAnimTraverseFlags[TraverseAnimType_e::ANIMTYPE_COUNT];
 
 static void initTraverseMasks()
 {
@@ -1025,6 +1025,11 @@ void Editor::connectOffMeshLinks()
 	}
 }
 
+unsigned int Editor::getTraverseFlags(const TraverseAnimType_e type)
+{
+	return s_traverseAnimTraverseFlags[type];
+}
+
 void Editor::updateToolStates(const float dt)
 {
 	for (int i = 0; i < MAX_TOOLS; i++)
@@ -1383,7 +1388,7 @@ void Editor::renderTraverseTableFineTuners()
 						? column
 						: NavMesh_GetFirstTraverseAnimTypeForType(m_selectedNavMeshType);
 
-					int* flags = &s_traverseAnimTraverseFlags[j];
+					int* const flags = reinterpret_cast<int*>(&s_traverseAnimTraverseFlags[j]);
 
 					ImGui::CheckboxFlags("", flags, 1 << row);
 					ImGui::PopID();
