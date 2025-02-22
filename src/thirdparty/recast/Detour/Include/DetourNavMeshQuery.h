@@ -41,6 +41,7 @@ class dtQueryFilter
 	
 public:
 	dtQueryFilter();
+	void resetTraverseCosts();
 	
 #ifdef DT_VIRTUAL_QUERYFILTER
 	virtual ~dtQueryFilter() { }
@@ -92,12 +93,12 @@ public:
 	/// Returns the traversal cost of the area.
 	///  @param[in]		i		The id of the area.
 	/// @returns The traversal cost of the area.
-	inline float getAreaCost(const int i) const { return m_traverseCost[i]; }
+	inline float getTraverseCost(const int i) const { return m_traverseCost[i]; }
 
 	/// Sets the traversal cost of the area.
 	///  @param[in]		i		The id of the area.
 	///  @param[in]		cost	The new cost of traversing the area.
-	inline void setAreaCost(const int i, const float cost) { m_traverseCost[i] = cost; } 
+	inline void setTraverseCost(const int i, const float cost) { m_traverseCost[i] = cost; }
 
 	/// Returns the include flags for the filter.
 	/// Any polygons that include one or more of these flags will be
@@ -113,12 +114,20 @@ public:
 	/// excluded from the operation.
 	inline unsigned short getExcludeFlags() const { return m_excludeFlags; }
 
-	/// Sets the exclude flags for the filter.
+	/// Sets the traverse flags for the filter.
 	/// @param[in]		flags		The new flags.
-	inline void setExcludeFlags(const unsigned short flags) { m_excludeFlags = flags; }	
+	inline void setExcludeFlags(const unsigned short flags) { m_excludeFlags = flags; }
+
+	/// Returns the traverse flags for the filter.
+	/// Any polygons that include one ore more of these flags will be
+	/// included in the operation.
+	inline unsigned int getTraverseFlags() const { return m_traverseFlags; }
+
+	/// Sets the traverse flags for the filter.
+	/// @param[in]		flags		The new flags.
+	inline void setTraverseFlags(const unsigned int flags) { m_traverseFlags = flags; }
 
 	///@}
-
 };
 
 /// Provides information about raycast hit

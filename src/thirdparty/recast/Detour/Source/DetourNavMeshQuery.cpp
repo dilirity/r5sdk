@@ -62,6 +62,11 @@ dtQueryFilter::dtQueryFilter() :
 	m_excludeFlags(0),
 	m_traverseFlags(0)
 {
+	resetTraverseCosts();
+}
+
+void dtQueryFilter::resetTraverseCosts()
+{
 	for (int i = 0; i < DT_MAX_TRAVERSE_TYPES; ++i)
 		m_traverseCost[i] = 1.0f;
 }

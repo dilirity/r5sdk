@@ -152,7 +152,6 @@ static bool getSteerTarget(dtNavMeshQuery* navQuery, const float* startPos, cons
 	return true;
 }
 
-
 NavMeshTesterTool::NavMeshTesterTool() :
 	m_editor(0),
 	m_navMesh(0),
@@ -192,22 +191,14 @@ void NavMeshTesterTool::init(Editor* editor)
 	m_editor = editor;
 	m_navMesh = editor->getNavMesh();
 	m_navQuery = editor->getNavMeshQuery();
+
 	recalc();
 
-	if (m_navQuery)
-	{
-		// Change costs.
-		m_filter.setAreaCost(DT_POLYAREA_GROUND, 1.0f);
-		m_filter.setAreaCost(DT_POLYAREA_JUMP, 1.5f);
-		//m_filter.setAreaCost(EDITOR_POLYAREA_ROAD, 1.0f);
-		m_filter.setAreaCost(DT_POLYAREA_TRIGGER, 1.0f);
-		//m_filter.setAreaCost(EDITOR_POLYAREA_GRASS, 2.0f);
-		//m_filter.setAreaCost(EDITOR_POLYAREA_WATER, 10.0f);
-	}
-	
 	m_neighbourhoodRadius = editor->getAgentRadius() * 20.0f;
 	m_randomRadius = editor->getAgentRadius() * 30.0f;
 	m_traverseAnimType = NavMesh_GetFirstTraverseAnimTypeForType(editor->getLoadedNavMeshType());
+
+	updateTraverseCosts();
 }
 
 void NavMeshTesterTool::handleMenu()
@@ -452,6 +443,7 @@ void NavMeshTesterTool::handleMenu()
 		if (ImGui::Checkbox(animtypeName, &isEnabled))
 		{
 			m_traverseAnimType = animTypeIndex;
+			updateTraverseCosts();
 		}
 	}
 
@@ -1033,6 +1025,27 @@ void NavMeshTesterTool::recalc()
 											   m_polys, m_parent, &m_npolys, MAX_POLYS);
 		}
 	}
+}
+
+void NavMeshTesterTool::updateTraverseCosts()
+{
+	if (!m_navMesh)
+		return;
+
+	if (m_traverseAnimType == ANIMTYPE_NONE)
+	{
+		m_filter.resetTraverseCosts();
+		m_filter.setTraverseFlags(0);
+
+		return;
+	}
+
+	const float* const costArr = g_traverseAnimDefaultCosts[m_traverseAnimType];
+
+	for (int i = 0; i < DT_MAX_TRAVERSE_TYPES; i++)
+		m_filter.setTraverseCost(i, costArr[i]);
+
+	m_filter.setTraverseFlags(Editor::getTraverseFlags(m_traverseAnimType));
 }
 
 static void getPolyCenter(dtNavMesh* navMesh, dtPolyRef ref, float* center)
