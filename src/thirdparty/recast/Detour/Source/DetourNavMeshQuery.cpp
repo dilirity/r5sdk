@@ -1366,6 +1366,9 @@ dtStatus dtNavMeshQuery::updateSlicedFindPath(const int maxIter, int* doneIters,
 			
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
+
+			if (!filter->traverseFilter(&bestLink, bestTile, bestPoly))
+				continue;
 			
 			unsigned char crossSide = 0; // See https://github.com/recastnavigation/recastnavigation/issues/438
 
@@ -2859,6 +2862,9 @@ dtStatus dtNavMeshQuery::findPolysAroundCircle(dtPolyRef startRef, const float* 
 			// Do not advance if the polygon is excluded by the filter.
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
+
+			if (!filter->traverseFilter(link, bestTile, bestPoly))
+				continue;
 			
 			// Find edge and calc distance to the edge.
 			float va[3], vb[3];
@@ -3048,6 +3054,9 @@ dtStatus dtNavMeshQuery::findPolysAroundShape(dtPolyRef startRef, const float* v
 
 			// Do not advance if the polygon is excluded by the filter.
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
+				continue;
+
+			if (!filter->traverseFilter(link, bestTile, bestPoly))
 				continue;
 			
 			// Find edge and calc distance to the edge.
@@ -3663,6 +3672,9 @@ dtStatus dtNavMeshQuery::findDistanceToWall(dtPolyRef startRef, const float* cen
 				continue;
 			
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
+				continue;
+
+			if (!filter->traverseFilter(link, bestTile, bestPoly))
 				continue;
 
 			dtNode* neighbourNode = m_nodePool->getNode(neighbourRef);
