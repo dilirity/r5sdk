@@ -2100,7 +2100,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 	}
 
 	// Ignore status return value as we're just about to return anyway.
-	appendVertex(closestEndPos, DT_STRAIGHTPATH_END, 0, DT_NULL_TRAVERSE_TYPE,
+	appendVertex(closestEndPos, vertexFlags, 0, DT_NULL_TRAVERSE_TYPE,
 						straightPath, straightPathFlags, straightPathRefs,
 						straightPathJumps, straightPathCount, maxStraightPath);
 	
