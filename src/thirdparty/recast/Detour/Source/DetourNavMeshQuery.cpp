@@ -1788,55 +1788,55 @@ dtStatus dtNavMeshQuery::appendPortals(const int startIdx, const int endIdx, con
 		
 		// Append intersection
 		float s,t;
-		if (rdIntersectSegSeg2D(startPos, endPos, left, right, s, t))
+		if (!rdIntersectSegSeg2D(startPos, endPos, left, right, s, t))
+			continue;
+
+		float pt[3];
+		rdVlerp(pt, left,right, t);
+
+		const unsigned char targetJump = jumpTypes[i+1];
+
+		if (targetJump < DT_MAX_TRAVERSE_TYPES)
 		{
-			float pt[3];
-			rdVlerp(pt, left,right, t);
-
-			const unsigned char targetJump = jumpTypes[i+1];
-
-			if (targetJump < DT_MAX_TRAVERSE_TYPES)
-			{
-				stat = appendVertex(pt, 0, from, targetJump,
-									straightPath, straightPathFlags, straightPathRefs,
-									straightPathJumps, straightPathCount, maxStraightPath);
-				if (stat != DT_IN_PROGRESS)
-					return stat;
-
-				if (dtStatusSucceed(getPortalPoints(to, toPoly, toTile, from, fromPoly, fromTile, 0, left, right)))
-				{
-					if (canTraversePortal(fromTile, fromPoly, to, jumpFilter, targetJump))
-					{
-						// Note(amos): this isn't the same as startPos as straightPathCount
-						// is incremented by the last call to appendVertex.
-						const float* jumpStartPos = &straightPath[(*straightPathCount-1)*3];
-
-						const float jumpEndPoint[3] = {
-							((left[1] - right[1]) * 100.f) + jumpStartPos[0],
-							(-(left[0] - right[0]) * 100.f) + jumpStartPos[1],
-							endPos[2]
-						};
-
-						// Modify vertex position to take the traverse portal into account
-						// for the next call to appendVertex.
-						rdIntersectSegSeg2D(jumpStartPos, jumpEndPoint, left, right, s, t);
-						rdVlerp(pt, left,right, t);
-					}
-					else
-					{
-						// Update vertex position as we advanced since last appendVertex call.
-						if (rdIntersectSegSeg2D(startPos, endPos, left, right, s, t))
-							rdVlerp(pt, left,right, rdClamp(t, 0.f, 1.f));
-					}
-				}
-			}
-
-			stat = appendVertex(pt, 0, path[i+1], DT_NULL_TRAVERSE_TYPE,
+			stat = appendVertex(pt, 0, from, targetJump,
 								straightPath, straightPathFlags, straightPathRefs,
 								straightPathJumps, straightPathCount, maxStraightPath);
 			if (stat != DT_IN_PROGRESS)
 				return stat;
+
+			if (dtStatusSucceed(getPortalPoints(to, toPoly, toTile, from, fromPoly, fromTile, 0, left, right)))
+			{
+				if (canTraversePortal(fromTile, fromPoly, to, jumpFilter, targetJump))
+				{
+					// Note(amos): this isn't the same as startPos as straightPathCount
+					// is incremented by the last call to appendVertex.
+					const float* jumpStartPos = &straightPath[(*straightPathCount-1)*3];
+
+					const float jumpEndPoint[3] = {
+						((left[1] - right[1]) * 100.f) + jumpStartPos[0],
+						(-(left[0] - right[0]) * 100.f) + jumpStartPos[1],
+						endPos[2]
+					};
+
+					// Modify vertex position to take the traverse portal into account
+					// for the next call to appendVertex.
+					rdIntersectSegSeg2D(jumpStartPos, jumpEndPoint, left, right, s, t);
+					rdVlerp(pt, left,right, t);
+				}
+				else
+				{
+					// Update vertex position as we advanced since last appendVertex call.
+					if (rdIntersectSegSeg2D(startPos, endPos, left, right, s, t))
+						rdVlerp(pt, left,right, rdClamp(t, 0.f, 1.f));
+				}
+			}
 		}
+
+		stat = appendVertex(pt, 0, path[i+1], DT_NULL_TRAVERSE_TYPE,
+							straightPath, straightPathFlags, straightPathRefs,
+							straightPathJumps, straightPathCount, maxStraightPath);
+		if (stat != DT_IN_PROGRESS)
+			return stat;
 	}
 	return DT_IN_PROGRESS;
 }
