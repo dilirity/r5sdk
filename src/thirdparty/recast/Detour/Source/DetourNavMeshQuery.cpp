@@ -525,7 +525,7 @@ dtStatus dtNavMeshQuery::closestPointOnPoly(dtPolyRef ref, const float* pos, flo
 /// 
 /// @p pos does not have to be within the bounds of the polybon or the navigation mesh.
 /// 
-dtStatus dtNavMeshQuery::closestPointOnPolyBoundary(dtPolyRef ref, const float* pos, float* closest) const
+dtStatus dtNavMeshQuery::closestPointOnPolyBoundary(dtPolyRef ref, const float* pos, float* closest, float* dist) const
 {
 	rdAssert(m_nav);
 	
@@ -548,11 +548,14 @@ dtStatus dtNavMeshQuery::closestPointOnPolyBoundary(dtPolyRef ref, const float* 
 		nv++;
 	}		
 	
-	bool inside = rdDistancePtPolyEdgesSqr(pos, verts, nv, edged, edget);
+	const bool inside = rdDistancePtPolyEdgesSqr(pos, verts, nv, edged, edget);
 	if (inside)
 	{
 		// Point is inside the polygon, return the point.
 		rdVcopy(closest, pos);
+
+		if (dist)
+			*dist = 0.f;
 	}
 	else
 	{
@@ -567,6 +570,10 @@ dtStatus dtNavMeshQuery::closestPointOnPolyBoundary(dtPolyRef ref, const float* 
 				imin = i;
 			}
 		}
+
+		if (dist)
+			*dist = dmin;
+
 		const float* va = &verts[imin*3];
 		const float* vb = &verts[((imin+1)%nv)*3];
 		rdVlerp(closest, va, vb, edget[imin]);
