@@ -43,10 +43,10 @@
 /// 
 /// DT_VIRTUAL_QUERYFILTER must be defined in order to extend this class.
 /// 
-/// Implement a custom query filter by overriding the virtual passFilter() 
-/// and getCost() functions. If this is done, both functions should be as 
-/// fast as possible. Use cached local copies of data rather than accessing 
-/// your own objects where possible.
+/// Implement a custom query filter by overriding the virtual passFilter(),
+/// traverseFilter() and getCost() functions. If this is done, all three
+/// functions should be as fast as possible. Use cached local copies of data
+/// rather than accessing your own objects where possible.
 /// 
 /// Custom implementations do not need to adhere to the flags or cost logic 
 /// used by the default implementation.  
@@ -84,12 +84,10 @@ bool dtQueryFilter::passFilter(const dtPolyRef /*ref*/,
 #ifndef DT_VIRTUAL_QUERYFILTER
 rdForceInline
 #endif
-bool dtQueryFilter::traverseFilter(const dtPolyRef /*ref*/,
-	const dtMeshTile* tile,
-	const dtPoly* poly) const
+bool dtQueryFilter::traverseFilter(const dtLink* link,
+	const dtMeshTile* /*tile*/,
+	const dtPoly* /*poly*/) const
 {
-	const dtLink* link = &tile->links[poly->firstLink];
-
 	if (link->hasTraverseType())
 	{
 		if (!(rdBitCellBit(link->getTraverseType()) & m_traverseFlags))
@@ -102,6 +100,8 @@ bool dtQueryFilter::traverseFilter(const dtPolyRef /*ref*/,
 #ifndef DT_VIRTUAL_QUERYFILTER
 rdForceInline
 #endif
+// NOTE: if you wish to uncomment the currently commented parameters, make sure to look around the code for
+// DT_VIRTUAL_QUERYFILTER directives as some features have been disabled for non-virtual query filters.
 float dtQueryFilter::getCost(const float* pa, const float* pb, const dtLink* link,
 									const dtPolyRef /*prevRef*/, const dtMeshTile* /*prevTile*/, const dtPoly* /*prevPoly*/,
 									const dtPolyRef /*curRef*/, const dtMeshTile* /*curTile*/, const dtPoly* /*curPoly*/,
@@ -410,7 +410,7 @@ dtStatus dtNavMeshQuery::findRandomPointAroundCircle(dtPolyRef startRef, const f
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(bestRef, bestTile, bestPoly))
+			if (!filter->traverseFilter(link, bestTile, bestPoly))
 				continue;
 			
 			// Find edge and calc distance to the edge.
@@ -1022,8 +1022,14 @@ dtStatus dtNavMeshQuery::findPath(dtPolyRef startRef, dtPolyRef endRef,
 		const dtPoly* parentPoly = 0;
 		if (bestNode->pidx)
 			parentRef = m_nodePool->getNodeAtIdx(bestNode->pidx)->id;
+
+		// Default implementation of dtQueryFilter::getCost only needs the start, end
+		// positions and the link. The tile and poly are therefore not used. Only
+		// obtain them when virtual query filter function overrides are enabled.
+#ifdef DT_VIRTUAL_QUERYFILTER
 		if (parentRef)
 			m_nav->getTileAndPolyByRefUnsafe(parentRef, &parentTile, &parentPoly);
+#endif // DT_VIRTUAL_QUERYFILTER
 		
 		for (unsigned int i = bestPoly->firstLink; i != DT_NULL_LINK; i = bestTile->links[i].next)
 		{
@@ -2144,8 +2150,7 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 							const dtPoly* neiPoly = 0;
 							m_nav->getTileAndPolyByRefUnsafe(link->ref, &neiTile, &neiPoly);
 
-							if (filter->passFilter(link->ref, neiTile, neiPoly) && 
-								filter->traverseFilter(curRef, curTile, curPoly))
+							if (filter->passFilter(link->ref, neiTile, neiPoly))
 							{
 								if (nneis < MAX_NEIS)
 									neis[nneis++] = link->ref;
@@ -2158,8 +2163,7 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 			{
 				const unsigned int idx = (unsigned int)(curPoly->neis[j]-1);
 				const dtPolyRef ref = m_nav->getPolyRefBase(curTile) | idx;
-				if (filter->passFilter(ref, curTile, &curTile->polys[idx]) &&
-					filter->traverseFilter(curRef, curTile, curPoly))
+				if (filter->passFilter(ref, curTile, &curTile->polys[idx]))
 				{
 					// Internal edge, encode id.
 					neis[nneis++] = ref;
@@ -2811,22 +2815,32 @@ dtStatus dtNavMeshQuery::findPolysAroundCircle(dtPolyRef startRef, const float* 
 		const dtPoly* parentPoly = 0;
 		if (bestNode->pidx)
 			parentRef = m_nodePool->getNodeAtIdx(bestNode->pidx)->id;
+
+		// Default implementation of dtQueryFilter::getCost only needs the start, end
+		// positions and the link. The tile and poly are therefore not used. Only
+		// obtain them when virtual query filter function overrides are enabled.
+#ifdef DT_VIRTUAL_QUERYFILTER
 		if (parentRef)
 			m_nav->getTileAndPolyByRefUnsafe(parentRef, &parentTile, &parentPoly);
+#endif // DT_VIRTUAL_QUERYFILTER
 
-		if (n < maxResult)
+		// Make sure our polygon isn't too small, reject those.
+		if (!(bestPoly->flags & DT_POLYFLAGS_TOO_SMALL))
 		{
-			if (resultRef)
-				resultRef[n] = bestRef;
-			if (resultParent)
-				resultParent[n] = parentRef;
-			if (resultCost)
-				resultCost[n] = bestNode->total;
-			++n;
-		}
-		else
-		{
-			status |= DT_BUFFER_TOO_SMALL;
+			if (n < maxResult)
+			{
+				if (resultRef)
+					resultRef[n] = bestRef;
+				if (resultParent)
+					resultParent[n] = parentRef;
+				if (resultCost)
+					resultCost[n] = bestNode->total;
+				++n;
+			}
+			else
+			{
+				status |= DT_BUFFER_TOO_SMALL;
+			}
 		}
 		
 		for (unsigned int i = bestPoly->firstLink; i != DT_NULL_LINK; i = bestTile->links[i].next)
@@ -2871,8 +2885,8 @@ dtStatus dtNavMeshQuery::findPolysAroundCircle(dtPolyRef startRef, const float* 
 			if (neighbourNode->flags == 0)
 				rdVlerp(neighbourNode->pos, va, vb, 0.5f);
 			
-			float cost = filter->getCost(
-				bestNode->pos, neighbourNode->pos, link,
+			const float cost = filter->getCost(
+				bestNode->pos, neighbourNode->pos, nullptr,
 				parentRef, parentTile, parentPoly,
 				bestRef, bestTile, bestPoly,
 				neighbourRef, neighbourTile, neighbourPoly);
@@ -2991,23 +3005,32 @@ dtStatus dtNavMeshQuery::findPolysAroundShape(dtPolyRef startRef, const float* v
 		const dtPoly* parentPoly = 0;
 		if (bestNode->pidx)
 			parentRef = m_nodePool->getNodeAtIdx(bestNode->pidx)->id;
+
+		// Default implementation of dtQueryFilter::getCost only needs the start, end
+		// positions and the link. The tile and poly are therefore not used. Only
+		// obtain them when virtual query filter function overrides are enabled.
+#ifdef DT_VIRTUAL_QUERYFILTER
 		if (parentRef)
 			m_nav->getTileAndPolyByRefUnsafe(parentRef, &parentTile, &parentPoly);
+#endif // DT_VIRTUAL_QUERYFILTER
 
-		if (n < maxResult)
+		// Make sure our polygon isn't too small, reject those.
+		if (!(bestPoly->flags & DT_POLYFLAGS_TOO_SMALL))
 		{
-			if (resultRef)
-				resultRef[n] = bestRef;
-			if (resultParent)
-				resultParent[n] = parentRef;
-			if (resultCost)
-				resultCost[n] = bestNode->total;
-
-			++n;
-		}
-		else
-		{
-			status |= DT_BUFFER_TOO_SMALL;
+			if (n < maxResult)
+			{
+				if (resultRef)
+					resultRef[n] = bestRef;
+				if (resultParent)
+					resultParent[n] = parentRef;
+				if (resultCost)
+					resultCost[n] = bestNode->total;
+				++n;
+			}
+			else
+			{
+				status |= DT_BUFFER_TOO_SMALL;
+			}
 		}
 		
 		for (unsigned int i = bestPoly->firstLink; i != DT_NULL_LINK; i = bestTile->links[i].next)
@@ -3022,7 +3045,7 @@ dtStatus dtNavMeshQuery::findPolysAroundShape(dtPolyRef startRef, const float* v
 			const dtMeshTile* neighbourTile = 0;
 			const dtPoly* neighbourPoly = 0;
 			m_nav->getTileAndPolyByRefUnsafe(neighbourRef, &neighbourTile, &neighbourPoly);
-			
+
 			// Do not advance if the polygon is excluded by the filter.
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
@@ -3054,8 +3077,8 @@ dtStatus dtNavMeshQuery::findPolysAroundShape(dtPolyRef startRef, const float* v
 			if (neighbourNode->flags == 0)
 				rdVlerp(neighbourNode->pos, va, vb, 0.5f);
 			
-			float cost = filter->getCost(
-				bestNode->pos, neighbourNode->pos, link,
+			const float cost = filter->getCost(
+				bestNode->pos, neighbourNode->pos, nullptr,
 				parentRef, parentTile, parentPoly,
 				bestRef, bestTile, bestPoly,
 				neighbourRef, neighbourTile, neighbourPoly);
@@ -3220,8 +3243,8 @@ dtStatus dtNavMeshQuery::findLocalNeighbourhood(dtPolyRef startRef, const float*
 			// Do not advance if the polygon is excluded by the filter.
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
-
-			if (!filter->traverseFilter(curRef, curTile, curPoly))
+			
+			if (!filter->traverseFilter(link, curTile, curPoly))
 				continue;
 			
 			// Find edge and calc distance to the edge.
@@ -3281,20 +3304,25 @@ dtStatus dtNavMeshQuery::findLocalNeighbourhood(dtPolyRef startRef, const float*
 					break;
 				}
 			}
+
 			if (overlap)
 				continue;
-			
-			// This poly is fine, store and advance to the poly.
-			if (n < maxResult)
+
+			// Make sure our polygon isn't too small, reject those.
+			if (!(neighbourPoly->flags & DT_POLYFLAGS_TOO_SMALL))
 			{
-				resultRef[n] = neighbourRef;
-				if (resultParent)
-					resultParent[n] = curRef;
-				++n;
-			}
-			else
-			{
-				status |= DT_BUFFER_TOO_SMALL;
+				// This poly is fine, store and advance to the poly.
+				if (n < maxResult)
+				{
+					resultRef[n] = neighbourRef;
+					if (resultParent)
+						resultParent[n] = curRef;
+					++n;
+				}
+				else
+				{
+					status |= DT_BUFFER_TOO_SMALL;
+				}
 			}
 			
 			if (nstack < MAX_STACK)
@@ -3551,14 +3579,8 @@ dtStatus dtNavMeshQuery::findDistanceToWall(dtPolyRef startRef, const float* cen
 		const dtPoly* bestPoly = 0;
 		m_nav->getTileAndPolyByRefUnsafe(bestRef, &bestTile, &bestPoly);
 		
-		// Get parent poly and tile.
-		dtPolyRef parentRef = 0;
-		const dtMeshTile* parentTile = 0;
-		const dtPoly* parentPoly = 0;
-		if (bestNode->pidx)
-			parentRef = m_nodePool->getNodeAtIdx(bestNode->pidx)->id;
-		if (parentRef)
-			m_nav->getTileAndPolyByRefUnsafe(parentRef, &parentTile, &parentPoly);
+		// Get parent ref.
+		const dtPolyRef parentRef = bestNode->pidx ? m_nodePool->getNodeAtIdx(bestNode->pidx)->id : 0;
 		
 		// Hit test walls.
 		for (int i = 0, j = (int)bestPoly->vertCount-1; i < (int)bestPoly->vertCount; j = i++)

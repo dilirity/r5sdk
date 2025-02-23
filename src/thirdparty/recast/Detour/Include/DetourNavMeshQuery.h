@@ -61,7 +61,7 @@ public:
 #ifdef DT_VIRTUAL_QUERYFILTER
 	virtual
 #endif
-	bool traverseFilter(const dtPolyRef ref,
+	bool traverseFilter(const dtLink* link,
 			const dtMeshTile* tile,
 			const dtPoly* poly) const;
 
