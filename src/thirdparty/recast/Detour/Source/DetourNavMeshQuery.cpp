@@ -1892,9 +1892,15 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 	if (dtStatusFailed(closestPointOnPolyBoundary(path[0], startPos, closestStartPos)))
 		return DT_FAILURE | DT_INVALID_PARAM;
 
-	float closestEndPos[3];
-	if (dtStatusFailed(closestPointOnPolyBoundary(path[pathSize-1], endPos, closestEndPos)))
+	float closestEndPos[3]; float distToClosest;
+	if (dtStatusFailed(closestPointOnPolyBoundary(path[pathSize-1], endPos, closestEndPos, &distToClosest)))
 		return DT_FAILURE | DT_INVALID_PARAM;
+
+	// This is a waypoint vertex if we aren't inside the goal polygon, which is
+	// the case when distToClosest == 0.f.
+	const unsigned char vertexFlags = (distToClosest == 0.0f)
+		? DT_STRAIGHTPATH_END
+		: DT_STRAIGHTPATH_WAYPOINT;
 	
 	// Add start point.
 	stat = appendVertex(closestStartPos, DT_STRAIGHTPATH_START, path[0], jumpTypes[0],
@@ -2005,7 +2011,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					
 					unsigned char flags = 0;
 					if (!rightPolyRef)
-						flags = DT_STRAIGHTPATH_END;
+						flags = vertexFlags;
 					else if (rightPolyType == DT_POLYTYPE_OFFMESH_CONNECTION)
 						flags = DT_STRAIGHTPATH_OFFMESH_CONNECTION;
 					dtPolyRef ref = rightPolyRef;
@@ -2057,7 +2063,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					
 					unsigned char flags = 0;
 					if (!leftPolyRef)
-						flags = DT_STRAIGHTPATH_END;
+						flags = vertexFlags;
 					else if (leftPolyType == DT_POLYTYPE_OFFMESH_CONNECTION)
 						flags = DT_STRAIGHTPATH_OFFMESH_CONNECTION;
 					dtPolyRef ref = leftPolyRef;

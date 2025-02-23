@@ -175,9 +175,10 @@ enum dtTileFlags
 /// Vertex flags returned by dtNavMeshQuery::findStraightPath.
 enum dtStraightPathFlags
 {
-	DT_STRAIGHTPATH_START = 0x01,				///< The vertex is the start position in the path.
-	DT_STRAIGHTPATH_END = 0x02,					///< The vertex is the end position in the path.
-	DT_STRAIGHTPATH_OFFMESH_CONNECTION = 0x04,	///< The vertex is the start of an off-mesh connection.
+	DT_STRAIGHTPATH_START = 1<<0,				///< The vertex is the start position in the path.
+	DT_STRAIGHTPATH_END = 1<<1,					///< The vertex is the end position in the path.
+	DT_STRAIGHTPATH_WAYPOINT = 1<<2,			///< The vertex is a waypoint in the path.
+	DT_STRAIGHTPATH_OFFMESH_CONNECTION = 1<<3,	///< The vertex is the start of an off-mesh connection.
 };
 
 /// Options for dtNavMeshQuery::findStraightPath.
