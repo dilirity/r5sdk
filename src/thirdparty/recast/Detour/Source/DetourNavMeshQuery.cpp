@@ -1730,10 +1730,32 @@ dtStatus dtNavMeshQuery::appendVertex(const float* pos, const unsigned char flag
 	return DT_IN_PROGRESS;
 }
 
+static bool canTraversePortal(const dtMeshTile* fromTile, const dtPoly* fromPoly, const dtPolyRef toRef,
+							  const int jumpFilter, const int targetJump)
+{
+	if (!jumpFilter)
+		return false;
+
+	if (!(rdBitCellBit(targetJump) & jumpFilter))
+		return false;
+
+	if (fromPoly->firstLink == DT_NULL_LINK)
+		return false;
+
+	// Make sure our goal poly has an actual link to our current poly.
+	for (unsigned int j = fromPoly->firstLink; j != DT_NULL_LINK; j = fromTile->links[j].next)
+	{
+		if (fromTile->links[j].ref == toRef)
+			return true;
+	}
+
+	return false;
+}
+
 dtStatus dtNavMeshQuery::appendPortals(const int startIdx, const int endIdx, const float* endPos, const dtPolyRef* path,
-									  float* straightPath, unsigned char* straightPathFlags, dtPolyRef* straightPathRefs,
-									  unsigned char* straightPathJumps, int* straightPathCount, const int maxStraightPath,
-									  const int options) const
+									  const unsigned char* jumpTypes, float* straightPath, unsigned char* straightPathFlags,
+									  dtPolyRef* straightPathRefs, unsigned char* straightPathJumps, int* straightPathCount,
+									  const int maxStraightPath, const int jumpFilter, const int options) const
 {
 	const float* startPos = &straightPath[(*straightPathCount-1)*3];
 	// Append or update last vertex
@@ -1770,6 +1792,44 @@ dtStatus dtNavMeshQuery::appendPortals(const int startIdx, const int endIdx, con
 		{
 			float pt[3];
 			rdVlerp(pt, left,right, t);
+
+			const unsigned char targetJump = jumpTypes[i+1];
+
+			if (targetJump < DT_MAX_TRAVERSE_TYPES)
+			{
+				stat = appendVertex(pt, 0, from, targetJump,
+									straightPath, straightPathFlags, straightPathRefs,
+									straightPathJumps, straightPathCount, maxStraightPath);
+				if (stat != DT_IN_PROGRESS)
+					return stat;
+
+				if (dtStatusSucceed(getPortalPoints(to, toPoly, toTile, from, fromPoly, fromTile, 0, left, right)))
+				{
+					if (canTraversePortal(fromTile, fromPoly, to, jumpFilter, targetJump))
+					{
+						// Note(amos): this isn't the same as startPos as straightPathCount
+						// is incremented by the last call to appendVertex.
+						const float* jumpStartPos = &straightPath[(*straightPathCount-1)*3];
+
+						const float jumpEndPoint[3] = {
+							((left[1] - right[1]) * 100.f) + jumpStartPos[0],
+							(-(left[0] - right[0]) * 100.f) + jumpStartPos[1],
+							endPos[2]
+						};
+
+						// Modify vertex position to take the traverse portal into account
+						// for the next call to appendVertex.
+						rdIntersectSegSeg2D(jumpStartPos, jumpEndPoint, left, right, s, t);
+						rdVlerp(pt, left,right, t);
+					}
+					else
+					{
+						// Update vertex position as we advanced since last appendVertex call.
+						if (rdIntersectSegSeg2D(startPos, endPos, left, right, s, t))
+							rdVlerp(pt, left,right, rdClamp(t, 0.f, 1.f));
+					}
+				}
+			}
 
 			stat = appendVertex(pt, 0, path[i+1], DT_NULL_TRAVERSE_TYPE,
 								straightPath, straightPathFlags, straightPathRefs,
@@ -1880,9 +1940,9 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					if (options & (DT_STRAIGHTPATH_AREA_CROSSINGS | DT_STRAIGHTPATH_ALL_CROSSINGS))
 					{
 						// Ignore status return value as we're just about to return anyway.
-						appendPortals(apexIndex, i, closestEndPos, path,
+						appendPortals(apexIndex, i, closestEndPos, path, jumpTypes,
 											 straightPath, straightPathFlags, straightPathRefs,
-											 straightPathJumps, straightPathCount, maxStraightPath, options);
+											 straightPathJumps, straightPathCount, maxStraightPath, 0xffffffff, options);
 					}
 
 					// Ignore status return value as we're just about to return anyway.
@@ -1926,9 +1986,9 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					// Append portals along the current straight path segment.
 					if (options & (DT_STRAIGHTPATH_AREA_CROSSINGS | DT_STRAIGHTPATH_ALL_CROSSINGS))
 					{
-						stat = appendPortals(apexIndex, rightIndex, portalRight, path,
+						stat = appendPortals(apexIndex, rightIndex, portalRight, path, jumpTypes,
 											 straightPath, straightPathFlags, straightPathRefs,
-											 straightPathJumps, straightPathCount, maxStraightPath, options);
+											 straightPathJumps, straightPathCount, maxStraightPath, 0xffffffff, options);
 						if (stat != DT_IN_PROGRESS)
 							return stat;					
 					}
@@ -1978,9 +2038,9 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					// Append portals along the current straight path segment.
 					if (options & (DT_STRAIGHTPATH_AREA_CROSSINGS | DT_STRAIGHTPATH_ALL_CROSSINGS))
 					{
-						stat = appendPortals(apexIndex, leftIndex, portalLeft, path,
+						stat = appendPortals(apexIndex, leftIndex, portalLeft, path, jumpTypes,
 											 straightPath, straightPathFlags, straightPathRefs,
-											 straightPathJumps, straightPathCount, maxStraightPath, options);
+											 straightPathJumps, straightPathCount, maxStraightPath, 0xffffffff, options);
 						if (stat != DT_IN_PROGRESS)
 							return stat;
 					}
@@ -2018,9 +2078,9 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 		// Append portals along the current straight path segment.
 		if (options & (DT_STRAIGHTPATH_AREA_CROSSINGS | DT_STRAIGHTPATH_ALL_CROSSINGS))
 		{
-			stat = appendPortals(apexIndex, pathSize-1, closestEndPos, path,
+			stat = appendPortals(apexIndex, pathSize-1, closestEndPos, path, jumpTypes,
 								 straightPath, straightPathFlags, straightPathRefs,
-								 straightPathJumps, straightPathCount, maxStraightPath, options);
+								 straightPathJumps, straightPathCount, maxStraightPath, 0xffffffff, options);
 			if (stat != DT_IN_PROGRESS)
 				return stat;
 		}

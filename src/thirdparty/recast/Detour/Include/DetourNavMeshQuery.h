@@ -638,9 +638,9 @@ private:
 
 	// Appends intermediate portal points to a straight path.
 	dtStatus appendPortals(const int startIdx, const int endIdx, const float* endPos, const dtPolyRef* path,
-						   float* straightPath, unsigned char* straightPathFlags, dtPolyRef* straightPathRefs,
-						   unsigned char* straightPathJumps, int* straightPathCount, const int maxStraightPath,
-						   const int options) const;
+						   const unsigned char* jumpTypes, float* straightPath, unsigned char* straightPathFlags,
+						   dtPolyRef* straightPathRefs, unsigned char* straightPathJumps, int* straightPathCount,
+						   const int maxStraightPath, const int jumpFilter, const int options) const;
 
 	// Gets the path leading to the specified end node.
 	dtStatus getPathToNode(struct dtNode* endNode, dtPolyRef* path, int* pathCount, int maxPath) const;
