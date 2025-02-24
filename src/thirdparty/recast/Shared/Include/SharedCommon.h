@@ -371,7 +371,7 @@ inline float rdVproj2D(const float* p, const float* v)
 /// close enough to each other to be considered collocated.
 inline bool rdVequal(const float* p0, const float* p1)
 {
-	static const float thr = rdSqr(1.0f/16384.0f);
+	const float thr = rdSqr(1.0f/16384.0f);
 	const float d = rdVdistSqr(p0, p1);
 	return d < thr;
 }
