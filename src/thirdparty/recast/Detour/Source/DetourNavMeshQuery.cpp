@@ -2774,9 +2774,9 @@ dtStatus dtNavMeshQuery::raycast(dtPolyRef startRef, const float* startPos, cons
 			const float* vb = &verts[b*3];
 			const float dx = vb[0] - va[0];
 			const float dy = vb[1] - va[1];
-			hit->hitNormal[0] = dy;
-			hit->hitNormal[1] = 0.0f;
-			hit->hitNormal[2] = -dx;
+			hit->hitNormal[0] = -dy;
+			hit->hitNormal[1] = dx;
+			hit->hitNormal[2] = 0.0f;
 			rdVnormalize(hit->hitNormal);
 			
 			hit->pathCount = n;
