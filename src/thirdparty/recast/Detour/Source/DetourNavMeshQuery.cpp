@@ -2690,9 +2690,12 @@ dtStatus dtNavMeshQuery::raycast(dtPolyRef startRef, const float* startPos, cons
 			if (nextPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
 				continue;
 			
-			// Skip links based on filter.
-			if (!filter->passFilter(link->ref, nextTile, nextPoly))
-				continue;
+			if (options & DT_RAYCAST_SKIP_OFFMESH_CONNECTION)
+			{
+				// Skip off-mesh connections.
+				if (nextPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
+					continue;
+			}
 			
 			// If the link is internal, just return the ref.
 			if (link->side == 0xff)

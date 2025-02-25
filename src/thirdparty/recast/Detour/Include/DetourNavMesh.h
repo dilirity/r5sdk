@@ -198,7 +198,8 @@ enum dtFindPathOptions
 /// Options for dtNavMeshQuery::raycast
 enum dtRaycastOptions
 {
-	DT_RAYCAST_USE_COSTS = 0x01,		///< Raycast should calculate movement cost along the ray and fill RaycastHit::cost
+	DT_RAYCAST_USE_COSTS = 1<<0,				///< Raycast should calculate movement cost along the ray and fill RaycastHit::cost.
+	DT_RAYCAST_SKIP_OFFMESH_CONNECTION = 1<<1	///< Raycast should skip off-mesh connections along the ray.
 };
 
 
