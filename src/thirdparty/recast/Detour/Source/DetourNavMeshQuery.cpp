@@ -1939,6 +1939,10 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 			
 			if (i+1 < pathSize)
 			{
+				// If from poly is the same as goal poly, advance.
+				if (path[i] == path[i+1])
+					continue;
+
 				unsigned char fromType; // fromType is ignored.
 
 				// Next portal.
