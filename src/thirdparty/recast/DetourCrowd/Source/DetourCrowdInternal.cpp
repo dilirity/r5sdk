@@ -66,7 +66,7 @@ float getDistanceToGoal(const dtCrowdAgent* ag, const float range)
 	if (!ag->ncorners)
 		return range;
 	
-	const bool endOfPath = (ag->cornerFlags[ag->ncorners-1] & DT_STRAIGHTPATH_END) ? true : false;
+	const bool endOfPath = dtIsStraightPathEnd(ag->cornerFlags[ag->ncorners-1]) ? true : false;
 	if (endOfPath)
 		return rdMin(rdVdist2D(ag->npos, &ag->cornerVerts[(ag->ncorners-1)*3]), range);
 	

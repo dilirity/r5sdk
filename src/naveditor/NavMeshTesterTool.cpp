@@ -135,7 +135,7 @@ static bool getSteerTarget(dtNavMeshQuery* navQuery, const float* startPos, cons
 	while (ns < nsteerPath)
 	{
 		// Stop at Off-Mesh link or when point is further than slop away.
-		if ((steerPathFlags[ns] & DT_STRAIGHTPATH_OFFMESH_CONNECTION) ||
+		if (dtIsStraightPathOffmeshConnection(steerPathFlags[ns]) ||
 			!inRange(&steerPath[ns*3], startPos, minTargetDist, 1000.0f))
 			break;
 		ns++;
@@ -543,8 +543,8 @@ void NavMeshTesterTool::handleToggle()
 		
 	rdVcopy(m_steerPos, steerPos);
 	
-	bool endOfPath = (steerPosFlag & DT_STRAIGHTPATH_END) ? true : false;
-	bool offMeshConnection = (steerPosFlag & DT_STRAIGHTPATH_OFFMESH_CONNECTION) ? true : false;
+	const bool endOfPath = dtIsStraightPathEnd(steerPosFlag);
+	const bool offMeshConnection = dtIsStraightPathOffmeshConnection(steerPosFlag);
 		
 	// Find movement delta.
 	float delta[3], len;
@@ -758,8 +758,8 @@ void NavMeshTesterTool::recalc()
 										polys, jumpTypes, npolys, steerPos, steerPosFlag, steerPosRef))
 						break;
 					
-					bool endOfPath = (steerPosFlag & DT_STRAIGHTPATH_END) ? true : false;
-					bool offMeshConnection = (steerPosFlag & DT_STRAIGHTPATH_OFFMESH_CONNECTION) ? true : false;
+					const bool endOfPath = dtIsStraightPathEnd(steerPosFlag);
+					const bool offMeshConnection = dtIsStraightPathOffmeshConnection(steerPosFlag);
 					
 					// Find movement delta.
 					float delta[3], len;
@@ -1177,7 +1177,7 @@ void NavMeshTesterTool::handleRender()
 			for (int i = 0; i < m_nstraightPath-1; ++i)
 			{
 				unsigned int col;
-				if (m_straightPathFlags[i] & DT_STRAIGHTPATH_OFFMESH_CONNECTION)
+				if (dtIsStraightPathOffmeshConnection(m_straightPathFlags[i]))
 					col = offMeshCol;
 				else
 					col = spathCol;
@@ -1190,11 +1190,11 @@ void NavMeshTesterTool::handleRender()
 			for (int i = 0; i < m_nstraightPath; ++i)
 			{
 				unsigned int col;
-				if (m_straightPathFlags[i] & DT_STRAIGHTPATH_START)
+				if (dtIsStraightPathStart(m_straightPathFlags[i]))
 					col = startCol;
-				else if (m_straightPathFlags[i] & DT_STRAIGHTPATH_END)
+				else if (dtIsStraightPathEnd(m_straightPathFlags[i]))
 					col = endCol;
-				else if (m_straightPathFlags[i] & DT_STRAIGHTPATH_OFFMESH_CONNECTION)
+				else if (dtIsStraightPathOffmeshConnection(m_straightPathFlags[i]))
 					col = offMeshCol;
 				else
 					col = spathCol;

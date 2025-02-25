@@ -1729,7 +1729,7 @@ dtStatus dtNavMeshQuery::appendVertex(const float* pos, const unsigned char flag
 		}
 
 		// If reached end of path, return.
-		if (flags == DT_STRAIGHTPATH_END)
+		if (dtIsStraightPathEnd(flags))
 		{
 			return DT_SUCCESS;
 		}
@@ -1896,11 +1896,11 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 	if (dtStatusFailed(closestPointOnPolyBoundary(path[pathSize-1], endPos, closestEndPos, &distToClosest)))
 		return DT_FAILURE | DT_INVALID_PARAM;
 
-	// This is a waypoint vertex if we aren't inside the goal polygon, which is
-	// the case when distToClosest == 0.f.
+	// Determine and mark whether the end vertex resides within the same
+	// polygon as the start vertex.
 	const unsigned char vertexFlags = (distToClosest == 0.0f)
-		? DT_STRAIGHTPATH_END
-		: DT_STRAIGHTPATH_WAYPOINT;
+		? DT_STRAIGHTPATH_END_INTERNAL
+		: DT_STRAIGHTPATH_END_EXTERNAL;
 	
 	// Add start point.
 	stat = appendVertex(closestStartPos, DT_STRAIGHTPATH_START, path[0], jumpTypes[0],

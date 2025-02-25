@@ -273,7 +273,7 @@ void CrowdToolState::handleRender()
 					dd.vertex(va[0],va[1],va[2]+agentRadius, duRGBA(128,0,0,192));
 					dd.vertex(vb[0],vb[1],vb[2]+agentRadius, duRGBA(128,0,0,192));
 				}
-				if (ag->ncorners && ag->cornerFlags[ag->ncorners-1] & DT_STRAIGHTPATH_OFFMESH_CONNECTION)
+				if (ag->ncorners && dtIsStraightPathOffmeshConnection(ag->cornerFlags[ag->ncorners-1]))
 				{
 					const float* v = &ag->cornerVerts[(ag->ncorners-1)*3];
 					dd.vertex(v[0],v[1],v[2], duRGBA(192,0,0,192));

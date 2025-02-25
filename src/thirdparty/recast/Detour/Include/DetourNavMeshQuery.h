@@ -665,6 +665,30 @@ private:
 	class dtNodeQueue* m_openList;		///< Pointer to open list queue.
 };
 
+/// Test whether this waypoint is the start in the straight path.
+/// @param	flag[in]		The waypoint flag.
+/// @ingroup detour
+inline bool dtIsStraightPathStart(const unsigned char flag)
+{
+	return flag & DT_STRAIGHTPATH_START;
+}
+
+/// Test whether this waypoint is the end in the straight path.
+/// @param	flag[in]		The waypoint flag.
+/// @ingroup detour
+inline bool dtIsStraightPathEnd(const unsigned char flag)
+{
+	return flag & (DT_STRAIGHTPATH_END_INTERNAL | DT_STRAIGHTPATH_END_EXTERNAL);
+}
+
+/// Test whether this waypoint is an off-mesh connection.
+/// @param	flag[in]		The waypoint flag.
+/// @ingroup detour
+inline bool dtIsStraightPathOffmeshConnection(const unsigned char flag)
+{
+	return flag & DT_STRAIGHTPATH_OFFMESH_CONNECTION;
+}
+
 /// Allocates a query object using the Detour allocator.
 /// @return An allocated query object, or null on failure.
 /// @ingroup detour
