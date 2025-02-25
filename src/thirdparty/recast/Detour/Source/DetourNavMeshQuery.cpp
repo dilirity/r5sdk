@@ -1700,7 +1700,7 @@ dtStatus dtNavMeshQuery::appendVertex(const float* pos, const unsigned char flag
 									  dtPolyRef* straightPathRefs, unsigned char* straightPathJumps,
 									  int* straightPathCount, const int maxStraightPath) const
 {
-	if ((*straightPathCount) > 0 && rdVequal(&straightPath[((*straightPathCount)-1)*3], pos))
+	if ((*straightPathCount) > 0 && ref && rdVequal(&straightPath[((*straightPathCount)-1)*3], pos))
 	{
 		// The vertices are equal, update flags and poly.
 		if (straightPathFlags)
