@@ -2022,10 +2022,9 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 						flags = vertexFlags;
 					else if (rightPolyType == DT_POLYTYPE_OFFMESH_CONNECTION)
 						flags = DT_STRAIGHTPATH_OFFMESH_CONNECTION;
-					dtPolyRef ref = rightPolyRef;
-					
+
 					// Append or update vertex
-					stat = appendVertex(portalApex, flags, ref, rightJumpType,
+					stat = appendVertex(portalApex, flags, rightPolyRef, rightJumpType,
 										straightPath, straightPathFlags, straightPathRefs,
 										straightPathJumps, straightPathCount, maxStraightPath);
 					if (stat != DT_IN_PROGRESS)
@@ -2074,10 +2073,9 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 						flags = vertexFlags;
 					else if (leftPolyType == DT_POLYTYPE_OFFMESH_CONNECTION)
 						flags = DT_STRAIGHTPATH_OFFMESH_CONNECTION;
-					dtPolyRef ref = leftPolyRef;
 
 					// Append or update vertex
-					stat = appendVertex(portalApex, flags, ref, leftJumpType, 
+					stat = appendVertex(portalApex, flags, leftPolyRef, leftJumpType,
 										straightPath, straightPathFlags, straightPathRefs,
 										straightPathJumps, straightPathCount, maxStraightPath);
 					if (stat != DT_IN_PROGRESS)
