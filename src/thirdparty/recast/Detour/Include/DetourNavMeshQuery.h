@@ -166,16 +166,16 @@ struct dtStraightPathResult
 	int pathCount;
 
 	/// The points describing the straight path.
-	float path[3][DT_STRAIGHT_PATH_RESOLUTION];
+	float path[3][DT_DEFAULT_STRAIGHT_PATH_RESOLUTION];
 
 	/// The array of polygon references that represent the path corridor.
-	dtPolyRef polys[DT_STRAIGHT_PATH_RESOLUTION];
+	dtPolyRef polys[DT_DEFAULT_STRAIGHT_PATH_RESOLUTION];
 
 	/// The jumps describing each point.
-	unsigned char jumps[DT_STRAIGHT_PATH_RESOLUTION];
+	unsigned char jumps[DT_DEFAULT_STRAIGHT_PATH_RESOLUTION];
 
 	/// The flags describing each point.
-	unsigned char flags[DT_STRAIGHT_PATH_RESOLUTION];
+	unsigned char flags[DT_DEFAULT_STRAIGHT_PATH_RESOLUTION];
 
 	/// Whether the end of the path is the goal destination.
 	bool pathEndIsGoal;

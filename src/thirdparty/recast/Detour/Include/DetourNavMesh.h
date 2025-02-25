@@ -154,8 +154,8 @@ static const unsigned char DT_OFFMESH_CON_TRAVERSE_ON_VERT = 1<<6;
 /// A flag that indicates that the off-mesh link can be traversed from or towards the polygon it connects to.
 static const unsigned char DT_OFFMESH_CON_TRAVERSE_ON_POLY = 1<<7;
 
-/// A value that determines the maximum number of points describing the straight path result.
-static const int DT_STRAIGHT_PATH_RESOLUTION = 5;
+/// A value that determines the default number of points describing the straight path result.
+static const int DT_DEFAULT_STRAIGHT_PATH_RESOLUTION = 5;
 
 /// The maximum number of user defined area ids.
 /// @ingroup detour
