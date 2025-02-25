@@ -1896,6 +1896,10 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 	if (dtStatusFailed(closestPointOnPolyBoundary(path[pathSize-1], endPos, closestEndPos, &distToClosest)))
 		return DT_FAILURE | DT_INVALID_PARAM;
 
+	// Start and end positions are too close, no action will be performed.
+	if (rdVequal(closestStartPos, closestEndPos))
+		return DT_FAILURE | DT_INVALID_ACTION;
+
 	// Determine and mark whether the end vertex resides within the same
 	// polygon as the start vertex.
 	const unsigned char vertexFlags = (distToClosest == 0.0f)
