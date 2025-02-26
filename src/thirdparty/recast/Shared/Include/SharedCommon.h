@@ -416,13 +416,27 @@ inline float rdTriArea2D(const float* a, const float* b, const float* c)
 	return acx*aby - abx*acy;
 }
 
+/// Derives the normal of the triangle ABC.
+///  @param[in]		a		Vertex A. [(x, y, z)]
+///  @param[in]		b		Vertex B. [(x, y, z)]
+///  @param[in]		c		Vertex C. [(x, y, z)]
+///  @param[out]	out		The resulting normal. [(x, y, z)]
+inline void rdTriNormal(const float* v0, const float* v1, const float* v2, float* out)
+{
+	float e0[3], e1[3];
+	rdVsub(e0, v1, v0);
+	rdVsub(e1, v2, v0);
+	rdVcross(out, e0, e1);
+	rdVnormalize(out);
+}
+
 /// Determines if two axis-aligned bounding boxes overlap.
 ///  @param[in]		amin	Minimum bounds of box A. [(x, y, z)]
 ///  @param[in]		amax	Maximum bounds of box A. [(x, y, z)]
 ///  @param[in]		bmin	Minimum bounds of box B. [(x, y, z)]
 ///  @param[in]		bmax	Maximum bounds of box B. [(x, y, z)]
 /// @return True if the two AABB's overlap.
-/// @see dtOverlapBounds
+/// @see rdOverlapBounds
 inline bool rdOverlapQuantBounds(const unsigned short amin[3], const unsigned short amax[3],
 								 const unsigned short bmin[3], const unsigned short bmax[3])
 {
@@ -439,7 +453,7 @@ inline bool rdOverlapQuantBounds(const unsigned short amin[3], const unsigned sh
 ///  @param[in]		bmin	Minimum bounds of box B. [(x, y, z)]
 ///  @param[in]		bmax	Maximum bounds of box B. [(x, y, z)]
 /// @return True if the two AABB's overlap.
-/// @see dtOverlapQuantBounds
+/// @see rdOverlapQuantBounds
 inline bool rdOverlapBounds(const float* amin, const float* amax,
 							const float* bmin, const float* bmax)
 {
