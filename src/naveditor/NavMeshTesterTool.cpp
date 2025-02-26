@@ -118,7 +118,7 @@ static bool getSteerTarget(dtNavMeshQuery* navQuery, const float* startPos, cons
 	unsigned char steerPathJumps[MAX_STEER_POINTS];
 	int nsteerPath = 0;
 	navQuery->findStraightPath(startPos, endPos, path, jumpTypes, pathSize,
-							   steerPath, steerPathFlags, steerPathPolys, steerPathJumps, &nsteerPath, MAX_STEER_POINTS);
+							   steerPath, steerPathFlags, steerPathPolys, steerPathJumps, &nsteerPath, MAX_STEER_POINTS, 0xffffffff);
 	if (!nsteerPath)
 		return false;
 		
@@ -656,7 +656,7 @@ void NavMeshTesterTool::handleUpdate(const float /*dt*/)
 
 				m_navQuery->findStraightPath(m_spos, epos, m_polys, m_jumpTypes, m_npolys,
 											 m_straightPath, m_straightPathFlags,
-											 m_straightPathPolys, m_straightPathJumps, &m_nstraightPath, MAX_POLYS, DT_STRAIGHTPATH_ALL_CROSSINGS);
+											 m_straightPathPolys, m_straightPathJumps, &m_nstraightPath, MAX_POLYS, 0xffffffff, DT_STRAIGHTPATH_ALL_CROSSINGS);
 			}
 			 
 			m_pathFindStatus = DT_FAILURE;
@@ -878,7 +878,7 @@ void NavMeshTesterTool::recalc()
 				
 				m_navQuery->findStraightPath(m_spos, epos, m_polys, m_jumpTypes, m_npolys,
 											 m_straightPath, m_straightPathFlags,
-											 m_straightPathPolys, m_straightPathJumps, &m_nstraightPath, MAX_POLYS, m_straightPathOptions);
+											 m_straightPathPolys, m_straightPathJumps, &m_nstraightPath, MAX_POLYS, 0xffffffff, m_straightPathOptions);
 			}
 		}
 		else

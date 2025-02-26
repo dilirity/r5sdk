@@ -237,7 +237,7 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 				rdTimeType findStraightPathStart = getPerfTime();
 				
 				navquery->findStraightPath(iter->spos, iter->epos, polys, jumps, iter->npolys,
-										   straight, 0, 0, 0, &iter->nstraight, MAX_POLYS);
+										   straight, 0, 0, 0, &iter->nstraight, MAX_POLYS, 0xffffffff);
 				rdTimeType findStraightPathEnd = getPerfTime();
 				iter->findStraightPathTime += getPerfTimeUsec(findStraightPathEnd - findStraightPathStart);
 			}

@@ -1868,7 +1868,8 @@ dtStatus dtNavMeshQuery::appendPortals(const int startIdx, const int endIdx, con
 dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* endPos,
 										  const dtPolyRef* path, const unsigned char* jumpTypes, const int pathSize,
 										  float* straightPath, unsigned char* straightPathFlags, dtPolyRef* straightPathRefs,
-										  unsigned char* straightPathJumps, int* straightPathCount, const int maxStraightPath, const int options) const
+										  unsigned char* straightPathJumps, int* straightPathCount, const int maxStraightPath, 
+										  const int jumpFilter, const int options) const
 {
 	rdAssert(m_nav);
 
@@ -1964,7 +1965,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					{
 						stat = appendPortals(apexIndex, i, closestEndPos, path, jumpTypes,
 											 straightPath, straightPathFlags, straightPathRefs,
-											 straightPathJumps, straightPathCount, maxStraightPath, 0xffffffff, options);
+											 straightPathJumps, straightPathCount, maxStraightPath, jumpFilter, options);
 					}
 
 					if (!shouldCross || stat == DT_IN_PROGRESS)
@@ -2015,7 +2016,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					{
 						stat = appendPortals(apexIndex, rightIndex, portalRight, path, jumpTypes,
 											 straightPath, straightPathFlags, straightPathRefs,
-											 straightPathJumps, straightPathCount, maxStraightPath, 0xffffffff, options);
+											 straightPathJumps, straightPathCount, maxStraightPath, jumpFilter, options);
 						if (stat != DT_IN_PROGRESS)
 							return stat;					
 					}
@@ -2066,7 +2067,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					{
 						stat = appendPortals(apexIndex, leftIndex, portalLeft, path, jumpTypes,
 											 straightPath, straightPathFlags, straightPathRefs,
-											 straightPathJumps, straightPathCount, maxStraightPath, 0xffffffff, options);
+											 straightPathJumps, straightPathCount, maxStraightPath, jumpFilter, options);
 						if (stat != DT_IN_PROGRESS)
 							return stat;
 					}
@@ -2105,7 +2106,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 		{
 			stat = appendPortals(apexIndex, pathSize-1, closestEndPos, path, jumpTypes,
 								 straightPath, straightPathFlags, straightPathRefs,
-								 straightPathJumps, straightPathCount, maxStraightPath, 0xffffffff, options);
+								 straightPathJumps, straightPathCount, maxStraightPath, jumpFilter, options);
 			if (stat != DT_IN_PROGRESS)
 				return stat;
 		}
@@ -2119,11 +2120,11 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 	return DT_SUCCESS | ((*straightPathCount >= maxStraightPath) ? DT_BUFFER_TOO_SMALL : 0);
 }
 
-dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* endPos, const dtPolyRef* path, const unsigned char* jumpTypes,
-										  const int pathSize, dtStraightPathResult& result, const int maxStraightPath, const int options) const
+dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* endPos, const dtPolyRef* path, const unsigned char* jumpTypes, const int pathSize,
+										  dtStraightPathResult& result, const int maxStraightPath, const int jumpFilter, const int options) const
 {
 	return findStraightPath(startPos, endPos, path, jumpTypes, 
-							pathSize, *result.path, result.flags, result.polys, result.jumps, &result.pathCount, maxStraightPath, options);
+							pathSize, *result.path, result.flags, result.polys, result.jumps, &result.pathCount, maxStraightPath, jumpFilter, options);
 }
 
 /// @par

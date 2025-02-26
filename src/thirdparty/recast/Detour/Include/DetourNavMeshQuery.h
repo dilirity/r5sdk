@@ -239,13 +239,14 @@ public:
 	///  @param[out]	straightPathJumps	The jump types that is being entered at each point. [opt]
 	///  @param[out]	straightPathCount	The number of points in the straight path.
 	///  @param[in]		maxStraightPath		The maximum number of points the straight path arrays can hold.  [Limit: > 0]
+	///  @param[in]		jumpFilter			A mask containing all the jump types to be considered when adding jump verts.
 	///  @param[in]		options				Query options. (see: #dtStraightPathOptions)
 	/// @returns The status flags for the query.
 	dtStatus findStraightPath(const float* startPos, const float* endPos,
 							  const dtPolyRef* path, const unsigned char* jumpTypes, const int pathSize,
 							  float* straightPath, unsigned char* straightPathFlags, dtPolyRef* straightPathRefs,
 							  unsigned char* straightPathJumps, int* straightPathCount, const int maxStraightPath,
-							  const int options = 0) const;
+							  const int jumpFilter, const int options = 0) const;
 
 	/// Finds the straight path from the start to the end position within the polygon corridor.
 	///  @param[in]		startPos			Path start position. [(x, y, z)]
@@ -255,10 +256,11 @@ public:
 	///  @param[in]		pathSize			The number of polygons in the @p path array.
 	///  @param[out]	result				The result of the straight path.
 	///  @param[in]		maxStraightPath		The maximum number of points the straight path arrays can hold.  [Limit: > 0]
+	///  @param[in]		jumpFilter			A mask containing all the jump types to be considered when adding jump verts.
 	///  @param[in]		options				Query options. (see: #dtStraightPathOptions)
 	/// @returns The status flags for the query.
-	dtStatus findStraightPath(const float* startPos, const float* endPos, const dtPolyRef* path, const unsigned char* jumpTypes,
-							  const int pathSize, dtStraightPathResult& result, const int maxStraightPath, const int options = 0) const;
+	dtStatus findStraightPath(const float* startPos, const float* endPos, const dtPolyRef* path, const unsigned char* jumpTypes, const int pathSize,
+							  dtStraightPathResult& result, const int maxStraightPath, const int jumpFilter, const int options = 0) const;
 
 	///@}
 	/// @name Sliced Pathfinding Functions
