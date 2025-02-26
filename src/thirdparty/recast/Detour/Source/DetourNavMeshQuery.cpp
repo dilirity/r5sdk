@@ -1957,21 +1957,27 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 						return DT_FAILURE | DT_INVALID_PARAM;
 					}
 
+					const bool shouldCross = options & (DT_STRAIGHTPATH_AREA_CROSSINGS | DT_STRAIGHTPATH_ALL_CROSSINGS);
+
 					// Append portals along the current straight path segment.
-					if (options & (DT_STRAIGHTPATH_AREA_CROSSINGS | DT_STRAIGHTPATH_ALL_CROSSINGS))
+					if (shouldCross)
 					{
-						// Ignore status return value as we're just about to return anyway.
-						appendPortals(apexIndex, i, closestEndPos, path, jumpTypes,
+						stat = appendPortals(apexIndex, i, closestEndPos, path, jumpTypes,
 											 straightPath, straightPathFlags, straightPathRefs,
 											 straightPathJumps, straightPathCount, maxStraightPath, 0xffffffff, options);
 					}
 
-					// Ignore status return value as we're just about to return anyway.
-					appendVertex(closestEndPos, 0, path[i], jumpTypes[i],
-										straightPath, straightPathFlags, straightPathRefs,
-										straightPathJumps, straightPathCount, maxStraightPath);
-					
-					return DT_SUCCESS | DT_PARTIAL_RESULT | ((*straightPathCount >= maxStraightPath) ? DT_BUFFER_TOO_SMALL : 0);
+					if (!shouldCross || stat == DT_IN_PROGRESS)
+					{
+						// Ignore status return value as we're just about to return anyway.
+						appendVertex(closestEndPos, 0, path[i], jumpTypes[i],
+									 straightPath, straightPathFlags, straightPathRefs,
+									 straightPathJumps, straightPathCount, maxStraightPath);
+
+						return DT_SUCCESS | DT_PARTIAL_RESULT | ((*straightPathCount >= maxStraightPath) ? DT_BUFFER_TOO_SMALL : 0);
+					}
+
+					return stat;
 				}
 				
 				// If starting really close the portal, advance.
