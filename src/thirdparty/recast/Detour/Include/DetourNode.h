@@ -43,7 +43,7 @@ struct dtNode
 	unsigned int pidx : DT_NODE_PARENT_BITS;	///< Index to parent node.
 	unsigned int state : DT_NODE_STATE_BITS;	///< extra state information. A polyRef can have multiple nodes with different extra info. see DT_MAX_STATES_PER_NODE
 	unsigned int flags : DT_NODE_FLAGS_BITS;	///< Node flags. A combination of dtNodeFlags.
-	unsigned int jumpt : DT_NODE_JUMPT_BITS;	///< Node jump type.
+	unsigned int jump : DT_NODE_JUMPT_BITS;		///< Node jump type.
 	dtPolyRef id;								///< Polygon ref the node corresponds to.
 };
 
