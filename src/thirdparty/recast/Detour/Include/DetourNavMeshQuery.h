@@ -231,6 +231,7 @@ public:
 	///  @param[in]		startPos			Path start position. [(x, y, z)]
 	///  @param[in]		endPos				Path end position. [(x, y, z)]
 	///  @param[in]		path				An array of polygon references that represent the path corridor.
+	///  @param[in]		jumpTypes			An array of jump types that represent the traversal corridor.
 	///  @param[in]		pathSize			The number of polygons in the @p path array.
 	///  @param[out]	straightPath		Points describing the straight path. [(x, y, z) * @p straightPathCount].
 	///  @param[out]	straightPathFlags	Flags describing each point. (See: #dtStraightPathFlags) [opt]
