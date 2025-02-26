@@ -2119,6 +2119,13 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 	return DT_SUCCESS | ((*straightPathCount >= maxStraightPath) ? DT_BUFFER_TOO_SMALL : 0);
 }
 
+dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* endPos, const dtPolyRef* path, const unsigned char* jumpTypes,
+										  const int pathSize, dtStraightPathResult& result, const int maxStraightPath, const int options) const
+{
+	return findStraightPath(startPos, endPos, path, jumpTypes, 
+							pathSize, *result.path, result.flags, result.polys, result.jumps, &result.pathCount, maxStraightPath, options);
+}
+
 /// @par
 ///
 /// This method is optimized for small delta movement and a small number of 

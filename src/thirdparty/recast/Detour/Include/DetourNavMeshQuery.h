@@ -247,6 +247,19 @@ public:
 							  unsigned char* straightPathJumps, int* straightPathCount, const int maxStraightPath,
 							  const int options = 0) const;
 
+	/// Finds the straight path from the start to the end position within the polygon corridor.
+	///  @param[in]		startPos			Path start position. [(x, y, z)]
+	///  @param[in]		endPos				Path end position. [(x, y, z)]
+	///  @param[in]		path				An array of polygon references that represent the path corridor.
+	///  @param[in]		jumpTypes			An array of jump types that represent the traversal corridor.
+	///  @param[in]		pathSize			The number of polygons in the @p path array.
+	///  @param[out]	result				The result of the straight path.
+	///  @param[in]		maxStraightPath		The maximum number of points the straight path arrays can hold.  [Limit: > 0]
+	///  @param[in]		options				Query options. (see: #dtStraightPathOptions)
+	/// @returns The status flags for the query.
+	dtStatus findStraightPath(const float* startPos, const float* endPos, const dtPolyRef* path, const unsigned char* jumpTypes,
+							  const int pathSize, dtStraightPathResult& result, const int maxStraightPath, const int options = 0) const;
+
 	///@}
 	/// @name Sliced Pathfinding Functions
 	/// Common use case:
