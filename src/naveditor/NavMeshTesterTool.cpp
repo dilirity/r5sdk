@@ -486,7 +486,7 @@ void NavMeshTesterTool::handleToggle()
 
 	if (!m_navMesh->isGoalPolyReachable(m_startRef, m_endRef, !hasAnimType, traverseTableIndex))
 	{
-		printf("%s: end poly '%d' is unreachable from start poly '%d'\n", "m_navMesh->isGoalPolyReachable", m_startRef, m_endRef);
+		printf("%s: goal poly '%u' is unreachable from poly '%u'\n", "m_navMesh->isGoalPolyReachable", m_startRef, m_endRef);
 
 		m_npolys = 0;
 		m_nsmoothPath = 0;
@@ -711,7 +711,7 @@ void NavMeshTesterTool::recalc()
 		isReachable = m_navMesh->isGoalPolyReachable(m_startRef, m_endRef, !hasAnimType, traverseTableIndex);
 
 		if (!isReachable)
-			printf("%s: end poly '%d' is unreachable from start poly '%d'\n", "m_navMesh->isGoalPolyReachable", m_startRef, m_endRef);
+			printf("%s: goal poly '%u' is unreachable from poly '%u'\n", "m_navMesh->isGoalPolyReachable", m_startRef, m_endRef);
 	}
 	
 	if (m_toolMode == TOOLMODE_PATHFIND_FOLLOW)
