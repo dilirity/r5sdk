@@ -218,14 +218,16 @@ public:
 	///  @param[in]		startPos	A position within the start polygon. [(x, y, z)]
 	///  @param[in]		endPos		A position within the end polygon. [(x, y, z)]
 	///  @param[in]		filter		The polygon filter to apply to the query.
-	///  @param[out]	path		An ordered list of polygon references representing the path. (Start to end.) 
+	///  @param[out]	path		An ordered list of polygon references representing the path. (Start to end.)
 	///  							[(polyRef) * @p pathCount]
+	///  @param[out]	jump		An ordered list of polygon references representing the path. (Start to end.)
+	///  							[(uchar) * @p pathCount]
 	///  @param[out]	pathCount	The number of polygons returned in the @p path array.
 	///  @param[in]		maxPath		The maximum number of polygons the @p path array can hold. [Limit: >= 1]
 	dtStatus findPath(dtPolyRef startRef, dtPolyRef endRef,
 					  const float* startPos, const float* endPos,
-					  const dtQueryFilter* filter,
-					  dtPolyRef* path, int* pathCount, const int maxPath) const;
+					  const dtQueryFilter* filter, dtPolyRef* path,
+					  unsigned char* jump, int* pathCount, const int maxPath) const;
 
 	/// Finds the straight path from the start to the end position within the polygon corridor.
 	///  @param[in]		startPos			Path start position. [(x, y, z)]
@@ -289,13 +291,15 @@ public:
 	dtStatus updateSlicedFindPath(const int maxIter, int* doneIters, const dtQueryFilter* filter);
 
 	/// Finalizes and returns the results of a sliced path query.
-	///  @param[out]	path		An ordered list of polygon references representing the path. (Start to end.) 
+	///  @param[out]	path		An ordered list of polygon references representing the path. (Start to end.)
 	///  							[(polyRef) * @p pathCount]
+	///  @param[out]	jump		An ordered list of jump types representing the traversal path. (Start to end.)
+	///  							[(uchar) * @p pathCount]
 	///  @param[out]	pathCount	The number of polygons returned in the @p path array.
 	///  @param[in]		maxPath		The max number of polygons the path array can hold. [Limit: >= 1]
 	///  @param[in]		filter		The polygon filter to apply to the query.
 	/// @returns The status flags for the query.
-	dtStatus finalizeSlicedFindPath(dtPolyRef* path, int* pathCount, const int maxPath, const dtQueryFilter* filter);
+	dtStatus finalizeSlicedFindPath(dtPolyRef* path, unsigned char* jumps, int* pathCount, const int maxPath, const dtQueryFilter* filter);
 	
 	/// Finalizes and returns the results of an incomplete sliced path query, returning the path to the furthest
 	/// polygon on the existing path that was visited during the search.
@@ -303,13 +307,15 @@ public:
 	///  @param[in]		existingSize	The number of polygon in the @p existing array.
 	///  @param[out]	path			An ordered list of polygon references representing the path. (Start to end.) 
 	///  								[(polyRef) * @p pathCount]
+	///  @param[out]	jump			An ordered list of jump types representing the traversal path. (Start to end.) 
+	///  								[(uchar) * @p pathCount]
 	///  @param[out]	pathCount		The number of polygons returned in the @p path array.
 	///  @param[in]		maxPath			The max number of polygons the @p path array can hold. [Limit: >= 1]
 	///  @param[in]		filter		The polygon filter to apply to the query.
 	/// @returns The status flags for the query.
 	dtStatus finalizeSlicedFindPathPartial(const dtPolyRef* existing, const int existingSize,
-										   dtPolyRef* path, int* pathCount, const int maxPath,
-										   const dtQueryFilter* filter);
+										   dtPolyRef* path, unsigned char* jump, int* pathCount,
+										   const int maxPath, const dtQueryFilter* filter);
 
 	///@}
 	/// @name Dijkstra Search Functions
@@ -354,6 +360,8 @@ public:
 	///  @param[in]		endRef		The reference id of the end polygon.
 	///  @param[out]	path		An ordered list of polygon references representing the path. (Start to end.)
 	///  							[(polyRef) * @p pathCount]
+	///  @param[out]	jump		An ordered list of jump types representing the traversal path. (Start to end.)
+	///  							[(uchar) * @p pathCount]
 	///  @param[out]	pathCount	The number of polygons returned in the @p path array.
 	///  @param[in]		maxPath		The maximum number of polygons the @p path array can hold. [Limit: >= 0]
 	///  @returns		The status flags. Returns DT_FAILURE | DT_INVALID_PARAM if any parameter is wrong, or if
@@ -362,7 +370,7 @@ public:
 	///  				Otherwise returns DT_SUCCESS.
 	///  @remarks		The result of this function depends on the state of the query object. For that reason it should only
 	///  				be used immediately after one of the two Dijkstra searches, findPolysAroundCircle or findPolysAroundShape.
-	dtStatus getPathFromDijkstraSearch(dtPolyRef endRef, dtPolyRef* path, int* pathCount, int maxPath) const;
+	dtStatus getPathFromDijkstraSearch(dtPolyRef endRef, dtPolyRef* path, unsigned char* jump, int* pathCount, int maxPath) const;
 
 	/// @}
 	/// @name Local Query Functions
@@ -437,13 +445,14 @@ public:
 	///  @param[in]		endPos			The desired end position of the mover. [(x, y, z)]
 	///  @param[in]		filter			The polygon filter to apply to the query.
 	///  @param[out]	resultPos		The result position of the mover. [(x, y, z)]
-	///  @param[out]	visited			The reference ids of the polygons visited during the move.
+	///  @param[out]	visitedPolys	The reference ids of the polygons visited during the move.
+	///  @param[out]	visitedJumps	The jump types visited during the move.
 	///  @param[out]	visitedCount	The number of polygons visited during the move.
 	///  @param[in]		maxVisitedSize	The maximum number of polygons the @p visited array can hold.
 	/// @returns The status flags for the query.
 	dtStatus moveAlongSurface(dtPolyRef startRef, const float* startPos, const float* endPos,
-							  const dtQueryFilter* filter,
-							  float* resultPos, dtPolyRef* visited, int* visitedCount, const int maxVisitedSize) const;
+							  const dtQueryFilter* filter, float* resultPos, dtPolyRef* visitedPolys,
+							  unsigned char* visitedJumps, int* visitedCount, const int maxVisitedSize) const;
 	
 	/// Casts a 'walkability' ray along the surface of the navigation mesh from 
 	/// the start position toward the end position.
@@ -659,7 +668,7 @@ private:
 						   const int maxStraightPath, const int jumpFilter, const int options) const;
 
 	// Gets the path leading to the specified end node.
-	dtStatus getPathToNode(struct dtNode* endNode, dtPolyRef* path, int* pathCount, int maxPath) const;
+	dtStatus getPathToNode(struct dtNode* endNode, dtPolyRef* path, unsigned char* jump, int* pathCount, int maxPath) const;
 	
 	const dtNavMesh* m_nav;				///< Pointer to navmesh data.
 

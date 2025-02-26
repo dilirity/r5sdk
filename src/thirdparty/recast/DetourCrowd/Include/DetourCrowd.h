@@ -228,6 +228,7 @@ class dtCrowd
 	dtProximityGrid* m_grid;
 	
 	dtPolyRef* m_pathResult;
+	unsigned char* m_jumpResult;
 	int m_maxPathResult;
 	
 	float m_agentPlacementHalfExtents[3];

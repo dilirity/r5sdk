@@ -89,7 +89,8 @@ class NavMeshTesterTool : public EditorTool
 	bool m_eposSet;
 
 	int m_pathIterNum;
-	dtPolyRef m_pathIterPolys[MAX_POLYS]; 
+	dtPolyRef m_pathIterPolys[MAX_POLYS];
+	unsigned char m_pathIterJumps[MAX_POLYS];
 	int m_pathIterPolyCount;
 	float m_prevIterPos[3], m_iterPos[3], m_steerPos[3], m_targetPos[3];
 	

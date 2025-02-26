@@ -226,7 +226,7 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 			// Find path
 			rdTimeType findPathStart = getPerfTime();
 
-			navquery->findPath(startRef, endRef, iter->spos, iter->epos, &filter, polys, &iter->npolys, MAX_POLYS);
+			navquery->findPath(startRef, endRef, iter->spos, iter->epos, &filter, polys, jumps, &iter->npolys, MAX_POLYS);
 			
 			rdTimeType findPathEnd = getPerfTime();
 			iter->findPathTime += getPerfTimeUsec(findPathEnd - findPathStart);

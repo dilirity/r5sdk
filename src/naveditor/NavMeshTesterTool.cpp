@@ -498,12 +498,15 @@ void NavMeshTesterTool::handleToggle()
 
 	if (m_pathIterNum == 0)
 	{
-		m_navQuery->findPath(m_startRef, m_endRef, m_spos, m_epos, &m_filter, m_polys, &m_npolys, MAX_POLYS);
+		m_navQuery->findPath(m_startRef, m_endRef, m_spos, m_epos, &m_filter, m_polys, m_jumpTypes, &m_npolys, MAX_POLYS);
 		m_nsmoothPath = 0;
 
 		m_pathIterPolyCount = m_npolys;
 		if (m_pathIterPolyCount)
-			memcpy(m_pathIterPolys, m_polys, sizeof(dtPolyRef)*m_pathIterPolyCount); 
+		{
+			memcpy(m_pathIterPolys, m_polys, sizeof(dtPolyRef)*m_pathIterPolyCount);
+			memcpy(m_pathIterJumps, m_jumpTypes, sizeof(unsigned char)*m_pathIterPolyCount);
+		}
 		
 		if (m_pathIterPolyCount)
 		{
@@ -537,7 +540,7 @@ void NavMeshTesterTool::handleToggle()
 	dtPolyRef steerPosRef;
 		
 	if (!getSteerTarget(m_navQuery, m_iterPos, m_targetPos, SLOP,
-						m_pathIterPolys, m_jumpTypes, m_pathIterPolyCount, steerPos, steerPosFlag, steerPosRef,
+						m_pathIterPolys, m_pathIterJumps, m_pathIterPolyCount, steerPos, steerPosFlag, steerPosRef,
 						m_steerPoints, &m_steerPointCount))
 		return;
 		
@@ -560,11 +563,12 @@ void NavMeshTesterTool::handleToggle()
 		
 	// Move
 	float result[3];
-	dtPolyRef visited[16];
+	dtPolyRef visitedPolys[16];
+	unsigned char visitedJumps[16];
 	int nvisited = 0;
 	m_navQuery->moveAlongSurface(m_pathIterPolys[0], m_iterPos, moveTgt, &m_filter,
-								 result, visited, &nvisited, 16);
-	m_pathIterPolyCount = dtMergeCorridorStartMoved(m_pathIterPolys, m_pathIterPolyCount, MAX_POLYS, visited, nvisited);
+								 result, visitedPolys, visitedJumps, &nvisited, 16);
+	m_pathIterPolyCount = dtMergeCorridorStartMoved(m_pathIterPolys, m_pathIterJumps, m_pathIterPolyCount, MAX_POLYS, visitedPolys, visitedJumps, nvisited);
 	m_pathIterPolyCount = fixupShortcuts(m_pathIterPolys, m_pathIterPolyCount, m_navQuery);
 
 	float h = 0;
@@ -644,7 +648,7 @@ void NavMeshTesterTool::handleUpdate(const float /*dt*/)
 		}
 		if (dtStatusSucceed(m_pathFindStatus))
 		{
-			m_navQuery->finalizeSlicedFindPath(m_polys, &m_npolys, MAX_POLYS, &m_filter);
+			m_navQuery->finalizeSlicedFindPath(m_polys, m_jumpTypes, &m_npolys, MAX_POLYS, &m_filter);
 			m_nstraightPath = 0;
 			if (m_npolys)
 			{
@@ -721,7 +725,7 @@ void NavMeshTesterTool::recalc()
 				   m_filter.getIncludeFlags(), m_filter.getExcludeFlags()); 
 #endif
 
-			m_navQuery->findPath(m_startRef, m_endRef, m_spos, m_epos, &m_filter, m_polys, &m_npolys, MAX_POLYS);
+			m_navQuery->findPath(m_startRef, m_endRef, m_spos, m_epos, &m_filter, m_polys, m_jumpTypes, &m_npolys, MAX_POLYS);
 
 			m_nsmoothPath = 0;
 
@@ -729,9 +733,10 @@ void NavMeshTesterTool::recalc()
 			{
 				// Iterate over the path to find smooth path on the detail mesh surface.
 				dtPolyRef polys[MAX_POLYS];
-				memcpy(polys, m_polys, sizeof(dtPolyRef)*m_npolys); 
+				unsigned char jumps[MAX_POLYS];
+				memcpy(polys, m_polys, sizeof(dtPolyRef)*m_npolys);
+				memcpy(jumps, m_jumpTypes, sizeof(unsigned char)*m_npolys);
 				int npolys = m_npolys;
-				unsigned char* jumpTypes = m_jumpTypes;
 				
 				float iterPos[3], targetPos[3];
 				m_navQuery->closestPointOnPoly(m_startRef, m_spos, iterPos, 0);
@@ -755,7 +760,7 @@ void NavMeshTesterTool::recalc()
 					dtPolyRef steerPosRef;
 					
 					if (!getSteerTarget(m_navQuery, iterPos, targetPos, SLOP,
-										polys, jumpTypes, npolys, steerPos, steerPosFlag, steerPosRef))
+										polys, jumps, npolys, steerPos, steerPosFlag, steerPosRef))
 						break;
 					
 					const bool endOfPath = dtIsStraightPathEnd(steerPosFlag);
@@ -775,12 +780,13 @@ void NavMeshTesterTool::recalc()
 					
 					// Move
 					float result[3];
-					dtPolyRef visited[16];
+					dtPolyRef visitedPolys[16];
+					unsigned char visitedJumps[16];
 					int nvisited = 0;
 					m_navQuery->moveAlongSurface(polys[0], iterPos, moveTgt, &m_filter,
-												 result, visited, &nvisited, 16);
+												 result, visitedPolys, visitedJumps, &nvisited, 16);
 
-					npolys = dtMergeCorridorStartMoved(polys, npolys, MAX_POLYS, visited, nvisited);
+					npolys = dtMergeCorridorStartMoved(polys, jumps, npolys, MAX_POLYS, visitedPolys, visitedJumps, nvisited);
 					npolys = fixupShortcuts(polys, npolys, m_navQuery);
 
 					float h = 0;
@@ -800,7 +806,7 @@ void NavMeshTesterTool::recalc()
 						}
 						break;
 					}
-					else if (offMeshConnection && inRange(iterPos, steerPos, SLOP, 1.0f))
+					else if (offMeshConnection && inRange(iterPos, steerPos, SLOP, 1.0f)) // Todo(kawe): traverse portals.
 					{
 						// Reached off-mesh connection.
 						float startPos[3], endPos[3];
@@ -866,7 +872,7 @@ void NavMeshTesterTool::recalc()
 				   m_spos[0],m_spos[1],m_spos[2], m_epos[0],m_epos[1],m_epos[2],
 				   m_filter.getIncludeFlags(), m_filter.getExcludeFlags()); 
 #endif
-			m_navQuery->findPath(m_startRef, m_endRef, m_spos, m_epos, &m_filter, m_polys, &m_npolys, MAX_POLYS);
+			m_navQuery->findPath(m_startRef, m_endRef, m_spos, m_epos, &m_filter, m_polys, m_jumpTypes, &m_npolys, MAX_POLYS);
 			m_nstraightPath = 0;
 			if (m_npolys)
 			{

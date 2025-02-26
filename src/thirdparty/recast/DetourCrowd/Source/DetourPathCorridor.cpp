@@ -23,8 +23,8 @@
 #include "Shared\Include\SharedAlloc.h"
 
 
-int dtMergeCorridorStartMoved(dtPolyRef* path, const int npath, const int maxPath,
-							  const dtPolyRef* visited, const int nvisited)
+int dtMergeCorridorStartMoved(dtPolyRef* path, unsigned char* jump, const int npath, const int maxPath,
+							  const dtPolyRef* visitedPolys, const unsigned char* visitedJumps, const int nvisited)
 {
 	int furthestPath = -1;
 	int furthestVisited = -1;
@@ -35,7 +35,7 @@ int dtMergeCorridorStartMoved(dtPolyRef* path, const int npath, const int maxPat
 		bool found = false;
 		for (int j = nvisited-1; j >= 0; --j)
 		{
-			if (path[i] == visited[j])
+			if (path[i] == visitedPolys[j])
 			{
 				furthestPath = i;
 				furthestVisited = j;
@@ -59,17 +59,23 @@ int dtMergeCorridorStartMoved(dtPolyRef* path, const int npath, const int maxPat
 	if (req+size > maxPath)
 		size = maxPath-req;
 	if (size > 0)
+	{
 		memmove(path+req, path+orig, size*sizeof(dtPolyRef));
+		memmove(jump+req, jump+orig, size*sizeof(unsigned char));
+	}
 	
 	// Store visited
 	for (int i = 0; i < req; ++i)
-		path[i] = visited[(nvisited-1)-i];				
+	{
+		path[i] = visitedPolys[(nvisited-1)-i];
+		jump[i] = visitedJumps[(nvisited-1)-i];
+	}
 	
 	return req+size;
 }
 
-int dtMergeCorridorEndMoved(dtPolyRef* path, const int npath, const int maxPath,
-							const dtPolyRef* visited, const int nvisited)
+int dtMergeCorridorEndMoved(dtPolyRef* path, unsigned char* jump, const int npath, const int maxPath,
+							const dtPolyRef* visitedPolys, const unsigned char* visitedJumps, const int nvisited)
 {
 	int furthestPath = -1;
 	int furthestVisited = -1;
@@ -80,7 +86,7 @@ int dtMergeCorridorEndMoved(dtPolyRef* path, const int npath, const int maxPath,
 		bool found = false;
 		for (int j = nvisited-1; j >= 0; --j)
 		{
-			if (path[i] == visited[j])
+			if (path[i] == visitedPolys[j])
 			{
 				furthestPath = i;
 				furthestVisited = j;
@@ -101,13 +107,16 @@ int dtMergeCorridorEndMoved(dtPolyRef* path, const int npath, const int maxPath,
 	const int count = rdMin(nvisited-vpos, maxPath-ppos);
 	rdAssert(ppos+count <= maxPath);
 	if (count)
-		memcpy(path+ppos, visited+vpos, sizeof(dtPolyRef)*count);
+	{
+		memcpy(path+ppos, visitedPolys+vpos, sizeof(dtPolyRef)*count);
+		memcpy(jump+ppos, visitedJumps+vpos, sizeof(unsigned char)*count);
+	}
 	
 	return ppos+count;
 }
 
-int dtMergeCorridorStartShortcut(dtPolyRef* path, const int npath, const int maxPath,
-								 const dtPolyRef* visited, const int nvisited)
+int dtMergeCorridorStartShortcut(dtPolyRef* path, unsigned char* jump, const int npath, const int maxPath,
+								 const dtPolyRef* visitedPolys, const unsigned char* visitedJumps, const int nvisited)
 {
 	int furthestPath = -1;
 	int furthestVisited = -1;
@@ -118,7 +127,7 @@ int dtMergeCorridorStartShortcut(dtPolyRef* path, const int npath, const int max
 		bool found = false;
 		for (int j = nvisited-1; j >= 0; --j)
 		{
-			if (path[i] == visited[j])
+			if (path[i] == visitedPolys[j])
 			{
 				furthestPath = i;
 				furthestVisited = j;
@@ -145,11 +154,17 @@ int dtMergeCorridorStartShortcut(dtPolyRef* path, const int npath, const int max
 	if (req+size > maxPath)
 		size = maxPath-req;
 	if (size)
+	{
 		memmove(path+req, path+orig, size*sizeof(dtPolyRef));
+		memmove(jump+req, jump+orig, size*sizeof(unsigned char));
+	}
 	
 	// Store visited
 	for (int i = 0; i < req; ++i)
-		path[i] = visited[i];
+	{
+		path[i] = visitedPolys[i];
+		jump[i] = visitedJumps[i];
+	}
 	
 	return req+size;
 }
@@ -281,9 +296,10 @@ int dtPathCorridor::findCorners(float* cornerVerts, unsigned char* cornerFlags,
 		ncorners--;
 		if (ncorners)
 		{
+			memmove(cornerVerts, cornerVerts+3, sizeof(float)*3*ncorners);
 			memmove(cornerFlags, cornerFlags+1, sizeof(unsigned char)*ncorners);
 			memmove(cornerPolys, cornerPolys+1, sizeof(dtPolyRef)*ncorners);
-			memmove(cornerVerts, cornerVerts+3, sizeof(float)*3*ncorners);
+			memmove(cornerJumps, cornerJumps+1, sizeof(unsigned char)*ncorners);
 		}
 	}
 	
@@ -341,13 +357,15 @@ void dtPathCorridor::optimizePathVisibility(const float* next, const float pathO
 	rdVmad(goal, m_pos, delta, pathOptimizationRange/dist);
 	
 	static const int MAX_RES = 32;
-	dtPolyRef res[MAX_RES];
+	dtPolyRef reqPath[MAX_RES];
+	unsigned char reqJump[MAX_RES];
+
 	float t, norm[3];
 	int nres = 0;
-	navquery->raycast(m_path[0], m_pos, goal, filter, &t, norm, res, &nres, MAX_RES);
+	navquery->raycast(m_path[0], m_pos, goal, filter, &t, norm, reqPath, &nres, MAX_RES);
 	if (nres > 1 && t > 0.99f)
 	{
-		m_npath = dtMergeCorridorStartShortcut(m_path, m_npath, m_maxPath, res, nres);
+		m_npath = dtMergeCorridorStartShortcut(m_path, m_jumpTypes, m_npath, m_maxPath, reqPath, reqJump, nres);
 	}
 }
 
@@ -373,15 +391,16 @@ bool dtPathCorridor::optimizePathTopology(dtNavMeshQuery* navquery, const dtQuer
 	static const int MAX_ITER = 32;
 	static const int MAX_RES = 32;
 	
-	dtPolyRef res[MAX_RES];
+	dtPolyRef reqPath[MAX_RES];
+	unsigned char reqJump[MAX_RES];
 	int nres = 0;
 	navquery->initSlicedFindPath(m_path[0], m_path[m_npath-1], m_pos, m_target);
 	navquery->updateSlicedFindPath(MAX_ITER, 0, filter);
-	dtStatus status = navquery->finalizeSlicedFindPathPartial(m_path, m_npath, res, &nres, MAX_RES, filter);
+	dtStatus status = navquery->finalizeSlicedFindPathPartial(m_path, m_npath, reqPath, reqJump, &nres, MAX_RES, filter);
 	
 	if (dtStatusSucceed(status) && nres > 0)
 	{
-		m_npath = dtMergeCorridorStartShortcut(m_path, m_npath, m_maxPath, res, nres);
+		m_npath = dtMergeCorridorStartShortcut(m_path, m_jumpTypes, m_npath, m_maxPath, reqPath, reqJump, nres);
 		return true;
 	}
 	
@@ -455,12 +474,13 @@ bool dtPathCorridor::movePosition(const float* npos, dtNavMeshQuery* navquery, c
 	// Move along navmesh and update new position.
 	float result[3];
 	static const int MAX_VISITED = 16;
-	dtPolyRef visited[MAX_VISITED];
+	dtPolyRef visitedPolys[MAX_VISITED];
+	unsigned char visitedJumps[MAX_VISITED];
 	int nvisited = 0;
 	dtStatus status = navquery->moveAlongSurface(m_path[0], m_pos, npos, filter,
-												 result, visited, &nvisited, MAX_VISITED);
+												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED);
 	if (dtStatusSucceed(status)) {
-		m_npath = dtMergeCorridorStartMoved(m_path, m_npath, m_maxPath, visited, nvisited);
+		m_npath = dtMergeCorridorStartMoved(m_path, m_jumpTypes, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
 		
 		// Adjust the position to stay on top of the navmesh.
 		float h = m_pos[2];
@@ -493,13 +513,14 @@ bool dtPathCorridor::moveTargetPosition(const float* npos, dtNavMeshQuery* navqu
 	// Move along navmesh and update new position.
 	float result[3];
 	static const int MAX_VISITED = 16;
-	dtPolyRef visited[MAX_VISITED];
+	dtPolyRef visitedPolys[MAX_VISITED];
+	unsigned char visitedJumps[MAX_VISITED];
 	int nvisited = 0;
 	dtStatus status = navquery->moveAlongSurface(m_path[m_npath-1], m_target, npos, filter,
-												 result, visited, &nvisited, MAX_VISITED);
+												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED);
 	if (dtStatusSucceed(status))
 	{
-		m_npath = dtMergeCorridorEndMoved(m_path, m_npath, m_maxPath, visited, nvisited);
+		m_npath = dtMergeCorridorEndMoved(m_path, m_jumpTypes, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
 		// TODO: should we do that?
 		// Adjust the position to stay on top of the navmesh.
 		/*	float h = m_target[2];
@@ -519,14 +540,16 @@ bool dtPathCorridor::moveTargetPosition(const float* npos, dtNavMeshQuery* navqu
 /// is expected to be in the last polygon. 
 /// 
 /// @warning The size of the path must not exceed the size of corridor's path buffer set during #init().
-void dtPathCorridor::setCorridor(const float* target, const dtPolyRef* path, const int npath)
+void dtPathCorridor::setCorridor(const float* target, const dtPolyRef* path, const unsigned char* jumps, const int npath)
 {
 	rdAssert(m_path);
+	rdAssert(m_jumpTypes);
 	rdAssert(npath > 0);
 	rdAssert(npath <= m_maxPath);
 	
 	rdVcopy(m_target, target);
 	memcpy(m_path, path, sizeof(dtPolyRef)*npath);
+	memcpy(m_jumpTypes, jumps, sizeof(unsigned char)*npath);
 	m_npath = npath;
 }
 

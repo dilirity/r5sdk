@@ -99,6 +99,7 @@ dtCrowd::dtCrowd() :
 	m_obstacleQuery(0),
 	m_grid(0),
 	m_pathResult(0),
+	m_jumpResult(0),
 	m_maxPathResult(0),
 	m_maxAgentRadius(0),
 	m_velocitySampleCount(0),
@@ -127,6 +128,9 @@ void dtCrowd::purge()
 	
 	rdFree(m_pathResult);
 	m_pathResult = 0;
+
+	rdFree(m_jumpResult);
+	m_jumpResult = 0;
 	
 	dtFreeProximityGrid(m_grid);
 	m_grid = 0;
@@ -184,6 +188,10 @@ bool dtCrowd::init(const int maxAgents, const float maxAgentRadius, dtNavMesh* n
 	m_maxPathResult = 256;
 	m_pathResult = (dtPolyRef*)rdAlloc(sizeof(dtPolyRef)*m_maxPathResult, RD_ALLOC_PERM);
 	if (!m_pathResult)
+		return false;
+
+	m_jumpResult = (unsigned char*)rdAlloc(sizeof(unsigned char*)*m_maxPathResult, RD_ALLOC_PERM);
+	if (!m_jumpResult)
 		return false;
 	
 	if (!m_pathq.init(m_maxPathResult, MAX_PATHQUEUE_NODES, nav))
@@ -474,6 +482,7 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 			static const int MAX_RES = 32;
 			float reqPos[3];
 			dtPolyRef reqPath[MAX_RES];	// The path to the request location
+			unsigned char reqJump[MAX_RES];	// The path to the request location
 			int reqPathCount = 0;
 
 			// Quick search towards the goal.
@@ -485,12 +494,12 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 			if (ag->targetReplan) // && npath > 10)
 			{
 				// Try to use existing steady path during replan if possible.
-				status = m_navquery->finalizeSlicedFindPathPartial(path, npath, reqPath, &reqPathCount, MAX_RES, queryFilter);
+				status = m_navquery->finalizeSlicedFindPathPartial(path, npath, reqPath, reqJump, &reqPathCount, MAX_RES, queryFilter);
 			}
 			else
 			{
 				// Try to move towards target when goal changes.
-				status = m_navquery->finalizeSlicedFindPath(reqPath, &reqPathCount, MAX_RES, queryFilter);
+				status = m_navquery->finalizeSlicedFindPath(reqPath, reqJump, &reqPathCount, MAX_RES, queryFilter);
 			}
 
 			if (!dtStatusFailed(status) && reqPathCount > 0)
@@ -521,7 +530,7 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 				reqPathCount = 1;
 			}
 
-			ag->corridor.setCorridor(reqPos, reqPath, reqPathCount);
+			ag->corridor.setCorridor(reqPos, reqPath, reqJump, reqPathCount);
 			ag->boundary.reset();
 			ag->partial = false;
 
@@ -584,6 +593,7 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 			else if (dtStatusSucceed(status))
 			{
 				const dtPolyRef* path = ag->corridor.getPath();
+				const unsigned char* jump = ag->corridor.getJump();
 				const int npath = ag->corridor.getPathCount();
 				rdAssert(npath);
 				
@@ -591,10 +601,11 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 				float targetPos[3];
 				rdVcopy(targetPos, ag->targetPos);
 				
-				dtPolyRef* res = m_pathResult;
+				dtPolyRef* pathRes = m_pathResult;
+				unsigned char* jumpRes = m_jumpResult;
 				bool valid = true;
 				int nres = 0;
-				status = m_pathq.getPathResult(ag->targetPathqRef, res, &nres, m_maxPathResult);
+				status = m_pathq.getPathResult(ag->targetPathqRef, pathRes, jumpRes, &nres, m_maxPathResult);
 				if (dtStatusFailed(status) || !nres)
 					valid = false;
 
@@ -611,7 +622,7 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 				
 				// The last ref in the old path should be the same as
 				// the location where the request was issued..
-				if (valid && path[npath-1] != res[0])
+				if (valid && path[npath-1] != pathRes[0])
 					valid = false;
 				
 				if (valid)
@@ -623,9 +634,11 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 						if ((npath-1)+nres > m_maxPathResult)
 							nres = m_maxPathResult - (npath-1);
 						
-						memmove(res+npath-1, res, sizeof(dtPolyRef)*nres);
+						memmove(pathRes+npath-1, pathRes, sizeof(dtPolyRef)*nres);
+						memmove(jumpRes+npath-1, jumpRes, sizeof(unsigned char)*nres);
 						// Copy old path in the beginning.
-						memcpy(res, path, sizeof(dtPolyRef)*(npath-1));
+						memcpy(pathRes, path, sizeof(dtPolyRef)*(npath-1));
+						memcpy(jumpRes, jump, sizeof(unsigned char)*(npath-1));
 						nres += npath-1;
 						
 						// Remove trackbacks
@@ -633,9 +646,10 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 						{
 							if (j-1 >= 0 && j+1 < nres)
 							{
-								if (res[j-1] == res[j+1])
+								if (pathRes[j-1] == pathRes[j+1])
 								{
-									memmove(res+(j-1), res+(j+1), sizeof(dtPolyRef)*(nres-(j+1)));
+									memmove(pathRes+(j-1), pathRes+(j+1), sizeof(dtPolyRef)*(nres-(j+1)));
+									memmove(jumpRes+(j-1), jumpRes+(j+1), sizeof(unsigned char)*(nres-(j+1)));
 									nres -= 2;
 									j -= 2;
 								}
@@ -645,11 +659,11 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 					}
 					
 					// Check for partial path.
-					if (res[nres-1] != ag->targetRef)
+					if (pathRes[nres-1] != ag->targetRef)
 					{
 						// Partial path, constrain target position inside the last polygon.
 						float nearest[3];
-						status = m_navquery->closestPointOnPoly(res[nres-1], targetPos, nearest, 0);
+						status = m_navquery->closestPointOnPoly(pathRes[nres-1], targetPos, nearest, 0);
 						if (dtStatusSucceed(status))
 							rdVcopy(targetPos, nearest);
 						else
@@ -660,7 +674,7 @@ void dtCrowd::updateMoveRequest(const float /*dt*/)
 				if (valid)
 				{
 					// Set current corridor.
-					ag->corridor.setCorridor(targetPos, res, nres);
+					ag->corridor.setCorridor(targetPos, pathRes, jumpRes, nres);
 					// Force to update boundary.
 					ag->boundary.reset();
 					ag->targetState = DT_CROWDAGENT_TARGET_VALID;

@@ -107,9 +107,10 @@ public:
 	
 	/// Loads a new path and target into the corridor.
 	///  @param[in]		target		The target location within the last polygon of the path. [(x, y, z)]
-	///  @param[in]		path		The path corridor. [(polyRef) * @p npolys]
+	///  @param[in]		polys		The path corridor. [(polyRef) * @p npolys]
+	///  @param[in]		jumps		The jump corridor. [(uchar) * @p npolys]
 	///  @param[in]		npath		The number of polygons in the path.
-	void setCorridor(const float* target, const dtPolyRef* polys, const int npath);
+	void setCorridor(const float* target, const dtPolyRef* polys, const unsigned char* jumps, const int npath);
 	
 	/// Gets the current position within the corridor. (In the first polygon.)
 	/// @return The current position within the corridor.
@@ -131,6 +132,10 @@ public:
 	/// @return The corridor's path. [(polyRef) * #getPathCount()]
 	inline const dtPolyRef* getPath() const { return m_path; }
 
+	/// The corridor's jump.
+	/// @return The corridor's jump. [(uchar) * #getPathCount()]
+	inline const unsigned char* getJump() const { return m_jumpTypes; }
+
 	/// The number of polygons in the current corridor path.
 	/// @return The number of polygons in the current corridor path.
 	inline int getPathCount() const { return m_npath; }
@@ -141,13 +146,13 @@ private:
 	dtPathCorridor& operator=(const dtPathCorridor&);
 };
 
-int dtMergeCorridorStartMoved(dtPolyRef* path, const int npath, const int maxPath,
-							  const dtPolyRef* visited, const int nvisited);
+int dtMergeCorridorStartMoved(dtPolyRef* path, unsigned char* jump, const int npath, const int maxPath,
+							  const dtPolyRef* visitedPolys, const unsigned char* visitedJumps, const int nvisited);
 
-int dtMergeCorridorEndMoved(dtPolyRef* path, const int npath, const int maxPath,
-							const dtPolyRef* visited, const int nvisited);
+int dtMergeCorridorEndMoved(dtPolyRef* path, unsigned char* jump, const int npath, const int maxPath,
+							const dtPolyRef* visitedPolys, const unsigned char* visitedJumps, const int nvisited);
 
-int dtMergeCorridorStartShortcut(dtPolyRef* path, const int npath, const int maxPath,
-								 const dtPolyRef* visited, const int nvisited);
+int dtMergeCorridorStartShortcut(dtPolyRef* path, unsigned char* jump, const int npath, const int maxPath,
+								 const dtPolyRef* visitedPolys, const unsigned char* visitedJumps, const int nvisited);
 
 #endif // DETOUTPATHCORRIDOR_H

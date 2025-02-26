@@ -36,6 +36,7 @@ class dtPathQueue
 		dtPolyRef startRef, endRef;
 		/// Result.
 		dtPolyRef* path;
+		unsigned char* jump;
 		int npath;
 		/// State.
 		dtStatus status;
@@ -66,7 +67,7 @@ public:
 	
 	dtStatus getRequestStatus(dtPathQueueRef ref) const;
 	
-	dtStatus getPathResult(dtPathQueueRef ref, dtPolyRef* path, int* pathSize, const int maxPath);
+	dtStatus getPathResult(dtPathQueueRef ref, dtPolyRef* path, unsigned char* jump, int* pathSize, const int maxPath);
 	
 	inline const dtNavMeshQuery* getNavQuery() const { return m_navquery; }
 
