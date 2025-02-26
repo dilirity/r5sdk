@@ -1126,7 +1126,7 @@ dtStatus dtNavMesh::connectTraverseLinks(const dtTileRef tileRef, const dtTraver
 namespace
 {
 	template<bool onlyBoundary>
-	void closestPointOnDetailEdges(const dtMeshTile* tile, const dtPoly* poly, const float* pos, float* closest)
+	void closestPointOnDetailEdges(const dtMeshTile* tile, const dtPoly* poly, const float* pos, float* closest, float* normal)
 	{
 		const unsigned int ip = (unsigned int)(poly - tile->polys);
 		const dtPolyDetail* pd = &tile->detailMeshes[ip];
@@ -1135,6 +1135,7 @@ namespace
 		float tmin = 0;
 		const float* pmin = 0;
 		const float* pmax = 0;
+		const float* pv[3] = { 0, 0, 0 };
 
 		for (int i = 0; i < pd->triCount; i++)
 		{
@@ -1173,15 +1174,25 @@ namespace
 					tmin = t;
 					pmin = v[j];
 					pmax = v[k];
+
+					if (normal)
+					{
+						pv[0] = v[0];
+						pv[1] = v[1];
+						pv[2] = v[2];
+					}
 				}
 			}
 		}
 
 		rdVlerp(closest, pmin, pmax, tmin);
+
+		if (normal)
+			rdTriNormal(pv[0], pv[1], pv[2], normal);
 	}
 }
 
-bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const float* pos, float* height) const
+bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const float* pos, float* height, float* normal) const
 {
 	// Off-mesh connections do not have detail polys and getting height
 	// over them does not make sense.
@@ -1218,6 +1229,10 @@ bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const 
 		if (rdClosestHeightPointTriangle(pos, v[0], v[1], v[2], h))
 		{
 			*height = h;
+
+			if (normal)
+				rdTriNormal(v[0], v[1], v[2], normal);
+
 			return true;
 		}
 	}
@@ -1227,19 +1242,19 @@ bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const 
 	// closest. This should almost never happen so the extra iteration here is
 	// ok.
 	float closest[3];
-	closestPointOnDetailEdges<false>(tile, poly, pos, closest);
+	closestPointOnDetailEdges<false>(tile, poly, pos, closest, normal);
 	*height = closest[2];
 	return true;
 }
 
-void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const float* pos, float* closest, bool* posOverPoly) const
+void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const float* pos, float* closest, bool* posOverPoly, float* normal) const
 {
 	const dtMeshTile* tile = 0;
 	const dtPoly* poly = 0;
 	getTileAndPolyByRefUnsafe(ref, &tile, &poly);
 
 	rdVcopy(closest, pos);
-	if (getPolyHeight(tile, poly, pos, &closest[2]))
+	if (getPolyHeight(tile, poly, pos, &closest[2], normal))
 	{
 		if (posOverPoly)
 			*posOverPoly = true;
@@ -1261,7 +1276,7 @@ void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const float* pos, float* close
 	}
 
 	// Outside poly that is not an offmesh connection.
-	closestPointOnDetailEdges<true>(tile, poly, pos, closest);
+	closestPointOnDetailEdges<true>(tile, poly, pos, closest, normal);
 }
 
 dtPolyRef dtNavMesh::findNearestPolyInTile(const dtMeshTile* tile,
