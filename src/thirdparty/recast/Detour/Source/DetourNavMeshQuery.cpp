@@ -1057,6 +1057,9 @@ dtStatus dtNavMeshQuery::findPath(dtPolyRef startRef, dtPolyRef endRef,
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
+			if (!filter->traverseFilter(&bestLink, bestTile, bestPoly))
+				continue;
+
 			// deal explicitly with crossing tile boundaries
 			unsigned char crossSide = 0;
 			if (bestLink.side != 0xff)
