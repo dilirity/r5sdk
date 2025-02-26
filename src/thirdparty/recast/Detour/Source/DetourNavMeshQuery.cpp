@@ -1848,6 +1848,31 @@ dtStatus dtNavMeshQuery::appendPortals(const int startIdx, const int endIdx, con
 	return DT_IN_PROGRESS;
 }
 
+// Only checks if non-jump waypoints are too close to the portal,
+// we should never advance the path on jump waypoints since that
+// would cause the NPC to become stuck at the current waypoint.
+static bool checkPortalProximity(const int pathSize, const unsigned char* jumpTypes,
+								 const float* portalApex, const float* left, const float* right)
+{
+	// Look ahead of max 2 points in the corridor to
+	// figure out if we are too close to the portal.
+	const int maxIter = rdMin(pathSize, 2);
+	const float thresh = rdSqr(0.001f);
+
+	float t; // Ignored.
+	if (maxIter < 1)
+		return rdDistancePtSegSqr2D(portalApex, left, right, t) < thresh;
+
+	int i = 1;
+	while (jumpTypes[i++] == DT_NULL_TRAVERSE_TYPE)
+	{
+		if (i > maxIter)
+			return rdDistancePtSegSqr2D(portalApex, left, right, t) < thresh;
+	}
+
+	return false;
+}
+
 /// @par
 /// 
 /// This method peforms what is often called 'string pulling'.
@@ -1984,8 +2009,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 				// If starting really close the portal, advance.
 				if (i == 0)
 				{
-					float t;
-					if (rdDistancePtSegSqr2D(portalApex, left, right, t) < rdSqr(0.001f))
+					if (checkPortalProximity(pathSize, jumpTypes, portalApex, left, right))
 						continue;
 				}
 			}
