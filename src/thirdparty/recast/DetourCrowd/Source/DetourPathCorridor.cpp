@@ -290,7 +290,7 @@ int dtPathCorridor::findCorners(float* cornerVerts, unsigned char* cornerFlags,
 	// Prune points in the beginning of the path which are too close.
 	while (ncorners)
 	{
-		if ((cornerFlags[0] & DT_STRAIGHTPATH_OFFMESH_CONNECTION) ||
+		if (dtIsStraightPathOffmeshConnection(cornerFlags[0]) ||
 			rdVdist2DSqr(&cornerVerts[0], m_pos) > rdSqr(MIN_TARGET_DIST))
 			break;
 		ncorners--;
@@ -306,7 +306,8 @@ int dtPathCorridor::findCorners(float* cornerVerts, unsigned char* cornerFlags,
 	// Prune points after an off-mesh connection.
 	for (int i = 0; i < ncorners; ++i)
 	{
-		if (cornerFlags[i] & DT_STRAIGHTPATH_OFFMESH_CONNECTION)
+		if (dtIsStraightPathOffmeshConnection(cornerFlags[i]) ||
+			(cornerJumps[i] != DT_NULL_TRAVERSE_TYPE))
 		{
 			ncorners = i+1;
 			break;

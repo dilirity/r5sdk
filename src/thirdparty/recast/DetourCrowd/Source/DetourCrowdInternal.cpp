@@ -50,7 +50,7 @@ bool overOffmeshConnection(const dtCrowdAgent* ag, const float radius)
 	if (!ag->ncorners)
 		return false;
 	
-	const bool offMeshConnection = (ag->cornerFlags[ag->ncorners-1] & DT_STRAIGHTPATH_OFFMESH_CONNECTION) ? true : false;
+	const bool offMeshConnection = dtIsStraightPathOffmeshConnection(ag->cornerFlags[ag->ncorners-1]);
 	if (offMeshConnection)
 	{
 		const float distSq = rdVdist2DSqr(ag->npos, &ag->cornerVerts[(ag->ncorners-1)*3]);
@@ -66,7 +66,7 @@ float getDistanceToGoal(const dtCrowdAgent* ag, const float range)
 	if (!ag->ncorners)
 		return range;
 	
-	const bool endOfPath = dtIsStraightPathEnd(ag->cornerFlags[ag->ncorners-1]) ? true : false;
+	const bool endOfPath = dtIsStraightPathEnd(ag->cornerFlags[ag->ncorners-1]);
 	if (endOfPath)
 		return rdMin(rdVdist2D(ag->npos, &ag->cornerVerts[(ag->ncorners-1)*3]), range);
 	
