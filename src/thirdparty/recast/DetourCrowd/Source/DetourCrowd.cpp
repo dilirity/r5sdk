@@ -235,7 +235,7 @@ bool dtCrowd::init(const int maxAgents, const float maxAgentRadius, dtNavMesh* n
 void dtCrowd::setObstacleAvoidanceParams(const int idx, const dtObstacleAvoidanceParams* params)
 {
 	if (idx >= 0 && idx < DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS)
-		memcpy(&m_obstacleQueryParams[idx], params, sizeof(dtObstacleAvoidanceParams));
+		m_obstacleQueryParams[idx] = *params;
 }
 
 const dtObstacleAvoidanceParams* dtCrowd::getObstacleAvoidanceParams(const int idx) const
@@ -273,7 +273,7 @@ void dtCrowd::updateAgentParameters(const int idx, const dtCrowdAgentParams* par
 {
 	if (idx < 0 || idx >= m_maxAgents)
 		return;
-	memcpy(&m_agents[idx].params, params, sizeof(dtCrowdAgentParams));
+	m_agents[idx].params = *params;
 }
 
 /// @par
