@@ -261,6 +261,22 @@ inline float rdVlenSqr(const float* v)
 	return v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
 }
 
+/// Derives the scalar length of the vector on the xy-plane.
+///  @param[in]		v The vector. [(x, y)]
+/// @return The scalar length of the vector.
+inline float rdVlen2D(const float* v)
+{
+	return rdMathSqrtf(v[0]*v[0] + v[1]*v[1]);
+}
+
+/// Derives the square of the scalar length of the vector on the xy-plane. (len * len)
+///  @param[in]		v The vector. [(x, y)]
+/// @return The square of the scalar length of the vector.
+inline float rdVlenSqr2D(const float* v)
+{
+	return v[0]*v[0] + v[1]*v[1];
+}
+
 /// Returns the distance between two points.
 ///  @param[in]		v1	A point. [(x, y, z)]
 ///  @param[in]		v2	A point. [(x, y, z)]
