@@ -1466,6 +1466,7 @@ dtStatus dtNavMeshQuery::updateSlicedFindPath(const int maxIter, int* doneIters,
 			neighbourNode->pidx = foundShortCut ? bestNode->pidx : m_nodePool->getNodeIdx(bestNode);
 			neighbourNode->id = neighbourRef;
 			neighbourNode->flags = (neighbourNode->flags & ~(DT_NODE_CLOSED | DT_NODE_PARENT_DETACHED));
+			neighbourNode->jump = bestLink.traverseType;
 			neighbourNode->cost = cost;
 			neighbourNode->total = total;
 			if (foundShortCut)
