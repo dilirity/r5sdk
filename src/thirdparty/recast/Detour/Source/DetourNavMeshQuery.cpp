@@ -410,7 +410,7 @@ dtStatus dtNavMeshQuery::findRandomPointAroundCircle(dtPolyRef startRef, const f
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(link, bestTile, bestPoly))
+			if (!filter->traverseFilter(link, neighbourTile, neighbourPoly))
 				continue;
 			
 			// Find edge and calc distance to the edge.
@@ -1057,7 +1057,7 @@ dtStatus dtNavMeshQuery::findPath(dtPolyRef startRef, dtPolyRef endRef,
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(&bestLink, bestTile, bestPoly))
+			if (!filter->traverseFilter(&bestLink, neighbourTile, neighbourPoly))
 				continue;
 
 			// deal explicitly with crossing tile boundaries
@@ -1380,7 +1380,7 @@ dtStatus dtNavMeshQuery::updateSlicedFindPath(const int maxIter, int* doneIters,
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(&bestLink, bestTile, bestPoly))
+			if (!filter->traverseFilter(&bestLink, neighbourTile, neighbourPoly))
 				continue;
 			
 			unsigned char crossSide = 0; // See https://github.com/recastnavigation/recastnavigation/issues/438
@@ -2995,7 +2995,7 @@ dtStatus dtNavMeshQuery::findPolysAroundCircle(dtPolyRef startRef, const float* 
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(link, bestTile, bestPoly))
+			if (!filter->traverseFilter(link, neighbourTile, neighbourPoly))
 				continue;
 			
 			// Find edge and calc distance to the edge.
@@ -3188,7 +3188,7 @@ dtStatus dtNavMeshQuery::findPolysAroundShape(dtPolyRef startRef, const float* v
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(link, bestTile, bestPoly))
+			if (!filter->traverseFilter(link, neighbourTile, neighbourPoly))
 				continue;
 			
 			// Find edge and calc distance to the edge.
@@ -3385,7 +3385,7 @@ dtStatus dtNavMeshQuery::findLocalNeighbourhood(dtPolyRef startRef, const float*
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 			
-			if (!filter->traverseFilter(link, curTile, curPoly))
+			if (!filter->traverseFilter(link, neighbourTile, neighbourPoly))
 				continue;
 			
 			// Find edge and calc distance to the edge.
@@ -3806,7 +3806,7 @@ dtStatus dtNavMeshQuery::findDistanceToWall(dtPolyRef startRef, const float* cen
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(link, bestTile, bestPoly))
+			if (!filter->traverseFilter(link, neighbourTile, neighbourPoly))
 				continue;
 
 			dtNode* neighbourNode = m_nodePool->getNode(neighbourRef);
