@@ -2212,7 +2212,7 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 	
 	dtStatus status = DT_SUCCESS;
 	
-	static const int MAX_STACK = 48;
+	static const int MAX_STACK = 256;
 	dtNode* stack[MAX_STACK];
 	int nstack = 0;
 	
@@ -3317,7 +3317,7 @@ dtStatus dtNavMeshQuery::findLocalNeighbourhood(dtPolyRef startRef, const float*
 		return DT_FAILURE | DT_INVALID_PARAM;
 	}
 
-	static const int MAX_STACK = 48;
+	static const int MAX_STACK = 256;
 	dtNode* stack[MAX_STACK];
 	int nstack = 0;
 	
