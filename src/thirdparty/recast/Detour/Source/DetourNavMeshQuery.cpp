@@ -692,8 +692,8 @@ dtStatus dtNavMeshQuery::findNearestPoly(const float* center, const float* halfE
 // If center and nearestPt point to an equal position, isOverPoly will be true;
 // however there's also a special case of climb height inside the polygon (see dtFindNearestPolyQuery)
 dtStatus dtNavMeshQuery::findNearestPoly(const float* center, const float* halfExtents,
-										 const dtQueryFilter* filter,
-										 dtPolyRef* nearestRef, float* nearestPt, bool* isOverPoly) const
+										 const dtQueryFilter* filter, dtPolyRef* nearestRef,
+										 float* nearestPt, bool* isOverPoly) const
 {
 	rdAssert(m_nav);
 
@@ -703,8 +703,8 @@ dtStatus dtNavMeshQuery::findNearestPoly(const float* center, const float* halfE
 	// queryPolygons below will check rest of params
 	
 	dtFindNearestPolyQuery query(this, center);
-
 	dtStatus status = queryPolygons(center, halfExtents, filter, &query);
+
 	if (dtStatusFailed(status))
 		return status;
 
