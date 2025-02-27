@@ -2281,7 +2281,8 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 							const dtPoly* neiPoly = 0;
 							m_nav->getTileAndPolyByRefUnsafe(link->ref, &neiTile, &neiPoly);
 
-							if (filter->passFilter(link->ref, neiTile, neiPoly))
+							if (filter->passFilter(link->ref, neiTile, neiPoly) && 
+								filter->traverseFilter(link, neiTile, neiPoly))
 							{
 								if (nneis < MAX_NEIS)
 									neis[nneis++] = link->ref;
@@ -3563,7 +3564,8 @@ dtStatus dtNavMeshQuery::getPolyWallSegments(dtPolyRef ref, const dtQueryFilter*
 						const dtMeshTile* neiTile = 0;
 						const dtPoly* neiPoly = 0;
 						m_nav->getTileAndPolyByRefUnsafe(link->ref, &neiTile, &neiPoly);
-						if (filter->passFilter(link->ref, neiTile, neiPoly))
+						if (filter->passFilter(link->ref, neiTile, neiPoly) &&
+							filter->traverseFilter(link, neiTile, neiPoly))
 						{
 							insertInterval(ints, nints, MAX_INTERVAL, link->bmin, link->bmax, link->ref);
 						}
@@ -3741,7 +3743,8 @@ dtStatus dtNavMeshQuery::findDistanceToWall(dtPolyRef startRef, const float* cen
 							const dtMeshTile* neiTile = 0;
 							const dtPoly* neiPoly = 0;
 							m_nav->getTileAndPolyByRefUnsafe(link->ref, &neiTile, &neiPoly);
-							if (filter->passFilter(link->ref, neiTile, neiPoly))
+							if (filter->passFilter(link->ref, neiTile, neiPoly) && 
+								filter->traverseFilter(link, neiTile, neiPoly))
 								solid = false;
 						}
 						break;
