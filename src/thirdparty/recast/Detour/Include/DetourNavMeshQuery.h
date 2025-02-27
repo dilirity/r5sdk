@@ -704,7 +704,7 @@ inline bool dtIsStraightPathStart(const unsigned char flag)
 /// @ingroup detour
 inline bool dtIsStraightPathEnd(const unsigned char flag)
 {
-	return flag & (DT_STRAIGHTPATH_END_INTERNAL | DT_STRAIGHTPATH_END_EXTERNAL);
+	return flag & (DT_STRAIGHTPATH_END_GOAL | DT_STRAIGHTPATH_END_PARTIAL);
 }
 
 /// Test whether this waypoint is an off-mesh connection.

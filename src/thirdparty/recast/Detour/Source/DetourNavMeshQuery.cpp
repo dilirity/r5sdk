@@ -1938,11 +1938,10 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 	if (rdVequal(closestStartPos, closestEndPos))
 		return DT_FAILURE | DT_INVALID_ACTION;
 
-	// Determine and mark whether the end vertex resides within the same
-	// polygon as the start vertex.
+	// Determine and mark whether the end vertex is our goal position.
 	const unsigned char endFlags = (distToClosest == 0.0f)
-		? DT_STRAIGHTPATH_END_INTERNAL
-		: DT_STRAIGHTPATH_END_EXTERNAL;
+		? DT_STRAIGHTPATH_END_GOAL
+		: DT_STRAIGHTPATH_END_PARTIAL;
 	
 	// Add start point.
 	stat = appendVertex(closestStartPos, DT_STRAIGHTPATH_START, path[0], jumpTypes[0],
@@ -2156,11 +2155,18 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 	return DT_SUCCESS | ((*straightPathCount >= maxStraightPath) ? DT_BUFFER_TOO_SMALL : 0);
 }
 
-dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* endPos, const dtPolyRef* path, const unsigned char* jumpTypes, const int pathSize,
-										  dtStraightPathResult& result, const int maxStraightPath, const int jumpFilter, const int options) const
+dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* endPos, const dtPolyRef* path,
+										  const unsigned char* jumpTypes, const int pathSize, dtStraightPathResult& result,
+										  const int maxStraightPath, const int jumpFilter, const int options) const
 {
-	return findStraightPath(startPos, endPos, path, jumpTypes, 
-							pathSize, *result.path, result.flags, result.polys, result.jumps, &result.pathCount, maxStraightPath, jumpFilter, options);
+	const dtStatus stat = findStraightPath(startPos, endPos, path, jumpTypes, pathSize,
+										   *result.path, result.flags, result.polys, result.jumps, &result.pathCount,
+										   maxStraightPath, jumpFilter, options);
+
+	if (dtStatusSucceed(stat))
+		result.pathEndIsGoal = (result.flags[result.pathCount-1] & DT_STRAIGHTPATH_END_GOAL) != 0;
+
+	return stat;
 }
 
 /// @par

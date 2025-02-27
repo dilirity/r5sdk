@@ -176,8 +176,8 @@ enum dtTileFlags
 enum dtStraightPathFlags : unsigned char
 {
 	DT_STRAIGHTPATH_START = 1<<0,				///< The vertex is the start position in the path.
-	DT_STRAIGHTPATH_END_INTERNAL = 1<<1,		///< The vertex is the end position in the path, on the same polygon as the start position.
-	DT_STRAIGHTPATH_END_EXTERNAL = 1<<2,		///< The vertex is the end position in the path.
+	DT_STRAIGHTPATH_END_GOAL = 1<<1,			///< The vertex is the goal end position in the path.
+	DT_STRAIGHTPATH_END_PARTIAL = 1<<2,			///< The vertex is the partial end position in the path.
 	DT_STRAIGHTPATH_OFFMESH_CONNECTION = 1<<3,	///< The vertex is the start of an off-mesh connection.
 };
 
