@@ -1939,7 +1939,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 
 	// Determine and mark whether the end vertex resides within the same
 	// polygon as the start vertex.
-	const unsigned char vertexFlags = (distToClosest == 0.0f)
+	const unsigned char endFlags = (distToClosest == 0.0f)
 		? DT_STRAIGHTPATH_END_INTERNAL
 		: DT_STRAIGHTPATH_END_EXTERNAL;
 	
@@ -2061,7 +2061,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					
 					unsigned char flags = 0;
 					if (!rightPolyRef)
-						flags = vertexFlags;
+						flags = endFlags;
 					else if (rightPolyType == DT_POLYTYPE_OFFMESH_CONNECTION)
 						flags = DT_STRAIGHTPATH_OFFMESH_CONNECTION;
 
@@ -2112,7 +2112,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					
 					unsigned char flags = 0;
 					if (!leftPolyRef)
-						flags = vertexFlags;
+						flags = endFlags;
 					else if (leftPolyType == DT_POLYTYPE_OFFMESH_CONNECTION)
 						flags = DT_STRAIGHTPATH_OFFMESH_CONNECTION;
 
@@ -2148,7 +2148,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 	}
 
 	// Ignore status return value as we're just about to return anyway.
-	appendVertex(closestEndPos, vertexFlags, 0, DT_NULL_TRAVERSE_TYPE,
+	appendVertex(closestEndPos, endFlags, 0, DT_NULL_TRAVERSE_TYPE,
 						straightPath, straightPathFlags, straightPathRefs,
 						straightPathJumps, straightPathCount, maxStraightPath);
 	
