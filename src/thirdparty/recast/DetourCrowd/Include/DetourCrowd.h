@@ -161,7 +161,7 @@ struct dtCrowdAgent
 	/// The agent's configuration parameters.
 	dtCrowdAgentParams params;
 
-	/// The local path corridor corners for the agent. (Staight path.) [(x, y, z) * #ncorners]
+	/// The local path corridor corners for the agent. (Straight path.) [(x, y, z) * #ncorners]
 	float cornerVerts[DT_CROWDAGENT_MAX_CORNERS*3];
 
 	/// The local path corridor corner flags. (See: #dtStraightPathFlags) [(flags) * #ncorners]

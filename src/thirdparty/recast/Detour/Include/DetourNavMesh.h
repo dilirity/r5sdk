@@ -192,7 +192,7 @@ enum dtStraightPathOptions
 /// Options for dtNavMeshQuery::initSlicedFindPath and updateSlicedFindPath
 enum dtFindPathOptions
 {
-	DT_FINDPATH_ANY_ANGLE = 0x02,		///< use raycasts during pathfind to "shortcut" (raycast still consider costs)
+	DT_FINDPATH_ANY_ANGLE = 0x02,		///< use raycasts during pathfind to "shortcut". (Raycast still considers costs.)
 };
 
 /// Options for dtNavMeshQuery::raycast

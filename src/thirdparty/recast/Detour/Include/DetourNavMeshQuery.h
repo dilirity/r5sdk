@@ -479,7 +479,7 @@ public:
 	///  							the start of the ray. [(x, y, z)]
 	///  @param[in]		endPos		The position to cast the ray toward. [(x, y, z)]
 	///  @param[in]		filter		The polygon filter to apply to the query.
-	///  @param[in]		flags		govern how the raycast behaves. See dtRaycastOptions
+	///  @param[in]		options		govern how the raycast behaves. See dtRaycastOptions.
 	///  @param[out]	hit			Pointer to a raycast hit structure which will be filled by the results.
 	///  @param[in]		prevRef		parent of start ref. Used during for cost calculation [opt]
 	/// @returns The status flags for the query.
