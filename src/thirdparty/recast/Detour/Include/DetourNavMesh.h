@@ -418,7 +418,7 @@ struct dtHint
 {
 	float* verts;					///< The triangle vertices. [Size: (x, y, z) * dtHint::vertCount]
 	dtTriangleSurface* tris;		///< The triangles. [Size: dtHint::triCount]
-	char unk[24]; // Editor only.
+	char reserved[24];				///< Reserved data for the Radiant level editor.
 	int vertCount;					///< The number of vertices in the hint.
 	int triCount;					///< The number of triangles in the hint.
 };
