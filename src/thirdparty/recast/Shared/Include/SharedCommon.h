@@ -250,7 +250,7 @@ inline void rdVcopy(float* dest, const float* a)
 /// @return The scalar length of the vector.
 inline float rdVlen(const float* v)
 {
-	return rdMathSqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+	return rdMathSqrtf(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
 }
 
 /// Derives the square of the scalar length of the vector. (len * len)
