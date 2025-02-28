@@ -130,8 +130,8 @@ endmacro()
 # -----------------------------------------------------------------------------
 macro( whole_program_optimization )
     if( ${OPTION_LTCG_MODE} STREQUAL "ON" )
-        set_property( TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
-        set_property( TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_PROFILE TRUE)
+        set_property( TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE )
+        set_property( TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION_PROFILE TRUE )
     endif()
 endmacro()
 
