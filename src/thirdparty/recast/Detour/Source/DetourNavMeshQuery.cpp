@@ -1860,6 +1860,30 @@ dtStatus dtNavMeshQuery::appendPortals(const int startIdx, const int endIdx, con
 	return DT_IN_PROGRESS;
 }
 
+dtStatus dtNavMeshQuery::appendPortalVertex(const float* startPos, const float* endPos, const int startIdx, const dtPolyRef* path,
+											float* straightPath, unsigned char* straightPathFlags, dtPolyRef* straightPathRefs,
+											unsigned char* straightPathJumps, int* straightPathCount, const int maxStraightPath) const
+{
+	const dtPolyRef from = path[startIdx-1];
+	const dtPolyRef goal = path[startIdx];
+
+	float left[3]; float right[3];
+	unsigned char fromType, toType;
+	if (!dtStatusSucceed(getPortalPoints(goal, from, left, right, fromType, toType)))
+		return DT_FAILURE | DT_PORTAL_BLOCKED;
+
+	float s, t;
+	if (!rdIntersectSegSeg2D(endPos, startPos, left, right, s, t))
+		return DT_FAILURE | DT_PORTAL_BLOCKED;
+
+	float pt[3];
+	rdVlerp(pt, left, right, rdClamp(t, 0.f, 1.f));
+
+	straightPathRefs[(*straightPathCount)-1] = from;
+	return appendVertex(pt, 0, goal, DT_NULL_TRAVERSE_TYPE, straightPath, straightPathFlags,
+						straightPathRefs, straightPathJumps, straightPathCount, maxStraightPath);
+}
+
 // Only checks if non-jump waypoints are too close to the portal,
 // we should never advance the path on jump waypoints since that
 // would cause the NPC to become stuck at the current waypoint.
@@ -2032,6 +2056,43 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 				
 				toType = DT_POLYTYPE_GROUND;
 			}
+
+			// Note(kawe): we need to be at least on the second vertex
+			// in the path corridor before we can append jump vertices.
+			if (!i)
+				rdAssert(jumpTypes[i] == DT_NULL_TRAVERSE_TYPE);
+
+			// Jump vertex.
+			if (i > 0 && jumpTypes[i] != DT_NULL_TRAVERSE_TYPE && !dtIsTraverseTypeOffMesh(jumpTypes[i]))
+			{
+				if (rdTriArea2D(portalRight, portalLeft, left) < 0.0f ||
+					rdTriArea2D(portalRight, portalLeft, right) < 0.0f)
+				{
+					float jumpPt[3];
+					rdVlerp(jumpPt, portalLeft, portalRight, 0.5f);
+
+					// Append 'from' jump vertex.
+					stat = appendVertex(jumpPt, 0, path[i-1], jumpTypes[i],
+						straightPath, straightPathFlags, straightPathRefs,
+						straightPathJumps, straightPathCount, maxStraightPath);
+
+					const bool contAfterJmp = (options & DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP) != 0;
+
+					// Append portals along the current straight path segment.
+					if (!(stat & DT_BUFFER_TOO_SMALL))
+					{
+						stat = appendPortalVertex(jumpPt, closestEndPos, i, path,
+												  straightPath, straightPathFlags, straightPathRefs,
+												  straightPathJumps, straightPathCount, maxStraightPath);
+
+						if ((contAfterJmp && stat != DT_IN_PROGRESS) || (!contAfterJmp && stat == DT_IN_PROGRESS))
+							return DT_SUCCESS;
+					}
+
+					if (!contAfterJmp)
+						return stat;
+				}
+			}
 			
 			// Left vertex.
 			if (rdTriArea2D(portalApex, portalLeft, left) <= 0.0f)
@@ -2071,6 +2132,20 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 										straightPathJumps, straightPathCount, maxStraightPath);
 					if (stat != DT_IN_PROGRESS)
 						return stat;
+
+					// Append portals along the current straight path segment.
+					if (i > 0 && jumpTypes[i] < DT_MAX_TRAVERSE_TYPES)
+					{
+						stat = appendPortalVertex(portalApex, closestEndPos, i, path,
+												  straightPath, straightPathFlags, straightPathRefs,
+												  straightPathJumps, straightPathCount, maxStraightPath);
+
+						if (stat != DT_SUCCESS && stat != DT_IN_PROGRESS)
+							return stat;
+
+						if (!(options & DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP))
+							return DT_SUCCESS;
+					}
 					
 					rdVcopy(portalLeft, portalApex);
 					rdVcopy(portalRight, portalApex);
@@ -2122,6 +2197,20 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 										straightPathJumps, straightPathCount, maxStraightPath);
 					if (stat != DT_IN_PROGRESS)
 						return stat;
+
+					// Append portals along the current straight path segment.
+					if (i > 0 && jumpTypes[i] < DT_MAX_TRAVERSE_TYPES)
+					{
+						stat = appendPortalVertex(portalApex, closestEndPos, i, path,
+												  straightPath, straightPathFlags, straightPathRefs,
+												  straightPathJumps, straightPathCount, maxStraightPath);
+
+						if (stat != DT_SUCCESS && stat != DT_IN_PROGRESS)
+							return stat;
+
+						if (!(options & DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP))
+							return DT_SUCCESS;
+					}
 					
 					rdVcopy(portalLeft, portalApex);
 					rdVcopy(portalRight, portalApex);

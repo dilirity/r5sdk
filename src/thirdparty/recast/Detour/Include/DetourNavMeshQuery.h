@@ -668,6 +668,11 @@ private:
 						   dtPolyRef* straightPathRefs, unsigned char* straightPathJumps, int* straightPathCount,
 						   const int maxStraightPath, const int jumpFilter, const int options) const;
 
+	// Appends traversal portal points to a straight path.
+	dtStatus appendPortalVertex(const float* startPos, const float* endPos, const int startIdx, const dtPolyRef* path,
+								float* straightPath, unsigned char* straightPathFlags, dtPolyRef* straightPathRefs,
+								unsigned char* straightPathJumps, int* straightPathCount, const int maxStraightPath) const;
+
 	// Gets the path leading to the specified end node.
 	dtStatus getPathToNode(struct dtNode* endNode, dtPolyRef* path, unsigned char* jump, int* pathCount, int maxPath) const;
 	

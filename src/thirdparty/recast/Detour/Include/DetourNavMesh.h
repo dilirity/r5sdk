@@ -188,8 +188,9 @@ enum dtStraightPathFlags : unsigned char
 /// Options for dtNavMeshQuery::findStraightPath.
 enum dtStraightPathOptions
 {
-	DT_STRAIGHTPATH_AREA_CROSSINGS = 0x01,	///< Add a vertex at every polygon edge crossing where area changes.
-	DT_STRAIGHTPATH_ALL_CROSSINGS = 0x02,	///< Add a vertex at every polygon edge crossing.
+	DT_STRAIGHTPATH_AREA_CROSSINGS = 1<<0,		///< Add a vertex at every polygon edge crossing where area changes.
+	DT_STRAIGHTPATH_ALL_CROSSINGS = 1<<1,		///< Add a vertex at every polygon edge crossing.
+	DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP = 1<<2	///< Continue the straight path after jump instead of returning out.
 };
 
 /// Options for dtNavMeshQuery::initSlicedFindPath and updateSlicedFindPath
