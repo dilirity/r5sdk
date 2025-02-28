@@ -2280,9 +2280,10 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 ///
 dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* startPos, const float* endPos,
 										  const dtQueryFilter* filter, float* resultPos, dtPolyRef* visitedPolys, 
-										  unsigned char* visitedJumps, int* visitedCount, const int maxVisitedSize) const
+										  unsigned char* visitedJumps, int* visitedCount, const int maxVisitedSize, const unsigned char options) const
 {
 	rdAssert(m_nav);
+	rdAssert(m_nodePool);
 	rdAssert(m_tinyNodePool);
 
 	if (!visitedCount)
@@ -2294,7 +2295,7 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 		!startPos || !rdVisfinite(startPos) ||
 		!endPos || !rdVisfinite(endPos) ||
 		!filter || !resultPos || !visitedPolys ||
-		!visitedJumps || maxVisitedSize <= 0)
+		maxVisitedSize <= 0)
 	{
 		return DT_FAILURE | DT_INVALID_PARAM;
 	}
@@ -2304,10 +2305,11 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 	static const int MAX_STACK = 256;
 	dtNode* stack[MAX_STACK];
 	int nstack = 0;
+
+	dtNodePool* nodePool = (options & DT_MOVEALONGSURFACE_USE_REGULAR_NODE_POOL) ? m_nodePool : m_tinyNodePool;
+	nodePool->clear();
 	
-	m_tinyNodePool->clear();
-	
-	dtNode* startNode = m_tinyNodePool->getNode(startRef);
+	dtNode* startNode = nodePool->getNode(startRef);
 	startNode->pidx = 0;
 	startNode->cost = 0;
 	startNode->total = 0;
@@ -2418,7 +2420,7 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 				for (int k = 0; k < nneis; ++k)
 				{
 					// Skip if no node can be allocated.
-					dtNode* neighbourNode = m_tinyNodePool->getNode(neis[k]);
+					dtNode* neighbourNode = nodePool->getNode(neis[k]);
 					if (!neighbourNode)
 						continue;
 					// Skip if already visited.
@@ -2437,7 +2439,7 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 					// Mark as the node as visited and push to queue.
 					if (nstack < MAX_STACK)
 					{
-						neighbourNode->pidx = m_tinyNodePool->getNodeIdx(curNode);
+						neighbourNode->pidx = nodePool->getNodeIdx(curNode);
 						neighbourNode->flags |= DT_NODE_CLOSED;
 						stack[nstack++] = neighbourNode;
 					}
@@ -2449,38 +2451,49 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 	int n = 0;
 	if (bestNode)
 	{
-		// Reverse the path.
-		dtNode* prev = 0;
-		dtNode* node = bestNode;
-		do
+		if (!(options & DT_MOVEALONGSURFACE_DONT_VISIT_POLYGONS))
 		{
-			dtNode* next = m_tinyNodePool->getNodeAtIdx(node->pidx);
-			node->pidx = m_tinyNodePool->getNodeIdx(prev);
-			prev = node;
-			node = next;
-		}
-		while (node);
-		
-		// Store result
-		node = prev;
-		do
-		{
-			visitedPolys[n] = node->id;
-			visitedJumps[n] = node->jump;
-			if (++n >= maxVisitedSize)
+			// Reverse the path.
+			dtNode* prev = 0;
+			dtNode* node = bestNode;
+			do
 			{
-				status |= DT_BUFFER_TOO_SMALL;
-				break;
-			}
-			node = m_tinyNodePool->getNodeAtIdx(node->pidx);
+				dtNode* next = nodePool->getNodeAtIdx(node->pidx);
+				node->pidx = nodePool->getNodeIdx(prev);
+				prev = node;
+				node = next;
+			} while (node);
+
+			// Store result
+			node = prev;
+			do
+			{
+				visitedPolys[n] = node->id;
+
+				if (visitedJumps)
+					visitedJumps[n] = node->jump;
+
+				if (++n >= maxVisitedSize)
+				{
+					status |= DT_BUFFER_TOO_SMALL;
+					break;
+				}
+				node = nodePool->getNodeAtIdx(node->pidx);
+			} while (node);
 		}
-		while (node);
+
+		if (options & DT_MOVEALONGSURFACE_USE_POLY_HEIGHT_FOR_RESULT)
+		{
+			// Ignore return value, because getPolyHeight will only set the
+			// height if it succeeds. If it fails we just use the currently
+			// stored height.
+			getPolyHeight(bestNode->id, bestPos, &bestPos[2]);
+		}
 	}
-	
-	rdVcopy(resultPos, bestPos);
-	
+
 	*visitedCount = n;
-	
+	rdVcopy(resultPos, bestPos);
+
 	return status;
 }
 

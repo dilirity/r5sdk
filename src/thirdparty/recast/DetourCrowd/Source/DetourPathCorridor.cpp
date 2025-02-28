@@ -479,7 +479,7 @@ bool dtPathCorridor::movePosition(const float* npos, dtNavMeshQuery* navquery, c
 	unsigned char visitedJumps[MAX_VISITED];
 	int nvisited = 0;
 	dtStatus status = navquery->moveAlongSurface(m_path[0], m_pos, npos, filter,
-												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED);
+												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED, 0);
 	if (dtStatusSucceed(status)) {
 		m_npath = dtMergeCorridorStartMoved(m_path, m_jumpTypes, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
 		
@@ -518,7 +518,7 @@ bool dtPathCorridor::moveTargetPosition(const float* npos, dtNavMeshQuery* navqu
 	unsigned char visitedJumps[MAX_VISITED];
 	int nvisited = 0;
 	dtStatus status = navquery->moveAlongSurface(m_path[m_npath-1], m_target, npos, filter,
-												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED);
+												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED, 0);
 	if (dtStatusSucceed(status))
 	{
 		m_npath = dtMergeCorridorEndMoved(m_path, m_jumpTypes, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);

@@ -449,10 +449,11 @@ public:
 	///  @param[out]	visitedJumps	The jump types visited during the move.
 	///  @param[out]	visitedCount	The number of polygons visited during the move.
 	///  @param[in]		maxVisitedSize	The maximum number of polygons the @p visited array can hold.
+	///  @param[in]		options			govern how moveAlongSurface behaves. See dtMoveAlongSurfaceOptions.
 	/// @returns The status flags for the query.
 	dtStatus moveAlongSurface(dtPolyRef startRef, const float* startPos, const float* endPos,
 							  const dtQueryFilter* filter, float* resultPos, dtPolyRef* visitedPolys,
-							  unsigned char* visitedJumps, int* visitedCount, const int maxVisitedSize) const;
+							  unsigned char* visitedJumps, int* visitedCount, const int maxVisitedSize, const unsigned char options) const;
 	
 	/// Casts a 'walkability' ray along the surface of the navigation mesh from 
 	/// the start position toward the end position.

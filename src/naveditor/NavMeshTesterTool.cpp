@@ -567,7 +567,7 @@ void NavMeshTesterTool::handleToggle()
 	unsigned char visitedJumps[16];
 	int nvisited = 0;
 	m_navQuery->moveAlongSurface(m_pathIterPolys[0], m_iterPos, moveTgt, &m_filter,
-								 result, visitedPolys, visitedJumps, &nvisited, 16);
+								 result, visitedPolys, visitedJumps, &nvisited, 16, 0);
 	m_pathIterPolyCount = dtMergeCorridorStartMoved(m_pathIterPolys, m_pathIterJumps, m_pathIterPolyCount, MAX_POLYS, visitedPolys, visitedJumps, nvisited);
 	m_pathIterPolyCount = fixupShortcuts(m_pathIterPolys, m_pathIterPolyCount, m_navQuery);
 
@@ -784,7 +784,7 @@ void NavMeshTesterTool::recalc()
 					unsigned char visitedJumps[16];
 					int nvisited = 0;
 					m_navQuery->moveAlongSurface(polys[0], iterPos, moveTgt, &m_filter,
-												 result, visitedPolys, visitedJumps, &nvisited, 16);
+												 result, visitedPolys, visitedJumps, &nvisited, 16, 0);
 
 					npolys = dtMergeCorridorStartMoved(polys, jumps, npolys, MAX_POLYS, visitedPolys, visitedJumps, nvisited);
 					npolys = fixupShortcuts(polys, npolys, m_navQuery);

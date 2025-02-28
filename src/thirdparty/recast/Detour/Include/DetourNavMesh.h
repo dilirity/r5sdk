@@ -206,6 +206,13 @@ enum dtRaycastOptions
 	DT_RAYCAST_SKIP_OFFMESH_CONNECTION = 1<<1	///< Raycast should skip off-mesh connections along the ray.
 };
 
+/// Options for dtNavMeshQuery::moveAlongSurface
+enum dtMoveAlongSurfaceOptions : unsigned char
+{
+	DT_MOVEALONGSURFACE_DONT_VISIT_POLYGONS = 1<<0,			///< Don't visit polygons during the move. (Useful if we don't care about the path.)
+	DT_MOVEALONGSURFACE_USE_REGULAR_NODE_POOL = 1<<1,		///< Use the regular node pool instead of the tiny one.
+	DT_MOVEALONGSURFACE_USE_POLY_HEIGHT_FOR_RESULT = 1<<2,	///< Use the height of the polygon at the end position in the z of the result position.
+};
 
 /// Limit raycasting during any angle pahfinding
 /// The limit is given as a multiple of the character radius
