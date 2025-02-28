@@ -103,6 +103,10 @@ static const unsigned char DT_NULL_TRAVERSE_TYPE = 0xff;
 /// The maximum number of traversal variations. (Jumping, climbing, crossing, etc.)
 static const unsigned char DT_MAX_TRAVERSE_TYPES = 32;
 
+/// The reserved traverse type index, which unlike other traverse types, is used internally
+/// to mark special traverse portals such as zip lines.
+static const unsigned char DT_RESERVED_TRAVERSE_TYPE = 19;
+
 /// A value that indicates the link doesn't contain a reverse traverse link.
 static const unsigned short DT_NULL_TRAVERSE_REVERSE_LINK = 0xffff;
 
@@ -1136,6 +1140,24 @@ int dtCalcTraverseTableCellIndex(const int numPolyGroups,
 ///  @return the total size needed for the static traverse table.
 ///  @ingroup detour
 int dtCalcTraverseTableSize(const int numPolyGroups);
+
+/// Returns whether this traverse type belongs to an off-mesh link.
+///  @param[in]	traverseType	The traverse type.
+///  @return the bit mask of (#DT_OFFMESH_CON_TRAVERSE_ON_VERT | #DT_OFFMESH_CON_TRAVERSE_ON_POLY)
+///  @ingroup detour
+inline int dtIsTraverseTypeOffMesh(const unsigned char traverseType)
+{
+	return traverseType & (DT_OFFMESH_CON_TRAVERSE_ON_VERT | DT_OFFMESH_CON_TRAVERSE_ON_POLY);
+}
+
+/// Returns whether this traverse type is reserved.
+///  @param[in]	traverseType	The traverse type.
+///  @return whether this traverse type is reserved.
+///  @ingroup detour
+inline bool dtIsTraverseTypeReserved(const unsigned char traverseType)
+{
+	return traverseType == (DT_RESERVED_TRAVERSE_TYPE | DT_OFFMESH_CON_TRAVERSE_ON_POLY);
+}
 
 /// Defines a navigation mesh tile data block.
 /// @ingroup detour
