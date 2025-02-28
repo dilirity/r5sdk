@@ -1892,17 +1892,17 @@ static bool checkPortalProximity(const int pathSize, const unsigned char* jumpTy
 {
 	// Look ahead of max 2 points in the corridor to
 	// figure out if we are too close to the portal.
-	const int maxIter = rdMin(pathSize, 2);
+	const int skipCount = rdMin(pathSize, 2);
 	const float thresh = rdSqr(0.001f);
 
 	float t; // Ignored.
-	if (maxIter < 1)
+	if (skipCount < 1)
 		return rdDistancePtSegSqr2D(portalApex, left, right, t) < thresh;
 
 	int i = 1;
 	while (jumpTypes[i++] == DT_NULL_TRAVERSE_TYPE)
 	{
-		if (i > maxIter)
+		if (i > skipCount)
 			return rdDistancePtSegSqr2D(portalApex, left, right, t) < thresh;
 	}
 
@@ -2060,7 +2060,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 
 			// note(kawe): we need to be at least on the second vertex
 			// in the path corridor before we can append jump vertices.
-			if (!i)
+			if (i == 0)
 				rdAssert(jumpTypes[i] == DT_NULL_TRAVERSE_TYPE);
 
 			// Jump vertex.
