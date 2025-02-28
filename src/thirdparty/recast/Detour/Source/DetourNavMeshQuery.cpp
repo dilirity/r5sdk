@@ -1911,7 +1911,7 @@ static bool checkPortalProximity(const int pathSize, const unsigned char* jumpTy
 
 /// @par
 /// 
-/// This method peforms what is often called 'string pulling'.
+/// This method performs what is often called 'string pulling'.
 ///
 /// The start position is clamped to the first polygon in the path, and the 
 /// end position is clamped to the last. So the start and end positions should 
@@ -2001,7 +2001,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 			
 			if (i+1 < pathSize)
 			{
-				// If from poly is the same as goal poly, advance.
+				// If from poly is the same as to poly, advance.
 				if (path[i] == path[i+1])
 					continue;
 
@@ -2042,7 +2042,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 					return stat;
 				}
 				
-				// If starting really close the portal, advance.
+				// If starting really close to the portal, advance.
 				if (i == 0)
 				{
 					if (checkPortalProximity(pathSize, jumpTypes, portalApex, left, right))
@@ -2058,7 +2058,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 				toType = DT_POLYTYPE_GROUND;
 			}
 
-			// Note(kawe): we need to be at least on the second vertex
+			// note(kawe): we need to be at least on the second vertex
 			// in the path corridor before we can append jump vertices.
 			if (!i)
 				rdAssert(jumpTypes[i] == DT_NULL_TRAVERSE_TYPE);
