@@ -73,6 +73,7 @@ enum CrowdAgentState
 	DT_CROWDAGENT_STATE_INVALID,		///< The agent is not in a valid state.
 	DT_CROWDAGENT_STATE_WALKING,		///< The agent is traversing a normal navigation mesh polygon.
 	DT_CROWDAGENT_STATE_OFFMESH,		///< The agent is traversing an off-mesh connection.
+	DT_CROWDAGENT_STATE_TRAVERSE,		///< The agent is traversing a traverse portal.
 };
 
 /// Configuration parameters for a crowd agent.
@@ -103,7 +104,7 @@ struct dtCrowdAgentParams
 	/// [Limits: 0 <= value <= #DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS]
 	unsigned char obstacleAvoidanceType;	
 
-	/// The index of the query filter used by this agent.
+	/// The index of the query filter used by this agent, dictated by #traverseAnimType.
 	unsigned char queryFilterType;
 
 	/// User defined data attached to the agent.

@@ -104,8 +104,18 @@ void CrowdToolState::init(class Editor* editor)
 	
 		crowd->init(MAX_AGENTS, m_editor->getAgentRadius(), nav);
 		
-		// Make polygons with 'disabled' flag invalid.
-		crowd->getEditableFilter(0)->setExcludeFlags(DT_POLYFLAGS_DISABLED);
+		for (int i = ANIMTYPE_NONE; i < ANIMTYPE_COUNT; i++)
+		{
+			// +1 because the first one is the default one, for crowd agents
+			// with traverseAnimType == ANIMTYPE_NONE. ANIMTYPE_NONE is -1.
+			dtQueryFilter* const filter = crowd->getEditableFilter(i+1);
+
+			filter->setIncludeFlags(DT_POLYFLAGS_ALL);
+			filter->setExcludeFlags(DT_POLYFLAGS_DISABLED);
+
+			if (i > ANIMTYPE_NONE)
+				filter->setTraverseFlags(Editor::getTraverseFlags(TraverseAnimType_e(i)));
+		}
 		
 		// Setup local avoidance params to different qualities.
 		dtObstacleAvoidanceParams params;
@@ -630,6 +640,12 @@ void CrowdToolState::handleUpdate(const float dt)
 		updateTick(dt);
 }
 
+static unsigned char getFilterTypeForTraverseType(const TraverseAnimType_e type)
+{
+	// +1 because the first type is reserved for ANIMTYPE_NONE, which is -1.
+	return (unsigned char)type + 1;
+}
+
 void CrowdToolState::addAgent(const float* p)
 {
 	if (!m_editor) return;
@@ -657,6 +673,7 @@ void CrowdToolState::addAgent(const float* p)
 	ap.obstacleAvoidanceType = (unsigned char)m_toolParams.m_obstacleAvoidanceType;
 	ap.separationWeight = m_toolParams.m_separationWeight;
 	ap.traverseAnimType = m_toolParams.m_traverseAnimType;
+	ap.queryFilterType = getFilterTypeForTraverseType(m_toolParams.m_traverseAnimType);
 	
 	int idx = crowd->addAgent(p, &ap);
 	if (idx != -1)
@@ -816,8 +833,13 @@ void CrowdToolState::updateAgentParams()
 		params.separationWeight = m_toolParams.m_separationWeight;
 		params.maxAcceleration = m_toolParams.m_maxAcceleration;
 		params.maxSpeed = m_toolParams.m_maxSpeed;
+
+		// Retain the traverse anim type and query filter type.
+		params.traverseAnimType = ag->params.traverseAnimType;
+		params.queryFilterType = ag->params.queryFilterType;
+
 		crowd->updateAgentParameters(i, &params);
-	}	
+	}
 }
 
 void CrowdToolState::updateTick(const float dt)

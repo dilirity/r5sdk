@@ -45,6 +45,15 @@ void integrate(dtCrowdAgent* ag, const float dt)
 		rdVset(ag->vel,0,0,0);
 }
 
+static inline bool checkLinkProximity(const dtCrowdAgent* ag, const float radius)
+{
+	const float distSq = rdVdist2DSqr(ag->npos, &ag->cornerVerts[(ag->ncorners-1)*3]);
+	if (distSq < radius*radius)
+		return true;
+
+	return false;
+}
+
 bool overOffmeshConnection(const dtCrowdAgent* ag, const float radius)
 {
 	if (!ag->ncorners)
@@ -53,8 +62,36 @@ bool overOffmeshConnection(const dtCrowdAgent* ag, const float radius)
 	const bool offMeshConnection = dtIsStraightPathOffmeshConnection(ag->cornerFlags[ag->ncorners-1]);
 	if (offMeshConnection)
 	{
-		const float distSq = rdVdist2DSqr(ag->npos, &ag->cornerVerts[(ag->ncorners-1)*3]);
-		if (distSq < radius*radius)
+		if (checkLinkProximity(ag, radius))
+			return true;
+	}
+	
+	return false;
+}
+
+bool overTraversePortal(const dtCrowdAgent* ag, const dtNavMeshQuery* query, const dtQueryFilter* filter, const float radius)
+{
+	if (!ag->ncorners)
+		return false;
+	
+	const unsigned char curJump = ag->cornerJumps[ag->ncorners-1];
+	const bool traversePortal = curJump != DT_NULL_TRAVERSE_TYPE;
+
+	if (traversePortal)
+	{
+		// note(kawe): if this asserts, then off-mesh connection
+		// links made it in the path which should never happen.
+		rdAssert(!dtIsTraverseTypeOffMesh(curJump));
+
+		float distToWall = 0;
+		float hitPos[3];
+		float hitNormal[3];
+
+		if (dtStatusFailed(query->findDistanceToWall(ag->cornerPolys[(ag->ncorners - 1)],
+			ag->npos, radius, filter, &distToWall, hitPos, hitNormal)))
+			return false;
+
+		if (distToWall < radius)
 			return true;
 	}
 	

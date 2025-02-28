@@ -744,6 +744,7 @@ void dtCrowd::checkPathValidity(dtCrowdAgent** agents, const int nagents, const 
 		const int idx = getAgentIndex(ag);
 		float agentPos[3];
 		dtPolyRef agentRef = ag->corridor.getFirstPoly();
+		unsigned char agentJump = ag->corridor.getFirstJump();
 		rdVcopy(agentPos, ag->npos);
 		if (!m_navquery->isValidPolyRef(agentRef, &m_filters[ag->params.queryFilterType]))
 		{
@@ -767,8 +768,8 @@ void dtCrowd::checkPathValidity(dtCrowdAgent** agents, const int nagents, const 
 
 			// Make sure the first polygon is valid, but leave other valid
 			// polygons in the path so that replanner can adjust the path better.
-			ag->corridor.fixPathStart(agentRef, agentPos);
-//			ag->corridor.trimInvalidPath(agentRef, agentPos, m_navquery, &m_filter);
+			ag->corridor.fixPathStart(agentRef, agentJump, agentPos);
+//			ag->corridor.trimInvalidPath(agentRef, agentJump, agentPos, m_navquery, &m_filter);
 			ag->boundary.reset();
 			rdVcopy(ag->npos, agentPos);
 
@@ -805,7 +806,7 @@ void dtCrowd::checkPathValidity(dtCrowdAgent** agents, const int nagents, const 
 		if (!ag->corridor.isValid(CHECK_LOOKAHEAD, m_navquery, &m_filters[ag->params.queryFilterType]))
 		{
 			// Fix current path.
-//			ag->corridor.trimInvalidPath(agentRef, agentPos, m_navquery, &m_filter);
+//			ag->corridor.trimInvalidPath(agentRef, agentJump, agentPos, m_navquery, &m_filter);
 //			ag->boundary.reset();
 			replan = true;
 		}
@@ -828,6 +829,19 @@ void dtCrowd::checkPathValidity(dtCrowdAgent** agents, const int nagents, const 
 			}
 		}
 	}
+}
+
+static void initAgentAnimation(dtCrowdAgent* ag, dtCrowdAgentAnimation* anim, const dtPolyRef polyRef, const unsigned char state)
+{
+	rdVcopy(anim->initPos, ag->npos);
+	anim->polyRef = polyRef;
+	anim->active = true;
+	anim->t = 0.0f;
+	anim->tmax = (rdVdist2D(anim->startPos, anim->endPos) / ag->params.maxSpeed) * 0.5f;
+
+	ag->state = state;
+	ag->ncorners = 0;
+	ag->nneis = 0;
 }
 
 void dtCrowd::update(const float dt, dtCrowdAgentDebugInfo* debug)
@@ -921,7 +935,7 @@ void dtCrowd::update(const float dt, dtCrowdAgentDebugInfo* debug)
 		}
 	}
 	
-	// Trigger off-mesh connections (depends on corners).
+	// Trigger off-mesh connections or traverse portals (depends on corners).
 	for (int i = 0; i < nagents; ++i)
 	{
 		dtCrowdAgent* ag = agents[i];
@@ -944,15 +958,26 @@ void dtCrowd::update(const float dt, dtCrowdAgentDebugInfo* debug)
 			if (ag->corridor.moveOverOffmeshConnection(ag->cornerPolys[ag->ncorners-1], refs,
 													   anim->startPos, anim->endPos, m_navquery))
 			{
-				rdVcopy(anim->initPos, ag->npos);
-				anim->polyRef = refs[1];
-				anim->active = true;
-				anim->t = 0.0f;
-				anim->tmax = (rdVdist2D(anim->startPos, anim->endPos) / ag->params.maxSpeed) * 0.5f;
-				
-				ag->state = DT_CROWDAGENT_STATE_OFFMESH;
-				ag->ncorners = 0;
-				ag->nneis = 0;
+				initAgentAnimation(ag, anim, refs[1], DT_CROWDAGENT_STATE_OFFMESH);
+				continue;
+			}
+			else
+			{
+				// Path validity check will ensure that bad/blocked connections will be replanned.
+			}
+		}
+		else if (overTraversePortal(ag, m_navquery, &m_filters[ag->params.queryFilterType], triggerRadius))
+		{
+			// Prepare to traverse portal.
+			const int idx = (int)(ag - m_agents);
+			dtCrowdAgentAnimation* anim = &m_agentAnims[idx];
+			
+			// Adjust the path over the traverse portal.
+			dtPolyRef refs[2];
+			if (ag->corridor.moveOverTraversePortal(ag->cornerPolys[ag->ncorners-1], &ag->cornerVerts[ag->ncorners-1],
+													refs, anim->startPos, anim->endPos, m_navquery))
+			{
+				initAgentAnimation(ag, anim, refs[1], DT_CROWDAGENT_STATE_TRAVERSE);
 				continue;
 			}
 			else
@@ -1114,14 +1139,13 @@ void dtCrowd::update(const float dt, dtCrowdAgentDebugInfo* debug)
 	{
 		for (int i = 0; i < nagents; ++i)
 		{
-			dtCrowdAgent* ag = agents[i];
-			const int idx0 = getAgentIndex(ag);
-			
+			dtCrowdAgent* ag = agents[i];			
 			if (ag->state != DT_CROWDAGENT_STATE_WALKING)
 				continue;
 
 			rdVset(ag->disp, 0,0,0);
-			
+
+			const int idx0 = getAgentIndex(ag);
 			float w = 0;
 
 			for (int j = 0; j < ag->nneis; ++j)
@@ -1193,15 +1217,15 @@ void dtCrowd::update(const float dt, dtCrowdAgentDebugInfo* debug)
 		}
 	}
 	
-	// Update agents using off-mesh connection.
+	// Update agents using off-mesh connection or traverse portals.
 	for (int i = 0; i < nagents; ++i)
 	{
 		dtCrowdAgent* ag = agents[i];
 		const int idx = (int)(ag - m_agents);
+
 		dtCrowdAgentAnimation* anim = &m_agentAnims[idx];
 		if (!anim->active)
 			continue;
-		
 
 		anim->t += dt;
 		if (anim->t > anim->tmax)

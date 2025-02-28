@@ -213,7 +213,7 @@ may be needed.  E.g. If you move the target, check #getLastPoly() to see if it i
 
 dtPathCorridor::dtPathCorridor() :
 	m_path(0),
-	m_jumpTypes(0),
+	m_jumps(0),
 	m_npath(0),
 	m_maxPath(0)
 {
@@ -224,7 +224,7 @@ dtPathCorridor::dtPathCorridor() :
 dtPathCorridor::~dtPathCorridor()
 {
 	rdFree(m_path);
-	rdFree(m_jumpTypes);
+	rdFree(m_jumps);
 }
 
 /// @par
@@ -237,9 +237,9 @@ bool dtPathCorridor::init(const int maxPath)
 	if (!m_path)
 		return false;
 
-	rdAssert(!m_jumpTypes);
-	m_jumpTypes = (unsigned char*)rdAlloc(sizeof(unsigned char)*maxPath, RD_ALLOC_PERM);
-	if (!m_jumpTypes)
+	rdAssert(!m_jumps);
+	m_jumps = (unsigned char*)rdAlloc(sizeof(unsigned char)*maxPath, RD_ALLOC_PERM);
+	if (!m_jumps)
 		return false;
 
 	m_npath = 0;
@@ -254,11 +254,11 @@ bool dtPathCorridor::init(const int maxPath)
 void dtPathCorridor::reset(dtPolyRef ref, const float* pos)
 {
 	rdAssert(m_path);
-	rdAssert(m_jumpTypes);
+	rdAssert(m_jumps);
 	rdVcopy(m_pos, pos);
 	rdVcopy(m_target, pos);
 	m_path[0] = ref;
-	m_jumpTypes[0] = DT_NULL_TRAVERSE_TYPE;
+	m_jumps[0] = DT_NULL_TRAVERSE_TYPE;
 	m_npath = 1;
 }
 
@@ -284,7 +284,7 @@ int dtPathCorridor::findCorners(float* cornerVerts, unsigned char* cornerFlags,
 	static const float MIN_TARGET_DIST = 0.01f;
 	
 	int ncorners = 0;
-	navquery->findStraightPath(m_pos, m_target, m_path, m_jumpTypes, m_npath,
+	navquery->findStraightPath(m_pos, m_target, m_path, m_jumps, m_npath,
 							   cornerVerts, cornerFlags, cornerPolys, cornerJumps, &ncorners, maxCorners, 0xffffffff);
 	
 	// Prune points in the beginning of the path which are too close.
@@ -303,7 +303,7 @@ int dtPathCorridor::findCorners(float* cornerVerts, unsigned char* cornerFlags,
 		}
 	}
 	
-	// Prune points after an off-mesh connection.
+	// Prune points after an off-mesh connection or traverse portal.
 	for (int i = 0; i < ncorners; ++i)
 	{
 		if (dtIsStraightPathOffmeshConnection(cornerFlags[i]) ||
@@ -361,12 +361,18 @@ void dtPathCorridor::optimizePathVisibility(const float* next, const float pathO
 	dtPolyRef reqPath[MAX_RES];
 	unsigned char reqJump[MAX_RES];
 
+	// Raycast will never go through traverse portals, so if we merge, the
+	// path must be clear and therefore no traverse link. Set everything to
+	// DT_NULL_TRAVERSE_TYPE here.
+	for (int i = 0; i < MAX_RES; i++)
+		reqJump[i] = DT_NULL_TRAVERSE_TYPE;
+
 	float t, norm[3];
 	int nres = 0;
 	navquery->raycast(m_path[0], m_pos, goal, filter, &t, norm, reqPath, &nres, MAX_RES);
 	if (nres > 1 && t > 0.99f)
 	{
-		m_npath = dtMergeCorridorStartShortcut(m_path, m_jumpTypes, m_npath, m_maxPath, reqPath, reqJump, nres);
+		m_npath = dtMergeCorridorStartShortcut(m_path, m_jumps, m_npath, m_maxPath, reqPath, reqJump, nres);
 	}
 }
 
@@ -401,25 +407,21 @@ bool dtPathCorridor::optimizePathTopology(dtNavMeshQuery* navquery, const dtQuer
 	
 	if (dtStatusSucceed(status) && nres > 0)
 	{
-		m_npath = dtMergeCorridorStartShortcut(m_path, m_jumpTypes, m_npath, m_maxPath, reqPath, reqJump, nres);
+		m_npath = dtMergeCorridorStartShortcut(m_path, m_jumps, m_npath, m_maxPath, reqPath, reqJump, nres);
 		return true;
 	}
 	
 	return false;
 }
 
-bool dtPathCorridor::moveOverOffmeshConnection(dtPolyRef offMeshConRef, dtPolyRef* refs,
-											   float* startPos, float* endPos,
-											   dtNavMeshQuery* navquery)
+bool dtPathCorridor::advancePoly(const dtPolyRef targetRef, dtPolyRef& prevRef, dtPolyRef& polyRef, int& npos)
 {
-	rdAssert(navquery);
 	rdAssert(m_path);
 	rdAssert(m_npath);
 
-	// Advance the path up to and over the off-mesh connection.
-	dtPolyRef prevRef = 0, polyRef = m_path[0];
-	int npos = 0;
-	while (npos < m_npath && polyRef != offMeshConRef)
+	// Advance the path up to and over the connection.
+	npos = 0;
+	while (npos < m_npath && polyRef != targetRef)
 	{
 		prevRef = polyRef;
 		polyRef = m_path[npos];
@@ -427,14 +429,37 @@ bool dtPathCorridor::moveOverOffmeshConnection(dtPolyRef offMeshConRef, dtPolyRe
 	}
 	if (npos == m_npath)
 	{
-		// Could not find offMeshConRef
+		// Could not find targetRef
 		return false;
 	}
 	
+	return true;
+}
+
+bool dtPathCorridor::prunePoly(const dtPolyRef targetRef, dtPolyRef& prevRef, dtPolyRef& polyRef)
+{
+	int npos;
+	if (!advancePoly(targetRef, prevRef, polyRef, npos))
+		return false;
+
 	// Prune path
 	for (int i = npos; i < m_npath; ++i)
 		m_path[i-npos] = m_path[i];
 	m_npath -= npos;
+
+	return true;
+}
+
+bool dtPathCorridor::moveOverOffmeshConnection(dtPolyRef offMeshConRef, dtPolyRef* refs,
+											   float* startPos, float* endPos,
+											   dtNavMeshQuery* navquery)
+{
+	rdAssert(navquery);
+
+	dtPolyRef prevRef;
+	dtPolyRef polyRef;
+	if (!prunePoly(offMeshConRef, prevRef, polyRef))
+		return false;
 
 	refs[0] = prevRef;
 	refs[1] = polyRef;
@@ -442,14 +467,37 @@ bool dtPathCorridor::moveOverOffmeshConnection(dtPolyRef offMeshConRef, dtPolyRe
 	const dtNavMesh* nav = navquery->getAttachedNavMesh();
 	rdAssert(nav);
 
-	dtStatus status = nav->getOffMeshConnectionPolyEndPoints(refs[0], refs[1], startPos, endPos);
-	if (dtStatusSucceed(status))
-	{
-		rdVcopy(m_pos, endPos);
-		return true;
-	}
+	if (dtStatusFailed(nav->getOffMeshConnectionPolyEndPoints(refs[0], refs[1], startPos, endPos)))
+		return false;
 
-	return false;
+	rdVcopy(m_pos, endPos);
+	return true;
+}
+
+bool dtPathCorridor::moveOverTraversePortal(dtPolyRef startPolyRef, const float* startVert,
+											dtPolyRef* refs, float* startPos, float* endPos,
+											dtNavMeshQuery* navquery)
+{
+	rdAssert(navquery);
+
+	dtPolyRef prevRef;
+	dtPolyRef polyRef;
+	if (!prunePoly(startPolyRef, prevRef, polyRef))
+		return false;
+
+	refs[0] = prevRef;
+	refs[1] = polyRef;
+
+	rdVcopy(startPos, startVert);
+	// At this point we don't know the next position, technically we can
+	// obtain the next polyref from the link that our jump type was taken
+	// from, but that is inaccessible at this point. Copy the startPos to
+	// the endPos to teleport it right to the waypoint. It might be worth
+	// revisiting this in the future to have this lerp the traversal too.
+	rdVcopy(endPos, startPos);
+
+	rdVcopy(m_pos, endPos);
+	return true;
 }
 
 /**
@@ -481,7 +529,7 @@ bool dtPathCorridor::movePosition(const float* npos, dtNavMeshQuery* navquery, c
 	dtStatus status = navquery->moveAlongSurface(m_path[0], m_pos, npos, filter,
 												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED, 0);
 	if (dtStatusSucceed(status)) {
-		m_npath = dtMergeCorridorStartMoved(m_path, m_jumpTypes, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
+		m_npath = dtMergeCorridorStartMoved(m_path, m_jumps, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
 		
 		// Adjust the position to stay on top of the navmesh.
 		float h = m_pos[2];
@@ -521,7 +569,7 @@ bool dtPathCorridor::moveTargetPosition(const float* npos, dtNavMeshQuery* navqu
 												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED, 0);
 	if (dtStatusSucceed(status))
 	{
-		m_npath = dtMergeCorridorEndMoved(m_path, m_jumpTypes, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
+		m_npath = dtMergeCorridorEndMoved(m_path, m_jumps, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
 		// TODO: should we do that?
 		// Adjust the position to stay on top of the navmesh.
 		/*	float h = m_target[2];
@@ -544,38 +592,43 @@ bool dtPathCorridor::moveTargetPosition(const float* npos, dtNavMeshQuery* navqu
 void dtPathCorridor::setCorridor(const float* target, const dtPolyRef* path, const unsigned char* jumps, const int npath)
 {
 	rdAssert(m_path);
-	rdAssert(m_jumpTypes);
+	rdAssert(m_jumps);
 	rdAssert(npath > 0);
 	rdAssert(npath <= m_maxPath);
 	
 	rdVcopy(m_target, target);
 	memcpy(m_path, path, sizeof(dtPolyRef)*npath);
-	memcpy(m_jumpTypes, jumps, sizeof(unsigned char)*npath);
+	memcpy(m_jumps, jumps, sizeof(unsigned char)*npath);
 	m_npath = npath;
 }
 
-bool dtPathCorridor::fixPathStart(dtPolyRef safeRef, const float* safePos)
+bool dtPathCorridor::fixPathStart(dtPolyRef safeRef, unsigned char safeJump, const float* safePos)
 {
 	rdAssert(m_path);
 
 	rdVcopy(m_pos, safePos);
 	if (m_npath < 3 && m_npath > 0)
 	{
-		m_path[0] = safeRef;
-		m_path[1] = 0;
 		m_path[2] = m_path[m_npath-1];
+		m_path[1] = 0;
+		m_path[0] = safeRef;
+
+		m_jumps[2] = m_jumps[m_npath-1];
+		m_jumps[1] = DT_NULL_TRAVERSE_TYPE;
+		m_jumps[0] = safeJump;
+
 		m_npath = 3;
 	}
 	else
 	{
-		m_path[0] = safeRef;
 		m_path[1] = 0;
+		m_path[0] = safeRef;
 	}
 	
 	return true;
 }
 
-bool dtPathCorridor::trimInvalidPath(dtPolyRef safeRef, const float* safePos,
+bool dtPathCorridor::trimInvalidPath(dtPolyRef safeRef, unsigned char safeJump, const float* safePos,
 									 dtNavMeshQuery* navquery, const dtQueryFilter* filter)
 {
 	rdAssert(navquery);
@@ -598,6 +651,7 @@ bool dtPathCorridor::trimInvalidPath(dtPolyRef safeRef, const float* safePos,
 		// The first polyref is bad, use current safe values.
 		rdVcopy(m_pos, safePos);
 		m_path[0] = safeRef;
+		m_jumps[0] = safeJump;
 		m_npath = 1;
 	}
 	else

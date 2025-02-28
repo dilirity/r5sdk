@@ -21,6 +21,7 @@
 
 void integrate(dtCrowdAgent* ag, const float dt);
 bool overOffmeshConnection(const dtCrowdAgent* ag, const float radius);
+bool overTraversePortal(const dtCrowdAgent* ag, const dtNavMeshQuery* query, const dtQueryFilter* filter, const float radius);
 float getDistanceToGoal(const dtCrowdAgent* ag, const float range);
 void calcSmoothSteerDirection(const dtCrowdAgent* ag, float* dir);
 void calcStraightSteerDirection(const dtCrowdAgent* ag, float* dir);

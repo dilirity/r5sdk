@@ -26,7 +26,7 @@
 class dtPathCorridor
 {
 	dtPolyRef* m_path;
-	unsigned char* m_jumpTypes;
+	unsigned char* m_jumps;
 	int m_npath;
 	int m_maxPath;
 
@@ -74,13 +74,20 @@ public:
 	///  @param[in]		filter		The filter to apply to the operation.	
 	bool optimizePathTopology(dtNavMeshQuery* navquery, const dtQueryFilter* filter);
 	
+	bool advancePoly(const dtPolyRef targetRef, dtPolyRef& prevRef, dtPolyRef& polyRef, int& npos);
+	bool prunePoly(const dtPolyRef targetRef, dtPolyRef& prevRef, dtPolyRef& polyRef);
+
 	bool moveOverOffmeshConnection(dtPolyRef offMeshConRef, dtPolyRef* refs,
 								   float* startPos, float* endPos,
 								   dtNavMeshQuery* navquery);
 
-	bool fixPathStart(dtPolyRef safeRef, const float* safePos);
+	bool moveOverTraversePortal(dtPolyRef startPolyRef, const float* startVert,
+								dtPolyRef* refs, float* startPos, float* endPos,
+								dtNavMeshQuery* navquery);
 
-	bool trimInvalidPath(dtPolyRef safeRef, const float* safePos,
+	bool fixPathStart(dtPolyRef safeRef, unsigned char safeJump, const float* safePos);
+
+	bool trimInvalidPath(dtPolyRef safeRef, unsigned char safeJump, const float* safePos,
 						 dtNavMeshQuery* navquery, const dtQueryFilter* filter);
 	
 	/// Checks the current corridor path to see if its polygon references remain valid. 
@@ -124,6 +131,10 @@ public:
 	/// @return The polygon reference id of the first polygon in the corridor. (Or zero if there is no path.)
 	inline dtPolyRef getFirstPoly() const { return m_npath ? m_path[0] : 0; }
 
+	/// The traverse type of the first jump in the corridor.
+	/// @return The traverse type of the first jump in the corridor. (Or #DT_NULL_TRAVERSE_TYPE if there is no path.)
+	inline unsigned char getFirstJump() const { return m_npath ? m_jumps[0] : DT_NULL_TRAVERSE_TYPE; }
+
 	/// The polygon reference id of the last polygon in the corridor, the polygon containing the target.
 	/// @return The polygon reference id of the last polygon in the corridor. (Or zero if there is no path.)
 	inline dtPolyRef getLastPoly() const { return m_npath ? m_path[m_npath-1] : 0; }
@@ -134,7 +145,7 @@ public:
 
 	/// The corridor's jump.
 	/// @return The corridor's jump. [(uchar) * #getPathCount()]
-	inline const unsigned char* getJump() const { return m_jumpTypes; }
+	inline const unsigned char* getJump() const { return m_jumps; }
 
 	/// The number of polygons in the current corridor path.
 	/// @return The number of polygons in the current corridor path.

@@ -60,7 +60,7 @@ class NavMeshTesterTool : public EditorTool
 	dtPolyRef m_endRef;
 	dtPolyRef m_polys[MAX_POLYS];
 	dtPolyRef m_parent[MAX_POLYS];
-	unsigned char m_jumpTypes[MAX_POLYS];
+	unsigned char m_jumps[MAX_POLYS];
 	int m_npolys;
 	float m_straightPath[MAX_POLYS*3];
 	unsigned char m_straightPathFlags[MAX_POLYS];
@@ -112,6 +112,7 @@ public:
 	virtual void handleRender();
 	virtual void handleRenderOverlay(double* proj, double* model, int* view);
 
+	void handleStraightPathMenu();
 	void recalc();
 	void updateTraverseCosts();
 
