@@ -2066,8 +2066,8 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 			// Jump vertex.
 			if (i > 0 && jumpTypes[i] != DT_NULL_TRAVERSE_TYPE && !dtIsTraverseTypeOffMesh(jumpTypes[i]))
 			{
-				if (rdTriArea2D(portalRight, portalLeft, left) < 0.0f ||
-					rdTriArea2D(portalRight, portalLeft, right) < 0.0f)
+				if (rdTriArea2D(portalLeft, portalRight, left) < 0.0f ||
+					rdTriArea2D(portalLeft, portalRight, right) < 0.0f)
 				{
 					float jumpPt[3];
 					rdVlerp(jumpPt, portalLeft, portalRight, 0.5f);
@@ -2095,6 +2095,13 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 				}
 			}
 			
+			enum AddStraightPathSegments
+			{
+				SP_SEGMENT_ADD_LEFT, SP_SEGMENT_ADD_RIGHT,
+				SP_SEGMENT_COUNT, // Left is checked and added first.
+			}; 
+			bool addSegments[SP_SEGMENT_COUNT] = { false, false };
+
 			// Left vertex.
 			if (rdTriArea2D(portalApex, portalLeft, left) <= 0.0f)
 			{
@@ -2108,58 +2115,11 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 				}
 				else
 				{
-					// Append portals along the current straight path segment.
-					if (options & (DT_STRAIGHTPATH_AREA_CROSSINGS | DT_STRAIGHTPATH_ALL_CROSSINGS))
-					{
-						stat = appendPortals(apexIndex, rightIndex, portalRight, path, jumpTypes,
-											 straightPath, straightPathFlags, straightPathRefs,
-											 straightPathJumps, straightPathCount, maxStraightPath, jumpFilter, options);
-						if (stat != DT_IN_PROGRESS)
-							return stat;					
-					}
-
-					if (!apexCrossTile && (m_nav->decodePolyIdTile(path[apexIndex]) != m_nav->decodePolyIdTile(path[rightIndex])))
-						apexCrossTile = true;
-				
-					rdVcopy(portalApex, portalRight);
-					apexIndex = rightIndex;
-					
-					unsigned char flags = 0;
-					if (!rightPolyRef)
-						flags = endFlags;
-					else if (rightPolyType == DT_POLYTYPE_OFFMESH_CONNECTION)
-						flags = DT_STRAIGHTPATH_OFFMESH_CONNECTION;
-
-					// Append or update vertex
-					stat = appendVertex(portalApex, flags, rightPolyRef, rightJumpType,
-										straightPath, straightPathFlags, straightPathRefs,
-										straightPathJumps, straightPathCount, maxStraightPath);
-					if (stat != DT_IN_PROGRESS)
-						return stat;
-
-					// Append portals along the current straight path segment.
-					if (i > 0 && jumpTypes[i] < DT_MAX_TRAVERSE_TYPES)
-					{
-						stat = appendPortalVertex(portalApex, closestEndPos, i, path,
-												  straightPath, straightPathFlags, straightPathRefs,
-												  straightPathJumps, straightPathCount, maxStraightPath);
-
-						if (stat != DT_SUCCESS && stat != DT_IN_PROGRESS)
-							return stat;
-
-						if (!(options & DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP))
-							return DT_SUCCESS;
-					}
-					
-					rdVcopy(portalLeft, portalApex);
-					rdVcopy(portalRight, portalApex);
-					leftIndex = apexIndex;
-					rightIndex = apexIndex;
-					
-					// Restart
-					i = apexIndex;
-					
-					continue;
+					// note(kawe): we must delay 'right' after 'left' since we
+					// flipped the coordinate system (XZY -> XYZ, Z is up now),
+					// 'left' however must know its poly, jump and index in
+					// case its vertex lies outside the current funnel.
+					addSegments[SP_SEGMENT_ADD_RIGHT] = true;
 				}
 			}
 			
@@ -2176,60 +2136,85 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 				}
 				else
 				{
-					// Append portals along the current straight path segment.
-					if (options & (DT_STRAIGHTPATH_AREA_CROSSINGS | DT_STRAIGHTPATH_ALL_CROSSINGS))
-					{
-						stat = appendPortals(apexIndex, leftIndex, portalLeft, path, jumpTypes,
-											 straightPath, straightPathFlags, straightPathRefs,
-											 straightPathJumps, straightPathCount, maxStraightPath, jumpFilter, options);
-						if (stat != DT_IN_PROGRESS)
-							return stat;
-					}
-
-					if (!apexCrossTile && (m_nav->decodePolyIdTile(path[apexIndex]) != m_nav->decodePolyIdTile(path[leftIndex])))
-						apexCrossTile = true;
-
-					rdVcopy(portalApex, portalLeft);
-					apexIndex = leftIndex;
-					
-					unsigned char flags = 0;
-					if (!leftPolyRef)
-						flags = endFlags;
-					else if (leftPolyType == DT_POLYTYPE_OFFMESH_CONNECTION)
-						flags = DT_STRAIGHTPATH_OFFMESH_CONNECTION;
-
-					// Append or update vertex
-					stat = appendVertex(portalApex, flags, leftPolyRef, leftJumpType,
-										straightPath, straightPathFlags, straightPathRefs,
-										straightPathJumps, straightPathCount, maxStraightPath);
-					if (stat != DT_IN_PROGRESS)
-						return stat;
-
-					// Append portals along the current straight path segment.
-					if (i > 0 && jumpTypes[i] < DT_MAX_TRAVERSE_TYPES)
-					{
-						stat = appendPortalVertex(portalApex, closestEndPos, i, path,
-												  straightPath, straightPathFlags, straightPathRefs,
-												  straightPathJumps, straightPathCount, maxStraightPath);
-
-						if (stat != DT_SUCCESS && stat != DT_IN_PROGRESS)
-							return stat;
-
-						if (!(options & DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP))
-							return DT_SUCCESS;
-					}
-					
-					rdVcopy(portalLeft, portalApex);
-					rdVcopy(portalRight, portalApex);
-					leftIndex = apexIndex;
-					rightIndex = apexIndex;
-					
-					// Restart
-					i = apexIndex;
-					
-					continue;
+					// note(kawe): see the same branch for the right vertex.
+					addSegments[SP_SEGMENT_ADD_LEFT] = true;
 				}
 			}
+
+			bool shouldContinue = false;
+
+			for (int segIdx = 0; segIdx < SP_SEGMENT_COUNT; segIdx++)
+			{
+				const bool add = addSegments[segIdx];
+
+				if (!add)
+					continue;
+
+				const bool isLeft = segIdx == SP_SEGMENT_ADD_LEFT;
+
+				const float* portalTarget = isLeft ? portalLeft : portalRight;
+				const dtPolyRef targetPolyRef = isLeft ? leftPolyRef : rightPolyRef;
+				const unsigned char targetJumpType = isLeft ? leftJumpType : rightJumpType;
+				const unsigned char targetPolyType = isLeft ? leftPolyType : rightPolyType;
+				const int targetIndex = isLeft ? leftIndex : rightIndex;
+
+				// Append portals along the current straight path segment.
+				if (options & (DT_STRAIGHTPATH_AREA_CROSSINGS | DT_STRAIGHTPATH_ALL_CROSSINGS))
+				{
+					stat = appendPortals(apexIndex, targetIndex, portalTarget, path, jumpTypes,
+										 straightPath, straightPathFlags, straightPathRefs,
+										 straightPathJumps, straightPathCount, maxStraightPath, jumpFilter, options);
+					if (stat != DT_IN_PROGRESS)
+						return stat;
+				}
+
+				if (!apexCrossTile && (m_nav->decodePolyIdTile(path[apexIndex]) != m_nav->decodePolyIdTile(path[targetIndex])))
+					apexCrossTile = true;
+
+				rdVcopy(portalApex, portalTarget);
+				apexIndex = targetIndex;
+				
+				unsigned char flags = 0;
+				if (!targetPolyRef)
+					flags = endFlags;
+				else if (targetPolyType == DT_POLYTYPE_OFFMESH_CONNECTION)
+					flags = DT_STRAIGHTPATH_OFFMESH_CONNECTION;
+
+				// Append or update vertex
+				stat = appendVertex(portalApex, flags, targetPolyRef, targetJumpType,
+									straightPath, straightPathFlags, straightPathRefs,
+									straightPathJumps, straightPathCount, maxStraightPath);
+				if (stat != DT_IN_PROGRESS)
+					return stat;
+
+				// Append portals along the current straight path segment.
+				if (i > 0 && jumpTypes[i] < DT_MAX_TRAVERSE_TYPES)
+				{
+					stat = appendPortalVertex(portalApex, closestEndPos, i, path,
+											  straightPath, straightPathFlags, straightPathRefs,
+											  straightPathJumps, straightPathCount, maxStraightPath);
+
+					if (stat != DT_SUCCESS && stat != DT_IN_PROGRESS)
+						return stat;
+
+					if (!(options & DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP))
+						return DT_SUCCESS;
+				}
+				
+				rdVcopy(portalLeft, portalApex);
+				rdVcopy(portalRight, portalApex);
+				leftIndex = apexIndex;
+				rightIndex = apexIndex;
+				
+				// Restart.
+				shouldContinue = true;
+				i = apexIndex;
+
+				break;
+			}
+
+			if (shouldContinue)
+				continue;
 
 			// Prevent occasional errors when portalApex, portalLeft and portalRight
 			// form an angle larger than 180 degrees.
