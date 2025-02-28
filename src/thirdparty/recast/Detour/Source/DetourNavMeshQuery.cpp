@@ -2436,6 +2436,15 @@ dtStatus dtNavMeshQuery::getPortalPoints(dtPolyRef from, const dtPoly* fromPoly,
 	}
 	if (!link)
 		return DT_FAILURE | DT_INVALID_PARAM;
+
+	// Copy the 'to' vertices over, this traverse type is reserved and
+	// used by the engine for special activities such as ziplines.
+	if (dtIsTraverseTypeReserved(link->traverseType))
+	{
+		rdVcopy(left, &toTile->verts[toPoly->verts[0]*3]);
+		rdVcopy(right, &toTile->verts[toPoly->verts[0]*3]);
+		return DT_SUCCESS;
+	}
 	
 	// Handle off-mesh connections.
 	if (fromPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
