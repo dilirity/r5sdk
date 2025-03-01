@@ -523,7 +523,7 @@ dtStatus dtNavMeshQuery::closestPointOnPoly(dtPolyRef ref, const float* pos, flo
 ///
 /// The height of @p closest will be the polygon boundary.  The height detail is not used.
 /// 
-/// @p pos does not have to be within the bounds of the polybon or the navigation mesh.
+/// @p pos does not have to be within the bounds of the polygon or the navigation mesh.
 /// 
 dtStatus dtNavMeshQuery::closestPointOnPolyBoundary(dtPolyRef ref, const float* pos, float* closest, float* dist) const
 {
@@ -586,6 +586,7 @@ dtStatus dtNavMeshQuery::closestPointOnPolyBoundary(dtPolyRef ref, const float* 
 ///
 /// Will return #DT_FAILURE | DT_INVALID_PARAM if the provided position is outside the xy-bounds 
 /// of the polygon.
+/// Will return #DT_FAILURE | #DT_INVALID_PARAM if the provided position is outside the xy-bounds 
 /// 
 dtStatus dtNavMeshQuery::getPolyHeight(dtPolyRef ref, const float* pos, float* height) const
 {
@@ -1018,7 +1019,7 @@ dtStatus dtNavMeshQuery::findPath(dtPolyRef startRef, dtPolyRef endRef,
 		}
 		
 		// Get current poly and tile.
-		// The API input has been cheked already, skip checking internal data.
+		// The API input has been checked already, skip checking internal data.
 		const dtPolyRef bestRef = bestNode->id;
 		const dtMeshTile* bestTile = 0;
 		const dtPoly* bestPoly = 0;
@@ -1316,7 +1317,7 @@ dtStatus dtNavMeshQuery::updateSlicedFindPath(const int maxIter, int* doneIters,
 		}
 		
 		// Get current poly and tile.
-		// The API input has been cheked already, skip checking internal data.
+		// The API input has been checked already, skip checking internal data.
 		const dtPolyRef bestRef = bestNode->id;
 		const dtMeshTile* bestTile = 0;
 		const dtPoly* bestPoly = 0;
@@ -2352,7 +2353,7 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 		nstack--;
 		
 		// Get poly and tile.
-		// The API input has been cheked already, skip checking internal data.
+		// The API input has been checked already, skip checking internal data.
 		const dtPolyRef curRef = curNode->id;
 		const dtMeshTile* curTile = 0;
 		const dtPoly* curPoly = 0;
@@ -3071,7 +3072,7 @@ dtStatus dtNavMeshQuery::findPolysAroundCircle(dtPolyRef startRef, const float* 
 		bestNode->flags |= DT_NODE_CLOSED;
 		
 		// Get poly and tile.
-		// The API input has been cheked already, skip checking internal data.
+		// The API input has been checked already, skip checking internal data.
 		const dtPolyRef bestRef = bestNode->id;
 		const dtMeshTile* bestTile = 0;
 		const dtPoly* bestPoly = 0;
