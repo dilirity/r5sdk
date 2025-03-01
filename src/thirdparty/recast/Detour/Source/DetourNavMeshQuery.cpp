@@ -308,7 +308,10 @@ dtStatus dtNavMeshQuery::findRandomPoint(const dtQueryFilter* filter, float (*fr
 	float pt[3];
 	rdRandomPointInConvexPoly(verts, poly->vertCount, areas, s, t, pt);
 	
-	closestPointOnPoly(polyRef, pt, pt, NULL);
+	const dtStatus stat = closestPointOnPoly(polyRef, pt, pt, NULL);
+
+	if (dtStatusFailed(stat))
+		return stat | DT_OUTSIDE_BOUNDS;
 	
 	rdVcopy(randomPt, pt);
 	*randomRef = polyRef;
@@ -481,7 +484,10 @@ dtStatus dtNavMeshQuery::findRandomPointAroundCircle(dtPolyRef startRef, const f
 	float pt[3];
 	rdRandomPointInConvexPoly(verts, randomPoly->vertCount, areas, s, t, pt);
 
-	closestPointOnPoly(randomPolyRef, pt, pt, NULL);
+	const dtStatus stat = closestPointOnPoly(randomPolyRef, pt, pt, NULL);
+
+	if (dtStatusFailed(stat))
+		return stat | DT_OUTSIDE_BOUNDS;
 	
 	rdVcopy(randomPt, pt);
 	*randomRef = randomPolyRef;

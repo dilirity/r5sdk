@@ -38,6 +38,7 @@ static const unsigned int DT_PARTIAL_RESULT = 1 << 6;	// Query did not reach the
 static const unsigned int DT_ALREADY_OCCUPIED = 1 << 7;	// A tile has already been assigned to the given x,y coordinate
 static const unsigned int DT_INVALID_ACTION = 1 << 8;	// An action without results, i.e. goal pos is the same as start pos.
 static const unsigned int DT_PORTAL_BLOCKED = 1 << 9;	// The portal was blocked and the operation could not continue.
+static const unsigned int DT_OUTSIDE_BOUNDS = 1 << 10;	// Query was performed out-of-bounds.
 
 
 // Returns true of status is success.
