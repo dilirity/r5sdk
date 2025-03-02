@@ -524,11 +524,15 @@ bool dtPathCorridor::movePosition(const float* npos, dtNavMeshQuery* navquery, c
 	float result[3];
 	static const int MAX_VISITED = 16;
 	dtPolyRef visitedPolys[MAX_VISITED];
-	unsigned char visitedJumps[MAX_VISITED];
 	int nvisited = 0;
 	dtStatus status = navquery->moveAlongSurface(m_path[0], m_pos, npos, filter,
-												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED, 0);
+												 result, visitedPolys, &nvisited, MAX_VISITED, 0);
 	if (dtStatusSucceed(status)) {
+
+		unsigned char visitedJumps[MAX_VISITED];
+		for (int i = 0; i < MAX_VISITED; i++)
+			visitedJumps[i] = DT_NULL_TRAVERSE_TYPE;
+
 		m_npath = dtMergeCorridorStartMoved(m_path, m_jumps, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
 		
 		// Adjust the position to stay on top of the navmesh.
@@ -563,12 +567,15 @@ bool dtPathCorridor::moveTargetPosition(const float* npos, dtNavMeshQuery* navqu
 	float result[3];
 	static const int MAX_VISITED = 16;
 	dtPolyRef visitedPolys[MAX_VISITED];
-	unsigned char visitedJumps[MAX_VISITED];
 	int nvisited = 0;
 	dtStatus status = navquery->moveAlongSurface(m_path[m_npath-1], m_target, npos, filter,
-												 result, visitedPolys, visitedJumps, &nvisited, MAX_VISITED, 0);
+												 result, visitedPolys, &nvisited, MAX_VISITED, 0);
 	if (dtStatusSucceed(status))
 	{
+		unsigned char visitedJumps[MAX_VISITED];
+		for (int i = 0; i < MAX_VISITED; i++)
+			visitedJumps[i] = DT_NULL_TRAVERSE_TYPE;
+
 		m_npath = dtMergeCorridorEndMoved(m_path, m_jumps, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
 		// TODO: should we do that?
 		// Adjust the position to stay on top of the navmesh.

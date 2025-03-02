@@ -2301,7 +2301,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const float* startPos, const float* en
 ///
 dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* startPos, const float* endPos,
 										  const dtQueryFilter* filter, float* resultPos, dtPolyRef* visitedPolys, 
-										  unsigned char* visitedJumps, int* visitedCount, const int maxVisitedSize, const unsigned char options) const
+										  int* visitedCount, const int maxVisitedSize, const unsigned char options) const
 {
 	rdAssert(m_nav);
 	rdAssert(m_nodePool);
@@ -2490,9 +2490,6 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 			do
 			{
 				visitedPolys[n] = node->id;
-
-				if (visitedJumps)
-					visitedJumps[n] = node->jump;
 
 				if (++n >= maxVisitedSize)
 				{
