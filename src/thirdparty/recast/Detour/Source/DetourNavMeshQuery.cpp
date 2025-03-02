@@ -2507,10 +2507,9 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 
 		if (options & DT_MOVEALONGSURFACE_USE_POLY_HEIGHT_FOR_RESULT)
 		{
-			// Ignore return value, because getPolyHeight will only set the
-			// height if it succeeds. If it fails we just use the currently
-			// stored height.
-			getPolyHeight(bestNode->id, bestPos, &bestPos[2]);
+			float closestPoint[3]; // If it fails we just use the currently stored height.
+			if (dtStatusSucceed(closestPointOnPoly(bestNode->id, bestPos, closestPoint, 0)))
+				bestPos[2] = closestPoint[2];
 		}
 	}
 
