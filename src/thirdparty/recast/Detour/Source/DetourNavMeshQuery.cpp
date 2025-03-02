@@ -932,6 +932,11 @@ dtStatus dtNavMeshQuery::queryPolygons(const float* center, const float* halfExt
 	m_nav->calcTileLoc(bmin, &minx, &miny);
 	m_nav->calcTileLoc(bmax, &maxx, &maxy);
 
+	if (minx > maxx)
+		rdSwap(minx, maxx);
+	if (miny > maxy)
+		rdSwap(miny, maxy);
+
 	static const int MAX_NEIS = 32;
 	const dtMeshTile* neis[MAX_NEIS];
 	
