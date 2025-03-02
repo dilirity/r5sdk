@@ -727,7 +727,6 @@ dtStatus dtNavMeshQuery::findNearestPoly(const float* center, const float* halfE
 	return DT_SUCCESS;
 }
 
-void dtNavMeshQuery::queryPolygonsInTile(const dtMeshTile* tile, const float* qmin, const float* qmax,
 int dtNavMeshQuery::queryPolygonsInTile(const dtMeshTile* tile, const float* qmin, const float* qmax,
 										 const dtQueryFilter* filter, dtPolyQuery* query) const
 {
