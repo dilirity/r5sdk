@@ -553,6 +553,7 @@ public:
 	///  @param[in]		ref			The reference id to the polygon.
 	///  @param[in]		pos			The position to check. [(x, y, z)]
 	///  @param[out]	closest		The closest point. [(x, y, z)]
+	///  @param[out]	dist		The distance from @p pos to polygon.
 	/// @returns The status flags for the query.
 	dtStatus closestPointOnPolyBoundary(dtPolyRef ref, const float* pos, float* closest, float* dist = nullptr) const;
 	
