@@ -1275,7 +1275,7 @@ void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const float* pos, float* close
 		return;
 	}
 
-	// Outside poly that is not an offmesh connection.
+	// Outside poly that is not an off-mesh connection.
 	closestPointOnDetailEdges<true>(tile, poly, pos, closest, normal);
 }
 
