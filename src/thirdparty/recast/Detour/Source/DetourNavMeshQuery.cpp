@@ -728,6 +728,7 @@ dtStatus dtNavMeshQuery::findNearestPoly(const float* center, const float* halfE
 }
 
 void dtNavMeshQuery::queryPolygonsInTile(const dtMeshTile* tile, const float* qmin, const float* qmax,
+int dtNavMeshQuery::queryPolygonsInTile(const dtMeshTile* tile, const float* qmin, const float* qmax,
 										 const dtQueryFilter* filter, dtPolyQuery* query) const
 {
 	rdAssert(m_nav);
@@ -842,6 +843,8 @@ void dtNavMeshQuery::queryPolygonsInTile(const dtMeshTile* tile, const float* qm
 	// Process the last polygons that didn't make a full batch.
 	if (n > 0)
 		query->process(tile, polys, polyRefs, n);
+
+	return n;
 }
 
 class dtCollectPolysQuery : public dtPolyQuery

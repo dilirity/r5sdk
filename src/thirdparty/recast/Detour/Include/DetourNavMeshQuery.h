@@ -649,7 +649,7 @@ private:
 	dtNavMeshQuery& operator=(const dtNavMeshQuery&);
 	
 	/// Queries polygons within a tile.
-	void queryPolygonsInTile(const dtMeshTile* tile, const float* qmin, const float* qmax,
+	int queryPolygonsInTile(const dtMeshTile* tile, const float* qmin, const float* qmax,
 							 const dtQueryFilter* filter, dtPolyQuery* query) const;
 
 	/// Returns portal points between two polygons.
