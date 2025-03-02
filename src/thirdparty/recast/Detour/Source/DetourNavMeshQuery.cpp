@@ -506,7 +506,7 @@ dtStatus dtNavMeshQuery::findRandomPointAroundCircle(dtPolyRef startRef, const f
 ///
 /// See closestPointOnPolyBoundary() for a limited but faster option.
 ///
-dtStatus dtNavMeshQuery::closestPointOnPoly(dtPolyRef ref, const float* pos, float* closest, bool* posOverPoly, float* normal) const
+dtStatus dtNavMeshQuery::closestPointOnPoly(dtPolyRef ref, const float* pos, float* closest, bool* posOverPoly, float* dist, float* normal) const
 {
 	rdAssert(m_nav);
 	if (!m_nav->isValidPolyRef(ref) ||
@@ -516,7 +516,7 @@ dtStatus dtNavMeshQuery::closestPointOnPoly(dtPolyRef ref, const float* pos, flo
 		return DT_FAILURE | DT_INVALID_PARAM;
 	}
 
-	m_nav->closestPointOnPoly(ref, pos, closest, posOverPoly, normal);
+	m_nav->closestPointOnPoly(ref, pos, closest, posOverPoly, dist, normal);
 	return DT_SUCCESS;
 }
 

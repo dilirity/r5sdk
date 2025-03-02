@@ -1107,7 +1107,7 @@ private:
 	/// Returns whether position is over the poly and the height at the position if so.
 	bool getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const float* pos, float* height, float* normal = 0) const;
 	/// Returns closest point on polygon.
-	void closestPointOnPoly(dtPolyRef ref, const float* pos, float* closest, bool* posOverPoly, float* normal = 0) const;
+	void closestPointOnPoly(dtPolyRef ref, const float* pos, float* closest, bool* posOverPoly, float* dist = 0, float* normal = 0) const;
 
 	dtMeshTile** m_posLookup;			///< Tile hash lookup.
 	dtMeshTile* m_nextFree;				///< Freelist of tiles.
