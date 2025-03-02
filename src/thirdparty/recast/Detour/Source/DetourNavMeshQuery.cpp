@@ -2315,8 +2315,7 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 	if (!m_nav->isValidPolyRef(startRef) ||
 		!startPos || !rdVisfinite(startPos) ||
 		!endPos || !rdVisfinite(endPos) ||
-		!filter || !resultPos || !visitedPolys ||
-		maxVisitedSize <= 0)
+		!filter || !resultPos || maxVisitedSize <= 0)
 	{
 		return DT_FAILURE | DT_INVALID_PARAM;
 	}
@@ -2474,6 +2473,8 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const float* start
 	{
 		if (!(options & DT_MOVEALONGSURFACE_DONT_VISIT_POLYGONS))
 		{
+			rdAssert(visitedPolys);
+
 			// Reverse the path.
 			dtNode* prev = 0;
 			dtNode* node = bestNode;
