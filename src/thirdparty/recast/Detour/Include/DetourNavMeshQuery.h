@@ -560,8 +560,9 @@ public:
 	///  @param[in]		ref			The reference id of the polygon.
 	///  @param[in]		pos			A position within the xy-bounds of the polygon. [(x, y, z)]
 	///  @param[out]	height		The height at the surface of the polygon.
+	///  @param[out]	normal		The normal of the triangle the point resides in. [(x, y, z)]
 	/// @returns The status flags for the query.
-	dtStatus getPolyHeight(dtPolyRef ref, const float* pos, float* height) const;
+	dtStatus getPolyHeight(dtPolyRef ref, const float* pos, float* height, float* normal = nullptr) const;
 
 	/// @}
 	/// @name Miscellaneous Functions

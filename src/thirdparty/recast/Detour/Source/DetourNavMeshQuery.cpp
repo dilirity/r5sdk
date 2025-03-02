@@ -593,7 +593,7 @@ dtStatus dtNavMeshQuery::closestPointOnPolyBoundary(dtPolyRef ref, const float* 
 /// Will return #DT_FAILURE | #DT_INVALID_PARAM if the provided position is outside the xy-bounds 
 /// of the polygon.
 /// 
-dtStatus dtNavMeshQuery::getPolyHeight(dtPolyRef ref, const float* pos, float* height) const
+dtStatus dtNavMeshQuery::getPolyHeight(dtPolyRef ref, const float* pos, float* height, float* normal) const
 {
 	rdAssert(m_nav);
 
@@ -620,7 +620,7 @@ dtStatus dtNavMeshQuery::getPolyHeight(dtPolyRef ref, const float* pos, float* h
 		return DT_SUCCESS;
 	}
 
-	return m_nav->getPolyHeight(tile, poly, pos, height)
+	return m_nav->getPolyHeight(tile, poly, pos, height, normal)
 		? DT_SUCCESS
 		: DT_FAILURE | DT_INVALID_PARAM;
 }
