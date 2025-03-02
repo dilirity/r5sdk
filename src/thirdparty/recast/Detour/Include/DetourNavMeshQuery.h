@@ -545,7 +545,7 @@ public:
 	///  @param[out]	closest		The closest point on the polygon. [(x, y, z)]
 	///  @param[out]	posOverPoly	True of the position is over the polygon.
 	///  @param[out]	normal		The normal of the triangle the point resides in. [(x, y, z)]
-	///  @param[out]	dist		The distance from @p pos to polygon.
+	///  @param[out]	dist		The distance from @p pos to the nearest polygon edge.
 	/// @returns The status flags for the query.
 	dtStatus closestPointOnPoly(dtPolyRef ref, const float* pos, float* closest, bool* posOverPoly, float* dist = nullptr, float* normal = nullptr) const;
 	
@@ -554,7 +554,7 @@ public:
 	///  @param[in]		ref			The reference id to the polygon.
 	///  @param[in]		pos			The position to check. [(x, y, z)]
 	///  @param[out]	closest		The closest point. [(x, y, z)]
-	///  @param[out]	dist		The distance from @p pos to polygon.
+	///  @param[out]	dist		The distance from @p pos to the nearest polygon edge.
 	/// @returns The status flags for the query.
 	dtStatus closestPointOnPolyBoundary(dtPolyRef ref, const float* pos, float* closest, float* dist = nullptr) const;
 	
