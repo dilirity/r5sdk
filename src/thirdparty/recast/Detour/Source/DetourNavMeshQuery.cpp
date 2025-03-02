@@ -795,8 +795,8 @@ dtStatus dtNavMeshQuery::findNearestPoly(const float* center, const float* halfE
 
 	// queryPolygons below will check rest of params
 	dtFindNearestPolyQuery query(this, center);
+	const dtStatus status = queryPolygonsInArea(center, halfExtents, filter, &query);
 
-	dtStatus status = queryPolygons(center, halfExtents, filter, &query);
 	if (dtStatusFailed(status))
 		return status;
 
@@ -824,8 +824,8 @@ dtStatus dtNavMeshQuery::findNearestPolyInBounds(const float* center, const floa
 
 	// queryPolygons below will check rest of params
 	dtFindNearestPolyInBoundsQuery query(this, center, halfExtents);
+	const dtStatus status = queryPolygonsInArea(center, halfExtents, filter, &query);
 
-	dtStatus status = queryPolygons(center, halfExtents, filter, &query);
 	if (dtStatusFailed(status))
 		return status;
 
@@ -1012,8 +1012,8 @@ dtStatus dtNavMeshQuery::queryPolygons(const float* center, const float* halfExt
 		return DT_FAILURE | DT_INVALID_PARAM;
 
 	dtCollectPolysQuery collector(polys, maxPolys);
+	const dtStatus status = queryPolygonsInArea(center, halfExtents, filter, &collector);
 
-	dtStatus status = queryPolygons(center, halfExtents, filter, &collector);
 	if (dtStatusFailed(status))
 		return status;
 
@@ -1023,13 +1023,33 @@ dtStatus dtNavMeshQuery::queryPolygons(const float* center, const float* halfExt
 
 /// @par 
 ///
+/// Selects the best algorithm for the query box,
+/// see #queryPolygonsSmallArea
+/// and #queryPolygonsLargeArea
+///
+dtStatus dtNavMeshQuery::queryPolygonsInArea(const float* center, const float* halfExtents,
+											 const dtQueryFilter* filter, dtPolyQuery* query) const
+{
+	rdAssert(m_nav);
+	dtStatus status;
+
+	if (rdVlenSqr2D(halfExtents) > rdSqr(m_nav->getParams()->tileWidth))
+		status = queryPolygonsLargeArea(center, halfExtents, filter, query);
+	else
+		status = queryPolygonsSmallArea(center, halfExtents, filter, query);
+
+	return status;
+}
+
+/// @par 
+///
 /// The query will be invoked with batches of polygons. Polygons passed
 /// to the query have bounding boxes that overlap with the center and halfExtents
 /// passed to this function. The dtPolyQuery::process function is invoked multiple
 /// times until all overlapping polygons have been processed.
 ///
-dtStatus dtNavMeshQuery::queryPolygons(const float* center, const float* halfExtents,
-									   const dtQueryFilter* filter, dtPolyQuery* query) const
+dtStatus dtNavMeshQuery::queryPolygonsSmallArea(const float* center, const float* halfExtents,
+												const dtQueryFilter* filter, dtPolyQuery* query) const
 {
 	rdAssert(m_nav);
 
@@ -1069,6 +1089,102 @@ dtStatus dtNavMeshQuery::queryPolygons(const float* center, const float* halfExt
 		}
 	}
 	
+	return DT_SUCCESS;
+}
+
+/// @par 
+///
+/// The same as #queryPolygonsSmallArea, but more optimized for @p halfExtents
+/// who's squared length extends beyond the squared tile size. The algorithm
+/// takes the current start point and spirals outwards. Only use this method
+/// over #queryPolygonsSmallArea when the above condition is met, as this is
+/// otherwise less efficient and could yield less accurate results too.
+///
+dtStatus dtNavMeshQuery::queryPolygonsLargeArea(const float* center, const float* halfExtents,
+												const dtQueryFilter* filter, dtPolyQuery* query) const
+{
+	rdAssert(m_nav);
+
+	if (!center || !rdVisfinite(center) ||
+		!halfExtents || !rdVisfinite(halfExtents) ||
+		!filter || !query)
+	{
+		return DT_FAILURE | DT_INVALID_PARAM;
+	}
+
+	float bmin[3], bmax[3];
+	rdVsub(bmin, center, halfExtents);
+	rdVadd(bmax, center, halfExtents);
+
+	// Find tiles the query touches.
+	int minx, miny, maxx, maxy;
+	m_nav->calcTileLoc(bmin, &minx, &miny);
+	m_nav->calcTileLoc(bmax, &maxx, &maxy);
+
+	if (minx > maxx)
+		rdSwap(minx, maxx);
+
+	const int centerX = (minx+maxx) / 2;
+	minx -= centerX;
+
+	// Check if the queried area is entirely to the right of the center
+	// tile. This strategy assumes symmetry around the center, so drop
+	// degenerate ranges here..
+	if (minx > 0)
+		return DT_SUCCESS;
+
+	maxx -= centerX;
+
+	if (miny > maxy)
+		rdSwap(miny, maxy);
+
+	const int centerY = (miny+maxy) / 2;
+	miny -= centerY;
+	maxy -= centerY;
+
+	int tx = 0, ty = 0, dir = 0;
+	int layer = 1, startLayer = INT_MAX;
+
+	static const int MAX_NEIS = 32;
+	const dtMeshTile* neis[MAX_NEIS];
+
+	// Spiral clockwise from the center tile outwards.
+	while (tx <= maxx && miny <= ty && ty <= maxy)
+	{
+		const int nneis = m_nav->getTilesAt(tx+centerX, ty+centerY, neis, MAX_NEIS);
+
+		for (int j = 0; j < nneis; ++j)
+		{
+			const int collected = queryPolygonsInTile(neis[j], bmin, bmax, filter, query);
+
+			if (collected > 0 && startLayer == INT_MAX)
+				startLayer = layer; // The layer from which we start.
+		}
+
+		// Advance through the current spiral layer.
+		if (dir == 0)
+			dir = ++tx == layer;
+		else if (dir == 1)
+		{
+			if (++ty == layer)
+				dir = 2;
+		}
+		else if (dir == 2)
+		{
+			if (-(--tx) == layer)
+				dir = 3;
+		}
+		else if (-(--ty) == layer)
+		{
+			// Expand the spiral layer outwards.
+			dir = 0;
+			layer++;
+		}
+
+		if (layer > startLayer && dir == 1 || minx > tx)
+			break;
+	}
+
 	return DT_SUCCESS;
 }
 

@@ -429,13 +429,29 @@ public:
 						   const dtQueryFilter* filter,
 						   dtPolyRef* polys, int* polyCount, const int maxPolys) const;
 
-	/// Finds polygons that overlap the search box.
+	/// Finds polygons that overlap the search box. (Auto-selects the best algorithm for @p halfExtents.)
 	///  @param[in]		center		The center of the search box. [(x, y, z)]
 	///  @param[in]		halfExtents		The search distance along each axis. [(x, y, z)]
 	///  @param[in]		filter		The polygon filter to apply to the query.
 	///  @param[in]		query		The query. Polygons found will be batched together and passed to this query.
-	dtStatus queryPolygons(const float* center, const float* halfExtents,
-						   const dtQueryFilter* filter, dtPolyQuery* query) const;
+	dtStatus queryPolygonsInArea(const float* center, const float* halfExtents,
+								 const dtQueryFilter* filter, dtPolyQuery* query) const;
+
+	/// Finds polygons that overlap the search box. (Works best when: ||@p halfExtents||^2 < #dtNavMeshParams::tileWidth^2.)
+	///  @param[in]		center		The center of the search box. [(x, y, z)]
+	///  @param[in]		halfExtents		The search distance along each axis. [(x, y, z)]
+	///  @param[in]		filter		The polygon filter to apply to the query.
+	///  @param[in]		query		The query. Polygons found will be batched together and passed to this query.
+	dtStatus queryPolygonsSmallArea(const float* center, const float* halfExtents,
+									const dtQueryFilter* filter, dtPolyQuery* query) const;
+
+	/// Finds polygons that overlap the search box. (Works best when: ||@p halfExtents||^2 >= #dtNavMeshParams::tileWidth^2.)
+	///  @param[in]		center		The center of the search box. [(x, y, z)]
+	///  @param[in]		halfExtents		The search distance along each axis. [(x, y, z)]
+	///  @param[in]		filter		The polygon filter to apply to the query.
+	///  @param[in]		query		The query. Polygons found will be batched together and passed to this query.
+	dtStatus queryPolygonsLargeArea(const float* center, const float* halfExtents,
+									const dtQueryFilter* filter, dtPolyQuery* query) const;
 
 	/// Finds the non-overlapping navigation polygons in the local neighbourhood around the center position.
 	///  @param[in]		startRef		The reference id of the polygon where the search starts.
