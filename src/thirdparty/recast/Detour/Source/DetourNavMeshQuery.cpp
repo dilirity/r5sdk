@@ -590,9 +590,8 @@ dtStatus dtNavMeshQuery::closestPointOnPolyBoundary(dtPolyRef ref, const float* 
 
 /// @par
 ///
-/// Will return #DT_FAILURE | DT_INVALID_PARAM if the provided position is outside the xy-bounds 
-/// of the polygon.
 /// Will return #DT_FAILURE | #DT_INVALID_PARAM if the provided position is outside the xy-bounds 
+/// of the polygon.
 /// 
 dtStatus dtNavMeshQuery::getPolyHeight(dtPolyRef ref, const float* pos, float* height) const
 {
@@ -606,7 +605,7 @@ dtStatus dtNavMeshQuery::getPolyHeight(dtPolyRef ref, const float* pos, float* h
 	if (!pos || !rdVisfinite2D(pos))
 		return DT_FAILURE | DT_INVALID_PARAM;
 
-	// We used to return success for offmesh connections, but the
+	// We used to return success for off-mesh connections, but the
 	// getPolyHeight in DetourNavMesh does not do this, so special
 	// case it here.
 	if (poly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
