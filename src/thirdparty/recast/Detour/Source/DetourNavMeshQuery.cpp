@@ -682,6 +682,93 @@ public:
 	}
 };
 
+class dtFindNearestPolyInBoundsQuery : public dtPolyQuery
+{
+	const dtNavMeshQuery* m_query;
+	const float* m_center;
+	const float* m_halfExtents;
+	float m_nearestDistanceSqr;
+	dtPolyRef m_nearestRef;
+	float m_nearestPoint[3];
+	bool m_overPoly;
+
+public:
+	dtFindNearestPolyInBoundsQuery(const dtNavMeshQuery* query, const float* center, const float* halfExtents)
+		: m_query(query), m_center(center), m_halfExtents(halfExtents), m_nearestDistanceSqr(FLT_MAX), m_nearestRef(0), m_nearestPoint(), m_overPoly(false)
+	{
+	}
+
+	dtPolyRef nearestRef() const { return m_nearestRef; }
+	const float* nearestPoint() const { return m_nearestPoint; }
+	bool isOverPoly() const { return m_overPoly; }
+
+	void process(const dtMeshTile* tile, dtPoly** polys, dtPolyRef* refs, int count)
+	{
+		rdIgnoreUnused(polys);
+		bool foundInsidePoly = false;
+
+		for (int i = 0; i < count; ++i)
+		{
+			dtPolyRef ref = refs[i];
+			float closestPtPoly[3];
+			float diff[3];
+			bool posOverPoly = false;
+			float d;
+
+			m_query->closestPointOnPoly(ref, m_center, closestPtPoly, &posOverPoly);
+			rdVsub(diff, m_center, closestPtPoly);
+
+			// Make sure the point resides within our query box.
+			// Reject it otherwise.
+			bool withinExtents = true;
+			for (int j = 0; j < 3; ++j)
+			{
+				if (rdMathFabsf(diff[j]) > m_halfExtents[j])
+				{
+					withinExtents = false;
+					break;
+				}
+			}
+
+			if (!withinExtents)
+				continue;
+
+			// If a point is directly over a polygon and closer than
+			// climb height, favor that instead of straight line nearest point.
+			if (posOverPoly)
+			{
+				d = rdAbs(diff[2]) - tile->header->walkableClimb;
+				d = d > 0 ? d * d : 0;
+
+				if (!foundInsidePoly)
+				{
+					// Update the nearest to this polygon.
+					m_nearestDistanceSqr = FLT_MAX;
+					foundInsidePoly = true;
+				}
+			}
+			else if (!foundInsidePoly)
+			{
+				d = rdVlenSqr(diff);
+			}
+			else
+			{
+				// We already have a better candidate, reject this one.
+				continue;
+			}
+
+			if (d < m_nearestDistanceSqr)
+			{
+				rdVcopy(m_nearestPoint, closestPtPoly);
+
+				m_nearestDistanceSqr = d;
+				m_nearestRef = ref;
+				m_overPoly = posOverPoly;
+			}
+		}
+	}
+};
+
 /// @par 
 ///
 /// @note If the search box does not intersect any polygons the search will 
@@ -707,10 +794,38 @@ dtStatus dtNavMeshQuery::findNearestPoly(const float* center, const float* halfE
 		return DT_FAILURE | DT_INVALID_PARAM;
 
 	// queryPolygons below will check rest of params
-	
 	dtFindNearestPolyQuery query(this, center);
-	dtStatus status = queryPolygons(center, halfExtents, filter, &query);
 
+	dtStatus status = queryPolygons(center, halfExtents, filter, &query);
+	if (dtStatusFailed(status))
+		return status;
+
+	*nearestRef = query.nearestRef();
+	// Only override nearestPt if we actually found a poly so the nearest point
+	// is valid.
+	if (nearestPt && *nearestRef)
+	{
+		rdVcopy(nearestPt, query.nearestPoint());
+		if (isOverPoly)
+			*isOverPoly = query.isOverPoly();
+	}
+	
+	return DT_SUCCESS;
+}
+
+dtStatus dtNavMeshQuery::findNearestPolyInBounds(const float* center, const float* halfExtents,
+												 const dtQueryFilter* filter, dtPolyRef* nearestRef,
+												 float* nearestPt, bool* isOverPoly) const
+{
+	rdAssert(m_nav);
+
+	if (!nearestRef)
+		return DT_FAILURE | DT_INVALID_PARAM;
+
+	// queryPolygons below will check rest of params
+	dtFindNearestPolyInBoundsQuery query(this, center, halfExtents);
+
+	dtStatus status = queryPolygons(center, halfExtents, filter, &query);
 	if (dtStatusFailed(status))
 		return status;
 
