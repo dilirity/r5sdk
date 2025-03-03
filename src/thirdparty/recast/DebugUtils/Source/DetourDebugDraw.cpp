@@ -140,8 +140,6 @@ static void drawPolyBoundaries(duDebugDraw* dd, const dtMeshTile* tile,
 	const dtMeshHeader* header = tile->header;
 	const float walkableRadius = header->walkableRadius;
 
-	static const float thr = 0.01f*0.01f;
-
 	for (int i = 0; i < header->polyCount; ++i)
 	{
 		const dtPoly* p = &tile->polys[i];
@@ -221,8 +219,8 @@ static void drawPolyBoundaries(duDebugDraw* dd, const dtMeshTile* tile,
 					if ((dtGetDetailTriEdgeFlags(t[3], n) & RD_DETAIL_EDGE_BOUNDARY) == 0)
 						continue;
 
-					if (rdDistancePtLine2D(tv[n],v0,v1) < thr &&
-						rdDistancePtLine2D(tv[m],v0,v1) < thr)
+					if (rdDistancePtLine2D(tv[n],v0,v1) < DT_DETAIL_EDGE_ALIGN_THRESHOLD &&
+						rdDistancePtLine2D(tv[m],v0,v1) < DT_DETAIL_EDGE_ALIGN_THRESHOLD)
 					{
 						dd->vertex(tv[n], c);
 						dd->vertex(tv[m], c);

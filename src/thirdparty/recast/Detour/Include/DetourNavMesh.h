@@ -382,6 +382,9 @@ inline int dtGetDetailTriEdgeFlags(unsigned char triFlags, int edgeIndex)
 	return (triFlags >> (edgeIndex * 2)) & 0x3;
 }
 
+/// If a point is this close to a detail triangle edge, its considered to be on it.
+static const float DT_DETAIL_EDGE_ALIGN_THRESHOLD = 0.01f*0.01f;
+
 /// Defines a link between polygons.
 /// @note This structure is rarely if ever used by the end user.
 /// @see dtMeshTile

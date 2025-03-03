@@ -382,7 +382,6 @@ void CAI_Utility::DrawNavMeshPolyBoundaries(const dtNavMesh* pMesh,
     const bool bDrawDetail,
     const bool bDepthBuffer) const
 {
-    static const float thr = 0.01f * 0.01f;
     Color col{ 20, 140, 255, 255 };
 
     if (!pMesh)
@@ -482,8 +481,8 @@ void CAI_Utility::DrawNavMeshPolyBoundaries(const dtNavMesh* pMesh,
                             if ((dtGetDetailTriEdgeFlags(t[3], n) & RD_DETAIL_EDGE_BOUNDARY) == 0)
                                 continue;
 
-                            if (rdDistancePtLine2D(tv[n], v0, v1) > thr ||
-                                rdDistancePtLine2D(tv[m], v0, v1) > thr)
+                            if (rdDistancePtLine2D(tv[n], v0, v1) > DT_DETAIL_EDGE_ALIGN_THRESHOLD ||
+                                rdDistancePtLine2D(tv[m], v0, v1) > DT_DETAIL_EDGE_ALIGN_THRESHOLD)
                                 continue;
                         }
 
