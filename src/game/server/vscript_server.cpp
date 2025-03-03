@@ -1,11 +1,16 @@
 //=============================================================================//
-//
+// 
 // Purpose: Expose native code to VScript API
 // 
 //-----------------------------------------------------------------------------
 // 
-// See 'game/shared/vscript_shared.cpp' for more details.
-//
+// Read the documentation in 'game/shared/vscript_shared.cpp' before modifying
+// existing code or adding new code!
+// 
+// To create server script bindings:
+// - use the DEFINE_SERVER_SCRIPTFUNC_NAMED() macro.
+// - prefix your function with "ServerScript_" i.e.: "ServerScript_GetVersion".
+// 
 //=============================================================================//
 
 #include "core/stdafx.h"
@@ -37,239 +42,218 @@ static void SQVM_ServerScript_f(const CCommand& args)
 }
 static ConCommand script("script", SQVM_ServerScript_f, "Run input code as SERVER script on the VM", FCVAR_DEVELOPMENTONLY | FCVAR_GAMEDLL | FCVAR_CHEAT | FCVAR_SERVER_FRAME_THREAD);
 
-namespace VScriptCode
+//-----------------------------------------------------------------------------
+// Purpose: sets whether the server could auto reload at this time (e.g. if
+// server admin has host_autoReloadRate AND host_autoReloadRespectGameState
+// set, and its time to auto reload, but the match hasn't finished yet, wait
+// until this is set to proceed the reload of the server
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_SetAutoReloadState(HSQUIRRELVM v)
 {
-    namespace Server
+    SQBool state = false;
+    sq_getbool(v, 2, &state);
+
+    g_hostReloadState = state;
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: kicks a player by given name
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_KickPlayerByName(HSQUIRRELVM v)
+{
+    const SQChar* playerName = nullptr;
+    const SQChar* reason = nullptr;
+
+    sq_getstring(v, 2, &playerName);
+    sq_getstring(v, 3, &reason);
+
+    if (!VALID_CHARSTAR(playerName))
     {
-        //-----------------------------------------------------------------------------
-        // Purpose: sets whether the server could auto reload at this time (e.g. if
-        // server admin has host_autoReloadRate AND host_autoReloadRespectGameState
-        // set, and its time to auto reload, but the match hasn't finished yet, wait
-        // until this is set to proceed the reload of the server
-        //-----------------------------------------------------------------------------
-        SQRESULT SetAutoReloadState(HSQUIRRELVM v)
-        {
-            SQBool state = false;
-            sq_getbool(v, 2, &state);
-
-            g_hostReloadState = state;
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: kicks a player by given name
-        //-----------------------------------------------------------------------------
-        SQRESULT KickPlayerByName(HSQUIRRELVM v)
-        {
-            const SQChar* playerName = nullptr;
-            const SQChar* reason = nullptr;
-
-            sq_getstring(v, 2, &playerName);
-            sq_getstring(v, 3, &reason);
-
-            if (!VALID_CHARSTAR(playerName))
-            {
-                v_SQVM_ScriptError("Empty or null player name");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            // Discard empty strings, this will use the default message instead.
-            if (!VALID_CHARSTAR(reason))
-                reason = nullptr;
-
-            g_BanSystem.KickPlayerByName(playerName, reason);
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: kicks a player by given handle or id
-        //-----------------------------------------------------------------------------
-        SQRESULT KickPlayerById(HSQUIRRELVM v)
-        {
-            const SQChar* playerHandle = nullptr;
-            const SQChar* reason = nullptr;
-
-            sq_getstring(v, 2, &playerHandle);
-            sq_getstring(v, 3, &reason);
-
-            if (!VALID_CHARSTAR(playerHandle))
-            {
-                v_SQVM_ScriptError("Empty or null player handle");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            // Discard empty strings, this will use the default message instead.
-            if (!VALID_CHARSTAR(reason))
-                reason = nullptr;
-
-            g_BanSystem.KickPlayerById(playerHandle, reason);
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: bans a player by given name
-        //-----------------------------------------------------------------------------
-        SQRESULT BanPlayerByName(HSQUIRRELVM v)
-        {
-            const SQChar* playerName = nullptr;
-            const SQChar* reason = nullptr;
-
-            sq_getstring(v, 2, &playerName);
-            sq_getstring(v, 3, &reason);
-
-            if (!VALID_CHARSTAR(playerName))
-            {
-                v_SQVM_ScriptError("Empty or null player name");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            // Discard empty strings, this will use the default message instead.
-            if (!VALID_CHARSTAR(reason))
-                reason = nullptr;
-
-            g_BanSystem.BanPlayerByName(playerName, reason);
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: bans a player by given handle or id
-        //-----------------------------------------------------------------------------
-        SQRESULT BanPlayerById(HSQUIRRELVM v)
-        {
-            const SQChar* playerHandle = nullptr;
-            const SQChar* reason = nullptr;
-
-            sq_getstring(v, 2, &playerHandle);
-            sq_getstring(v, 3, &reason);
-
-            if (!VALID_CHARSTAR(playerHandle))
-            {
-                v_SQVM_ScriptError("Empty or null player handle");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            // Discard empty strings, this will use the default message instead.
-            if (!VALID_CHARSTAR(reason))
-                reason = nullptr;
-
-            g_BanSystem.BanPlayerById(playerHandle, reason);
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: unbans a player by given nucleus id or ip address
-        //-----------------------------------------------------------------------------
-        SQRESULT UnbanPlayer(HSQUIRRELVM v)
-        {
-            const SQChar* szCriteria = nullptr;
-            sq_getstring(v, 2, &szCriteria);
-
-            if (!VALID_CHARSTAR(szCriteria))
-            {
-                v_SQVM_ScriptError("Empty or null player criteria");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            g_BanSystem.UnbanPlayer(szCriteria);
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: gets the number of real players on this server
-        //-----------------------------------------------------------------------------
-        SQRESULT GetNumHumanPlayers(HSQUIRRELVM v)
-        {
-            sq_pushinteger(v, g_pServer->GetNumHumanPlayers());
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: gets the number of fake players on this server
-        //-----------------------------------------------------------------------------
-        SQRESULT GetNumFakeClients(HSQUIRRELVM v)
-        {
-            sq_pushinteger(v, g_pServer->GetNumFakeClients());
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: gets the current server id
-        //-----------------------------------------------------------------------------
-        SQRESULT GetServerID(HSQUIRRELVM v)
-        {
-            sq_pushstring(v, g_LogSessionUUID.c_str(), (SQInteger)g_LogSessionUUID.length());
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: checks whether the server is active
-        //-----------------------------------------------------------------------------
-        SQRESULT IsServerActive(HSQUIRRELVM v)
-        {
-            bool isActive = g_pServer->IsActive();
-            sq_pushbool(v, isActive);
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
+        v_SQVM_ScriptError("Empty or null player name");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
     }
 
-    namespace PlayerEntity
+    // Discard empty strings, this will use the default message instead.
+    if (!VALID_CHARSTAR(reason))
+        reason = nullptr;
+
+    g_BanSystem.KickPlayerByName(playerName, reason);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: kicks a player by given handle or id
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_KickPlayerById(HSQUIRRELVM v)
+{
+    const SQChar* playerHandle = nullptr;
+    const SQChar* reason = nullptr;
+
+    sq_getstring(v, 2, &playerHandle);
+    sq_getstring(v, 3, &reason);
+
+    if (!VALID_CHARSTAR(playerHandle))
     {
-        //-----------------------------------------------------------------------------
-        // Purpose: sets a class var on the server and each client
-        //-----------------------------------------------------------------------------
-        SQRESULT ScriptSetClassVar(HSQUIRRELVM v)
-        {
-            CPlayer* player = nullptr;
-
-            if (!v_sq_getentity(v, (SQEntity*)&player))
-                return SQ_ERROR;
-
-            const SQChar* key = nullptr;
-            sq_getstring(v, 2, &key);
-
-            if (!VALID_CHARSTAR(key))
-            {
-                v_SQVM_ScriptError("Empty or null class key");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            const SQChar* val = nullptr;
-            sq_getstring(v, 3, &val);
-
-            if (!VALID_CHARSTAR(val))
-            {
-                v_SQVM_ScriptError("Empty or null class value");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            CClient* const client = g_pServer->GetClient(player->GetEdict() - 1);
-            SVC_SetClassVar msg(key, val);
-
-            const bool success = client->SendNetMsgEx(&msg, false, true, false);
-
-            if (success)
-            {
-                const char* pArgs[3] = {
-                    "_setClassVarServer",
-                    key,
-                    val
-                };
-
-                const CCommand cmd((int)V_ARRAYSIZE(pArgs), pArgs, cmd_source_t::kCommandSrcCode);
-                const int oldIdx = *g_nCommandClientIndex;
-
-                *g_nCommandClientIndex = client->GetUserID();
-                v__setClassVarServer_f(cmd);
-
-                *g_nCommandClientIndex = oldIdx;
-            }
-
-            sq_pushbool(v, success);
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
+        v_SQVM_ScriptError("Empty or null player handle");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
     }
+
+    // Discard empty strings, this will use the default message instead.
+    if (!VALID_CHARSTAR(reason))
+        reason = nullptr;
+
+    g_BanSystem.KickPlayerById(playerHandle, reason);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: bans a player by given name
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_BanPlayerByName(HSQUIRRELVM v)
+{
+    const SQChar* playerName = nullptr;
+    const SQChar* reason = nullptr;
+
+    sq_getstring(v, 2, &playerName);
+    sq_getstring(v, 3, &reason);
+
+    if (!VALID_CHARSTAR(playerName))
+    {
+        v_SQVM_ScriptError("Empty or null player name");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    // Discard empty strings, this will use the default message instead.
+    if (!VALID_CHARSTAR(reason))
+        reason = nullptr;
+
+    g_BanSystem.BanPlayerByName(playerName, reason);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: bans a player by given handle or id
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_BanPlayerById(HSQUIRRELVM v)
+{
+    const SQChar* playerHandle = nullptr;
+    const SQChar* reason = nullptr;
+
+    sq_getstring(v, 2, &playerHandle);
+    sq_getstring(v, 3, &reason);
+
+    if (!VALID_CHARSTAR(playerHandle))
+    {
+        v_SQVM_ScriptError("Empty or null player handle");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    // Discard empty strings, this will use the default message instead.
+    if (!VALID_CHARSTAR(reason))
+        reason = nullptr;
+
+    g_BanSystem.BanPlayerById(playerHandle, reason);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: unbans a player by given nucleus id or ip address
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_UnbanPlayer(HSQUIRRELVM v)
+{
+    const SQChar* szCriteria = nullptr;
+    sq_getstring(v, 2, &szCriteria);
+
+    if (!VALID_CHARSTAR(szCriteria))
+    {
+        v_SQVM_ScriptError("Empty or null player criteria");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    g_BanSystem.UnbanPlayer(szCriteria);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the number of real players on this server
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_GetNumHumanPlayers(HSQUIRRELVM v)
+{
+    sq_pushinteger(v, g_pServer->GetNumHumanPlayers());
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the number of fake players on this server
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_GetNumFakeClients(HSQUIRRELVM v)
+{
+    sq_pushinteger(v, g_pServer->GetNumFakeClients());
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the current server id
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_GetServerID(HSQUIRRELVM v)
+{
+    sq_pushstring(v, g_LogSessionUUID.c_str(), (SQInteger)g_LogSessionUUID.length());
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: sets a class var on the server and each client
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_ScriptSetClassVar(HSQUIRRELVM v)
+{
+    CPlayer* player = nullptr;
+
+    if (!v_sq_getentity(v, (SQEntity*)&player))
+        return SQ_ERROR;
+
+    const SQChar* key = nullptr;
+    sq_getstring(v, 2, &key);
+
+    if (!VALID_CHARSTAR(key))
+    {
+        v_SQVM_ScriptError("Empty or null class key");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const SQChar* val = nullptr;
+    sq_getstring(v, 3, &val);
+
+    if (!VALID_CHARSTAR(val))
+    {
+        v_SQVM_ScriptError("Empty or null class value");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    CClient* const client = g_pServer->GetClient(player->GetEdict() - 1);
+    SVC_SetClassVar msg(key, val);
+
+    const bool success = client->SendNetMsgEx(&msg, false, true, false);
+
+    if (success)
+    {
+        const char* pArgs[3] = {
+            "_setClassVarServer",
+            key,
+            val
+        };
+
+        const CCommand cmd((int)V_ARRAYSIZE(pArgs), pArgs, cmd_source_t::kCommandSrcCode);
+        const int oldIdx = *g_nCommandClientIndex;
+
+        *g_nCommandClientIndex = client->GetUserID();
+        v__setClassVarServer_f(cmd);
+
+        *g_nCommandClientIndex = oldIdx;
+    }
+
+    sq_pushbool(v, success);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //---------------------------------------------------------------------------------
@@ -347,7 +331,7 @@ static void Script_RegisterServerPlayerClassFuncs()
         "Change a variable in the player's class settings",
         "bool",
         "string key, string value",
-        VScriptCode::PlayerEntity::ScriptSetClassVar);
+        ServerScript_ScriptSetClassVar);
 }
 //---------------------------------------------------------------------------------
 static void Script_RegisterServerAIClassFuncs()

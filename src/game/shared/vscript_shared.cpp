@@ -4,11 +4,24 @@
 // 
 //-----------------------------------------------------------------------------
 // 
-// Create functions here under the target VM namespace. If the function has to
-// be registered for 2 or more VM's, put them under the 'SHARED' namespace. 
-// Ifdef them out for 'SERVER_DLL' / 'CLIENT_DLL' if the target VM's do not 
-// include 'SERVER' / 'CLIENT'.
-//
+// The scripting API is designed using a Foreign Function Interface (FFI) pattern,
+// allowing you to define functions in code and abstract them for use in target VM.
+// 
+// This allows computationally heavy tasks to be offloaded to native code while the
+// scripts handle the less demanding operations. This also allows for interfacing
+// script code directly with the engine and SDK code with minimal runtime overhead.
+// 
+// There are some rules for creating these abstractions:
+// - all bindings must return using SCRIPT_CHECK_AND_RETURN().
+// - all bindings must be declared as a static function.
+// - all bindings take a single parameter, using the type HSQUIRRELVM.
+// - all bindings must have the type SQRESULT as return value.
+// - registration is done using DEFINE_<context>_SCRIPTFUNC_NAMED().
+// 
+// To create shared script bindings:
+// - use the DEFINE_SHARED_SCRIPTFUNC_NAMED() macro.
+// - prefix your function with "SharedScript_" i.e. "SharedScript_GetVersion".
+// 
 //=============================================================================//
 
 #include "core/stdafx.h"
@@ -18,72 +31,66 @@
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 #include "vscript_shared.h"
 
-namespace VScriptCode
+//-----------------------------------------------------------------------------
+// Purpose: expose SDK version to the VScript API
+//-----------------------------------------------------------------------------
+static SQRESULT SharedScript_GetSDKVersion(HSQUIRRELVM v)
 {
-    namespace Shared
+    sq_pushstring(v, SDK_VERSION, sizeof(SDK_VERSION) - 1);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: return all available maps
+//-----------------------------------------------------------------------------
+static SQRESULT SharedScript_GetAvailableMaps(HSQUIRRELVM v)
+{
+    AUTO_LOCK(g_InstalledMapsMutex);
+
+    if (g_InstalledMaps.IsEmpty())
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+    sq_newarray(v, 0);
+
+    FOR_EACH_VEC(g_InstalledMaps, i)
     {
-        //-----------------------------------------------------------------------------
-        // Purpose: expose SDK version to the VScript API
-        //-----------------------------------------------------------------------------
-        SQRESULT GetSDKVersion(HSQUIRRELVM v)
-        {
-            sq_pushstring(v, SDK_VERSION, sizeof(SDK_VERSION)-1);
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
+        const CUtlString& mapName = g_InstalledMaps[i];
 
-        //-----------------------------------------------------------------------------
-        // Purpose: return all available maps
-        //-----------------------------------------------------------------------------
-        SQRESULT GetAvailableMaps(HSQUIRRELVM v)
-        {
-            AUTO_LOCK(g_InstalledMapsMutex);
-
-            if (g_InstalledMaps.IsEmpty())
-                SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-
-            sq_newarray(v, 0);
-
-            FOR_EACH_VEC(g_InstalledMaps, i)
-            {
-                const CUtlString& mapName = g_InstalledMaps[i];
-
-                sq_pushstring(v, mapName.String(), (SQInteger)mapName.Length());
-                sq_arrayappend(v, -2);
-            }
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: return all available playlists
-        //-----------------------------------------------------------------------------
-        SQRESULT GetAvailablePlaylists(HSQUIRRELVM v)
-        {
-            if (g_vecAllPlaylists.IsEmpty())
-                SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-
-            sq_newarray(v, 0);
-            for (const CUtlString& it : g_vecAllPlaylists)
-            {
-                sq_pushstring(v, it.String(), (SQInteger)it.Length());
-                sq_arrayappend(v, -2);
-            }
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        SQRESULT ScriptError(HSQUIRRELVM v)
-        {
-            SQChar* pString = NULL;
-            SQInteger a4 = 0;
-
-            if (SQVM_sprintf(v, 0, 1, &a4, &pString) < 0)
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-
-            v_SQVM_ScriptError("%s", pString);
-            SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-        }
+        sq_pushstring(v, mapName.String(), (SQInteger)mapName.Length());
+        sq_arrayappend(v, -2);
     }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: return all available playlists
+//-----------------------------------------------------------------------------
+static SQRESULT SharedScript_GetAvailablePlaylists(HSQUIRRELVM v)
+{
+    if (g_vecAllPlaylists.IsEmpty())
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+    sq_newarray(v, 0);
+    for (const CUtlString& it : g_vecAllPlaylists)
+    {
+        sq_pushstring(v, it.String(), (SQInteger)it.Length());
+        sq_arrayappend(v, -2);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static SQRESULT SharedScript_ScriptError(HSQUIRRELVM v)
+{
+    SQChar* pString = NULL;
+    SQInteger a4 = 0;
+
+    if (SQVM_sprintf(v, 0, 1, &a4, &pString) < 0)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    v_SQVM_ScriptError("%s", pString);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 }
 
 //---------------------------------------------------------------------------------
@@ -114,7 +121,7 @@ void Script_RegisterListenServerConstants(CSquirrelVM* s)
 // Purpose: server enums
 // Input  : *s - 
 //---------------------------------------------------------------------------------
-void Script_RegisterCommonEnums_Server(CSquirrelVM* const s)
+static void Script_RegisterCommonEnums_Server(CSquirrelVM* const s)
 {
     v_Script_RegisterCommonEnums_Server(s);
 
@@ -126,7 +133,7 @@ void Script_RegisterCommonEnums_Server(CSquirrelVM* const s)
 // Purpose: client/ui enums
 // Input  : *s - 
 //---------------------------------------------------------------------------------
-void Script_RegisterCommonEnums_Client(CSquirrelVM* const s)
+static void Script_RegisterCommonEnums_Client(CSquirrelVM* const s)
 {
     v_Script_RegisterCommonEnums_Client(s);
 

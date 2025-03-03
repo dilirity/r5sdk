@@ -1,11 +1,20 @@
- //=============================================================================//
-//
+//=============================================================================//
+// 
 // Purpose: Expose native code to VScript API
 // 
 //-----------------------------------------------------------------------------
 // 
-// See 'game/shared/vscript_shared.cpp' for more details.
-//
+// Read the documentation in 'game/shared/vscript_shared.cpp' before modifying
+// existing code or adding new code!
+// 
+// To create client script bindings:
+// - use the DEFINE_CLIENT_SCRIPTFUNC_NAMED() macro.
+// - prefix your function with "ClientScript_" i.e.: "ClientScript_GetVersion".
+// 
+// To create ui script bindings:
+// - use the DEFINE_UI_SCRIPTFUNC_NAMED() macro.
+// - prefix your function with "UIScript_" i.e.: "UIScript_GetVersion".
+// 
 //=============================================================================//
 
 #include "core/stdafx.h"
@@ -80,458 +89,450 @@ static SQBool Script_CheckServerIndexAndFailure(HSQUIRRELVM v, SQInteger iServer
     return true;
 }
 
-namespace VScriptCode
+//-----------------------------------------------------------------------------
+// Purpose: checks whether this SDK build is a client dll
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_IsClientDLL(HSQUIRRELVM v)
 {
-    namespace Client
+    sq_pushbool(v, ::IsClientDLL());
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static void Internal_UIScript_RequestForServerBrowserListThreaded()
+{
+    string responseMsg;
+    size_t serverCount;
+
+    const bool success = g_ServerListManager.RefreshServerList(responseMsg, serverCount);
+
+    g_TaskQueue.Dispatch([success, errorMsg = std::move(responseMsg), serverCount]
+        {
+            if (!g_pUIScript)
+                return;
+
+            HSCRIPT onRequestComplete = g_pUIScript->FindFunction("UICodeCallback_OnServerListRequestCompleted",
+                "void functionref( bool success, string errorMsg, int serverCount )", nullptr);
+
+            if (!onRequestComplete)
+                return;
+
+            ScriptVariant_t args[3] = { success, errorMsg.c_str(), (int)serverCount };
+            g_pUIScript->ExecuteFunction(onRequestComplete, args, SDK_ARRAYSIZE(args), nullptr, 0);
+
+            free(onRequestComplete);
+        }, 0);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: refreshes the server list
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_RequestServerList(HSQUIRRELVM v)
+{
+    std::thread(Internal_UIScript_RequestForServerBrowserListThreaded).detach();
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: get current server count from pylon
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetServerCount(HSQUIRRELVM v)
+{
+    size_t iCount = g_ServerListManager.m_vServerList.size();
+    sq_pushinteger(v, static_cast<SQInteger>(iCount));
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: get response from private server request
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetHiddenServerName(HSQUIRRELVM v)
+{
+    const SQChar* privateToken = nullptr;
+
+    if (SQ_FAILED(sq_getstring(v, 2, &privateToken)) || VALID_CHARSTAR(privateToken))
     {
-        //-----------------------------------------------------------------------------
-        // Purpose: checks whether this SDK build is a client dll
-        //-----------------------------------------------------------------------------
-        SQRESULT IsClientDLL(HSQUIRRELVM v)
-        {
-            sq_pushbool(v, ::IsClientDLL());
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
+        v_SQVM_ScriptError("Empty or null private token");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
     }
-    namespace Ui
+
+    string hiddenServerRequestMessage;
+    NetGameServer_t serverListing;
+
+    bool result = g_MasterServer.GetServerByToken(serverListing, hiddenServerRequestMessage, privateToken); // Send token connect request.
+    if (!result)
     {
-        static void RequestForServerBrowserListThreaded()
+        if (hiddenServerRequestMessage.empty())
+            sq_pushstring(v, "Request failed", -1);
+        else
         {
-            string responseMsg;
-            size_t serverCount;
-
-            const bool success = g_ServerListManager.RefreshServerList(responseMsg, serverCount);
-
-            g_TaskQueue.Dispatch([success, errorMsg = std::move(responseMsg), serverCount]
-                {
-                    if (!g_pUIScript)
-                        return;
-
-                    HSCRIPT onRequestComplete = g_pUIScript->FindFunction("UICodeCallback_OnServerListRequestCompleted",
-                        "void functionref( bool success, string errorMsg, int serverCount )", nullptr);
-
-                    if (!onRequestComplete)
-                        return;
-
-                    ScriptVariant_t args[3] = { success, errorMsg.c_str(), (int)serverCount };
-                    g_pUIScript->ExecuteFunction(onRequestComplete, args, SDK_ARRAYSIZE(args), nullptr, 0);
-
-                    free(onRequestComplete);
-                }, 0);
+            hiddenServerRequestMessage = Format("Request failed: %s", hiddenServerRequestMessage.c_str());
+            sq_pushstring(v, hiddenServerRequestMessage.c_str(), (SQInteger)hiddenServerRequestMessage.length());
         }
 
-        //-----------------------------------------------------------------------------
-        // Purpose: refreshes the server list
-        //-----------------------------------------------------------------------------
-        SQRESULT RequestServerList(HSQUIRRELVM v)
-        {
-            std::thread(RequestForServerBrowserListThreaded).detach();
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: get current server count from pylon
-        //-----------------------------------------------------------------------------
-        SQRESULT GetServerCount(HSQUIRRELVM v)
-        {
-            size_t iCount = g_ServerListManager.m_vServerList.size();
-            sq_pushinteger(v, static_cast<SQInteger>(iCount));
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: get response from private server request
-        //-----------------------------------------------------------------------------
-        SQRESULT GetHiddenServerName(HSQUIRRELVM v)
-        {
-            const SQChar* privateToken = nullptr;
-
-            if (SQ_FAILED(sq_getstring(v, 2, &privateToken)) || VALID_CHARSTAR(privateToken))
-            {
-                v_SQVM_ScriptError("Empty or null private token");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            string hiddenServerRequestMessage;
-            NetGameServer_t serverListing;
-
-            bool result = g_MasterServer.GetServerByToken(serverListing, hiddenServerRequestMessage, privateToken); // Send token connect request.
-            if (!result)
-            {
-                if (hiddenServerRequestMessage.empty())
-                    sq_pushstring(v, "Request failed", -1);
-                else
-                {
-                    hiddenServerRequestMessage = Format("Request failed: %s", hiddenServerRequestMessage.c_str());
-                    sq_pushstring(v, hiddenServerRequestMessage.c_str(), (SQInteger)hiddenServerRequestMessage.length());
-                }
-
-                SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-            }
-
-            if (serverListing.name.empty())
-            {
-                if (hiddenServerRequestMessage.empty())
-                    hiddenServerRequestMessage = Format("Server listing empty");
-                else
-                    hiddenServerRequestMessage = Format("Server listing empty: %s", hiddenServerRequestMessage.c_str());
-
-                sq_pushstring(v, hiddenServerRequestMessage.c_str(), (SQInteger)hiddenServerRequestMessage.length());
-            }
-            else
-            {
-                hiddenServerRequestMessage = Format("Found server: %s", serverListing.name.c_str());
-                sq_pushstring(v, hiddenServerRequestMessage.c_str(), (SQInteger)hiddenServerRequestMessage.length());
-            }
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: get server's current name from serverlist index
-        //-----------------------------------------------------------------------------
-        SQRESULT GetServerName(HSQUIRRELVM v)
-        {
-            AUTO_LOCK(g_ServerListManager.m_Mutex);
-
-            SQInteger iServer = -1;
-            sq_getinteger(v, 2, &iServer);
-
-            if (!Script_CheckServerIndexAndFailure(v, iServer))
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-
-            const string& serverName = g_ServerListManager.m_vServerList[iServer].name;
-            sq_pushstring(v, serverName.c_str(), (SQInteger)serverName.length());
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: get server's current description from serverlist index
-        //-----------------------------------------------------------------------------
-        SQRESULT GetServerDescription(HSQUIRRELVM v)
-        {
-            AUTO_LOCK(g_ServerListManager.m_Mutex);
-
-            SQInteger iServer = -1;
-            sq_getinteger(v, 2, &iServer);
-
-            if (!Script_CheckServerIndexAndFailure(v, iServer))
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-
-            const string& serverDescription = g_ServerListManager.m_vServerList[iServer].description;
-            sq_pushstring(v, serverDescription.c_str(), (SQInteger)serverDescription.length());
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: get server's current map via serverlist index
-        //-----------------------------------------------------------------------------
-        SQRESULT GetServerMap(HSQUIRRELVM v)
-        {
-            AUTO_LOCK(g_ServerListManager.m_Mutex);
-
-            SQInteger iServer = -1;
-            sq_getinteger(v, 2, &iServer);
-
-            if (!Script_CheckServerIndexAndFailure(v, iServer))
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-
-            const string& serverMapName = g_ServerListManager.m_vServerList[iServer].map;
-            sq_pushstring(v, serverMapName.c_str(), (SQInteger)serverMapName.length());
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: get server's current playlist via serverlist index
-        //-----------------------------------------------------------------------------
-        SQRESULT GetServerPlaylist(HSQUIRRELVM v)
-        {
-            AUTO_LOCK(g_ServerListManager.m_Mutex);
-
-            SQInteger iServer = -1;
-            sq_getinteger(v, 2, &iServer);
-
-            if (!Script_CheckServerIndexAndFailure(v, iServer))
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-
-            const string& serverPlaylist = g_ServerListManager.m_vServerList[iServer].playlist;
-            sq_pushstring(v, serverPlaylist.c_str(), (SQInteger)serverPlaylist.length());
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: get server's current player count via serverlist index
-        //-----------------------------------------------------------------------------
-        SQRESULT GetServerCurrentPlayers(HSQUIRRELVM v)
-        {
-            AUTO_LOCK(g_ServerListManager.m_Mutex);
-
-            SQInteger iServer = -1;
-            sq_getinteger(v, 2, &iServer);
-
-            if (!Script_CheckServerIndexAndFailure(v, iServer))
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-
-            const SQInteger playerCount = g_ServerListManager.m_vServerList[iServer].numPlayers;
-            sq_pushinteger(v, playerCount);
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: get server's current player count via serverlist index
-        //-----------------------------------------------------------------------------
-        SQRESULT GetServerMaxPlayers(HSQUIRRELVM v)
-        {
-            AUTO_LOCK(g_ServerListManager.m_Mutex);
-
-            SQInteger iServer = -1;
-            sq_getinteger(v, 2, &iServer);
-
-            if (!Script_CheckServerIndexAndFailure(v, iServer))
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-
-            const SQInteger maxPlayers = g_ServerListManager.m_vServerList[iServer].maxPlayers;
-            sq_pushinteger(v, maxPlayers);
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: get promo data for serverbrowser panels
-        //-----------------------------------------------------------------------------
-        SQRESULT GetPromoData(HSQUIRRELVM v)
-        {
-            enum class R5RPromoData : SQInteger
-            {
-                PromoLargeTitle,
-                PromoLargeDesc,
-                PromoLeftTitle,
-                PromoLeftDesc,
-                PromoRightTitle,
-                PromoRightDesc
-            };
-
-            SQInteger idx = 0;
-            sq_getinteger(v, 2, &idx);
-
-            R5RPromoData ePromoIndex = static_cast<R5RPromoData>(idx);
-            const char* pszPromoKey;
-
-            switch (ePromoIndex)
-            {
-            case R5RPromoData::PromoLargeTitle:
-            {
-                pszPromoKey = "#PROMO_LARGE_TITLE";
-                break;
-            }
-            case R5RPromoData::PromoLargeDesc:
-            {
-                pszPromoKey = "#PROMO_LARGE_DESCRIPTION";
-                break;
-            }
-            case R5RPromoData::PromoLeftTitle:
-            {
-                pszPromoKey = "#PROMO_LEFT_TITLE";
-                break;
-            }
-            case R5RPromoData::PromoLeftDesc:
-            {
-                pszPromoKey = "#PROMO_LEFT_DESCRIPTION";
-                break;
-            }
-            case R5RPromoData::PromoRightTitle:
-            {
-                pszPromoKey = "#PROMO_RIGHT_TITLE";
-                break;
-            }
-            case R5RPromoData::PromoRightDesc:
-            {
-                pszPromoKey = "#PROMO_RIGHT_DESCRIPTION";
-                break;
-            }
-            default:
-            {
-                pszPromoKey = "#PROMO_SDK_ERROR";
-                break;
-            }
-            }
-
-            sq_pushstring(v, pszPromoKey, -1);
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        static void RequestEULAThreaded()
-        {
-            MSEulaData_t eulaDataMs;
-            string responseMsg;
-
-            const bool success = g_MasterServer.GetEULA(eulaDataMs, responseMsg);
-
-            g_TaskQueue.Dispatch([success, errorMsg = std::move(responseMsg), eulaData = std::move(eulaDataMs)]
-                {
-                    if (success)
-                    {
-                        // set EULA version cvar to the newly fetched EULA version
-                        eula_version->SetValue(eulaData.version);
-                    }
-
-                    if (!g_pUIScript)
-                        return;
-
-                    HSCRIPT onRequestComplete = g_pUIScript->FindFunction("UICodeCallback_OnEULARequestCompleted", 
-                        "void functionref( bool success, string errorMsg, string language, string eulaData )", nullptr);
-
-                    if (!onRequestComplete)
-                        return;
-
-                    ScriptVariant_t args[4] = { success, errorMsg.c_str(), eulaData.language.c_str(), eulaData.contents.c_str() };
-                    g_pUIScript->ExecuteFunction(onRequestComplete, args, SDK_ARRAYSIZE(args), nullptr, 0);
-
-                    free(onRequestComplete);
-                }, 0);
-        }
-
-        SQRESULT RequestEULAContents(HSQUIRRELVM v)
-        {
-            std::thread(RequestEULAThreaded).detach();
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: connect to server from native server browser entries
-        //-----------------------------------------------------------------------------
-        SQRESULT ConnectToServer(HSQUIRRELVM v)
-        {
-            const SQChar* ipAddress = nullptr;
-            if (SQ_FAILED(sq_getstring(v, 2, &ipAddress)))
-            {
-                v_SQVM_ScriptError("Missing ip address");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            const SQChar* cryptoKey = nullptr;
-            if (SQ_FAILED(sq_getstring(v, 3, &cryptoKey)))
-            {
-                v_SQVM_ScriptError("Missing encryption key");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            Msg(eDLL_T::UI, "Connecting to server with ip address '%s' and encryption key '%s'\n", ipAddress, cryptoKey);
-            g_ServerListManager.ConnectToServer(ipAddress, cryptoKey);
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: set netchannel encryption key and connect to server
-        //-----------------------------------------------------------------------------
-        SQRESULT ConnectToListedServer(HSQUIRRELVM v)
-        {
-            AUTO_LOCK(g_ServerListManager.m_Mutex);
-
-            SQInteger iServer = -1;
-            sq_getinteger(v, 2, &iServer);
-
-            if (!Script_CheckServerIndexAndFailure(v, iServer))
-            {
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            const NetGameServer_t& gameServer = g_ServerListManager.m_vServerList[iServer];
-
-            g_ServerListManager.ConnectToServer(gameServer.address, gameServer.port,
-                gameServer.netKey);
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: request token from pylon and join server with result.
-        //-----------------------------------------------------------------------------
-        SQRESULT ConnectToHiddenServer(HSQUIRRELVM v)
-        {
-            const SQChar* privateToken = nullptr;
-            const SQRESULT strRet = sq_getstring(v, 2, &privateToken);
-
-            if (SQ_FAILED(strRet) || VALID_CHARSTAR(privateToken))
-            {
-                v_SQVM_ScriptError("Empty or null private token");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            string hiddenServerRequestMessage;
-            NetGameServer_t netListing;
-
-            const bool result = g_MasterServer.GetServerByToken(netListing, hiddenServerRequestMessage, privateToken); // Send token connect request.
-            if (result)
-            {
-                g_ServerListManager.ConnectToServer(netListing.address, netListing.port, netListing.netKey);
-            }
-            else
-            {
-                Warning(eDLL_T::UI, "Failed to connect to private server: %s\n", hiddenServerRequestMessage.c_str());
-            }
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: create server via native serverbrowser entries
-        // TODO: return a boolean on failure instead of raising an error, so we could
-        // determine from scripts whether or not to spin a local server, or connect
-        // to a dedicated server (for disconnecting and loading the lobby, for example)
-        //-----------------------------------------------------------------------------
-        SQRESULT CreateServer(HSQUIRRELVM v)
-        {
-            const SQChar* serverName = nullptr;
-            const SQChar* serverDescription = nullptr;
-            const SQChar* serverMapName = nullptr;
-            const SQChar* serverPlaylist = nullptr;
-
-            sq_getstring(v, 2, &serverName);
-            sq_getstring(v, 3, &serverDescription);
-            sq_getstring(v, 4, &serverMapName);
-            sq_getstring(v, 5, &serverPlaylist);
-
-            SQInteger serverVisibility = 0;
-            sq_getinteger(v, 6, &serverVisibility);
-
-            if (!VALID_CHARSTAR(serverName) ||
-                !VALID_CHARSTAR(serverMapName) ||
-                !VALID_CHARSTAR(serverPlaylist))
-            {
-                v_SQVM_ScriptError("Empty or null server criteria");
-                SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
-            }
-
-            hostname->SetValue(serverName);
-            hostdesc.SetValue(serverDescription);
-
-            pylon_host_visibility.SetValue((int)serverVisibility);
-
-            // Launch server.
-            g_ServerHostManager.LaunchServer(serverMapName, serverPlaylist);
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
-
-        //-----------------------------------------------------------------------------
-        // Purpose: shuts the server down and disconnects all clients
-        //-----------------------------------------------------------------------------
-        SQRESULT DestroyServer(HSQUIRRELVM v)
-        {
-            if (g_pHostState->m_bActiveGame)
-                g_pHostState->m_iNextState = HostStates_t::HS_GAME_SHUTDOWN;
-
-            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-        }
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
+
+    if (serverListing.name.empty())
+    {
+        if (hiddenServerRequestMessage.empty())
+            hiddenServerRequestMessage = Format("Server listing empty");
+        else
+            hiddenServerRequestMessage = Format("Server listing empty: %s", hiddenServerRequestMessage.c_str());
+
+        sq_pushstring(v, hiddenServerRequestMessage.c_str(), (SQInteger)hiddenServerRequestMessage.length());
+    }
+    else
+    {
+        hiddenServerRequestMessage = Format("Found server: %s", serverListing.name.c_str());
+        sq_pushstring(v, hiddenServerRequestMessage.c_str(), (SQInteger)hiddenServerRequestMessage.length());
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: get server's current name from server list index
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetServerName(HSQUIRRELVM v)
+{
+    AUTO_LOCK(g_ServerListManager.m_Mutex);
+
+    SQInteger iServer = -1;
+    sq_getinteger(v, 2, &iServer);
+
+    if (!Script_CheckServerIndexAndFailure(v, iServer))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const string& serverName = g_ServerListManager.m_vServerList[iServer].name;
+    sq_pushstring(v, serverName.c_str(), (SQInteger)serverName.length());
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: get server's current description from server list index
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetServerDescription(HSQUIRRELVM v)
+{
+    AUTO_LOCK(g_ServerListManager.m_Mutex);
+
+    SQInteger iServer = -1;
+    sq_getinteger(v, 2, &iServer);
+
+    if (!Script_CheckServerIndexAndFailure(v, iServer))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const string& serverDescription = g_ServerListManager.m_vServerList[iServer].description;
+    sq_pushstring(v, serverDescription.c_str(), (SQInteger)serverDescription.length());
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: get server's current map via server list index
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetServerMap(HSQUIRRELVM v)
+{
+    AUTO_LOCK(g_ServerListManager.m_Mutex);
+
+    SQInteger iServer = -1;
+    sq_getinteger(v, 2, &iServer);
+
+    if (!Script_CheckServerIndexAndFailure(v, iServer))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const string& serverMapName = g_ServerListManager.m_vServerList[iServer].map;
+    sq_pushstring(v, serverMapName.c_str(), (SQInteger)serverMapName.length());
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: get server's current playlist via server list index
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetServerPlaylist(HSQUIRRELVM v)
+{
+    AUTO_LOCK(g_ServerListManager.m_Mutex);
+
+    SQInteger iServer = -1;
+    sq_getinteger(v, 2, &iServer);
+
+    if (!Script_CheckServerIndexAndFailure(v, iServer))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const string& serverPlaylist = g_ServerListManager.m_vServerList[iServer].playlist;
+    sq_pushstring(v, serverPlaylist.c_str(), (SQInteger)serverPlaylist.length());
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: get server's current player count via server list index
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetServerCurrentPlayers(HSQUIRRELVM v)
+{
+    AUTO_LOCK(g_ServerListManager.m_Mutex);
+
+    SQInteger iServer = -1;
+    sq_getinteger(v, 2, &iServer);
+
+    if (!Script_CheckServerIndexAndFailure(v, iServer))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const SQInteger playerCount = g_ServerListManager.m_vServerList[iServer].numPlayers;
+    sq_pushinteger(v, playerCount);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: get server's current player count via server list index
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetServerMaxPlayers(HSQUIRRELVM v)
+{
+    AUTO_LOCK(g_ServerListManager.m_Mutex);
+
+    SQInteger iServer = -1;
+    sq_getinteger(v, 2, &iServer);
+
+    if (!Script_CheckServerIndexAndFailure(v, iServer))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const SQInteger maxPlayers = g_ServerListManager.m_vServerList[iServer].maxPlayers;
+    sq_pushinteger(v, maxPlayers);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: get promo data for server browser panels
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetPromoData(HSQUIRRELVM v)
+{
+    enum class R5RPromoData : SQInteger
+    {
+        PromoLargeTitle,
+        PromoLargeDesc,
+        PromoLeftTitle,
+        PromoLeftDesc,
+        PromoRightTitle,
+        PromoRightDesc
+    };
+
+    SQInteger idx = 0;
+    sq_getinteger(v, 2, &idx);
+
+    R5RPromoData ePromoIndex = static_cast<R5RPromoData>(idx);
+    const char* pszPromoKey;
+
+    switch (ePromoIndex)
+    {
+    case R5RPromoData::PromoLargeTitle:
+    {
+        pszPromoKey = "#PROMO_LARGE_TITLE";
+        break;
+    }
+    case R5RPromoData::PromoLargeDesc:
+    {
+        pszPromoKey = "#PROMO_LARGE_DESCRIPTION";
+        break;
+    }
+    case R5RPromoData::PromoLeftTitle:
+    {
+        pszPromoKey = "#PROMO_LEFT_TITLE";
+        break;
+    }
+    case R5RPromoData::PromoLeftDesc:
+    {
+        pszPromoKey = "#PROMO_LEFT_DESCRIPTION";
+        break;
+    }
+    case R5RPromoData::PromoRightTitle:
+    {
+        pszPromoKey = "#PROMO_RIGHT_TITLE";
+        break;
+    }
+    case R5RPromoData::PromoRightDesc:
+    {
+        pszPromoKey = "#PROMO_RIGHT_DESCRIPTION";
+        break;
+    }
+    default:
+    {
+        pszPromoKey = "#PROMO_SDK_ERROR";
+        break;
+    }
+    }
+
+    sq_pushstring(v, pszPromoKey, -1);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static void Internal_UIScript_RequestEULAThreaded()
+{
+    MSEulaData_t eulaDataMs;
+    string responseMsg;
+
+    const bool success = g_MasterServer.GetEULA(eulaDataMs, responseMsg);
+
+    g_TaskQueue.Dispatch([success, errorMsg = std::move(responseMsg), eulaData = std::move(eulaDataMs)]
+        {
+            if (success)
+            {
+                // set EULA version cvar to the newly fetched EULA version
+                eula_version->SetValue(eulaData.version);
+            }
+
+            if (!g_pUIScript)
+                return;
+
+            HSCRIPT onRequestComplete = g_pUIScript->FindFunction("UICodeCallback_OnEULARequestCompleted",
+                "void functionref( bool success, string errorMsg, string language, string eulaData )", nullptr);
+
+            if (!onRequestComplete)
+                return;
+
+            ScriptVariant_t args[4] = { success, errorMsg.c_str(), eulaData.language.c_str(), eulaData.contents.c_str() };
+            g_pUIScript->ExecuteFunction(onRequestComplete, args, SDK_ARRAYSIZE(args), nullptr, 0);
+
+            free(onRequestComplete);
+        }, 0);
+}
+
+static SQRESULT UIScript_RequestEULAContents(HSQUIRRELVM v)
+{
+    std::thread(Internal_UIScript_RequestEULAThreaded).detach();
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: connect to server from native server browser entries
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_ConnectToServer(HSQUIRRELVM v)
+{
+    const SQChar* ipAddress = nullptr;
+    if (SQ_FAILED(sq_getstring(v, 2, &ipAddress)))
+    {
+        v_SQVM_ScriptError("Missing ip address");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const SQChar* cryptoKey = nullptr;
+    if (SQ_FAILED(sq_getstring(v, 3, &cryptoKey)))
+    {
+        v_SQVM_ScriptError("Missing encryption key");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    Msg(eDLL_T::UI, "Connecting to server with ip address '%s' and encryption key '%s'\n", ipAddress, cryptoKey);
+    g_ServerListManager.ConnectToServer(ipAddress, cryptoKey);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: set netchannel encryption key and connect to server
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_ConnectToListedServer(HSQUIRRELVM v)
+{
+    AUTO_LOCK(g_ServerListManager.m_Mutex);
+
+    SQInteger iServer = -1;
+    sq_getinteger(v, 2, &iServer);
+
+    if (!Script_CheckServerIndexAndFailure(v, iServer))
+    {
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const NetGameServer_t& gameServer = g_ServerListManager.m_vServerList[iServer];
+
+    g_ServerListManager.ConnectToServer(gameServer.address, gameServer.port,
+        gameServer.netKey);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: request token from pylon and join server with result.
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_ConnectToHiddenServer(HSQUIRRELVM v)
+{
+    const SQChar* privateToken = nullptr;
+    const SQRESULT strRet = sq_getstring(v, 2, &privateToken);
+
+    if (SQ_FAILED(strRet) || VALID_CHARSTAR(privateToken))
+    {
+        v_SQVM_ScriptError("Empty or null private token");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    string hiddenServerRequestMessage;
+    NetGameServer_t netListing;
+
+    const bool result = g_MasterServer.GetServerByToken(netListing, hiddenServerRequestMessage, privateToken); // Send token connect request.
+    if (result)
+    {
+        g_ServerListManager.ConnectToServer(netListing.address, netListing.port, netListing.netKey);
+    }
+    else
+    {
+        Warning(eDLL_T::UI, "Failed to connect to private server: %s\n", hiddenServerRequestMessage.c_str());
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: create server via native server browser entries
+// TODO: return a boolean on failure instead of raising an error, so we could
+// determine from scripts whether or not to spin a local server, or connect
+// to a dedicated server (for disconnecting and loading the lobby, for example)
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_CreateServer(HSQUIRRELVM v)
+{
+    const SQChar* serverName = nullptr;
+    const SQChar* serverDescription = nullptr;
+    const SQChar* serverMapName = nullptr;
+    const SQChar* serverPlaylist = nullptr;
+
+    sq_getstring(v, 2, &serverName);
+    sq_getstring(v, 3, &serverDescription);
+    sq_getstring(v, 4, &serverMapName);
+    sq_getstring(v, 5, &serverPlaylist);
+
+    SQInteger serverVisibility = 0;
+    sq_getinteger(v, 6, &serverVisibility);
+
+    if (!VALID_CHARSTAR(serverName) ||
+        !VALID_CHARSTAR(serverMapName) ||
+        !VALID_CHARSTAR(serverPlaylist))
+    {
+        v_SQVM_ScriptError("Empty or null server criteria");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    hostname->SetValue(serverName);
+    hostdesc.SetValue(serverDescription);
+
+    pylon_host_visibility.SetValue((int)serverVisibility);
+
+    // Launch server.
+    g_ServerHostManager.LaunchServer(serverMapName, serverPlaylist);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: shuts the server down and disconnects all clients
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_DestroyServer(HSQUIRRELVM v)
+{
+    if (g_pHostState->m_bActiveGame)
+        g_pHostState->m_iNextState = HostStates_t::HS_GAME_SHUTDOWN;
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //---------------------------------------------------------------------------------

@@ -1,36 +1,6 @@
 #ifndef VSCRIPT_CLIENT_H
 #define VSCRIPT_CLIENT_H
 
-namespace VScriptCode
-{
-	namespace Client
-	{
-		SQRESULT IsClientDLL(HSQUIRRELVM v);
-	}
-
-	namespace Ui
-	{
-		SQRESULT RequestServerList(HSQUIRRELVM v);
-		SQRESULT GetServerCount(HSQUIRRELVM v);
-
-		SQRESULT GetHiddenServerName(HSQUIRRELVM v);
-		SQRESULT GetServerName(HSQUIRRELVM v);
-		SQRESULT GetServerDescription(HSQUIRRELVM v);
-
-		SQRESULT GetServerMap(HSQUIRRELVM v);
-		SQRESULT GetServerPlaylist(HSQUIRRELVM v);
-
-		SQRESULT GetServerCurrentPlayers(HSQUIRRELVM v);
-		SQRESULT GetServerMaxPlayers(HSQUIRRELVM v);
-
-		SQRESULT GetPromoData(HSQUIRRELVM v);
-
-		SQRESULT ConnectToListedServer(HSQUIRRELVM v);
-		SQRESULT ConnectToHiddenServer(HSQUIRRELVM v);
-		SQRESULT ConnectToServer(HSQUIRRELVM v);
-	}
-}
-
 void Script_RegisterClientFunctions(CSquirrelVM* s);
 void Script_RegisterUIFunctions(CSquirrelVM* s);
 void Script_RegisterUIServerFunctions(CSquirrelVM* s);
@@ -38,11 +8,11 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s);
 
 #define DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...) \
 	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(Client_Script_##functionName),  \
-	helpString, returnType, parameters, VScriptCode::Client::##functionName, __VA_ARGS__)        \
+	helpString, returnType, parameters, ClientScript_##functionName, __VA_ARGS__)        \
 
 #define DEFINE_UI_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...)     \
 	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(UI_Script_##functionName),      \
-	helpString, returnType, parameters, VScriptCode::Ui::##functionName, __VA_ARGS__)            \
+	helpString, returnType, parameters, UIScript_##functionName, __VA_ARGS__)            \
 
 inline void (*v_Script_RegisterClientEntityClassFuncs)();
 inline void (*v_Script_RegisterClientPlayerClassFuncs)();

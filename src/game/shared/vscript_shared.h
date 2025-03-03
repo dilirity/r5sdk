@@ -12,22 +12,12 @@ inline void*(*v_RestoreRemoteChecksumsFromSaveGame)(void* a1, void* a2);
 inline uint32_t* g_nServerRemoteChecksum = nullptr;
 inline uint32_t* g_nClientRemoteChecksum = nullptr;
 
-namespace VScriptCode
-{
-	namespace Shared
-	{
-		SQRESULT GetSDKVersion(HSQUIRRELVM v);
-		SQRESULT GetAvailableMaps(HSQUIRRELVM v);
-		SQRESULT GetAvailablePlaylists(HSQUIRRELVM v);
-	}
-}
-
 void Script_RegisterCommonAbstractions(CSquirrelVM* s);
 void Script_RegisterListenServerConstants(CSquirrelVM* s);
 
 #define DEFINE_SHARED_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...)          \
 	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(SHARED_SCRIPT( Script_##functionName )), \
-	helpString, returnType, parameters, VScriptCode::Shared::##functionName, __VA_ARGS__)                 \
+	helpString, returnType, parameters, SharedScript_##functionName, __VA_ARGS__)                 \
 
 ///////////////////////////////////////////////////////////////////////////////
 class VScriptShared : public IDetour

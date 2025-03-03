@@ -2233,25 +2233,13 @@ static bool LiveAPI_HandleEventByCategory(HSQUIRRELVM const v, const SQTable* co
 	Code exposed to scripts
 */
 
-namespace VScriptCode
-{
-	namespace Server
-	{
-		SQRESULT LiveAPI_IsValidToRun(HSQUIRRELVM v);
-		SQRESULT LiveAPI_LogRaw(HSQUIRRELVM v);
-
-		SQRESULT LiveAPI_StartLogging(HSQUIRRELVM v);
-		SQRESULT LiveAPI_StopLogging(HSQUIRRELVM v);
-	}
-}
-
-SQRESULT VScriptCode::Server::LiveAPI_IsValidToRun(HSQUIRRELVM v)
+static SQRESULT ServerScript_LiveAPI_IsValidToRun(HSQUIRRELVM v)
 {
 	sq_pushbool(v, LiveAPISystem()->IsValidToRun());
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
-SQRESULT VScriptCode::Server::LiveAPI_LogRaw(HSQUIRRELVM v)
+static SQRESULT ServerScript_LiveAPI_LogRaw(HSQUIRRELVM v)
 {
 	if (!LiveAPISystem()->IsEnabled())
 		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -2281,13 +2269,13 @@ SQRESULT VScriptCode::Server::LiveAPI_LogRaw(HSQUIRRELVM v)
 	SCRIPT_CHECK_AND_RETURN(v, result);
 }
 
-SQRESULT VScriptCode::Server::LiveAPI_StartLogging(HSQUIRRELVM v)
+static SQRESULT ServerScript_LiveAPI_StartLogging(HSQUIRRELVM v)
 {
 	LiveAPISystem()->CreateLogger();
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
-SQRESULT VScriptCode::Server::LiveAPI_StopLogging(HSQUIRRELVM v)
+static SQRESULT ServerScript_LiveAPI_StopLogging(HSQUIRRELVM v)
 {
 	LiveAPISystem()->DestroyLogger();
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);

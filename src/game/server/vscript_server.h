@@ -2,31 +2,6 @@
 #define VSCRIPT_SERVER_H
 #include "vscript/languages/squirrel_re/vsquirrel.h"
 
-namespace VScriptCode
-{
-	namespace Server
-	{
-		SQRESULT CreateServer(HSQUIRRELVM v);
-		SQRESULT DestroyServer(HSQUIRRELVM v);
-
-		SQRESULT SetAutoReloadState(HSQUIRRELVM v);
-
-		SQRESULT KickPlayerByName(HSQUIRRELVM v);
-		SQRESULT KickPlayerById(HSQUIRRELVM v);
-		SQRESULT BanPlayerByName(HSQUIRRELVM v);
-		SQRESULT BanPlayerById(HSQUIRRELVM v);
-		SQRESULT UnbanPlayer(HSQUIRRELVM v);
-
-		SQRESULT GetNumHumanPlayers(HSQUIRRELVM v);
-		SQRESULT GetNumFakeClients(HSQUIRRELVM v);
-
-		SQRESULT GetServerID(HSQUIRRELVM v);
-
-		SQRESULT IsServerActive(HSQUIRRELVM v);
-		SQRESULT IsDedicated(HSQUIRRELVM v);
-	}
-}
-
 void Script_RegisterServerFunctions(CSquirrelVM* s);
 void Script_RegisterCoreServerFunctions(CSquirrelVM* s);
 void Script_RegisterAdminServerFunctions(CSquirrelVM* s);
@@ -35,7 +10,7 @@ void Script_RegisterServerEnums(CSquirrelVM* const s);
 
 #define DEFINE_SERVER_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...) \
 	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(Server_Script_##functionName),  \
-	helpString, returnType, parameters, VScriptCode::Server::##functionName, __VA_ARGS__)        \
+	helpString, returnType, parameters, ServerScript_##functionName, __VA_ARGS__)        \
 
 inline void (*v_Script_RegisterServerEntityClassFuncs)();
 inline void (*v_Script_RegisterServerPlayerClassFuncs)();
