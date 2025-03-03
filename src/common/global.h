@@ -63,6 +63,7 @@ extern ConVar* name_cvar;
 // SERVER                                                                 |
 #ifndef CLIENT_DLL
 extern ConVar* ai_script_nodes_draw;
+extern ConVar* navmesh_move_along_surface_asserts;
 
 extern ConVar* sv_forceChatToTeamOnly;
 

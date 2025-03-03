@@ -76,6 +76,7 @@ ConVar* name_cvar                          = nullptr;
 // SERVER                                                                     |
 #ifndef CLIENT_DLL
 ConVar* ai_script_nodes_draw               = nullptr;
+ConVar* navmesh_move_along_surface_asserts = nullptr;
 
 ConVar* sv_forceChatToTeamOnly             = nullptr;
 
@@ -153,6 +154,7 @@ void ConVar_InitShipped(void)
 {
 #ifndef CLIENT_DLL
 	ai_script_nodes_draw             = g_pCVar->FindVar("ai_script_nodes_draw");
+	navmesh_move_along_surface_asserts = g_pCVar->FindVar("navmesh_move_along_surface_asserts");
 	bhit_enable                      = g_pCVar->FindVar("bhit_enable");
 #endif // !CLIENT_DLL
 	developer                        = g_pCVar->FindVar("developer");
