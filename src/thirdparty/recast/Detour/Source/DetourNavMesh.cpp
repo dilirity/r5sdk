@@ -1048,9 +1048,9 @@ static dtStatus internalTryConnectUsingSpatial(const dtTraverseLinkConnectParams
 					nneis += state.navMesh->getNeighbourTilesAt(baseHeader->x, baseHeader->y, n, &neis[nneis], numSlotsLeft);
 				}
 
-				// No neighbors, nothing to link to.
+				// No neighbors, nothing to link to; no link will be established.
 				if (!nneis)
-					continue;
+					return DT_FAILURE | DT_INVALID_ACTION;
 			}
 			else
 			{
