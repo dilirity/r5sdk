@@ -795,7 +795,7 @@ void dtNavMesh::connectIntLinks(dtMeshTile* tile)
 	}
 }
 
-/// The internal state of #dtNavMesh::connectTraverseLinks
+/// The internal state of #dtNavMesh::connectTraverseLinks.
 struct dtTraverseLinkConnectState
 {
 	const dtNavMesh* navMesh; ///< The navmesh we are currently mutating.

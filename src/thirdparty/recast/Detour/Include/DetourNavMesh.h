@@ -199,14 +199,14 @@ enum dtFindPathOptions
 	DT_FINDPATH_ANY_ANGLE = 0x02,		///< use raycasts during pathfind to "shortcut". (Raycast still considers costs.)
 };
 
-/// Options for dtNavMeshQuery::raycast
+/// Options for dtNavMeshQuery::raycast.
 enum dtRaycastOptions
 {
 	DT_RAYCAST_USE_COSTS = 1<<0,				///< Raycast should calculate movement cost along the ray and fill RaycastHit::cost.
 	DT_RAYCAST_SKIP_OFFMESH_CONNECTION = 1<<1	///< Raycast should skip off-mesh connections along the ray.
 };
 
-/// Options for dtNavMeshQuery::moveAlongSurface
+/// Options for dtNavMeshQuery::moveAlongSurface.
 enum dtMoveAlongSurfaceOptions : unsigned char
 {
 	DT_MOVEALONGSURFACE_DONT_VISIT_POLYGONS = 1<<0,			///< Don't visit polygons during the move. (Useful if we don't care about the path.)
