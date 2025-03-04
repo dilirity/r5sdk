@@ -118,7 +118,7 @@ struct dtNavMeshCreateParams
 class dtDisjointSet
 {
 public:
-	dtDisjointSet() = default;
+	dtDisjointSet() { limit = -1; };
 	dtDisjointSet(const int size, const int max = -1)
 	{
 		init(size, max);
@@ -152,7 +152,7 @@ public:
 	{
 		const int newId = parent.size();
 
-		if (limit > 0 && newId > limit)
+		if (limit > 0 && newId >= limit)
 			return -1; // Limit has been reached.
 
 		rank.push(0);

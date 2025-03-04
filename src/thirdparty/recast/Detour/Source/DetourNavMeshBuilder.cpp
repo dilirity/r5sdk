@@ -557,6 +557,13 @@ bool dtCreateTraverseTableData(const dtTraverseTableCreateParams* params)
 	const dtDisjointSet& baseSet = params->sets[0];
 	const int polyGroupCount = baseSet.getSetCount();
 
+	// If you hit this, then the #dtDisjointSet contains more than
+	// #DT_MAX_POLY_GROUP_COUNT items. The maximum item count must
+	// be initialized in #dtCreateDisjointPolyGroups, otherwise the
+	// loop below will spin forever as 'polyGroupCount' will become
+	// larger than the maximum an unsigned short can contain.
+	rdAssert(polyGroupCount <= DT_MAX_POLY_GROUP_COUNT);
+
 	const int tableSize = dtCalcTraverseTableSize(polyGroupCount);
 	nav->setTraverseTableSize(tableSize);
 
