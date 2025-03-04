@@ -138,6 +138,13 @@ typedef enum tagSQObjectType
 // does the type keep track of references?
 #define ISREFCOUNTED(t) (t & SQOBJECT_REF_COUNTED)
 
+typedef struct tagSQVector3D
+{
+	SQFloat x;
+	SQFloat y;
+	SQFloat z;
+} SQVector3D;
+
 typedef union tagSQObjectValue
 {
 	struct SQTable* pTable;
@@ -163,6 +170,15 @@ typedef union tagSQObjectValue
 typedef struct tagSQObject
 {
 	SQObjectType _type;
+
+	// 3D vectors start from this member variable, and
+	// the other 8 bytes are utilizing `_unVal`. Since
+	// '_unVal' is aligned to 8 bytes, we will have 4
+	// bytes padding between `_type` and `_unVal`. To
+	// make up for this burned space, we use this pad
+	// for the X member of the SQVector3D struct, while
+	// Y and Z utilize the space taken by `_unVal`.
+	// This allows for keeping the struct size the same.
 	SQInteger _pad;
 	SQObjectValue _unVal;
 } SQObject;
@@ -171,6 +187,7 @@ typedef struct tagSQObject
 SQRESULT sq_pushroottable(HSQUIRRELVM v);
 SQRESULT sq_getinteger(HSQUIRRELVM v, SQInteger idx, SQInteger* i);
 SQRESULT sq_getfloat(HSQUIRRELVM v, SQInteger idx, SQFloat* f);
+SQRESULT sq_getvector(HSQUIRRELVM v, SQInteger idx, const SQVector3D** w);
 SQRESULT sq_getbool(HSQUIRRELVM v, SQInteger idx, SQBool* b);
 SQRESULT sq_getthread(HSQUIRRELVM v, SQInteger idx, HSQUIRRELVM* thread);
 SQRESULT sq_getstring(HSQUIRRELVM v, SQInteger idx, const SQChar** c);
@@ -183,6 +200,7 @@ void sq_pushbool(HSQUIRRELVM v, SQBool b);
 void sq_pushstring(HSQUIRRELVM v, const SQChar* string, SQInteger len);
 void sq_pushinteger(HSQUIRRELVM v, SQInteger val);
 void sq_pushfloat(HSQUIRRELVM v, SQFloat n);
+void sq_pushvector(HSQUIRRELVM v, const SQVector3D* w);
 void sq_newarray(HSQUIRRELVM v, SQInteger size);
 void sq_newtable(HSQUIRRELVM v);
 SQRESULT sq_newslot(HSQUIRRELVM v, SQInteger idx);
@@ -216,6 +234,7 @@ SQBool sq_release(HSQUIRRELVM v, SQObject* po);
 #define sq_isinstance(o) ((o)._type==OT_INSTANCE)
 #define sq_isbool(o) ((o)._type==OT_BOOL)
 #define sq_isweakref(o) ((o)._type==OT_WEAKREF)
+#define sq_isvector(o) ((o)._type==OT_VECTOR)
 #define sq_type(o) ((o)._type)
 
 /* ==== SQUIRREL ======================================================================================================================================================== */

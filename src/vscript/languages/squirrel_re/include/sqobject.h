@@ -90,7 +90,7 @@ struct SQWeakRef : SQRefCounted
 #define _refcounted(obj) ((obj)._unVal.pRefCounted)
 #define _rawval(obj) ((obj)._unVal.raw)
 
-#define _vector3d(obj) ((Vector3D*)&(obj)._pad)
+#define _vector(obj) ((SQVector3D*)&(obj)._pad)
 
 #define _stringval(obj) (obj)._unVal.pString->_val
 #define _userdataval(obj) (obj)._unVal.pUserData->_val
@@ -153,6 +153,16 @@ struct SQObjectPtr : public SQObject
 		_type = OT_FLOAT;
 		_pad = NULL;
 		_unVal.fFloat = fFloat;
+	}
+
+	SQObjectPtr(const SQVector3D* wVector)
+	{
+		_type = OT_VECTOR;
+		SQVector3D* const vec = (SQVector3D*)&_pad;
+
+		vec->x = wVector->x;
+		vec->y = wVector->y;
+		vec->z = wVector->z;
 	}
 
 	inline ~SQObjectPtr()
