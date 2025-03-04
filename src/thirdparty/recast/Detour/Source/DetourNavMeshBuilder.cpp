@@ -1243,7 +1243,7 @@ bool dtCreateNavMeshData(dtNavMeshCreateParams* params, unsigned char** outData,
 
 		rdVcopy(cell.pos, cellItem.pos);
 		cell.polyIndex = cellItem.polyIndex;
-		cell.setOccupied();
+		cell.setUnoccupied();
 	}
 #endif
 
@@ -1897,7 +1897,7 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 
 		rdVcopy(cell.pos, cellItem.pos);
 		cell.polyIndex = cellItem.polyIndex;
-		cell.setOccupied();
+		cell.setUnoccupied();
 	}
 #endif
 
