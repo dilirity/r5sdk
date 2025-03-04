@@ -329,19 +329,27 @@ inline float rdVdist2DSqr(const float* v1, const float* v2)
 ///  @param[in,out]	v	The vector to normalize. [(x, y, z)]
 inline void rdVnormalize(float* v)
 {
-	float d = 1.0f / rdMathSqrtf(rdSqr(v[0]) + rdSqr(v[1]) + rdSqr(v[2]));
-	v[0] *= d;
-	v[1] *= d;
-	v[2] *= d;
+	const float s = rdMathSqrtf(rdSqr(v[0]) + rdSqr(v[1]) + rdSqr(v[2]));
+	if (rdLikely(s > 0))
+	{
+		const float d = 1.0f / s;
+		v[0] *= d;
+		v[1] *= d;
+		v[2] *= d;
+	}
 }
 
 /// Normalizes the vector on the xy-plane.
 ///  @param[in,out]	v	The vector to normalize. [(x, y, z)]
 inline void rdVnormalize2D(float* v)
 {
-	float d = 1.0f / rdMathSqrtf(rdSqr(v[0]) + rdSqr(v[1]));
-	v[0] *= d;
-	v[1] *= d;
+	const float s = rdMathSqrtf(rdSqr(v[0]) + rdSqr(v[1]));
+	if (rdLikely(s > 0))
+	{
+		const float d = 1.0f / s;
+		v[0] *= d;
+		v[1] *= d;
+	}
 }
 
 /// Derives the magnitude of the vector.
