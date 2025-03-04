@@ -1510,8 +1510,8 @@ bool rcBuildPolyMeshDetail(rcContext* ctx, const rcPolyMesh& mesh, const rcCompa
 		}
 	}
 	
-#ifndef REVERSE_DIRECTION
-	flipPolyMeshDetail(dmesh, mesh.nverts)
+#if !REVERSE_DIRECTION
+	flipPolyMeshDetail(dmesh, mesh.nverts);
 #endif // !REVERSE_DIRECTION
 
 	return true;
