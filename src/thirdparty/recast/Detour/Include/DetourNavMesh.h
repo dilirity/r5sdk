@@ -1235,7 +1235,7 @@ Basically, if the storage structure of a tile changes, its associated
 tile reference changes.
 
 
-@var unsigned short dtPoly::neis[DT_VERTS_PER_POLYGON]
+@var unsigned short dtPoly::neis[RD_VERTS_PER_POLYGON]
 @par
 
 Each entry represents data for the edge starting at the vertex of the same index.
