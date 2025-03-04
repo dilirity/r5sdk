@@ -285,7 +285,7 @@ int dtPathCorridor::findCorners(float* cornerVerts, unsigned char* cornerFlags,
 	
 	int ncorners = 0;
 	navquery->findStraightPath(m_pos, m_target, m_path, m_jumps, m_npath,
-							   cornerVerts, cornerFlags, cornerPolys, cornerJumps, &ncorners, maxCorners, 0xffffffff);
+							   cornerVerts, cornerFlags, cornerPolys, cornerJumps, &ncorners, maxCorners, 0xffffffff, DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP);
 	
 	// Prune points in the beginning of the path which are too close.
 	while (ncorners)
