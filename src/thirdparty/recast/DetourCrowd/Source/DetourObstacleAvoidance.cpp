@@ -22,20 +22,20 @@
 #include "Shared\Include\SharedAlloc.h"
 #include "Shared\Include\SharedAssert.h"
 
-static int sweepCircleCircle(const float* c0, const float r0, const float* v,
-							 const float* c1, const float r1,
+static int sweepCircleCircle(const rdVec3D* c0, const float r0, const rdVec3D* v,
+							 const rdVec3D* c1, const float r1,
 							 float& tmin, float& tmax)
 {
-	static const float EPS = 0.0001f;
-	float s[3];
-	rdVsub(s,c1,c0);
+	static const float EPS = 0.0001f; // math_refactor(kawe): use RD_EPS.
+	rdVec3D s;
+	rdVsub(&s,c1,c0);
 	float r = r0+r1;
-	float c = rdVdot2D(s,s) - r*r;
+	float c = rdVdot2D(&s,&s) - r*r;
 	float a = rdVdot2D(v,v);
 	if (a < EPS) return 0;	// not moving
 	
 	// Overlap, calc time to exit.
-	float b = rdVdot2D(v,s);
+	float b = rdVdot2D(v,&s);
 	float d = b*b - a*c;
 	if (d < 0.0f) return 0; // no intersection.
 	a = 1.0f / a;
@@ -45,19 +45,19 @@ static int sweepCircleCircle(const float* c0, const float r0, const float* v,
 	return 1;
 }
 
-static int isectRaySeg(const float* ap, const float* u,
-					   const float* bp, const float* bq,
+static int isectRaySeg(const rdVec3D* ap, const rdVec2D* u,
+					   const rdVec3D* bp, const rdVec3D* bq,
 					   float& t)
 {
-	float v[3], w[3];
-	rdVsub(v,bq,bp);
-	rdVsub(w,ap,bp);
-	float d = rdVperp2D(u,v);
+	rdVec3D v, w;
+	rdVsub(&v,bq,bp);
+	rdVsub(&w,ap,bp);
+	float d = rdVperp2D(u,&v);
 	if (rdMathFabsf(d) < RD_EPS) return 0;
 	d = 1.0f/d;
-	t = rdVperp2D(v,w) * d;
+	t = rdVperp2D(&v,&w) * d;
 	if (t < 0 || t > 1) return 0;
-	float s = rdVperp2D(u,w) * d;
+	float s = rdVperp2D(u,&w) * d;
 	if (s < 0 || s > 1) return 0;
 	return 1;
 }
@@ -108,7 +108,7 @@ bool dtObstacleAvoidanceDebugData::init(const int maxSamples)
 	rdAssert(maxSamples);
 	m_maxSamples = maxSamples;
 
-	m_vel = (float*)rdAlloc(sizeof(float)*3*m_maxSamples, RD_ALLOC_PERM);
+	m_vel = (rdVec3D*)rdAlloc(sizeof(rdVec3D)*m_maxSamples, RD_ALLOC_PERM);
 	if (!m_vel)
 		return false;
 	m_pen = (float*)rdAlloc(sizeof(float)*m_maxSamples, RD_ALLOC_PERM);
@@ -138,7 +138,7 @@ void dtObstacleAvoidanceDebugData::reset()
 	m_nsamples = 0;
 }
 
-void dtObstacleAvoidanceDebugData::addSample(const float* vel, const float ssize, const float pen,
+void dtObstacleAvoidanceDebugData::addSample(const rdVec3D* vel, const float ssize, const float pen,
 											 const float vpen, const float vcpen, const float spen, const float tpen)
 {
 	if (m_nsamples >= m_maxSamples)
@@ -150,7 +150,7 @@ void dtObstacleAvoidanceDebugData::addSample(const float* vel, const float ssize
 	rdAssert(m_vcpen);
 	rdAssert(m_spen);
 	rdAssert(m_tpen);
-	rdVcopy(&m_vel[m_nsamples*3], vel);
+	m_vel[m_nsamples] = *vel;
 	m_ssize[m_nsamples] = ssize;
 	m_pen[m_nsamples] = pen;
 	m_vpen[m_nsamples] = vpen;
@@ -245,30 +245,30 @@ void dtObstacleAvoidanceQuery::reset()
 	m_nsegments = 0;
 }
 
-void dtObstacleAvoidanceQuery::addCircle(const float* pos, const float rad,
-										 const float* vel, const float* dvel)
+void dtObstacleAvoidanceQuery::addCircle(const rdVec3D* pos, const float rad,
+										 const rdVec3D* vel, const rdVec3D* dvel)
 {
 	if (m_ncircles >= m_maxCircles)
 		return;
 		
 	dtObstacleCircle* cir = &m_circles[m_ncircles++];
-	rdVcopy(cir->p, pos);
+	cir->p = *pos;
 	cir->rad = rad;
-	rdVcopy(cir->vel, vel);
-	rdVcopy(cir->dvel, dvel);
+	cir->vel = *vel;
+	cir->dvel = *dvel;
 }
 
-void dtObstacleAvoidanceQuery::addSegment(const float* p, const float* q)
+void dtObstacleAvoidanceQuery::addSegment(const rdVec3D* p, const rdVec3D* q)
 {
 	if (m_nsegments >= m_maxSegments)
 		return;
 	
 	dtObstacleSegment* seg = &m_segments[m_nsegments++];
-	rdVcopy(seg->p, p);
-	rdVcopy(seg->q, q);
+	seg->p = *p;
+	seg->q = *q;
 }
 
-void dtObstacleAvoidanceQuery::prepare(const float* pos, const float* dvel)
+void dtObstacleAvoidanceQuery::prepare(const rdVec3D* pos, const rdVec3D* dvel)
 {
 	// Prepare obstacles
 	for (int i = 0; i < m_ncircles; ++i)
@@ -276,25 +276,25 @@ void dtObstacleAvoidanceQuery::prepare(const float* pos, const float* dvel)
 		dtObstacleCircle* cir = &m_circles[i];
 		
 		// Side
-		const float* pa = pos;
-		const float* pb = cir->p;
+		const rdVec3D* pa = pos;
+		const rdVec3D* pb = &cir->p;
 		
-		const float orig[3] = {0,0,0};
-		float dv[3];
-		rdVsub(cir->dp,pb,pa);
-		rdVnormalize(cir->dp);
-		rdVsub(dv, cir->dvel, dvel);
+		const rdVec3D orig(0,0,0);
+		rdVec3D dv;
+		rdVsub(&cir->dp,pb,pa);
+		rdVnormalize(&cir->dp);
+		rdVsub(&dv, &cir->dvel, dvel);
 		
-		const float a = rdTriArea2D(orig, cir->dp,dv);
+		const float a = rdTriArea2D(&orig, &cir->dp,&dv);
 		if (a < 0.01f)
 		{
-			cir->np[0] = -cir->dp[1];
-			cir->np[1] = cir->dp[0];
+			cir->np.x = -cir->dp.y;
+			cir->np.y = cir->dp.x;
 		}
 		else
 		{
-			cir->np[0] = cir->dp[1];
-			cir->np[1] = -cir->dp[0];
+			cir->np.x = cir->dp.y;
+			cir->np.y = -cir->dp.x;
 		}
 	}	
 
@@ -305,8 +305,8 @@ void dtObstacleAvoidanceQuery::prepare(const float* pos, const float* dvel)
 		// Precalc if the agent is really close to the segment.
 		const float r = 0.01f;
 		float t;
-		seg->touch = rdDistancePtSegSqr2D(pos, seg->p, seg->q, t) < rdSqr(r);
-	}	
+		seg->touch = rdDistancePtSegSqr2D(pos, &seg->p, &seg->q, t) < rdSqr(r);
+	}
 }
 
 
@@ -316,9 +316,9 @@ void dtObstacleAvoidanceQuery::prepare(const float* pos, const float* dvel)
  * @param dvel desired velocity
  * @param minPenalty threshold penalty for early out
  */
-float dtObstacleAvoidanceQuery::processSample(const float* vcand, const float cs,
-											  const float* pos, const float rad,
-											  const float* vel, const float* dvel,
+float dtObstacleAvoidanceQuery::processSample(const rdVec3D* vcand, const float cs,
+											  const rdVec3D* pos, const float rad,
+											  const rdVec3D* vel, const rdVec2D* dvel,
 											  const float minPenalty,
 											  dtObstacleAvoidanceDebugData* debug)
 {
@@ -327,7 +327,7 @@ float dtObstacleAvoidanceQuery::processSample(const float* vcand, const float cs
 	const float vcpen = m_params.weightCurVel * (rdVdist2D(vcand, vel) * m_invVmax);
 
 	// find the threshold hit time to bail out based on the early out penalty
-	// (see how the penalty is calculated below to understnad)
+	// (see how the penalty is calculated below to understand)
 	float minPen = minPenalty - vpen - vcpen;
 	float tThresold = (m_params.weightToi / minPen - 0.1f) * m_params.horizTime;
 	if (tThresold - m_params.horizTime > -FLT_EPSILON)
@@ -343,17 +343,17 @@ float dtObstacleAvoidanceQuery::processSample(const float* vcand, const float cs
 		const dtObstacleCircle* cir = &m_circles[i];
 			
 		// RVO
-		float vab[3];
-		rdVscale(vab, vcand, 2);
-		rdVsub(vab, vab, vel);
-		rdVsub(vab, vab, cir->vel);
+		rdVec3D vab;
+		rdVscale(&vab, vcand, 2);
+		rdVsub(&vab, &vab, vel);
+		rdVsub(&vab, &vab, &cir->vel);
 		
 		// Side
-		side += rdClamp(rdMin(rdVdot2D(cir->dp,vab)*0.5f+0.5f, rdVdot2D(cir->np,vab)*2), 0.0f, 1.0f);
+		side += rdClamp(rdMin(rdVdot2D(&cir->dp,&vab)*0.5f+0.5f, rdVdot2D(&cir->np,&vab)*2), 0.0f, 1.0f);
 		nside++;
 		
 		float htmin = 0, htmax = 0;
-		if (!sweepCircleCircle(pos,rad, vab, cir->p,cir->rad, htmin, htmax))
+		if (!sweepCircleCircle(pos,rad, &vab, &cir->p,cir->rad, htmin, htmax))
 			continue;
 		
 		// Handle overlapping obstacles.
@@ -383,19 +383,19 @@ float dtObstacleAvoidanceQuery::processSample(const float* vcand, const float cs
 		if (seg->touch)
 		{
 			// Special case when the agent is very close to the segment.
-			float sdir[3], snorm[3];
-			rdVsub(sdir, seg->q, seg->p);
-			snorm[0] = -sdir[1];
-			snorm[1] = sdir[0];
+			rdVec3D sdir, snorm;
+			rdVsub(&sdir, &seg->q, &seg->p);
+			snorm.x = -sdir.y;
+			snorm.y = sdir.x;
 			// If the velocity is pointing towards the segment, no collision.
-			if (rdVdot2D(snorm, vcand) < 0.0f)
+			if (rdVdot2D(&snorm, vcand) < 0.0f)
 				continue;
 			// Else immediate collision.
 			htmin = 0.0f;
 		}
 		else
 		{
-			if (!isectRaySeg(pos, vcand, seg->p, seg->q, htmin))
+			if (!isectRaySeg(pos, vcand, &seg->p, &seg->q, htmin))
 				continue;
 		}
 		
@@ -427,8 +427,8 @@ float dtObstacleAvoidanceQuery::processSample(const float* vcand, const float cs
 	return penalty;
 }
 
-int dtObstacleAvoidanceQuery::sampleVelocityGrid(const float* pos, const float rad, const float vmax,
-												 const float* vel, const float* dvel, float* nvel,
+int dtObstacleAvoidanceQuery::sampleVelocityGrid(const rdVec3D* pos, const float rad, const float vmax,
+												 const rdVec3D* vel, const rdVec3D* dvel, rdVec3D* nvel,
 												 const dtObstacleAvoidanceParams* params,
 												 dtObstacleAvoidanceDebugData* debug)
 {
@@ -444,8 +444,8 @@ int dtObstacleAvoidanceQuery::sampleVelocityGrid(const float* pos, const float r
 	if (debug)
 		debug->reset();
 
-	const float cvx = dvel[0] * m_params.velBias;
-	const float cvy = dvel[1] * m_params.velBias;
+	const float cvx = dvel->x * m_params.velBias;
+	const float cvy = dvel->y * m_params.velBias;
 	const float cs = vmax * 2 * (1 - m_params.velBias) / (float)(m_params.gridSize-1);
 	const float half = (m_params.gridSize-1)*cs*0.5f;
 		
@@ -456,19 +456,19 @@ int dtObstacleAvoidanceQuery::sampleVelocityGrid(const float* pos, const float r
 	{
 		for (int x = 0; x < m_params.gridSize; ++x)
 		{
-			float vcand[3];
-			vcand[0] = cvx + x*cs - half;
-			vcand[1] = cvy + y*cs - half;
-			vcand[2] = 0;
+			rdVec3D vcand;
+			vcand.x = cvx + x*cs - half;
+			vcand.y = cvy + y*cs - half;
+			vcand.z = 0;
 			
-			if (rdSqr(vcand[0])+rdSqr(vcand[1]) > rdSqr(vmax+cs/2)) continue;
+			if (rdSqr(vcand.x)+rdSqr(vcand.y) > rdSqr(vmax+cs/2)) continue;
 			
-			const float penalty = processSample(vcand, cs, pos,rad,vel,dvel, minPenalty, debug);
+			const float penalty = processSample(&vcand, cs, pos,rad,vel,dvel, minPenalty, debug);
 			ns++;
 			if (penalty < minPenalty)
 			{
 				minPenalty = penalty;
-				rdVcopy(nvel, vcand);
+				rdVcopy(nvel, &vcand);
 			}
 		}
 	}
@@ -478,29 +478,18 @@ int dtObstacleAvoidanceQuery::sampleVelocityGrid(const float* pos, const float r
 
 
 // vector normalization that ignores the z-component.
-inline void dtNormalize2D(float* v)
+inline void dtRotate2D(rdVec3D* dest, const rdVec3D* v, float ang) // math_refactor(amos): move to common.
 {
-	float d = rdMathSqrtf(v[0] * v[0] + v[1] * v[1]);
-	if (d==0)
-		return;
-	d = 1.0f / d;
-	v[0] *= d;
-	v[1] *= d;
-}
-
-// vector normalization that ignores the z-component.
-inline void dtRorate2D(float* dest, const float* v, float ang)
-{
-	float c = rdMathCosf(ang);
-	float s = rdMathSinf(ang);
-	dest[0] = v[0]*c - v[1]*s;
-	dest[1] = v[0]*s + v[1]*c;
-	dest[2] = v[2];
+	const float c = rdMathCosf(ang);
+	const float s = rdMathSinf(ang);
+	dest->x = v->x*c - v->y*s;
+	dest->y = v->x*s + v->y*c;
+	dest->z = v->z;
 }
 
 
-int dtObstacleAvoidanceQuery::sampleVelocityAdaptive(const float* pos, const float rad, const float vmax,
-													 const float* vel, const float* dvel, float* nvel,
+int dtObstacleAvoidanceQuery::sampleVelocityAdaptive(const rdVec3D* pos, const float rad, const float vmax,
+													 const rdVec3D* vel, const rdVec3D* dvel, rdVec3D* nvel,
 													 const dtObstacleAvoidanceParams* params,
 													 dtObstacleAvoidanceDebugData* debug)
 {
@@ -511,13 +500,13 @@ int dtObstacleAvoidanceQuery::sampleVelocityAdaptive(const float* pos, const flo
 	m_vmax = vmax;
 	m_invVmax = vmax > 0 ? 1.0f / vmax : FLT_MAX;
 	
-	rdVset(nvel, 0,0,0);
+	nvel->init(0,0,0);
 	
 	if (debug)
 		debug->reset();
 
 	// Build sampling pattern aligned to desired velocity.
-	float pat[(DT_MAX_PATTERN_DIVS*DT_MAX_PATTERN_RINGS+1)*2];
+	rdVec2D pat[DT_MAX_PATTERN_DIVS*DT_MAX_PATTERN_RINGS+1];
 	int npat = 0;
 
 	const int ndivs = (int)m_params.adaptiveDivs;
@@ -531,33 +520,33 @@ int dtObstacleAvoidanceQuery::sampleVelocityAdaptive(const float* pos, const flo
 	const float sa = rdMathSinf(da);
 
 	// desired direction
-	float ddir[6];
-	rdVcopy(ddir, dvel);
-	dtNormalize2D(ddir);
-	dtRorate2D (ddir+3, ddir, da*0.5f); // rotated by da/2
+	rdVec3D ddir[2];
+	rdVcopy(&ddir[0], dvel);
+	rdVnormalize2D(&ddir[0]);
+	dtRotate2D(&ddir[1], ddir, da * 0.5f); // rotated by da/2
 
 	// Always add sample at zero
-	pat[npat*2+0] = 0;
-	pat[npat*2+1] = 0;
+	pat[npat].x = 0;
+	pat[npat].y = 0;
 	npat++;
 	
 	for (int j = 0; j < nr; ++j)
 	{
 		const float r = (float)(nr-j)/(float)nr;
-		pat[npat*2+0] = ddir[(j%2)*3] * r;
-		pat[npat*2+1] = ddir[(j%2)*3+1] * r;
-		float* last1 = pat + npat*2;
-		float* last2 = last1;
+		pat[npat].x = ddir[(j%2)].x * r;
+		pat[npat].y = ddir[(j%2)].y * r;
+		rdVec2D* last1 = &pat[npat];
+		rdVec2D* last2 = last1;
 		npat++;
 
 		for (int i = 1; i < nd-1; i+=2)
 		{
 			// get next point on the "right" (rotate CW)
-			pat[npat*2+0] = last1[0]*ca + last1[1]*sa;
-			pat[npat*2+1] = -last1[0]*sa + last1[1]*ca;
+			pat[npat].x = last1->x*ca + last1->y*sa;
+			pat[npat].y = -last1->x*sa + last1->y*ca;
 			// get next point on the "left" (rotate CCW)
-			pat[npat*2+2] = last2[0]*ca - last2[1]*sa;
-			pat[npat*2+3] = last2[0]*sa + last2[1]*ca;
+			pat[npat+1].x = last2->x*ca - last2->y*sa;
+			pat[npat+1].y = last2->x*sa + last2->y*ca;
 
 			last1 = pat + npat*2;
 			last2 = last1 + 2;
@@ -566,8 +555,8 @@ int dtObstacleAvoidanceQuery::sampleVelocityAdaptive(const float* pos, const flo
 
 		if ((nd&1) == 0)
 		{
-			pat[npat*2+2] = last2[0]*ca - last2[1]*sa;
-			pat[npat*2+3] = last2[0]*sa + last2[1]*ca;
+			pat[npat+1].x = last2->x*ca - last2->y*sa;
+			pat[npat+1].y = last2->x*sa + last2->y*ca;
 			npat++;
 		}
 	}
@@ -575,40 +564,39 @@ int dtObstacleAvoidanceQuery::sampleVelocityAdaptive(const float* pos, const flo
 
 	// Start sampling.
 	float cr = vmax * (1.0f - m_params.velBias);
-	float res[3];
-	rdVset(res, dvel[0] * m_params.velBias, 0, dvel[2] * m_params.velBias);
+	rdVec3D res;
+	rdVset(&res, dvel->x * m_params.velBias, 0, dvel->z * m_params.velBias); // math_refactor(kawe): probably a missed xzy -> xyz conversion here!
 	int ns = 0;
 
 	for (int k = 0; k < depth; ++k)
 	{
 		float minPenalty = FLT_MAX;
-		float bvel[3];
-		rdVset(bvel, 0,0,0);
+		rdVec3D bvel(0,0,0);
 		
 		for (int i = 0; i < npat; ++i)
 		{
-			float vcand[3];
-			vcand[0] = res[0] + pat[i*2+0]*cr;
-			vcand[1] = res[1] + pat[i*2+1]*cr;
-			vcand[2] = 0;
+			rdVec3D vcand;
+			vcand.x = res.x + pat[i].x*cr;
+			vcand.y = res.y + pat[i].y*cr;
+			vcand.z = 0;
 			
-			if (rdSqr(vcand[0])+rdSqr(vcand[1]) > rdSqr(vmax+0.001f)) continue;
+			if (rdSqr(vcand.x)+rdSqr(vcand.y) > rdSqr(vmax+0.001f)) continue;
 			
-			const float penalty = processSample(vcand,cr/10, pos,rad,vel,dvel, minPenalty, debug);
+			const float penalty = processSample(&vcand,cr/10, pos,rad,vel,dvel, minPenalty, debug);
 			ns++;
 			if (penalty < minPenalty)
 			{
 				minPenalty = penalty;
-				rdVcopy(bvel, vcand);
+				rdVcopy(&bvel, &vcand);
 			}
 		}
 
-		rdVcopy(res, bvel);
+		rdVcopy(&res, &bvel);
 
 		cr *= 0.5f;
 	}	
 	
-	rdVcopy(nvel, res);
+	rdVcopy(nvel, &res);
 	
 	return ns;
 }

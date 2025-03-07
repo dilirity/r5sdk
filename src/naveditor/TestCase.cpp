@@ -189,11 +189,11 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 	
 	resetTimes();
 	
-	static const int MAX_POLYS = 256;
+	static const int MAX_POLYS = 256; // math_refactor(kawe): increase this to 512.
 	dtPolyRef polys[MAX_POLYS];
 	unsigned char jumps[MAX_POLYS];
-	float straight[MAX_POLYS*3];
-	const float polyPickExt[3] = {2,4,2};
+	rdVec3D straight[MAX_POLYS];
+	const rdVec3D polyPickExt(2,4,2); // math_refactor(kawe): missed XZY -> XYZ coordinate conversion here!
 	
 	for (Test* iter = m_tests; iter; iter = iter->next)
 	{
@@ -212,8 +212,8 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 		rdTimeType findNearestPolyStart = getPerfTime();
 		
 		dtPolyRef startRef, endRef;
-		navquery->findNearestPoly(iter->spos, polyPickExt, &filter, &startRef, iter->nspos);
-		navquery->findNearestPoly(iter->epos, polyPickExt, &filter, &endRef, iter->nepos);
+		navquery->findNearestPoly(&iter->spos, &polyPickExt, &filter, &startRef, &iter->nspos);
+		navquery->findNearestPoly(&iter->epos, &polyPickExt, &filter, &endRef, &iter->nepos);
 
 		rdTimeType findNearestPolyEnd = getPerfTime();
 		iter->findNearestPolyTime += getPerfTimeUsec(findNearestPolyEnd - findNearestPolyStart);
@@ -226,7 +226,7 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 			// Find path
 			rdTimeType findPathStart = getPerfTime();
 
-			navquery->findPath(startRef, endRef, iter->spos, iter->epos, &filter, polys, jumps, &iter->npolys, MAX_POLYS);
+			navquery->findPath(startRef, endRef, &iter->spos, &iter->epos, &filter, polys, jumps, &iter->npolys, MAX_POLYS);
 			
 			rdTimeType findPathEnd = getPerfTime();
 			iter->findPathTime += getPerfTimeUsec(findPathEnd - findPathStart);
@@ -236,7 +236,7 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 			{
 				rdTimeType findStraightPathStart = getPerfTime();
 				
-				navquery->findStraightPath(iter->spos, iter->epos, polys, jumps, iter->npolys,
+				navquery->findStraightPath(&iter->spos, &iter->epos, polys, jumps, iter->npolys,
 										   straight, 0, 0, 0, &iter->nstraight, MAX_POLYS, 0xffffffff);
 				rdTimeType findStraightPathEnd = getPerfTime();
 				iter->findStraightPathTime += getPerfTimeUsec(findStraightPathEnd - findStraightPathStart);
@@ -250,25 +250,25 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 			}
 			if (iter->nstraight)
 			{
-				iter->straight = new float[iter->nstraight*3];
-				memcpy(iter->straight, straight, sizeof(float)*3*iter->nstraight);
+				iter->straight = new rdVec3D[iter->nstraight];
+				memcpy(iter->straight, straight, sizeof(rdVec3D)*iter->nstraight);
 			}
 		}
 		else if (iter->type == TEST_RAYCAST)
 		{
 			float t = 0;
-			float hitNormal[3], hitPos[3];
+			rdVec3D hitNormal, hitPos;
 			
-			iter->straight = new float[2*3];
+			iter->straight = new rdVec3D[2];
 			iter->nstraight = 2;
 			
-			iter->straight[0] = iter->spos[0];
-			iter->straight[1] = iter->spos[1];
-			iter->straight[2] = iter->spos[2];
+			iter->straight->x = iter->spos.x;
+			iter->straight->y = iter->spos.y;
+			iter->straight->z = iter->spos.z;
 			
 			rdTimeType findPathStart = getPerfTime();
 			
-			navquery->raycast(startRef, iter->spos, iter->epos, &filter, &t, hitNormal, polys, &iter->npolys, MAX_POLYS);
+			navquery->raycast(startRef, &iter->spos, &iter->epos, &filter, &t, &hitNormal, polys, &iter->npolys, MAX_POLYS);
 
 			rdTimeType findPathEnd = getPerfTime();
 			iter->findPathTime += getPerfTimeUsec(findPathEnd - findPathStart);
@@ -276,21 +276,21 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 			if (t > 1)
 			{
 				// No hit
-				rdVcopy(hitPos, iter->epos);
+				hitPos = iter->epos;
 			}
 			else
 			{
 				// Hit
-				rdVlerp(hitPos, iter->spos, iter->epos, t);
+				rdVlerp(&hitPos, &iter->spos, &iter->epos, t);
 			}
 			// Adjust height.
 			if (iter->npolys > 0)
 			{
 				float h = 0;
-				navquery->getPolyHeight(polys[iter->npolys-1], hitPos, &h);
-				hitPos[2] = h;
+				navquery->getPolyHeight(polys[iter->npolys-1], &hitPos, &h);
+				hitPos.z = h;
 			}
-			rdVcopy(&iter->straight[3], hitPos);
+			rdVcopy(&iter->straight[1], &hitPos);
 
 			if (iter->npolys)
 			{
@@ -320,42 +320,42 @@ void TestCase::handleRender()
 	glBegin(GL_LINES);
 	for (Test* iter = m_tests; iter; iter = iter->next)
 	{
-		float dir[3];
-		rdVsub(dir, iter->epos, iter->spos);
-		rdVnormalize(dir);
+		rdVec3D dir;
+		rdVsub(&dir, &iter->epos, &iter->spos);
+		rdVnormalize(&dir);
 		glColor4ub(128,25,0,192);
-		glVertex3f(iter->spos[0],iter->spos[1],iter->spos[2]-0.3f);
-		glVertex3f(iter->spos[0],iter->spos[1],iter->spos[2]+0.3f);
-		glVertex3f(iter->spos[0],iter->spos[1],iter->spos[2]+0.3f);
-		glVertex3f(iter->spos[0]+dir[0]*0.3f,iter->spos[1]+dir[1]*0.3f,iter->spos[2]+0.3f+dir[2]*0.3f);
+		glVertex3f(iter->spos.x,iter->spos.y,iter->spos.z-0.3f);
+		glVertex3f(iter->spos.x,iter->spos.y,iter->spos.z+0.3f);
+		glVertex3f(iter->spos.x,iter->spos.y,iter->spos.z+0.3f);
+		glVertex3f(iter->spos.x+dir.x*0.3f,iter->spos.y+dir.y*0.3f,iter->spos.z+0.3f+dir.z*0.3f);
 		glColor4ub(51,102,0,129);
-		glVertex3f(iter->epos[0],iter->epos[1],iter->epos[2]-0.3f);
-		glVertex3f(iter->epos[0],iter->epos[1],iter->epos[2]+0.3f);
+		glVertex3f(iter->epos.x,iter->epos.y,iter->epos.z-0.3f);
+		glVertex3f(iter->epos.x,iter->epos.y,iter->epos.z+0.3f);
 
 		if (iter->expand)
 		{
 			const float s = 0.1f;
 			glColor4ub(255,32,0,128);
-			glVertex3f(iter->spos[0]-s,iter->spos[1],iter->spos[2]);
-			glVertex3f(iter->spos[0]+s,iter->spos[1],iter->spos[2]);
-			glVertex3f(iter->spos[0],iter->spos[1]-s,iter->spos[2]);
-			glVertex3f(iter->spos[0],iter->spos[1]+s,iter->spos[2]);
+			glVertex3f(iter->spos.x-s,iter->spos.y,iter->spos.z);
+			glVertex3f(iter->spos.x+s,iter->spos.y,iter->spos.z);
+			glVertex3f(iter->spos.x,iter->spos.y-s,iter->spos.z);
+			glVertex3f(iter->spos.x,iter->spos.y+s,iter->spos.z);
 			glColor4ub(255,192,0,255);
-			glVertex3f(iter->nspos[0]-s,iter->nspos[1],iter->nspos[2]);
-			glVertex3f(iter->nspos[0]+s,iter->nspos[1],iter->nspos[2]);
-			glVertex3f(iter->nspos[0],iter->nspos[1]-s,iter->nspos[2]);
-			glVertex3f(iter->nspos[0],iter->nspos[1]+s,iter->nspos[2]);
+			glVertex3f(iter->nspos.x-s,iter->nspos.y,iter->nspos.z);
+			glVertex3f(iter->nspos.x+s,iter->nspos.y,iter->nspos.z);
+			glVertex3f(iter->nspos.x,iter->nspos.y-s,iter->nspos.z);
+			glVertex3f(iter->nspos.x,iter->nspos.y+s,iter->nspos.z);
 			
 			glColor4ub(255,32,0,128);
-			glVertex3f(iter->epos[0]-s,iter->epos[1],iter->epos[2]);
-			glVertex3f(iter->epos[0]+s,iter->epos[1],iter->epos[2]);
-			glVertex3f(iter->epos[0],iter->epos[1]-s,iter->epos[2]);
-			glVertex3f(iter->epos[0],iter->epos[1]+s,iter->epos[2]);
+			glVertex3f(iter->epos.x-s,iter->epos.y,iter->epos.z);
+			glVertex3f(iter->epos.x+s,iter->epos.y,iter->epos.z);
+			glVertex3f(iter->epos.x,iter->epos.y-s,iter->epos.z);
+			glVertex3f(iter->epos.x,iter->epos.y+s,iter->epos.z);
 			glColor4ub(255,192,0,255);
-			glVertex3f(iter->nepos[0]-s,iter->nepos[1],iter->nepos[2]);
-			glVertex3f(iter->nepos[0]+s,iter->nepos[1],iter->nepos[2]);
-			glVertex3f(iter->nepos[0],iter->nepos[1]-s,iter->nepos[2]);
-			glVertex3f(iter->nepos[0],iter->nepos[1]+s,iter->nepos[2]);
+			glVertex3f(iter->nepos.x-s,iter->nepos.y,iter->nepos.z);
+			glVertex3f(iter->nepos.x+s,iter->nepos.y,iter->nepos.z);
+			glVertex3f(iter->nepos.x,iter->nepos.y-s,iter->nepos.z);
+			glVertex3f(iter->nepos.x,iter->nepos.y+s,iter->nepos.z);
 		}
 		
 		if (iter->expand)
@@ -365,8 +365,8 @@ void TestCase::handleRender()
 			
 		for (int i = 0; i < iter->nstraight-1; ++i)
 		{
-			glVertex3f(iter->straight[i*3+0],iter->straight[i*3+1],iter->straight[i*3+2]+0.3f);
-			glVertex3f(iter->straight[(i+1)*3+0],iter->straight[(i+1)*3+1],iter->straight[(i+1)*3+2]+0.3f);
+			glVertex3f(iter->straight[i].x,iter->straight[i].y,iter->straight[i].z+0.3f);
+			glVertex3f(iter->straight[(i+1)].x,iter->straight[(i+1)].y,iter->straight[(i+1)].z+0.3f);
 		}
 	}
 	glEnd();
@@ -384,24 +384,24 @@ bool TestCase::handleRenderOverlay(double* proj, double* model, int* view)
 
 	for (Test* iter = m_tests; iter; iter = iter->next)
 	{
-		float pt[3], dir[3];
+		rdVec3D pt, dir;
 		if (iter->nstraight)
 		{
-			rdVcopy(pt, &iter->straight[3]);
-			if (rdVdist(pt, iter->spos) > LABEL_DIST)
+			rdVcopy(&pt, &iter->straight[1]);
+			if (rdVdist(&pt, &iter->spos) > LABEL_DIST)
 			{
-				rdVsub(dir, pt, iter->spos);
-				rdVnormalize(dir);
-				rdVmad(pt, iter->spos, dir, LABEL_DIST);
+				rdVsub(&dir, &pt, &iter->spos);
+				rdVnormalize(&dir);
+				rdVmad(&pt, &iter->spos, &dir, LABEL_DIST);
 			}
-			pt[2]+=0.5f;
+			pt.z+=0.5f;
 		}
 		else
 		{
-			rdVsub(dir, iter->epos, iter->spos);
-			rdVnormalize(dir);
-			rdVmad(pt, iter->spos, dir, LABEL_DIST);
-			pt[2]+=0.5f;
+			rdVsub(&dir, &iter->epos, &iter->spos);
+			rdVnormalize(&dir);
+			rdVmad(&pt, &iter->spos, &dir, LABEL_DIST);
+			pt.z+=0.5f;
 		}
 		
 		if (gluProject((GLdouble)pt[0], (GLdouble)pt[1], (GLdouble)pt[2],

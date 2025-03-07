@@ -53,7 +53,7 @@ bool duDumpPolyMeshToObj(rcPolyMesh& pmesh, duFileIO* io)
 	const int nvp = pmesh.nvp;
 	const float cs = pmesh.cs;
 	const float ch = pmesh.ch;
-	const float* orig = pmesh.bmin;
+	const rdVec3D* orig = &pmesh.bmin;
 	
 	ioprintf(io, "# Recast NavMesh\n");
 	ioprintf(io, "o NavMesh\n");
@@ -63,9 +63,9 @@ bool duDumpPolyMeshToObj(rcPolyMesh& pmesh, duFileIO* io)
 	for (int i = 0; i < pmesh.nverts; ++i)
 	{
 		const unsigned short* v = &pmesh.verts[i*3];
-		const float x = orig[0] + v[0]*cs;
-		const float y = orig[1] + v[1]*cs;
-		const float z = orig[2] +(v[2]+1)*ch + 0.1f;
+		const float x = orig->x + v[0]*cs;
+		const float y = orig->y + v[1]*cs;
+		const float z = orig->z +(v[2]+1)*ch + 0.1f;
 		ioprintf(io, "v %f %f %f\n", x,y,z);
 	}
 
@@ -77,7 +77,7 @@ bool duDumpPolyMeshToObj(rcPolyMesh& pmesh, duFileIO* io)
 		for (int j = 2; j < nvp; ++j)
 		{
 			if (p[j] == RD_MESH_NULL_IDX) break;
-			ioprintf(io, "f %d %d %d\n", p[0]+1, p[j-1]+1, p[j]+1); 
+			ioprintf(io, "f %d %d %d\n", (int)p[0]+1, (int)p[j-1]+1, (int)p[j]+1);
 		}
 	}
 	
@@ -104,8 +104,8 @@ bool duDumpPolyMeshDetailToObj(rcPolyMeshDetail& dmesh, duFileIO* io)
 
 	for (int i = 0; i < dmesh.nverts; ++i)
 	{
-		const float* v = &dmesh.verts[i*3];
-		ioprintf(io, "v %f %f %f\n", v[0],v[1],v[2]);
+		const rdVec3D* v = &dmesh.verts[i];
+		ioprintf(io, "v %f %f %f\n", v->x,v->y,v->z);
 	}
 	
 	ioprintf(io, "\n");
@@ -150,8 +150,8 @@ bool duDumpContourSet(struct rcContourSet& cset, duFileIO* io)
 
 	io->write(&cset.nconts, sizeof(cset.nconts));
 	
-	io->write(cset.bmin, sizeof(cset.bmin));
-	io->write(cset.bmax, sizeof(cset.bmax));
+	io->write(&cset.bmin, sizeof(cset.bmin));
+	io->write(&cset.bmax, sizeof(cset.bmax));
 	
 	io->write(&cset.cs, sizeof(cset.cs));
 	io->write(&cset.ch, sizeof(cset.ch));
@@ -214,8 +214,8 @@ bool duReadContourSet(struct rcContourSet& cset, duFileIO* io)
 	}
 	memset(cset.conts, 0, sizeof(rcContour)*cset.nconts);
 	
-	io->read(cset.bmin, sizeof(cset.bmin));
-	io->read(cset.bmax, sizeof(cset.bmax));
+	io->read(&cset.bmin, sizeof(cset.bmin));
+	io->read(&cset.bmax, sizeof(cset.bmax));
 	
 	io->read(&cset.cs, sizeof(cset.cs));
 	io->read(&cset.ch, sizeof(cset.ch));
@@ -283,8 +283,8 @@ bool duDumpCompactHeightfield(struct rcCompactHeightfield& chf, duFileIO* io)
 	io->write(&chf.maxDistance, sizeof(chf.maxDistance));
 	io->write(&chf.maxRegions, sizeof(chf.maxRegions));
 
-	io->write(chf.bmin, sizeof(chf.bmin));
-	io->write(chf.bmax, sizeof(chf.bmax));
+	io->write(&chf.bmin, sizeof(chf.bmin));
+	io->write(&chf.bmax, sizeof(chf.bmax));
 
 	io->write(&chf.cs, sizeof(chf.cs));
 	io->write(&chf.ch, sizeof(chf.ch));
@@ -350,8 +350,8 @@ bool duReadCompactHeightfield(struct rcCompactHeightfield& chf, duFileIO* io)
 	io->read(&chf.maxDistance, sizeof(chf.maxDistance));
 	io->read(&chf.maxRegions, sizeof(chf.maxRegions));
 	
-	io->read(chf.bmin, sizeof(chf.bmin));
-	io->read(chf.bmax, sizeof(chf.bmax));
+	io->read(&chf.bmin, sizeof(chf.bmin));
+	io->read(&chf.bmax, sizeof(chf.bmax));
 	
 	io->read(&chf.cs, sizeof(chf.cs));
 	io->read(&chf.ch, sizeof(chf.ch));

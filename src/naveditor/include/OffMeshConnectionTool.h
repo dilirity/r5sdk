@@ -26,8 +26,9 @@
 // TODO: eventually this needs to be the type for off-mesh connections in InputGeom!
 struct OffMeshConnection
 {
-	float pos[6];
-	float refPos[3];
+	rdVec3D posa;
+	rdVec3D posb;
+	rdVec3D refPos;
 	float rad;
 	float refYaw;
 	unsigned char dir;
@@ -40,8 +41,8 @@ struct OffMeshConnection
 class OffMeshConnectionTool : public EditorTool
 {
 	Editor* m_editor;
-	float m_hitPos[3];
-	float m_refOffset[3];
+	rdVec3D m_hitPos;
+	rdVec3D m_refOffset;
 	float m_lastSelectedAgentRadius;
 	float m_radius;
 	bool m_hitPosSet;
@@ -65,7 +66,7 @@ public:
 	virtual void init(Editor* editor);
 	virtual void reset();
 	virtual void handleMenu();
-	virtual void handleClick(const float* s, const float* p, const int v, bool shift);
+	virtual void handleClick(const rdVec3D* s, const rdVec3D* p, const int v, bool shift);
 	virtual void handleToggle();
 	virtual void handleStep();
 	virtual void handleUpdate(const float dt);

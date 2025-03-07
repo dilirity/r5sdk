@@ -23,11 +23,11 @@ void integrate(dtCrowdAgent* ag, const float dt);
 bool overOffmeshConnection(const dtCrowdAgent* ag, const float radius);
 bool overTraversePortal(const dtCrowdAgent* ag, const dtNavMeshQuery* query, const dtQueryFilter* filter, const float radius);
 float getDistanceToGoal(const dtCrowdAgent* ag, const float range);
-void calcSmoothSteerDirection(const dtCrowdAgent* ag, float* dir);
-void calcStraightSteerDirection(const dtCrowdAgent* ag, float* dir);
+void calcSmoothSteerDirection(const dtCrowdAgent* ag, rdVec3D* dir);
+void calcStraightSteerDirection(const dtCrowdAgent* ag, rdVec3D* dir);
 int addNeighbour(const int idx, const float dist,
 	dtCrowdNeighbour* neis, const int nneis, const int maxNeis);
-int getNeighbours(const float* pos, const float height, const float range,
+int getNeighbours(const rdVec3D* pos, const float height, const float range,
 	const dtCrowdAgent* skip, dtCrowdNeighbour* result, const int maxResult,
 	dtCrowdAgent** agents, const int /*nagents*/, dtProximityGrid* grid);
 int addToOptQueue(dtCrowdAgent* newag, dtCrowdAgent** agents, const int nagents, const int maxAgents);

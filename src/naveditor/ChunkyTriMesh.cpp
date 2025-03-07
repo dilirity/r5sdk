@@ -21,8 +21,8 @@
 
 struct BoundsItem
 {
-	float bmin[3];
-	float bmax[3];
+	rdVec3D bmin;
+	rdVec3D bmax;
 	int i;
 };
 
@@ -30,9 +30,9 @@ static int compareItemX(const void* va, const void* vb)
 {
 	const BoundsItem* a = (const BoundsItem*)va;
 	const BoundsItem* b = (const BoundsItem*)vb;
-	if (a->bmin[0] < b->bmin[0])
+	if (a->bmin.x < b->bmin.x)
 		return -1;
-	if (a->bmin[0] > b->bmin[0])
+	if (a->bmin.x > b->bmin.x)
 		return 1;
 	return 0;
 }
@@ -41,9 +41,9 @@ static int compareItemY(const void* va, const void* vb)
 {
 	const BoundsItem* a = (const BoundsItem*)va;
 	const BoundsItem* b = (const BoundsItem*)vb;
-	if (a->bmin[1] < b->bmin[1])
+	if (a->bmin.y < b->bmin.y)
 		return -1;
-	if (a->bmin[1] > b->bmin[1])
+	if (a->bmin.y > b->bmin.y)
 		return 1;
 	return 0;
 }
@@ -52,35 +52,35 @@ static int compareItemZ(const void* va, const void* vb)
 {
 	const BoundsItem* a = (const BoundsItem*)va;
 	const BoundsItem* b = (const BoundsItem*)vb;
-	if (a->bmin[2] < b->bmin[2])
+	if (a->bmin.z < b->bmin.z)
 		return -1;
-	if (a->bmin[2] > b->bmin[2])
+	if (a->bmin.z > b->bmin.z)
 		return 1;
 	return 0;
 }
 
 static void calcExtends(const BoundsItem* items, const int /*nitems*/,
 						const int imin, const int imax,
-						float* bmin, float* bmax)
+						rdVec3D* bmin, rdVec3D* bmax)
 {
-	bmin[0] = items[imin].bmin[0];
-	bmin[1] = items[imin].bmin[1];
-	bmin[2] = items[imin].bmin[2];
+	bmin->x = items[imin].bmin.x;
+	bmin->y = items[imin].bmin.y;
+	bmin->z = items[imin].bmin.z;
 	
-	bmax[0] = items[imin].bmax[0];
-	bmax[1] = items[imin].bmax[1];
-	bmax[2] = items[imin].bmax[2];
+	bmax->x = items[imin].bmax.x;
+	bmax->y = items[imin].bmax.y;
+	bmax->z = items[imin].bmax.z;
 	
 	for (int i = imin+1; i < imax; ++i)
 	{
 		const BoundsItem& it = items[i];
-		if (it.bmin[0] < bmin[0]) bmin[0] = it.bmin[0];
-		if (it.bmin[1] < bmin[1]) bmin[1] = it.bmin[1];
-		if (it.bmin[2] < bmin[2]) bmin[2] = it.bmin[2];
+		if (it.bmin.x < bmin->x) bmin->x = it.bmin.x;
+		if (it.bmin.y < bmin->y) bmin->y = it.bmin.y;
+		if (it.bmin.z < bmin->z) bmin->z = it.bmin.z;
 		
-		if (it.bmax[0] > bmax[0]) bmax[0] = it.bmax[0];
-		if (it.bmax[1] > bmax[1]) bmax[1] = it.bmax[1];
-		if (it.bmax[2] > bmax[2]) bmax[2] = it.bmax[2];
+		if (it.bmax.x > bmax->x) bmax->x = it.bmax.x;
+		if (it.bmax.y > bmax->y) bmax->y = it.bmax.y;
+		if (it.bmax.z > bmax->z) bmax->z = it.bmax.z;
 	}
 }
 
@@ -115,7 +115,7 @@ static void subdivide(BoundsItem* items, int nitems, int imin, int imax, int tri
 	if (inum <= trisPerChunk)
 	{
 		// Leaf
-		calcExtends(items, nitems, imin, imax, node.bmin, node.bmax);
+		calcExtends(items, nitems, imin, imax, &node.bmin, &node.bmax);
 		
 		// Copy triangles.
 		node.i = curTri;
@@ -134,11 +134,11 @@ static void subdivide(BoundsItem* items, int nitems, int imin, int imax, int tri
 	else
 	{
 		// Split
-		calcExtends(items, nitems, imin, imax, node.bmin, node.bmax);
+		calcExtends(items, nitems, imin, imax, &node.bmin, &node.bmax);
 		
-		const int	axis = longestAxis(node.bmax[0] - node.bmin[0],
-							   node.bmax[1] - node.bmin[1],
-							   node.bmax[2] - node.bmin[2]);
+		const int	axis = longestAxis(node.bmax.x - node.bmin.x,
+							   node.bmax.y - node.bmin.y,
+							   node.bmax.z - node.bmin.z);
 		
 		if (axis == 0)
 		{
@@ -169,7 +169,7 @@ static void subdivide(BoundsItem* items, int nitems, int imin, int imax, int tri
 	}
 }
 
-bool rcCreateChunkyTriMesh(const float* verts, const int* tris, int ntris,
+bool rcCreateChunkyTriMesh(const rdVec3D* verts, const int* tris, int ntris,
 						   int trisPerChunk, rcChunkyTriMesh* cm)
 {
 	int nchunks = (ntris + trisPerChunk-1) / trisPerChunk;
@@ -195,19 +195,19 @@ bool rcCreateChunkyTriMesh(const float* verts, const int* tris, int ntris,
 		BoundsItem& it = items[i];
 		it.i = i;
 		// Calc triangle XYZ bounds.
-		it.bmin[0] = it.bmax[0] = verts[t[0]*3+0];
-		it.bmin[1] = it.bmax[1] = verts[t[0]*3+1];
-		it.bmin[2] = it.bmax[2] = verts[t[0]*3+2];
+		it.bmin.x = it.bmax.x = verts[t[0]].x;
+		it.bmin.y = it.bmax.y = verts[t[0]].y;
+		it.bmin.z = it.bmax.z = verts[t[0]].z;
 		for (int j = 1; j < 3; ++j)
 		{
-			const float* v = &verts[t[j]*3];
-			if (v[0] < it.bmin[0]) it.bmin[0] = v[0]; 
-			if (v[1] < it.bmin[1]) it.bmin[1] = v[1]; 
-			if (v[2] < it.bmin[2]) it.bmin[2] = v[2]; 
+			const rdVec3D* v = &verts[t[j]];
+			if (v->x < it.bmin.x) it.bmin.x = v->x;
+			if (v->y < it.bmin.y) it.bmin.y = v->y;
+			if (v->z < it.bmin.z) it.bmin.z = v->z;
 
-			if (v[0] > it.bmax[0]) it.bmax[0] = v[0]; 
-			if (v[1] > it.bmax[1]) it.bmax[1] = v[1]; 
-			if (v[2] > it.bmax[2]) it.bmax[2] = v[2]; 
+			if (v->x > it.bmax.x) it.bmax.x = v->x;
+			if (v->y > it.bmax.y) it.bmax.y = v->y;
+			if (v->z > it.bmax.z) it.bmax.z = v->z;
 		}
 	}
 
@@ -234,17 +234,17 @@ bool rcCreateChunkyTriMesh(const float* verts, const int* tris, int ntris,
 }
 
 
-inline bool checkOverlapRect(const float amin[2], const float amax[2],
-							 const float bmin[2], const float bmax[2])
+static inline bool checkOverlapRect(const rdVec2D* amin, const rdVec2D* amax,
+							 const rdVec2D* bmin, const rdVec2D* bmax)
 {
 	bool overlap = true;
-	overlap = (amin[0] > bmax[0] || amax[0] < bmin[0]) ? false : overlap;
-	overlap = (amin[1] > bmax[1] || amax[1] < bmin[1]) ? false : overlap;
+	overlap = (amin->x > bmax->x || amax->x < bmin->x) ? false : overlap;
+	overlap = (amin->y > bmax->y || amax->y < bmin->y) ? false : overlap;
 	return overlap;
 }
 
 int rcGetChunksOverlappingRect(const rcChunkyTriMesh* cm,
-							   float bmin[2], float bmax[2],
+							   rdVec2D* bmin, rdVec2D* bmax,
 							   int* ids, const int maxIds)
 {
 	// Traverse tree
@@ -253,7 +253,7 @@ int rcGetChunksOverlappingRect(const rcChunkyTriMesh* cm,
 	while (i < cm->nnodes)
 	{
 		const rcChunkyTriMeshNode* node = &cm->nodes[i];
-		const bool overlap = checkOverlapRect(bmin, bmax, node->bmin, node->bmax);
+		const bool overlap = checkOverlapRect(bmin, bmax, &node->bmin, &node->bmax);
 		const bool isLeafNode = node->i >= 0;
 		
 		if (isLeafNode && overlap)
@@ -277,13 +277,13 @@ int rcGetChunksOverlappingRect(const rcChunkyTriMesh* cm,
 	return n;
 }
 
-int rcGetChunksOverlappingRect(const rcChunkyTriMesh * cm, float bmin[2], float bmax[2], int * ids, const int maxIds, int& currentCount, int& currentNode)
+int rcGetChunksOverlappingRect(const rcChunkyTriMesh* cm, const rdVec2D* bmin, const rdVec2D* bmax, int* ids, const int maxIds, int& currentCount, int& currentNode)
 {
 	// Traverse tree
 	while (currentNode < cm->nnodes)
 	{
 		const rcChunkyTriMeshNode* node = &cm->nodes[currentNode];
-		const bool overlap = checkOverlapRect(bmin, bmax, node->bmin, node->bmax);
+		const bool overlap = checkOverlapRect(bmin, bmax, &node->bmin, &node->bmax);
 		const bool isLeafNode = node->i >= 0;
 
 		if (isLeafNode && overlap)
@@ -313,30 +313,30 @@ int rcGetChunksOverlappingRect(const rcChunkyTriMesh * cm, float bmin[2], float 
 
 
 
-static bool checkOverlapSegment(const float p[3], const float q[3],
-								const float bmin[3], const float bmax[3])
+static bool checkOverlapSegment(const rdVec3D* p, const rdVec3D* q,
+								const rdVec3D* bmin, const rdVec3D* bmax)
 {
 	float tmin = 0;
 	float tmax = 1;
-	float d[3];
-	d[0] = q[0] - p[0];
-	d[1] = q[1] - p[1];
-	d[2] = q[2] - p[2];
+	rdVec3D d;
+	d.x = q->x - p->x;
+	d.y = q->y - p->y;
+	d.z = q->z - p->z;
 	
 	for (int i = 0; i < 3; i++)
 	{
 		if (rdMathFabsf(d[i]) < RD_EPS)
 		{
 			// Ray is parallel to slab. No hit if origin not within slab
-			if (p[i] < bmin[i] || p[i] > bmax[i])
+			if ((*p)[i] < (*bmin)[i] || (*p)[i] > (*bmax)[i])
 				return false;
 		}
 		else
 		{
 			// Compute intersection t value of ray with near and far plane of slab
 			float ood = 1.0f / d[i];
-			float t1 = (bmin[i] - p[i]) * ood;
-			float t2 = (bmax[i] - p[i]) * ood;
+			float t1 = ((*bmin)[i] - (*p)[i]) * ood;
+			float t2 = ((*bmax)[i] - (*p)[i]) * ood;
 			if (t1 > t2) { float tmp = t1; t1 = t2; t2 = tmp; }
 			if (t1 > tmin) tmin = t1;
 			if (t2 < tmax) tmax = t2;
@@ -348,7 +348,7 @@ static bool checkOverlapSegment(const float p[3], const float q[3],
 
 
 int rcGetChunksOverlappingSegment(const rcChunkyTriMesh* cm,
-								  float p[3], float q[3],
+								  const rdVec3D* p, const rdVec3D* q,
 								  int* ids, const int maxIds)
 {
 	// Traverse tree
@@ -357,7 +357,7 @@ int rcGetChunksOverlappingSegment(const rcChunkyTriMesh* cm,
 	while (i < cm->nnodes)
 	{
 		const rcChunkyTriMeshNode* node = &cm->nodes[i];
-		const bool overlap = checkOverlapSegment(p, q, node->bmin, node->bmax);
+		const bool overlap = checkOverlapSegment(p, q, &node->bmin, &node->bmax);
 		const bool isLeafNode = node->i >= 0;
 		
 		if (isLeafNode && overlap)

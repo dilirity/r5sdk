@@ -1114,8 +1114,8 @@ bool rcBuildPolyMesh(rcContext* ctx, rcContourSet& cset, const int nvp, rcPolyMe
 	
 	rcScopedTimer timer(ctx, RC_TIMER_BUILD_POLYMESH);
 
-	rdVcopy(mesh.bmin, cset.bmin);
-	rdVcopy(mesh.bmax, cset.bmax);
+	mesh.bmin = cset.bmin;
+	mesh.bmax = cset.bmax;
 	mesh.cs = cset.cs;
 	mesh.ch = cset.ch;
 	mesh.borderSize = cset.borderSize;
@@ -1435,7 +1435,7 @@ bool rcBuildPolyMesh(rcContext* ctx, rcContourSet& cset, const int nvp, rcPolyMe
 	{
 		const unsigned short* p = &mesh.polys[i*2*nvp];
 		unsigned short vi[3];
-		float fv[3][2];
+		rdVec2D fv[3];
 		float polyArea = 0.0f;
 		for (int j = 2; j < nvp; ++j)
 		{
@@ -1454,11 +1454,11 @@ bool rcBuildPolyMesh(rcContext* ctx, rcContourSet& cset, const int nvp, rcPolyMe
 			{
 				const unsigned short* v = &mesh.verts[vi[k]*3];
 
-				fv[k][0] = mesh.bmin[0] + v[0]*mesh.cs;
-				fv[k][1] = mesh.bmin[1] + v[1]*mesh.cs;
+				fv[k].x = mesh.bmin.x + v[0]*mesh.cs;
+				fv[k].y = mesh.bmin.y + v[1]*mesh.cs;
 			}
 
-			polyArea += rdTriArea2D(fv[0], fv[1], fv[2]);
+			polyArea += rdTriArea2D(&fv[0], &fv[1], &fv[2]);
 		}
 
 		mesh.surfa[i] = (unsigned short)rdMathRoundf(polyArea*RC_POLY_SURFAREA_QUANT_FACTOR);
@@ -1493,16 +1493,16 @@ bool rcMergePolyMeshes(rcContext* ctx, rcPolyMesh** meshes, const int nmeshes, r
 	mesh.nvp = meshes[0]->nvp;
 	mesh.cs = meshes[0]->cs;
 	mesh.ch = meshes[0]->ch;
-	rdVcopy(mesh.bmin, meshes[0]->bmin);
-	rdVcopy(mesh.bmax, meshes[0]->bmax);
+	mesh.bmin = meshes[0]->bmin;
+	mesh.bmax = meshes[0]->bmax;
 
 	int maxVerts = 0;
 	int maxPolys = 0;
 	int maxVertsPerMesh = 0;
 	for (int i = 0; i < nmeshes; ++i)
 	{
-		rdVmin(mesh.bmin, meshes[i]->bmin);
-		rdVmax(mesh.bmax, meshes[i]->bmax);
+		mesh.bmin = meshes[i]->bmin;
+		mesh.bmax = meshes[i]->bmax;
 		maxVertsPerMesh = rdMax(maxVertsPerMesh, meshes[i]->nverts);
 		maxVerts += meshes[i]->nverts;
 		maxPolys += meshes[i]->npolys;
@@ -1674,8 +1674,8 @@ bool rcCopyPolyMesh(rcContext* ctx, const rcPolyMesh& src, rcPolyMesh& dst)
 	dst.npolys = src.npolys;
 	dst.maxpolys = src.npolys;
 	dst.nvp = src.nvp;
-	rdVcopy(dst.bmin, src.bmin);
-	rdVcopy(dst.bmax, src.bmax);
+	dst.bmin = src.bmin;
+	dst.bmax = src.bmax;
 	dst.cs = src.cs;
 	dst.ch = src.ch;
 	dst.borderSize = src.borderSize;

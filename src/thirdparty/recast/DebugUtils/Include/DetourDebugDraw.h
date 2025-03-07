@@ -74,22 +74,22 @@ struct duDrawTraverseLinkParams
 	bool dynamicOffset;
 };
 
-void duDebugDrawMeshTile(struct duDebugDraw* dd, const dtNavMesh& mesh, const dtNavMeshQuery* query, const dtMeshTile* tile, const float* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams);
-void duDebugDrawNavMesh(struct duDebugDraw* dd, const dtNavMesh& mesh, const float* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams);
-void duDebugDrawNavMeshWithClosedList(struct duDebugDraw* dd, const dtNavMesh& mesh, const dtNavMeshQuery& query, const float* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams);
-void duDebugDrawNavMeshNodes(struct duDebugDraw* dd, const dtNavMeshQuery& query, const float* offset);
-void duDebugDrawNavMeshBVTree(struct duDebugDraw* dd, const dtNavMesh& mesh, const float* offset);
-void duDebugDrawNavMeshPortals(struct duDebugDraw* dd, const dtNavMesh& mesh, const float* offset);
-void duDebugDrawNavMeshPolysWithFlags(struct duDebugDraw* dd, const dtNavMesh& mesh, const unsigned short polyFlags, const float* offset,
+void duDebugDrawMeshTile(struct duDebugDraw* dd, const dtNavMesh& mesh, const dtNavMeshQuery* query, const dtMeshTile* tile, const rdVec3D* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams);
+void duDebugDrawNavMesh(struct duDebugDraw* dd, const dtNavMesh& mesh, const rdVec3D* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams);
+void duDebugDrawNavMeshWithClosedList(struct duDebugDraw* dd, const dtNavMesh& mesh, const dtNavMeshQuery& query, const rdVec3D* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams);
+void duDebugDrawNavMeshNodes(struct duDebugDraw* dd, const dtNavMeshQuery& query, const rdVec3D* offset);
+void duDebugDrawNavMeshBVTree(struct duDebugDraw* dd, const dtNavMesh& mesh, const rdVec3D* offset);
+void duDebugDrawNavMeshPortals(struct duDebugDraw* dd, const dtNavMesh& mesh, const rdVec3D* offset);
+void duDebugDrawNavMeshPolysWithFlags(struct duDebugDraw* dd, const dtNavMesh& mesh, const unsigned short polyFlags, const rdVec3D* offset,
 									  const unsigned int drawFlags, const unsigned int col, const bool soften = true);
-void duDebugDrawNavMeshPoly(struct duDebugDraw* dd, const dtNavMesh& mesh, dtPolyRef ref, const float* offset,
+void duDebugDrawNavMeshPoly(struct duDebugDraw* dd, const dtNavMesh& mesh, dtPolyRef ref, const rdVec3D* offset,
 									  const unsigned int drawFlags, const unsigned int col, const bool soften = true);
 
-void duDebugDrawTileCacheLayerAreas(struct duDebugDraw* dd, const dtTileCacheLayer& layer, const float cs, const float ch, const float* offset);
-void duDebugDrawTileCacheLayerRegions(struct duDebugDraw* dd, const dtTileCacheLayer& layer, const float cs, const float ch, const float* offset);
+void duDebugDrawTileCacheLayerAreas(struct duDebugDraw* dd, const dtTileCacheLayer& layer, const float cs, const float ch, const rdVec3D* offset);
+void duDebugDrawTileCacheLayerRegions(struct duDebugDraw* dd, const dtTileCacheLayer& layer, const float cs, const float ch, const rdVec3D* offset);
 void duDebugDrawTileCacheContours(struct duDebugDraw* dd, const struct dtTileCacheContourSet& lcset,
-								  const float* orig, const float cs, const float ch, const float* offset);
+								  const rdVec3D* orig, const float cs, const float ch, const rdVec3D* offset);
 void duDebugDrawTileCachePolyMesh(struct duDebugDraw* dd, const struct dtTileCachePolyMesh& lmesh,
-								  const float* orig, const float cs, const float ch, const float* offset);
+								  const rdVec3D* orig, const float cs, const float ch, const rdVec3D* offset);
 
 #endif // DETOURDEBUGDRAW_H

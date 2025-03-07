@@ -15,7 +15,7 @@
 //    misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
 //
-
+/* math_refactor(kawe): this file is no longer used and pending removal.
 #include "NavEditor/include/GameUtils.h"
 
 void coordGameSwap(float* c)
@@ -95,3 +95,5 @@ void unpatchTileGame(dtMeshTile* t)
 		coordGameUnswap(t->offMeshCons[i].refPos);
 	}
 }
+
+*/

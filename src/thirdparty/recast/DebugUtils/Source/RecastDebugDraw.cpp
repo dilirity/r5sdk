@@ -20,124 +20,125 @@
 #include "DebugUtils/Include/RecastDebugDraw.h"
 #include "Recast/Include/Recast.h"
 
-void duDebugDrawTriMesh(duDebugDraw* dd, const float* verts, int /*nverts*/,
-						const int* tris, const float* normals, int ntris,
-						const unsigned char* flags, const float texScale, const float* offset)
+void duDebugDrawTriMesh(duDebugDraw* dd, const rdVec3D* verts, int /*nverts*/,
+						const int* tris, const rdVec3D* normals, int ntris,
+						const unsigned char* flags, const float texScale, const rdVec3D* offset)
 {
 	if (!dd) return;
 	if (!verts) return;
 	if (!tris) return;
 	if (!normals) return;
 
-	float uva[2];
-	float uvb[2];
-	float uvc[2];
+	rdVec2D uva;
+	rdVec2D uvb;
+	rdVec2D uvc;
 
 	const unsigned int unwalkable = duRGBA(192,128,0,255);
 
 	dd->texture(true);
 
 	dd->begin(DU_DRAW_TRIS, 1.0f, offset);
-	for (int i = 0; i < ntris*3; i += 3)
+	for (int i = 0; i < ntris; i++)
 	{
-		const float* norm = &normals[i];
+		const rdVec3D* norm = &normals[i];
 		unsigned int color;
-		unsigned char a = (unsigned char)(220*(2+norm[0]+norm[1])/4);
+		unsigned char a = (unsigned char)(220*(2+norm->x+norm->y)/4);
 		if (flags && !flags[i/3])
 			color = duLerpCol(duRGBA(a,a,a,255), unwalkable, 64);
 		else
 			color = duRGBA(a,a,a,255);
 
-		const float* va = &verts[tris[i+0]*3];
-		const float* vb = &verts[tris[i+1]*3];
-		const float* vc = &verts[tris[i+2]*3];
+		const rdVec3D* va = &verts[tris[i+0]];
+		const rdVec3D* vb = &verts[tris[i+1]];
+		const rdVec3D* vc = &verts[tris[i+2]];
 		
 		int ax = 0, ay = 0;
-		if (rdAbs(norm[1]) > rdAbs(norm[ax]))
+		if (rdAbs(norm->y) > rdAbs((*norm)[ax]))
 			ax = 1;
-		if (rdAbs(norm[2]) > rdAbs(norm[ax]))
+		if (rdAbs(norm->z) > rdAbs((*norm)[ax]))
 			ax = 2;
 		ax = (1<<ax)&3; // +1 mod 3
 		ay = (1<<ax)&3; // +1 mod 3
 
-		uva[0] = va[ax]*texScale;
-		uva[1] = va[ay]*texScale;
-		uvb[0] = vb[ax]*texScale;
-		uvb[1] = vb[ay]*texScale;
-		uvc[0] = vc[ax]*texScale;
-		uvc[1] = vc[ay]*texScale;
+		uva.x = (*va)[ax]*texScale;
+		uva.y = (*va)[ay]*texScale;
+		uvb.x = (*vb)[ax]*texScale;
+		uvb.y = (*vb)[ay]*texScale;
+		uvc.x = (*vc)[ax]*texScale;
+		uvc.y = (*vc)[ay]*texScale;
 		
-		dd->vertex(va, color, uva);
-		dd->vertex(vb, color, uvb);
-		dd->vertex(vc, color, uvc);
+		dd->vertex(va, color, &uva);
+		dd->vertex(vb, color, &uvb);
+		dd->vertex(vc, color, &uvc);
 	}
 	dd->end();
 	dd->texture(false);
 }
 
-void duDebugDrawTriMeshSlope(duDebugDraw* dd, const float* verts, int /*nverts*/,
-							 const int* tris, const float* normals, int ntris,
-							 const float walkableSlopeAngle, const float texScale, const float* offset)
+void duDebugDrawTriMeshSlope(duDebugDraw* dd, const rdVec3D* verts, int /*nverts*/,
+							 const int* tris, const rdVec3D* normals, int ntris,
+							 const float walkableSlopeAngle, const float texScale, const rdVec3D* offset)
 {
 	if (!dd) return;
 	if (!verts) return;
 	if (!tris) return;
 	if (!normals) return;
 	
-	const float walkableThr = rdMathCosf(walkableSlopeAngle/180.0f*DU_PI);
-	
-	float uva[2];
-	float uvb[2];
-	float uvc[2];
-	
 	dd->texture(true);
 
+	const float walkableThr = rdMathCosf(walkableSlopeAngle/180.0f*DU_PI);
 	const unsigned int unwalkable = duRGBA(192,128,0,255);
 	
 	dd->begin(DU_DRAW_TRIS, 1.0f, offset);
-	for (int i = 0; i < ntris*3; i += 3)
+	for (int i = 0; i < ntris; i++)
 	{
-		const float* norm = &normals[i];
+		const rdVec3D* norm = &normals[i];
 		unsigned int color;
-		unsigned char a = (unsigned char)(220*(2+norm[0]+norm[1])/4);
-		if (norm[2] < walkableThr)
+		unsigned char a = (unsigned char)(220*(2+norm->x+norm->y)/4);
+		if (norm->z < walkableThr)
 			color = duLerpCol(duRGBA(a,a,a,255), unwalkable, 64);
 		else
 			color = duRGBA(a,a,a,255);
 		
-		const float* va = &verts[tris[i+0]*3];
-		const float* vb = &verts[tris[i+1]*3];
-		const float* vc = &verts[tris[i+2]*3];
+		const rdVec3D* va = &verts[tris[(i*3)+0]];
+		const rdVec3D* vb = &verts[tris[(i*3)+1]];
+		const rdVec3D* vc = &verts[tris[(i*3)+2]];
 		
 		int ax = 0, ay = 0;
-		if (rdAbs(norm[1]) > rdAbs(norm[ax]))
+		const float absNorm = rdAbs((*norm)[ax]);
+
+		if (rdAbs(norm->y) > absNorm)
 			ax = 1;
-		if (rdAbs(norm[2]) > rdAbs(norm[ax]))
+		if (rdAbs(norm->z) > absNorm) // math_refactor(kawe): should this use X?
 			ax = 2;
 		ax = (1<<ax)&3; // +1 mod 3
 		ay = (1<<ax)&3; // +1 mod 3
 		
-		uva[0] = va[ax]*texScale;
-		uva[1] = va[ay]*texScale;
-		uvb[0] = vb[ax]*texScale;
-		uvb[1] = vb[ay]*texScale;
-		uvc[0] = vc[ax]*texScale;
-		uvc[1] = vc[ay]*texScale;
+		rdVec2D uva;
+		rdVec2D uvb;
+		rdVec2D uvc;
+
+		uva.x = (*va)[ax]*texScale;
+		uva.y = (*va)[ay]*texScale;
+		uvb.x = (*vb)[ax]*texScale;
+		uvb.y = (*vb)[ay]*texScale;
+		uvc.x = (*vc)[ax]*texScale;
+		uvc.y = (*vc)[ay]*texScale;
 		
-		dd->vertex(va, color, uva);
-		dd->vertex(vb, color, uvb);
-		dd->vertex(vc, color, uvc);
+		dd->vertex(va, color, &uva);
+		dd->vertex(vb, color, &uvb);
+		dd->vertex(vc, color, &uvc);
 	}
 	dd->end();
 
 	dd->texture(false);
 }
 
-void duDebugDrawHeightfieldSolid(duDebugDraw* dd, const rcHeightfield& hf, const float* offset)
+void duDebugDrawHeightfieldSolid(duDebugDraw* dd, const rcHeightfield& hf, const rdVec3D* offset)
 {
 	if (!dd) return;
 
-	const float* orig = hf.bmin;
+	const rdVec3D* orig = &hf.bmin;
 	const float cs = hf.cs;
 	const float ch = hf.ch;
 	
@@ -153,12 +154,12 @@ void duDebugDrawHeightfieldSolid(duDebugDraw* dd, const rcHeightfield& hf, const
 	{
 		for (int x = 0; x < w; ++x)
 		{
-			float fx = orig[0] + x*cs;
-			float fy = orig[1] + y*cs;
+			float fx = orig->x + x*cs;
+			float fy = orig->y + y*cs;
 			const rcSpan* s = hf.spans[x + y*w];
 			while (s)
 			{
-				duAppendBox(dd, fx, fy, orig[2] + s->smin*ch, fx+cs,  fy+cs, orig[2] + s->smax*ch, fcol);
+				duAppendBox(dd, fx, fy, orig->z + s->smin*ch, fx+cs,  fy+cs, orig->z + s->smax*ch, fcol);
 				s = s->next;
 			}
 		}
@@ -166,11 +167,11 @@ void duDebugDrawHeightfieldSolid(duDebugDraw* dd, const rcHeightfield& hf, const
 	dd->end();
 }
 
-void duDebugDrawHeightfieldWalkable(duDebugDraw* dd, const rcHeightfield& hf, const float* offset)
+void duDebugDrawHeightfieldWalkable(duDebugDraw* dd, const rcHeightfield& hf, const rdVec3D* offset)
 {
 	if (!dd) return;
 
-	const float* orig = hf.bmin;
+	const rdVec3D* orig = &hf.bmin;
 	const float cs = hf.cs;
 	const float ch = hf.ch;
 	
@@ -186,8 +187,8 @@ void duDebugDrawHeightfieldWalkable(duDebugDraw* dd, const rcHeightfield& hf, co
 	{
 		for (int x = 0; x < w; ++x)
 		{
-			float fx = orig[0] + x*cs;
-			float fy = orig[1] + y*cs;
+			float fx = orig->x + x*cs;
+			float fy = orig->y + y*cs;
 			const rcSpan* s = hf.spans[x + y*w];
 			while (s)
 			{
@@ -198,7 +199,7 @@ void duDebugDrawHeightfieldWalkable(duDebugDraw* dd, const rcHeightfield& hf, co
 				else
 					fcol[0] = duMultCol(dd->areaToFaceCol(s->area), 200);
 				
-				duAppendBox(dd, fx, fy, orig[2] + s->smin*ch, fx+cs, fy+cs, orig[2] + s->smax*ch, fcol);
+				duAppendBox(dd, fx, fy, orig->z + s->smin*ch, fx+cs, fy+cs, orig->z + s->smax*ch, fcol);
 				s = s->next;
 			}
 		}
@@ -207,7 +208,7 @@ void duDebugDrawHeightfieldWalkable(duDebugDraw* dd, const rcHeightfield& hf, co
 	dd->end();
 }
 
-void duDebugDrawCompactHeightfieldSolid(duDebugDraw* dd, const rcCompactHeightfield& chf, const float* offset)
+void duDebugDrawCompactHeightfieldSolid(duDebugDraw* dd, const rcCompactHeightfield& chf, const rdVec3D* offset)
 {
 	if (!dd) return;
 
@@ -220,8 +221,8 @@ void duDebugDrawCompactHeightfieldSolid(duDebugDraw* dd, const rcCompactHeightfi
 	{
 		for (int x = 0; x < chf.width; ++x)
 		{
-			const float fx = chf.bmin[0] + x*cs;
-			const float fy = chf.bmin[1] + y*cs;
+			const float fx = chf.bmin.x + x*cs;
+			const float fy = chf.bmin.y + y*cs;
 			const rcCompactCell& c = chf.cells[x+y*chf.width];
 
 			for (unsigned i = c.index, ni = c.index+c.count; i < ni; ++i)
@@ -237,7 +238,7 @@ void duDebugDrawCompactHeightfieldSolid(duDebugDraw* dd, const rcCompactHeightfi
 				else
 					color = dd->areaToFaceCol(area);
 				
-				const float fz = chf.bmin[2] + (s.z+1)*ch;
+				const float fz = chf.bmin.z + (s.z+1)*ch;
 				dd->vertex(fx, fy, fz, color);
 				dd->vertex(fx+cs, fy, fz, color);
 				dd->vertex(fx+cs, fy+cs, fz, color);
@@ -248,7 +249,7 @@ void duDebugDrawCompactHeightfieldSolid(duDebugDraw* dd, const rcCompactHeightfi
 	dd->end();
 }
 
-void duDebugDrawCompactHeightfieldRegions(duDebugDraw* dd, const rcCompactHeightfield& chf, const float* offset)
+void duDebugDrawCompactHeightfieldRegions(duDebugDraw* dd, const rcCompactHeightfield& chf, const rdVec3D* offset)
 {
 	if (!dd) return;
 
@@ -261,14 +262,14 @@ void duDebugDrawCompactHeightfieldRegions(duDebugDraw* dd, const rcCompactHeight
 	{
 		for (int x = 0; x < chf.width; ++x)
 		{
-			const float fx = chf.bmin[0] + x*cs;
-			const float fy = chf.bmin[1] + y*cs;
+			const float fx = chf.bmin.x + x*cs;
+			const float fy = chf.bmin.y + y*cs;
 			const rcCompactCell& c = chf.cells[x+y*chf.width];
 			
 			for (unsigned i = c.index, ni = c.index+c.count; i < ni; ++i)
 			{
 				const rcCompactSpan& s = chf.spans[i];
-				const float fz = chf.bmin[2] + (s.z)*ch;
+				const float fz = chf.bmin.z + (s.z)*ch;
 				unsigned int color;
 				if (s.reg)
 					color = duIntToCol(s.reg, 192);
@@ -287,7 +288,7 @@ void duDebugDrawCompactHeightfieldRegions(duDebugDraw* dd, const rcCompactHeight
 }
 
 
-void duDebugDrawCompactHeightfieldDistance(duDebugDraw* dd, const rcCompactHeightfield& chf, const float* offset)
+void duDebugDrawCompactHeightfieldDistance(duDebugDraw* dd, const rcCompactHeightfield& chf, const rdVec3D* offset)
 {
 	if (!dd) return;
 	if (!chf.dist) return;
@@ -305,14 +306,14 @@ void duDebugDrawCompactHeightfieldDistance(duDebugDraw* dd, const rcCompactHeigh
 	{
 		for (int x = 0; x < chf.width; ++x)
 		{
-			const float fx = chf.bmin[0] + x*cs;
-			const float fy = chf.bmin[1] + y*cs;
+			const float fx = chf.bmin.x + x*cs;
+			const float fy = chf.bmin.y + y*cs;
 			const rcCompactCell& c = chf.cells[x+y*chf.width];
 			
 			for (unsigned i = c.index, ni = c.index+c.count; i < ni; ++i)
 			{
 				const rcCompactSpan& s = chf.spans[i];
-				const float fz = chf.bmin[2] + (s.z+1)*ch;
+				const float fz = chf.bmin.z + (s.z+1)*ch;
 				const unsigned char cd = (unsigned char)(chf.dist[i] * dscale);
 				const unsigned int color = duRGBA(cd,cd,cd,255);
 				dd->vertex(fx, fy, fz, color);
@@ -325,7 +326,7 @@ void duDebugDrawCompactHeightfieldDistance(duDebugDraw* dd, const rcCompactHeigh
 	dd->end();
 }
 
-static void drawLayerPortals(duDebugDraw* dd, const rcHeightfieldLayer* layer, const float* offset)
+static void drawLayerPortals(duDebugDraw* dd, const rcHeightfieldLayer* layer, const rdVec3D* offset)
 {
 	const float cs = layer->cs;
 	const float ch = layer->ch;
@@ -351,12 +352,12 @@ static void drawLayerPortals(duDebugDraw* dd, const rcHeightfieldLayer* layer, c
 				if (layer->cons[idx] & (1<<(dir+4)))
 				{
 					const int* seg = &segs[dir*4];
-					const float ax = layer->bmin[0] + (x+seg[0])*cs;
-					const float ay = layer->bmin[1] + (y+seg[1])*cs;
-					const float az = layer->bmin[2] + (lh+2)*ch;
-					const float bx = layer->bmin[0] + (x+seg[2])*cs;
-					const float by = layer->bmin[1] + (y+seg[3])*cs;
-					const float bz = layer->bmin[2] + (lh+2)*ch;
+					const float ax = layer->bmin.x + (x+seg[0])*cs;
+					const float ay = layer->bmin.y + (y+seg[1])*cs;
+					const float az = layer->bmin.z + (lh+2)*ch;
+					const float bx = layer->bmin.x + (x+seg[2])*cs;
+					const float by = layer->bmin.y + (y+seg[3])*cs;
+					const float bz = layer->bmin.z + (lh+2)*ch;
 					dd->vertex(ax, ay, az, pcol);
 					dd->vertex(bx, by, bz, pcol);
 				}
@@ -366,7 +367,7 @@ static void drawLayerPortals(duDebugDraw* dd, const rcHeightfieldLayer* layer, c
 	dd->end();
 }
 
-void duDebugDrawHeightfieldLayer(duDebugDraw* dd, const struct rcHeightfieldLayer& layer, const int idx, const float* offset)
+void duDebugDrawHeightfieldLayer(duDebugDraw* dd, const struct rcHeightfieldLayer& layer, const int idx, const rdVec3D* offset)
 {
 	const float cs = layer.cs;
 	const float ch = layer.ch;
@@ -376,14 +377,14 @@ void duDebugDrawHeightfieldLayer(duDebugDraw* dd, const struct rcHeightfieldLaye
 	unsigned int color = duIntToCol(idx+1, 255);
 	
 	// Layer bounds
-	float bmin[3], bmax[3];
-	bmin[0] = layer.bmin[0] + layer.minx*cs;
-	bmin[1] = layer.bmin[1] + layer.miny*cs;
-	bmin[2] = layer.bmin[2];
-	bmax[0] = layer.bmin[0] + (layer.maxx+1)*cs;
-	bmax[1] = layer.bmax[1] + (layer.maxy+1)*cs;
-	bmax[2] = layer.bmin[2];
-	duDebugDrawBoxWire(dd, bmin[0],bmin[1],bmin[2], bmax[0],bmax[1],bmax[2], duTransCol(color,128), 2.0f, 0);
+	rdVec3D bmin, bmax;
+	bmin.x = layer.bmin.x + layer.minx*cs;
+	bmin.y = layer.bmin.y + layer.miny*cs;
+	bmin.z = layer.bmin.z;
+	bmax.x = layer.bmin.x + (layer.maxx+1)*cs;
+	bmax.y = layer.bmax.y + (layer.maxy+1)*cs;
+	bmax.z = layer.bmin.z;
+	duDebugDrawBoxWire(dd, bmin.x,bmin.y,bmin.z, bmax.x,bmax.y,bmax.z, duTransCol(color,128), 2.0f, 0);
 	
 	// Layer height
 	dd->begin(DU_DRAW_QUADS, 1.0f, offset);
@@ -404,9 +405,9 @@ void duDebugDrawHeightfieldLayer(duDebugDraw* dd, const struct rcHeightfieldLaye
 			else
 				col = duLerpCol(color, dd->areaToFaceCol(area), 32);
 			
-			const float fx = layer.bmin[0] + x*cs;
-			const float fy = layer.bmin[1] + y*cs;
-			const float fz = layer.bmin[2] +(lh+1)*ch;
+			const float fx = layer.bmin.x + x*cs;
+			const float fy = layer.bmin.y + y*cs;
+			const float fz = layer.bmin.z +(lh+1)*ch;
 			
 			dd->vertex(fx, fy, fz, col);
 			dd->vertex(fx+cs, fy, fz, col);
@@ -420,34 +421,32 @@ void duDebugDrawHeightfieldLayer(duDebugDraw* dd, const struct rcHeightfieldLaye
 	drawLayerPortals(dd, &layer, offset);
 }
 
-void duDebugDrawHeightfieldLayers(duDebugDraw* dd, const struct rcHeightfieldLayerSet& lset, const float* offset)
+void duDebugDrawHeightfieldLayers(duDebugDraw* dd, const struct rcHeightfieldLayerSet& lset, const rdVec3D* offset)
 {
 	if (!dd) return;
 	for (int i = 0; i < lset.nlayers; ++i)
 		duDebugDrawHeightfieldLayer(dd, lset.layers[i], i, offset);
 }
 
-static void getContourCenter(const rcContour* cont, const float* orig, float cs, float ch, float* center)
+static void getContourCenter(const rcContour* cont, const rdVec3D* orig, float cs, float ch, rdVec3D* center)
 {
-	center[0] = 0;
-	center[1] = 0;
-	center[2] = 0;
+	center->init(0,0,0);
 	if (!cont->nverts)
 		return;
 	for (int i = 0; i < cont->nverts; ++i)
 	{
 		const int* v = &cont->verts[i*4];
-		center[0] += (float)v[0];
-		center[1] += (float)v[1];
-		center[2] += (float)v[2];
+		center->x += (float)v[0];
+		center->y += (float)v[1];
+		center->z += (float)v[2];
 	}
 	const float s = 1.0f / cont->nverts;
-	center[0] *= s * cs;
-	center[1] *= s * cs;
-	center[2] *= s * ch;
-	center[0] += orig[0];
-	center[1] += orig[1];
-	center[2] += orig[2]+4*ch;
+	center->x *= s * cs;
+	center->y *= s * cs;
+	center->z *= s * ch;
+	center->x += orig->x;
+	center->y += orig->y;
+	center->z += orig->z+4*ch;
 }
 
 static const rcContour* findContourFromSet(const rcContourSet& cset, unsigned short reg)
@@ -460,17 +459,16 @@ static const rcContour* findContourFromSet(const rcContourSet& cset, unsigned sh
 	return 0;
 }
 
-void duDebugDrawRegionConnections(duDebugDraw* dd, const rcContourSet& cset, const float* offset, const float alpha)
+void duDebugDrawRegionConnections(duDebugDraw* dd, const rcContourSet& cset, const rdVec3D* offset, const float alpha)
 {
 	if (!dd) return;
 	
-	const float* orig = cset.bmin;
+	const rdVec3D* orig = &cset.bmin;
 	const float cs = cset.cs;
 	const float ch = cset.ch;
 	
 	// Draw centers
-	float pos[3], pos2[3];
-
+	rdVec3D pos, pos2;
 	unsigned int color = duRGBA(0,0,0,196);
 
 	dd->begin(DU_DRAW_LINES, 2.0f, offset);
@@ -478,7 +476,7 @@ void duDebugDrawRegionConnections(duDebugDraw* dd, const rcContourSet& cset, con
 	for (int i = 0; i < cset.nconts; ++i)
 	{
 		const rcContour* cont = &cset.conts[i];
-		getContourCenter(cont, orig, cs, ch, pos);
+		getContourCenter(cont, orig, cs, ch, &pos);
 		for (int j = 0; j < cont->nverts; ++j)
 		{
 			const int* v = &cont->verts[j*4];
@@ -486,8 +484,8 @@ void duDebugDrawRegionConnections(duDebugDraw* dd, const rcContourSet& cset, con
 			const rcContour* cont2 = findContourFromSet(cset, (unsigned short)v[3]);
 			if (cont2)
 			{
-				getContourCenter(cont2, orig, cs, ch, pos2);
-				duAppendArc(dd, pos[0],pos[1],pos[2], pos2[0],pos2[1],pos2[2], 0.25f, 30.0f, 30.0f, color);
+				getContourCenter(cont2, orig, cs, ch, &pos2);
+				duAppendArc(dd, pos.x,pos.y,pos.z, pos2.x,pos2.y,pos2.z, 0.25f, 30.0f, 30.0f, color);
 			}
 		}
 	}
@@ -502,17 +500,17 @@ void duDebugDrawRegionConnections(duDebugDraw* dd, const rcContourSet& cset, con
 	{
 		const rcContour* cont = &cset.conts[i];
 		unsigned int col = duDarkenCol(duIntToCol(cont->reg,a));
-		getContourCenter(cont, orig, cs, ch, pos);
-		dd->vertex(pos, col);
+		getContourCenter(cont, orig, cs, ch, &pos);
+		dd->vertex(&pos, col);
 	}
 	dd->end();
 }
 
-void duDebugDrawRawContours(duDebugDraw* dd, const rcContourSet& cset, const float* offset, const float alpha)
+void duDebugDrawRawContours(duDebugDraw* dd, const rcContourSet& cset, const rdVec3D* offset, const float alpha)
 {
 	if (!dd) return;
 
-	const float* orig = cset.bmin;
+	const rdVec3D* orig = &cset.bmin;
 	const float cs = cset.cs;
 	const float ch = cset.ch;
 	
@@ -528,18 +526,18 @@ void duDebugDrawRawContours(duDebugDraw* dd, const rcContourSet& cset, const flo
 		for (int j = 0; j < c.nrverts; ++j)
 		{
 			const int* v = &c.rverts[j*4];
-			float fx = orig[0] + v[0]*cs;
-			float fy = orig[1] + v[1]*cs;
-			float fz = orig[2] +(v[2]+1+(i&1))*ch;
+			float fx = orig->x + v[0]*cs;
+			float fy = orig->y + v[1]*cs;
+			float fz = orig->z +(v[2]+1+(i&1))*ch;
 			dd->vertex(fx,fy,fz,color);
 			if (j > 0)
 				dd->vertex(fx,fy,fz,color);
 		}
 		// Loop last segment.
 		const int* v = &c.rverts[0];
-		float fx = orig[0] + v[0]*cs;
-		float fy = orig[1] + v[1]*cs;
-		float fz = orig[2] +(v[2]+1+(i&1))*ch;
+		float fx = orig->x + v[0]*cs;
+		float fy = orig->y + v[1]*cs;
+		float fz = orig->z +(v[2]+1+(i&1))*ch;
 		dd->vertex(fx,fy,fz,color);
 	}
 	dd->end();
@@ -562,20 +560,20 @@ void duDebugDrawRawContours(duDebugDraw* dd, const rcContourSet& cset, const flo
 				off = ch*2;
 			}
 			
-			float fx = orig[0] + v[0]*cs;
-			float fy = orig[1] + v[1]*cs;
-			float fz = orig[2] +(v[2]+1+(i&1))*ch+off;
+			float fx = orig->x + v[0]*cs;
+			float fy = orig->y + v[1]*cs;
+			float fz = orig->z +(v[2]+1+(i&1))*ch+off;
 			dd->vertex(fx,fy,fz, colv);
 		}
 	}
 	dd->end();
 }
 
-void duDebugDrawContours(duDebugDraw* dd, const rcContourSet& cset, const float* offset, const float alpha)
+void duDebugDrawContours(duDebugDraw* dd, const rcContourSet& cset, const rdVec3D* offset, const float alpha)
 {
 	if (!dd) return;
 
-	const float* orig = cset.bmin;
+	const rdVec3D* orig = &cset.bmin;
 	const float cs = cset.cs;
 	const float ch = cset.ch;
 	
@@ -596,13 +594,13 @@ void duDebugDrawContours(duDebugDraw* dd, const rcContourSet& cset, const float*
 			const int* vb = &c.verts[j*4];
 			unsigned int col = (va[3] & RC_AREA_BORDER) ? bcolor : color; 
 			float fx,fy,fz;
-			fx = orig[0] + va[0]*cs;
-			fy = orig[1] + va[1]*cs;
-			fz = orig[2] +(va[2]+1+(i&1))*ch;
+			fx = orig->x + va[0]*cs;
+			fy = orig->y + va[1]*cs;
+			fz = orig->z +(va[2]+1+(i&1))*ch;
 			dd->vertex(fx,fy,fz, col);
-			fx = orig[0] + vb[0]*cs;
-			fy = orig[1] + vb[1]*cs;
-			fz = orig[2] +(vb[2]+1+(i&1))*ch;
+			fx = orig->x + vb[0]*cs;
+			fy = orig->y + vb[1]*cs;
+			fz = orig->z +(vb[2]+1+(i&1))*ch;
 			dd->vertex(fx,fy,fz, col);
 		}
 	}
@@ -625,23 +623,23 @@ void duDebugDrawContours(duDebugDraw* dd, const rcContourSet& cset, const float*
 				off = ch*2;
 			}
 
-			float fx = orig[0] + v[0]*cs;
-			float fy = orig[1] + v[1]*cs;
-			float fz = orig[2] +(v[2]+1+(i&1))*ch+off;
+			float fx = orig->x + v[0]*cs;
+			float fy = orig->y + v[1]*cs;
+			float fz = orig->z +(v[2]+1+(i&1))*ch+off;
 			dd->vertex(fx,fy,fz, colv);
 		}
 	}
 	dd->end();
 }
 
-void duDebugDrawPolyMesh(duDebugDraw* dd, const struct rcPolyMesh& mesh, const float* offset)
+void duDebugDrawPolyMesh(duDebugDraw* dd, const struct rcPolyMesh& mesh, const rdVec3D* offset)
 {
 	if (!dd) return;
 
 	const int nvp = mesh.nvp;
 	const float cs = mesh.cs;
 	const float ch = mesh.ch;
-	const float* orig = mesh.bmin;
+	const rdVec3D* orig = &mesh.bmin;
 	
 	dd->begin(DU_DRAW_TRIS, 1.0f, offset);
 	
@@ -668,9 +666,9 @@ void duDebugDrawPolyMesh(duDebugDraw* dd, const struct rcPolyMesh& mesh, const f
 			for (int k = 0; k < 3; ++k)
 			{
 				const unsigned short* v = &mesh.verts[vi[k]*3];
-				const float x = orig[0] + v[0]*cs;
-				const float y = orig[1] + v[1]*cs;
-				const float z = orig[2] +(v[2]+1)*ch;
+				const float x = orig->x + v[0]*cs;
+				const float y = orig->y + v[1]*cs;
+				const float z = orig->z +(v[2]+1)*ch;
 				dd->vertex(x,y,z, color);
 			}
 		}
@@ -694,9 +692,9 @@ void duDebugDrawPolyMesh(duDebugDraw* dd, const struct rcPolyMesh& mesh, const f
 			for (int k = 0; k < 2; ++k)
 			{
 				const unsigned short* v = &mesh.verts[vi[k]*3];
-				const float x = orig[0] + v[0]*cs;
-				const float y = orig[1] + v[1]*cs;
-				const float z = orig[2] +(v[2]+1)*ch+0.1f;
+				const float x = orig->x + v[0]*cs;
+				const float y = orig->y + v[1]*cs;
+				const float z = orig->z +(v[2]+1)*ch+0.1f;
 				dd->vertex(x,y,z, coln);
 			}
 		}
@@ -722,9 +720,9 @@ void duDebugDrawPolyMesh(duDebugDraw* dd, const struct rcPolyMesh& mesh, const f
 			for (int k = 0; k < 2; ++k)
 			{
 				const unsigned short* v = &mesh.verts[vi[k]*3];
-				const float x = orig[0] + v[0]*cs;
-				const float y = orig[1] + v[1]*cs;
-				const float z = orig[2] +(v[2]+1)*ch+0.1f;
+				const float x = orig->x + v[0]*cs;
+				const float y = orig->y + v[1]*cs;
+				const float z = orig->z +(v[2]+1)*ch+0.1f;
 				dd->vertex(x,y,z, col);
 			}
 		}
@@ -736,15 +734,15 @@ void duDebugDrawPolyMesh(duDebugDraw* dd, const struct rcPolyMesh& mesh, const f
 	for (int i = 0; i < mesh.nverts; ++i)
 	{
 		const unsigned short* v = &mesh.verts[i*3];
-		const float x = orig[0] + v[0]*cs;
-		const float y = orig[1] + v[1]*cs;
-		const float z = orig[2] +(v[2]+1)*ch+0.1f;
+		const float x = orig->x + v[0]*cs;
+		const float y = orig->y + v[1]*cs;
+		const float z = orig->z +(v[2]+1)*ch+0.1f;
 		dd->vertex(x,y,z, colv);
 	}
 	dd->end();
 }
 
-void duDebugDrawPolyMeshDetail(duDebugDraw* dd, const struct rcPolyMeshDetail& dmesh, const float* offset)
+void duDebugDrawPolyMeshDetail(duDebugDraw* dd, const struct rcPolyMeshDetail& dmesh, const rdVec3D* offset)
 {
 	if (!dd) return;
 
@@ -756,16 +754,16 @@ void duDebugDrawPolyMeshDetail(duDebugDraw* dd, const struct rcPolyMeshDetail& d
 		const unsigned int bverts = m[0];
 		const unsigned int btris = m[2];
 		const int ntris = (int)m[3];
-		const float* verts = &dmesh.verts[bverts*3];
+		const rdVec3D* verts = &dmesh.verts[bverts];
 		const unsigned char* tris = &dmesh.tris[btris*4];
 
 		unsigned int color = duIntToCol(i, 192);
 
 		for (int j = 0; j < ntris; ++j)
 		{
-			dd->vertex(&verts[tris[j*4+0]*3], color);
-			dd->vertex(&verts[tris[j*4+1]*3], color);
-			dd->vertex(&verts[tris[j*4+2]*3], color);
+			dd->vertex(&verts[tris[j*4+0]], color);
+			dd->vertex(&verts[tris[j*4+1]], color);
+			dd->vertex(&verts[tris[j*4+2]], color);
 		}
 	}
 	dd->end();
@@ -779,7 +777,7 @@ void duDebugDrawPolyMeshDetail(duDebugDraw* dd, const struct rcPolyMeshDetail& d
 		const unsigned int bverts = m[0];
 		const unsigned int btris = m[2];
 		const int ntris = (int)m[3];
-		const float* verts = &dmesh.verts[bverts*3];
+		const rdVec3D* verts = &dmesh.verts[bverts];
 		const unsigned char* tris = &dmesh.tris[btris*4];
 		
 		for (int j = 0; j < ntris; ++j)
@@ -793,8 +791,8 @@ void duDebugDrawPolyMeshDetail(duDebugDraw* dd, const struct rcPolyMeshDetail& d
 					// Internal edge
 					if (t[kp] < t[k])
 					{
-						dd->vertex(&verts[t[kp]*3], coli);
-						dd->vertex(&verts[t[k]*3], coli);
+						dd->vertex(&verts[t[kp]], coli);
+						dd->vertex(&verts[t[k]], coli);
 					}
 				}
 			}
@@ -811,7 +809,7 @@ void duDebugDrawPolyMeshDetail(duDebugDraw* dd, const struct rcPolyMeshDetail& d
 		const unsigned int bverts = m[0];
 		const unsigned int btris = m[2];
 		const int ntris = (int)m[3];
-		const float* verts = &dmesh.verts[bverts*3];
+		const rdVec3D* verts = &dmesh.verts[bverts];
 		const unsigned char* tris = &dmesh.tris[btris*4];
 		
 		for (int j = 0; j < ntris; ++j)
@@ -823,8 +821,8 @@ void duDebugDrawPolyMeshDetail(duDebugDraw* dd, const struct rcPolyMeshDetail& d
 				if (ef != 0)
 				{
 					// Ext edge
-					dd->vertex(&verts[t[kp]*3], cole);
-					dd->vertex(&verts[t[k]*3], cole);
+					dd->vertex(&verts[t[kp]], cole);
+					dd->vertex(&verts[t[k]], cole);
 				}
 			}
 		}
@@ -838,9 +836,9 @@ void duDebugDrawPolyMeshDetail(duDebugDraw* dd, const struct rcPolyMeshDetail& d
 		const unsigned int* m = &dmesh.meshes[i*4];
 		const unsigned int bverts = m[0];
 		const int nverts = (int)m[1];
-		const float* verts = &dmesh.verts[bverts*3];
+		const rdVec3D* verts = &dmesh.verts[bverts];
 		for (int j = 0; j < nverts; ++j)
-			dd->vertex(&verts[j*3], colv);
+			dd->vertex(&verts[j], colv);
 	}
 	dd->end();
 }

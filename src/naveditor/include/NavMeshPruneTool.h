@@ -29,7 +29,7 @@ class NavMeshPruneTool : public EditorTool
 	
 	class NavmeshFlags* m_flags;
 
-	float m_hitPos[3];
+	rdVec3D m_hitPos;
 	bool m_hitPosSet;
 	
 public:
@@ -40,7 +40,7 @@ public:
 	virtual void init(Editor* editor);
 	virtual void reset();
 	virtual void handleMenu();
-	virtual void handleClick(const float* s, const float* p, const int v, bool shift);
+	virtual void handleClick(const rdVec3D* s, const rdVec3D* p, const int v, bool shift);
 	virtual void handleToggle();
 	virtual void handleStep();
 	virtual void handleUpdate(const float dt);

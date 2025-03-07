@@ -46,29 +46,29 @@ bool rcMeshLoaderBsp::load(const std::string& /*filename*/)
 
 
 	// Calculate normals.
-	m_normals.resize(m_triCount*3);
-	for (int i = 0; i < m_triCount*3; i += 3)
+	m_normals.resize(m_triCount);
+	for (int i = 0; i < m_triCount; i++)
 	{
-		const float* v0 = &m_verts[m_tris[i]*3];
-		const float* v1 = &m_verts[m_tris[i+1]*3];
-		const float* v2 = &m_verts[m_tris[i+2]*3];
-		float e0[3], e1[3];
+		const rdVec3D* v0 = &m_verts[m_tris[i*3]];
+		const rdVec3D* v1 = &m_verts[m_tris[i*3+1]];
+		const rdVec3D* v2 = &m_verts[m_tris[i*3+2]];
+		rdVec3D e0, e1;
 		for (int j = 0; j < 3; ++j)
 		{
-			e0[j] = v1[j] - v0[j];
-			e1[j] = v2[j] - v0[j];
+			e0[j] = (*v1)[j] - (*v0)[j];
+			e1[j] = (*v2)[j] - (*v0)[j];
 		}
-		float* n = &m_normals[i];
-		n[0] = e0[1]*e1[2] - e0[2]*e1[1];
-		n[1] = e0[2]*e1[0] - e0[0]*e1[2];
-		n[2] = e0[0]*e1[1] - e0[1]*e1[0];
-		float d = sqrtf(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+		rdVec3D* n = &m_normals[i];
+		n->x = e0.y*e1.z - e0.z*e1.y;
+		n->y = e0.z*e1.x - e0.x*e1.z;
+		n->z = e0.x*e1.y - e0.y*e1.x;
+		float d = sqrtf(n->x*n->x + n->y*n->y + n->z*n->z);
 		if (d > 0)
 		{
 			d = 1.0f/d;
-			n[0] *= d;
-			n[1] *= d;
-			n[2] *= d;
+			n->x *= d;
+			n->y *= d;
+			n->z *= d;
 		}
 	}
 	

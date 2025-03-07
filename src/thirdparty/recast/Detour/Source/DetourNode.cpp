@@ -137,6 +137,7 @@ dtNode* dtNodePool::getNode(dtPolyRef id, unsigned char state)
 	
 	// Init node
 	node = &m_nodes[i];
+	node->pos.init(0,0,0);
 	node->pidx = 0;
 	node->cost = 0;
 	node->total = 0;

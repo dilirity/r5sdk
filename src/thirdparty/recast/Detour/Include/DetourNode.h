@@ -37,7 +37,7 @@ static const int DT_NODE_FLAGS_BITS = 3;
 static const int DT_NODE_JUMPT_BITS = 8;
 struct dtNode
 {
-	float pos[3];								///< Position of the node.
+	rdVec3D pos;								///< Position of the node.
 	float cost;									///< Cost from previous node to current node.
 	float total;								///< Cost up to the node.
 	unsigned int pidx : DT_NODE_PARENT_BITS;	///< Index to parent node.

@@ -118,7 +118,7 @@ void dtPathQueue::update(const int maxIters)
 		// Handle query start.
 		if (q.status == 0)
 		{
-			q.status = m_navquery->initSlicedFindPath(q.startRef, q.endRef, q.startPos, q.endPos);
+			q.status = m_navquery->initSlicedFindPath(q.startRef, q.endRef, &q.startPos, &q.endPos);
 		}		
 		// Handle query in progress.
 		if (dtStatusInProgress(q.status))
@@ -140,7 +140,7 @@ void dtPathQueue::update(const int maxIters)
 }
 
 dtPathQueueRef dtPathQueue::request(dtPolyRef startRef, dtPolyRef endRef,
-									const float* startPos, const float* endPos,
+									const rdVec3D* startPos, const rdVec3D* endPos,
 									const dtQueryFilter* filter)
 {
 	// Find empty slot
@@ -162,9 +162,9 @@ dtPathQueueRef dtPathQueue::request(dtPolyRef startRef, dtPolyRef endRef,
 	
 	PathQuery& q = m_queue[slot];
 	q.ref = ref;
-	rdVcopy(q.startPos, startPos);
+	q.startPos = *startPos;
 	q.startRef = startRef;
-	rdVcopy(q.endPos, endPos);
+	q.endPos = *endPos;
 	q.endRef = endRef;
 	
 	q.status = 0;

@@ -44,7 +44,7 @@ class ShapeVolumeTool : public EditorTool
 	float m_convexHeight;
 	float m_convexDescent;
 	
-	float m_pts[MAX_SHAPEVOL_PTS*3];
+	rdVec3D m_pts[MAX_SHAPEVOL_PTS];
 	int m_npts;
 	int m_hull[MAX_SHAPEVOL_PTS];
 	int m_nhull;
@@ -61,7 +61,7 @@ public:
 	virtual void init(Editor* editor);
 	virtual void reset();
 	virtual void handleMenu();
-	virtual void handleClick(const float* s, const float* p, const int v, bool shift);
+	virtual void handleClick(const rdVec3D* s, const rdVec3D* p, const int v, bool shift);
 	virtual void handleToggle();
 	virtual void handleStep();
 	virtual void handleUpdate(const float dt);

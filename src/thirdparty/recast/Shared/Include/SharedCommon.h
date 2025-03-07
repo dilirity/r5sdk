@@ -22,6 +22,7 @@
 #include "Shared/Include/SharedConst.h"
 #include "Shared/Include/SharedDefs.h"
 #include "Shared/Include/SharedMath.h"
+#include "SharedAssert.h"
 
 /**
 @defgroup shared Shared
@@ -93,47 +94,137 @@ inline int rdBitCellBit(const int i) { return (1 << ((i) & (RD_BITS_PER_BIT_CELL
 /// @}
 /// @name Vector helper functions.
 /// @{
+/// 
+
+/// A 2-dimensional vector structure.
+struct rdVec2D
+{
+	rdVec2D() = default;
+	rdVec2D(const float ix, const float iy)
+	{
+		init(ix, iy);
+	}
+
+	rdForceInline void init(const float ix, const float iy)
+	{
+		x = ix;
+		y = iy;
+	}
+
+	rdForceInline float& operator[](const int i)
+	{
+		rdAssert((i>=0) && (i<2));
+		return ((float*)this)[i];
+	}
+
+	rdForceInline float operator[](const int i) const
+	{
+		Assert((i>=0) && (i<2));
+		return ((float*)this)[i];
+	}
+
+	rdVec2D& operator=(const rdVec2D&) = default;
+
+	float x;
+	float y;
+};
+
+/// A 3-dimensional vector structure.
+/// note(kawe): in the future this shouldn't derive from rdVec2D,
+/// but instead it should return an explicit rdVec2D on request.
+/// This will be a big change as the library was initially made
+/// using float arrays which allows for passing vec3d into vec2d
+/// code. If this gets changed, the compiled code should be
+/// checked for performance regressions. The current switch to
+/// vector structures actually improved the majority of the code
+/// performance as the compiler now knows the size ahead of time.
+struct rdVec3D : public rdVec2D
+{
+	rdVec3D() = default;
+	rdVec3D(const float ix, const float iy, const float iz)
+	{
+		init(ix, iy, iz);
+	}
+
+	rdVec3D(const rdVec3D& o)
+	{
+		init(o.x, o.y, o.z);
+	}
+
+	rdVec3D(const rdVec3D* o)
+	{
+		init(o->x, o->y, o->z);
+	}
+
+	rdForceInline void init(const float ix, const float iy, const float iz)
+	{
+		x = ix;
+		y = iy;
+		z = iz;
+	}
+
+	rdForceInline rdVec2D get2D() const
+	{
+		return rdVec2D(x, y);
+	}
+
+	rdForceInline float& operator[](const int i)
+	{
+		rdAssert((i>=0) && (i<3));
+		return ((float*)this)[i];
+	}
+
+	rdForceInline float operator[](const int i) const
+	{
+		Assert((i>=0) && (i<3));
+		return ((float*)this)[i];
+	}
+
+	rdVec3D& operator=(const rdVec3D&) = default;
+
+	float z;
+};
 
 /// Derives the cross product of two vectors. (@p v1 x @p v2)
 ///  @param[out]	dest	The cross product. [(x, y, z)]
 ///  @param[in]		v1		A Vector [(x, y, z)]
 ///  @param[in]		v2		A vector [(x, y, z)]
-inline void rdVcross(float* dest, const float* v1, const float* v2)
+inline void rdVcross(rdVec3D* dest, const rdVec3D* v1, const rdVec3D* v2)
 {
-	dest[0] = v1[1]*v2[2] - v1[2]*v2[1];
-	dest[1] = v1[2]*v2[0] - v1[0]*v2[2];
-	dest[2] = v1[0]*v2[1] - v1[1]*v2[0]; 
+	dest->x = v1->y*v2->z - v1->z*v2->y;
+	dest->y = v1->z*v2->x - v1->x*v2->z;
+	dest->z = v1->x*v2->y - v1->y*v2->x;
 }
 
 /// Derives the xy-plane 2D perp product of the two vectors. (uy*vx - ux*vy)
-///  @param[in]		u		The LHV vector [(x, y, z)]
-///  @param[in]		v		The RHV vector [(x, y, z)]
+///  @param[in]		u		The LHV vector [(x, y)]
+///  @param[in]		v		The RHV vector [(x, y)]
 /// @return The perp dot product on the xy-plane.
 ///
 /// The vectors are projected onto the xy-plane, so the z-values are ignored.
-inline float rdVperp2D(const float* u, const float* v)
+inline float rdVperp2D(const rdVec2D* u, const rdVec2D* v)
 {
-	return u[0]*v[1] - u[1]*v[0];
+	return u->x*v->y - u->y*v->x;
 }
 
 /// Derives the dot product of two vectors. (@p v1 . @p v2)
 ///  @param[in]		v1	A Vector [(x, y, z)]
 ///  @param[in]		v2	A vector [(x, y, z)]
 /// @return The dot product.
-inline float rdVdot(const float* v1, const float* v2)
+inline float rdVdot(const rdVec3D* v1, const rdVec3D* v2)
 {
-	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+	return v1->x*v2->x + v1->y*v2->y + v1->z*v2->z;
 }
 
 /// Derives the dot product of two vectors on the xy-plane. (@p u . @p v)
-///  @param[in]		u		A vector [(x, y, z)]
-///  @param[in]		v		A vector [(x, y, z)]
+///  @param[in]		u		A vector [(x, y)]
+///  @param[in]		v		A vector [(x, y)]
 /// @return The dot product on the xy-plane.
 ///
 /// The vectors are projected onto the xy-plane, so the z-values are ignored.
-inline float rdVdot2D(const float* u, const float* v)
+inline float rdVdot2D(const rdVec2D* u, const rdVec2D* v)
 {
-	return u[0]*v[0] + u[1]*v[1];
+	return u->x*v->x + u->y*v->y;
 }
 
 /// Performs a scaled vector addition. (@p v1 + (@p v2 * @p s))
@@ -141,11 +232,11 @@ inline float rdVdot2D(const float* u, const float* v)
 ///  @param[in]		v1		The base vector. [(x, y, z)]
 ///  @param[in]		v2		The vector to scale and add to @p v1. [(x, y, z)]
 ///  @param[in]		s		The amount to scale @p v2 by before adding to @p v1.
-inline void rdVmad(float* dest, const float* v1, const float* v2, const float s)
+inline void rdVmad(rdVec3D* dest, const rdVec3D* v1, const rdVec3D* v2, const float s)
 {
-	dest[0] = v1[0]+v2[0]*s;
-	dest[1] = v1[1]+v2[1]*s;
-	dest[2] = v1[2]+v2[2]*s;
+	dest->x = v1->x+v2->x*s;
+	dest->y = v1->y+v2->y*s;
+	dest->z = v1->z+v2->z*s;
 }
 
 /// Performs a scaled vector addition. ((@p v1 + @p v2) * @p s)
@@ -153,11 +244,11 @@ inline void rdVmad(float* dest, const float* v1, const float* v2, const float s)
 ///  @param[in]		v1		The base vector. [(x, y, z)]
 ///  @param[in]		v2		The vector to add to @p v1. [(x, y, z)]
 ///  @param[in]		s		The amount to scale the addition result of @p v1 and @p v2.
-inline void rdVsad(float* dest, const float* v1, const float* v2, const float s)
+inline void rdVsad(rdVec3D* dest, const rdVec3D* v1, const rdVec3D* v2, const float s)
 {
-	dest[0] = (v1[0]+v2[0])*s;
-	dest[1] = (v1[1]+v2[1])*s;
-	dest[2] = (v1[2]+v2[2])*s;
+	dest->x = (v1->x+v2->x)*s;
+	dest->y = (v1->y+v2->y)*s;
+	dest->z = (v1->z+v2->z)*s;
 }
 
 /// Performs a linear interpolation between two vectors. (@p v1 toward @p v2)
@@ -165,64 +256,74 @@ inline void rdVsad(float* dest, const float* v1, const float* v2, const float s)
 ///  @param[in]		v1		The starting vector.
 ///  @param[in]		v2		The destination vector.
 ///	 @param[in]		t		The interpolation factor. [Limits: 0 <= value <= 1.0]
-inline void rdVlerp(float* dest, const float* v1, const float* v2, const float t)
+inline void rdVlerp(rdVec3D* dest, const rdVec3D* v1, const rdVec3D* v2, const float t)
 {
-	dest[0] = v1[0]+(v2[0]-v1[0])*t;
-	dest[1] = v1[1]+(v2[1]-v1[1])*t;
-	dest[2] = v1[2]+(v2[2]-v1[2])*t;
+	dest->x = v1->x+(v2->x-v1->x)*t;
+	dest->y = v1->y+(v2->y-v1->y)*t;
+	dest->z = v1->z+(v2->z-v1->z)*t;
 }
 
 /// Performs a vector addition. (@p v1 + @p v2)
 ///  @param[out]	dest	The result vector. [(x, y, z)]
 ///  @param[in]		v1		The base vector. [(x, y, z)]
 ///  @param[in]		v2		The vector to add to @p v1. [(x, y, z)]
-inline void rdVadd(float* dest, const float* v1, const float* v2)
+inline void rdVadd(rdVec3D* dest, const rdVec3D* v1, const rdVec3D* v2)
 {
-	dest[0] = v1[0]+v2[0];
-	dest[1] = v1[1]+v2[1];
-	dest[2] = v1[2]+v2[2];
+	dest->x = v1->x+v2->x;
+	dest->y = v1->y+v2->y;
+	dest->z = v1->z+v2->z;
 }
 
 /// Performs a vector subtraction. (@p v1 - @p v2)
 ///  @param[out]	dest	The result vector. [(x, y, z)]
 ///  @param[in]		v1		The base vector. [(x, y, z)]
 ///  @param[in]		v2		The vector to subtract from @p v1. [(x, y, z)]
-inline void rdVsub(float* dest, const float* v1, const float* v2)
+inline void rdVsub(rdVec3D* dest, const rdVec3D* v1, const rdVec3D* v2)
 {
-	dest[0] = v1[0]-v2[0];
-	dest[1] = v1[1]-v2[1];
-	dest[2] = v1[2]-v2[2];
+	dest->x = v1->x-v2->x;
+	dest->y = v1->y-v2->y;
+	dest->z = v1->z-v2->z;
+}
+
+/// Performs a vector subtraction on the xy-plane. (@p v1 - @p v2)
+///  @param[out]	dest	The result vector. [(x, y)]
+///  @param[in]		v1		The base vector. [(x, y)]
+///  @param[in]		v2		The vector to subtract from @p v1. [(x, y)]
+inline void rdVsub2D(rdVec2D* dest, const rdVec2D* v1, const rdVec2D* v2)
+{
+	dest->x = v1->x - v2->x;
+	dest->y = v1->y - v2->y;
 }
 
 /// Scales the vector by the specified value. (@p v * @p t)
 ///  @param[out]	dest	The result vector. [(x, y, z)]
 ///  @param[in]		v		The vector to scale. [(x, y, z)]
 ///  @param[in]		t		The scaling factor.
-inline void rdVscale(float* dest, const float* v, const float t)
+inline void rdVscale(rdVec3D* dest, const rdVec3D* v, const float t)
 {
-	dest[0] = v[0]*t;
-	dest[1] = v[1]*t;
-	dest[2] = v[2]*t;
+	dest->x = v->x*t;
+	dest->y = v->y*t;
+	dest->z = v->z*t;
 }
 
 /// Selects the minimum value of each element from the specified vectors.
 ///  @param[in,out]	mn	A vector.  (Will be updated with the result.) [(x, y, z)]
 ///  @param[in]	v	A vector. [(x, y, z)]
-inline void rdVmin(float* mn, const float* v)
+inline void rdVmin(rdVec3D* mn, const rdVec3D* v)
 {
-	mn[0] = rdMin(mn[0], v[0]);
-	mn[1] = rdMin(mn[1], v[1]);
-	mn[2] = rdMin(mn[2], v[2]);
+	mn->x = rdMin(mn->x, v->x);
+	mn->y = rdMin(mn->y, v->y);
+	mn->z = rdMin(mn->z, v->z);
 }
 
 /// Selects the maximum value of each element from the specified vectors.
 ///  @param[in,out]	mx	A vector.  (Will be updated with the result.) [(x, y, z)]
 ///  @param[in]		v	A vector. [(x, y, z)]
-inline void rdVmax(float* mx, const float* v)
+inline void rdVmax(rdVec3D* mx, const rdVec3D* v)
 {
-	mx[0] = rdMax(mx[0], v[0]);
-	mx[1] = rdMax(mx[1], v[1]);
-	mx[2] = rdMax(mx[2], v[2]);
+	mx->x = rdMax(mx->x, v->x);
+	mx->y = rdMax(mx->y, v->y);
+	mx->z = rdMax(mx->z, v->z);
 }
 
 /// Sets the vector elements to the specified values.
@@ -230,62 +331,62 @@ inline void rdVmax(float* mx, const float* v)
 ///  @param[in]		x		The x-value of the vector.
 ///  @param[in]		y		The y-value of the vector.
 ///  @param[in]		z		The z-value of the vector.
-inline void rdVset(float* dest, const float x, const float y, const float z)
+inline void rdVset(rdVec3D* dest, const float x, const float y, const float z)
 {
-	dest[0] = x; dest[1] = y; dest[2] = z;
+	dest->x = x; dest->y = y; dest->z = z;
 }
 
 /// Performs a vector copy.
 ///  @param[out]	dest	The result. [(x, y, z)]
 ///  @param[in]		a		The vector to copy. [(x, y, z)]
-inline void rdVcopy(float* dest, const float* a)
+inline void rdVcopy(rdVec3D* dest, const rdVec3D* a)
 {
-	dest[0] = a[0];
-	dest[1] = a[1];
-	dest[2] = a[2];
+	dest->x = a->x;
+	dest->y = a->y;
+	dest->z = a->z;
 }
 
 /// Derives the scalar length of the vector.
 ///  @param[in]		v The vector. [(x, y, z)]
 /// @return The scalar length of the vector.
-inline float rdVlen(const float* v)
+inline float rdVlen(const rdVec3D* v)
 {
-	return rdMathSqrtf(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+	return rdMathSqrtf(v->x*v->x + v->y*v->y + v->z*v->z);
 }
 
 /// Derives the square of the scalar length of the vector. (len * len)
 ///  @param[in]		v The vector. [(x, y, z)]
 /// @return The square of the scalar length of the vector.
-inline float rdVlenSqr(const float* v)
+inline float rdVlenSqr(const rdVec3D* v)
 {
-	return v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+	return v->x*v->x + v->y*v->y + v->z*v->z;
 }
 
 /// Derives the scalar length of the vector on the xy-plane.
 ///  @param[in]		v The vector. [(x, y)]
 /// @return The scalar length of the vector.
-inline float rdVlen2D(const float* v)
+inline float rdVlen2D(const rdVec2D* v)
 {
-	return rdMathSqrtf(v[0]*v[0] + v[1]*v[1]);
+	return rdMathSqrtf(v->x*v->x + v->y*v->y);
 }
 
 /// Derives the square of the scalar length of the vector on the xy-plane. (len * len)
 ///  @param[in]		v The vector. [(x, y)]
 /// @return The square of the scalar length of the vector.
-inline float rdVlenSqr2D(const float* v)
+inline float rdVlenSqr2D(const rdVec2D* v)
 {
-	return v[0]*v[0] + v[1]*v[1];
+	return v->x*v->x + v->y*v->y;
 }
 
 /// Returns the distance between two points.
 ///  @param[in]		v1	A point. [(x, y, z)]
 ///  @param[in]		v2	A point. [(x, y, z)]
 /// @return The distance between the two points.
-inline float rdVdist(const float* v1, const float* v2)
+inline float rdVdist(const rdVec3D* v1, const rdVec3D* v2)
 {
-	const float dx = v2[0] - v1[0];
-	const float dy = v2[1] - v1[1];
-	const float dz = v2[2] - v1[2];
+	const float dx = v2->x - v1->x;
+	const float dy = v2->y - v1->y;
+	const float dz = v2->z - v1->z;
 	return rdMathSqrtf(dx*dx + dy*dy + dz*dz);
 }
 
@@ -293,77 +394,79 @@ inline float rdVdist(const float* v1, const float* v2)
 ///  @param[in]		v1	A point. [(x, y, z)]
 ///  @param[in]		v2	A point. [(x, y, z)]
 /// @return The square of the distance between the two points.
-inline float rdVdistSqr(const float* v1, const float* v2)
+inline float rdVdistSqr(const rdVec3D* v1, const rdVec3D* v2)
 {
-	const float dx = v2[0] - v1[0];
-	const float dy = v2[1] - v1[1];
-	const float dz = v2[2] - v1[2];
+	const float dx = v2->x - v1->x;
+	const float dy = v2->y - v1->y;
+	const float dz = v2->z - v1->z;
 	return dx*dx + dy*dy + dz*dz;
 }
 
 /// Derives the distance between the specified points on the xy-plane.
-///  @param[in]		v1	A point. [(x, y, z)]
-///  @param[in]		v2	A point. [(x, y, z)]
+///  @param[in]		v1	A point. [(x, y)]
+///  @param[in]		v2	A point. [(x, y)]
 /// @return The distance between the point on the xy-plane.
 ///
 /// The vectors are projected onto the xy-plane, so the z-values are ignored.
-inline float rdVdist2D(const float* v1, const float* v2)
+inline float rdVdist2D(const rdVec2D* v1, const rdVec2D* v2)
 {
-	const float dx = v2[0] - v1[0];
-	const float dy = v2[1] - v1[1];
+	const float dx = v2->x - v1->x;
+	const float dy = v2->y - v1->y;
 	return rdMathSqrtf(dx*dx + dy*dy);
 }
 
 /// Derives the square of the distance between the specified points on the xy-plane.
-///  @param[in]		v1	A point. [(x, y, z)]
-///  @param[in]		v2	A point. [(x, y, z)]
+///  @param[in]		v1	A point. [(x, y)]
+///  @param[in]		v2	A point. [(x, y)]
 /// @return The square of the distance between the point on the xy-plane.
-inline float rdVdist2DSqr(const float* v1, const float* v2)
+inline float rdVdist2DSqr(const rdVec2D* v1, const rdVec2D* v2)
 {
-	const float dx = v2[0] - v1[0];
-	const float dy = v2[1] - v1[1];
+	const float dx = v2->x - v1->x;
+	const float dy = v2->y - v1->y;
 	return dx*dx + dy*dy;
 }
 
 /// Normalizes the vector.
 ///  @param[in,out]	v	The vector to normalize. [(x, y, z)]
-inline void rdVnormalize(float* v)
+inline void rdVnormalize(rdVec3D* v)
 {
-	const float s = rdMathSqrtf(rdSqr(v[0]) + rdSqr(v[1]) + rdSqr(v[2]));
+	// math_refactor(kawe): use rdVmag here.
+	const float s = rdMathSqrtf(rdSqr(v->x) + rdSqr(v->y) + rdSqr(v->z));
 	if (rdLikely(s > 0))
 	{
 		const float d = 1.0f / s;
-		v[0] *= d;
-		v[1] *= d;
-		v[2] *= d;
+		v->x *= d;
+		v->y *= d;
+		v->z *= d;
 	}
 }
 
 /// Normalizes the vector on the xy-plane.
 ///  @param[in,out]	v	The vector to normalize. [(x, y, z)]
-inline void rdVnormalize2D(float* v)
+inline void rdVnormalize2D(rdVec2D* v)
 {
-	const float s = rdMathSqrtf(rdSqr(v[0]) + rdSqr(v[1]));
+	// math_refactor(kawe): use rdVmag2D here.
+	const float s = rdMathSqrtf(rdSqr(v->x) + rdSqr(v->y));
 	if (rdLikely(s > 0))
 	{
 		const float d = 1.0f / s;
-		v[0] *= d;
-		v[1] *= d;
+		v->x *= d;
+		v->y *= d;
 	}
 }
 
 /// Derives the magnitude of the vector.
 ///  @param[in]		v	A vector. [(x, y, z)]
 /// @return The magnitude of the vector.
-inline float rdVmag(const float* v)
+inline float rdVmag(const rdVec3D* v)
 {
 	return rdMathSqrtf(rdVdot(v, v));
 }
 
 /// Derives the magnitude of the vector on the xy-plane.
-///  @param[in]		v	A vector. [(x, y, z)]
+///  @param[in]		v	A vector. [(x, y)]
 /// @return The magnitude of the vector on the xy-plane.
-inline float rdVmag2D(const float* v)
+inline float rdVmag2D(const rdVec2D* v)
 {
 	return rdMathSqrtf(rdVdot2D(v, v));
 }
@@ -372,16 +475,16 @@ inline float rdVmag2D(const float* v)
 ///  @param[in]		p	A point. [(x, y, z)]
 ///  @param[in]		v	A vector. [(x, y, z)]
 /// @return The scalar projection of the specified point into the vector.
-inline float rdVproj(const float* p, const float* v)
+inline float rdVproj(const rdVec3D* p, const rdVec3D* v)
 {
 	return rdVdot(p, v) / rdVmag(v);
 }
 
 /// Derives the scalar projection of the specified point into the vector on the xy-plane.
-///  @param[in]		p	A point. [(x, y, z)]
-///  @param[in]		v	A vector. [(x, y, z)]
+///  @param[in]		p	A point. [(x, y)]
+///  @param[in]		v	A vector. [(x, y)]
 /// @return The scalar projection of the specified point into the vector on the xy-plane.
-inline float rdVproj2D(const float* p, const float* v)
+inline float rdVproj2D(const rdVec2D* p, const rdVec2D* v)
 {
 	return rdVdot2D(p, v) / rdVmag2D(v);
 }
@@ -393,7 +496,7 @@ inline float rdVproj2D(const float* p, const float* v)
 ///
 /// Basically, this function will return true if the specified points are 
 /// close enough to each other to be considered collocated.
-inline bool rdVequal(const float* p0, const float* p1)
+inline bool rdVequal(const rdVec3D* p0, const rdVec3D* p1)
 {
 	const float thr = rdSqr(1.0f/16384.0f);
 	const float d = rdVdistSqr(p0, p1);
@@ -404,21 +507,21 @@ inline bool rdVequal(const float* p0, const float* p1)
 ///  @param[in]		v	A point. [(x, y, z)]
 /// @return True if all of the point's components are finite, i.e. not NaN
 /// or any of the infinities.
-inline bool rdVisfinite(const float* v)
+inline bool rdVisfinite(const rdVec3D* v)
 {
-	bool result =
-		rdMathIsfinite(v[0]) &&
-		rdMathIsfinite(v[1]) &&
-		rdMathIsfinite(v[2]);
+	bool result = // math_refactor(kawe): can be const.
+		rdMathIsfinite(v->x) &&
+		rdMathIsfinite(v->y) &&
+		rdMathIsfinite(v->z);
 
 	return result;
 }
 
 /// Checks that the specified vector's 2D components are finite.
-///  @param[in]		v	A point. [(x, y, z)]
-inline bool rdVisfinite2D(const float* v)
+///  @param[in]		v	A point. [(x, y)]
+inline bool rdVisfinite2D(const rdVec2D* v)
 {
-	bool result = rdMathIsfinite(v[0]) && rdMathIsfinite(v[1]);
+	bool result = rdMathIsfinite(v->x) && rdMathIsfinite(v->y); // math_refactor(kawe): can be const.
 	return result;
 }
 
@@ -427,16 +530,16 @@ inline bool rdVisfinite2D(const float* v)
 /// @{
 
 /// Derives the signed xy-plane area of the triangle ABC, or the relationship of line AB to point C.
-///  @param[in]		a		Vertex A. [(x, y, z)]
-///  @param[in]		b		Vertex B. [(x, y, z)]
-///  @param[in]		c		Vertex C. [(x, y, z)]
+///  @param[in]		a		Vertex A. [(x, y)]
+///  @param[in]		b		Vertex B. [(x, y)]
+///  @param[in]		c		Vertex C. [(x, y)]
 /// @return The signed xy-plane area of the triangle.
-inline float rdTriArea2D(const float* a, const float* b, const float* c)
+inline float rdTriArea2D(const rdVec2D* a, const rdVec2D* b, const rdVec2D* c)
 {
-	const float abx = b[0] - a[0];
-	const float aby = b[1] - a[1];
-	const float acx = c[0] - a[0];
-	const float acy = c[1] - a[1];
+	const float abx = b->x - a->x;
+	const float aby = b->y - a->y;
+	const float acx = c->x - a->x;
+	const float acy = c->y - a->y;
 	return acx*aby - abx*acy;
 }
 
@@ -445,12 +548,12 @@ inline float rdTriArea2D(const float* a, const float* b, const float* c)
 ///  @param[in]		b		Vertex B. [(x, y, z)]
 ///  @param[in]		c		Vertex C. [(x, y, z)]
 ///  @param[out]	out		The resulting normal. [(x, y, z)]
-inline void rdTriNormal(const float* v0, const float* v1, const float* v2, float* out)
+inline void rdTriNormal(const rdVec3D* v0, const rdVec3D* v1, const rdVec3D* v2, rdVec3D* out)
 {
-	float e0[3], e1[3];
-	rdVsub(e0, v1, v0);
-	rdVsub(e1, v2, v0);
-	rdVcross(out, e0, e1);
+	rdVec3D e0, e1;
+	rdVsub(&e0, v1, v0);
+	rdVsub(&e1, v2, v0);
+	rdVcross(out, &e0, &e1);
 	rdVnormalize(out);
 }
 
@@ -478,13 +581,13 @@ inline bool rdOverlapQuantBounds(const unsigned short amin[3], const unsigned sh
 ///  @param[in]		bmax	Maximum bounds of box B. [(x, y, z)]
 /// @return True if the two AABB's overlap.
 /// @see rdOverlapQuantBounds
-inline bool rdOverlapBounds(const float* amin, const float* amax,
-							const float* bmin, const float* bmax)
+inline bool rdOverlapBounds(const rdVec3D* amin, const rdVec3D* amax,
+							const rdVec3D* bmin, const rdVec3D* bmax)
 {
 	bool overlap = true;
-	overlap = (amin[0] > bmax[0] || amax[0] < bmin[0]) ? false : overlap;
-	overlap = (amin[1] > bmax[1] || amax[1] < bmin[1]) ? false : overlap;
-	overlap = (amin[2] > bmax[2] || amax[2] < bmin[2]) ? false : overlap;
+	overlap = (amin->x > bmax->x || amax->x < bmin->x) ? false : overlap;
+	overlap = (amin->y > bmax->y || amax->y < bmin->y) ? false : overlap;
+	overlap = (amin->z > bmax->z || amax->z < bmin->z) ? false : overlap;
 	return overlap;
 }
 
@@ -492,7 +595,7 @@ inline bool rdOverlapBounds(const float* amin, const float* amax,
 ///  @param[in]		v1	The start vector. [(x, y, z)]
 ///  @param[in]		v2	The end vector. [(x, y, z)]
 /// @return The slope angle between the 2 points.
-float rdCalcSlopeAngle(const float* v1, const float* v2);
+float rdCalcSlopeAngle(const rdVec3D* v1, const rdVec3D* v2);
 
 /// Derives the closest point on a triangle from the specified reference point.
 ///  @param[out]	closest	The closest point on the triangle.	
@@ -500,8 +603,8 @@ float rdCalcSlopeAngle(const float* v1, const float* v2);
 ///  @param[in]		a		Vertex A of triangle ABC. [(x, y, z)]
 ///  @param[in]		b		Vertex B of triangle ABC. [(x, y, z)]
 ///  @param[in]		c		Vertex C of triangle ABC. [(x, y, z)]
-void rdClosestPtPointTriangle(float* closest, const float* p,
-							  const float* a, const float* b, const float* c);
+void rdClosestPtPointTriangle(rdVec3D* closest, const rdVec3D* p,
+							  const rdVec3D* a, const rdVec3D* b, const rdVec3D* c);
 
 /// Derives the z-axis height of the closest point on the triangle from the specified reference point.
 ///  @param[in]		p		The reference point from which to test. [(x, y, z)]
@@ -509,44 +612,44 @@ void rdClosestPtPointTriangle(float* closest, const float* p,
 ///  @param[in]		b		Vertex B of triangle ABC. [(x, y, z)]
 ///  @param[in]		c		Vertex C of triangle ABC. [(x, y, z)]
 ///  @param[out]	h		The resulting height.
-bool rdClosestHeightPointTriangle(const float* p, const float* a, const float* b, const float* c, float& h);
+bool rdClosestHeightPointTriangle(const rdVec3D* p, const rdVec3D* a, const rdVec3D* b, const rdVec3D* c, float& h);
 
-bool rdIntersectSegmentTriangle(const float* sp, const float* sq,
-								const float* a, const float* b, const float* c, float& t);
+bool rdIntersectSegmentTriangle(const rdVec3D* sp, const rdVec3D* sq,
+								const rdVec3D* a, const rdVec3D* b, const rdVec3D* c, float& t);
 
-bool rdIntersectSegmentPoly2D(const float* p0, const float* p1,
-							  const float* verts, int nverts,
+bool rdIntersectSegmentPoly2D(const rdVec3D* p0, const rdVec3D* p1,
+							  const rdVec3D* verts, int nverts,
 							  float& tmin, float& tmax,
 							  int& segMin, int& segMax);
 
-bool rdIntersectSegmentAABB(const float* sp, const float* sq,
-						 const float* amin, const float* amax,
+bool rdIntersectSegmentAABB(const rdVec3D* sp, const rdVec3D* sq,
+						 const rdVec3D* amin, const rdVec3D* amax,
 						 float& tmin, float& tmax);
 
-bool rdIntersectSegmentCylinder(const float* sp, const float* sq, const float* position,
+bool rdIntersectSegmentCylinder(const rdVec3D* sp, const rdVec3D* sq, const rdVec3D* position,
 								const float radius, const float height,
 								float& tmin, float& tmax);
 
-bool rdIntersectSegmentConvexHull(const float* sp, const float* sq, const float* verts,
+bool rdIntersectSegmentConvexHull(const rdVec3D* sp, const rdVec3D* sq, const rdVec3D* verts,
 								  int nverts, float hmin, float hmax,
 								  float& tmin, float& tmax);
 
-bool rdIntersectSegSeg2D(const float* ap, const float* aq,
-						 const float* bp, const float* bq,
+bool rdIntersectSegSeg2D(const rdVec2D* ap, const rdVec2D* aq,
+						 const rdVec2D* bp, const rdVec2D* bq,
 						 float& s, float& t);
 
-float rdDistancePtLine2D(const float* pt, const float* p, const float* q);
+float rdDistancePtLine2D(const rdVec2D* pt, const rdVec2D* p, const rdVec2D* q);
 
 /// Derives the normal of an edge
-///  @param[in]		dir		The direction of the edge. [(x, y, z)]
+///  @param[in]		dir		The direction of the edge. [(x, y)]
 ///  @param[out]	out		The resulting normal. [(x, y)]
-void rdCalcEdgeNormal2D(const float* dir, float* out);
+void rdCalcEdgeNormal2D(const rdVec2D* dir, rdVec2D* out);
 
 /// Derives the normal of an edge
 ///  @param[in]		v1		First vert of the polygon edge. [(x, y, z)]
 ///  @param[in]		v2		Second vert of the polygon edge. [(x, y, z)]
 ///  @param[out]	out		The resulting normal. [(x, y)]
-void rdCalcEdgeNormalPt2D(const float* v1, const float* v2, float* out);
+void rdCalcEdgeNormalPt2D(const rdVec2D* v1, const rdVec2D* v2, rdVec2D* out);
 
 /// Derives the sub-edge area of an edge.
 ///  @param[in]		edgeStart		First vert of the polygon edge. [(x, y, z)]
@@ -555,8 +658,8 @@ void rdCalcEdgeNormalPt2D(const float* v1, const float* v2, float* out);
 ///  @param[in]		subEdgeEnd		Second vert of the detail edge. [(x, y, z)]
 ///  @param[out]	tmin			The normalized distance ratio from polygon edge start to detail edge start.
 ///  @param[out]	tmax			The normalized distance ratio from polygon edge start to detail edge end.
-void rdCalcSubEdgeArea2D(const float* edgeStart, const float* edgeEnd, const float* subEdgeStart,
-	const float* subEdgeEnd, float& tmin, float& tmax);
+void rdCalcSubEdgeArea2D(const rdVec2D* edgeStart, const rdVec2D* edgeEnd, const rdVec2D* subEdgeStart,
+	const rdVec2D* subEdgeEnd, float& tmin, float& tmax);
 
 /// Derives the overlap between 2 edges.
 ///  @param[in]		edge1Start		Start vert of the first edge. [(x, y, z)]
@@ -565,8 +668,8 @@ void rdCalcSubEdgeArea2D(const float* edgeStart, const float* edgeEnd, const flo
 ///  @param[in]		edge2End		End vert of the second edge. [(x, y, z)]
 ///  @param[in]		targetEdgeVec	The projection direction. [(x, y, z)]
 /// @return The length of the overlap.
-float rdCalcEdgeOverlap2D(const float* edge1Start, const float* edge1End,
-	const float* edge2Start, const float* edge2End, const float* targetEdgeVec);
+float rdCalcEdgeOverlap2D(const rdVec2D* edge1Start, const rdVec2D* edge1End,
+	const rdVec2D* edge2Start, const rdVec2D* edge2End, const rdVec2D* targetEdgeVec);
 
 /// Derives the maximum angle in which an object on an elevated surface can be seen from below.
 ///  @param[in]		ledgeSpan		The distance between the edge of the object and the edge of the ledge.
@@ -581,15 +684,15 @@ float rdCalcMaxLOSAngle(const float ledgeSpan, const float objectHeight);
 /// @return The amount we need to offset to maintain LOS.
 float rdCalcLedgeSpanOffsetAmount(const float ledgeSpan, const float slopeAngle, const float maxAngle);
 
-unsigned char rdClassifyPointOutsideBounds(const float* pt, const float* bmin, const float* bmax);
-unsigned char rdClassifyPointInsideBounds(const float* pt, const float* bmin, const float* bmax);
+unsigned char rdClassifyPointOutsideBounds(const rdVec2D* pt, const rdVec2D* bmin, const rdVec2D* bmax);
+unsigned char rdClassifyPointInsideBounds(const rdVec2D* pt, const rdVec2D* bmin, const rdVec2D* bmax);
 
 /// Determines if the specified point is inside the axis-aligned bounding box.
 ///  @param[in]		pt		The point to check. [(x, y, z)]
 ///  @param[in]		bmin	Minimum bounds of the box. [(x, y, z)]
 ///  @param[in]		bmax	Maximum bounds of the box. [(x, y, z)]
 /// @return True if the point is inside the axis-aligned bounding box.
-bool rdPointInAABB(const float* pt, const float* bmin, const float* bmax);
+bool rdPointInAABB(const rdVec3D* pt, const rdVec3D* bmin, const rdVec3D* bmax);
 
 /// Determines if the specified point is inside the cylinder on the xy-plane.
 ///  @param[in]		pt		The point to check. [(x, y, z)]
@@ -597,26 +700,26 @@ bool rdPointInAABB(const float* pt, const float* bmin, const float* bmax);
 ///  @param[in]		radius	The radius of the cylinder.
 ///  @param[in]		height	The height of the cylinder.
 /// @return True if the point is inside the cylinder.
-bool rdPointInCylinder(const float* pt, const float* pos, const float radius, const float height);
+bool rdPointInCylinder(const rdVec3D* pt, const rdVec3D* pos, const float radius, const float height);
 
 /// Determines if the specified point is inside the convex polygon on the xy-plane.
 ///  @param[in]		pt		The point to check. [(x, y, z)]
 ///  @param[in]		verts	The polygon vertices. [(x, y, z) * @p nverts]
 ///  @param[in]		nverts	The number of vertices. [Limit: >= 3]
 /// @return True if the point is inside the polygon.
-bool rdPointInPolygon(const float* pt, const float* verts, const int nverts);
+bool rdPointInPolygon(const rdVec3D* pt, const rdVec3D* verts, const int nverts);
 
-bool rdDistancePtPolyEdgesSqr(const float* pt, const float* verts, const int nverts,
-							float* ed, float* et);
+bool rdDistancePtPolyEdgesSqr(const rdVec3D* pt, const rdVec3D* verts, const int nverts,
+							  float* ed, float* et);
 
-float rdDistancePtSegSqr2D(const float* pt, const float* p, const float* q, float& t);
+float rdDistancePtSegSqr2D(const rdVec3D* pt, const rdVec3D* p, const rdVec3D* q, float& t);
 
 /// Derives the centroid of a convex polygon.
 ///  @param[out]	tc		The centroid of the polygon. [(x, y, z)]
 ///  @param[in]		idx		The polygon indices. [(vertIndex) * @p nidx]
 ///  @param[in]		nidx	The number of indices in the polygon. [Limit: >= 3]
 ///  @param[in]		verts	The polygon vertices. [(x, y, z) * vertCount]
-void rdCalcPolyCenter(float* tc, const unsigned short* idx, int nidx, const float* verts);
+void rdCalcPolyCenter(rdVec3D* tc, const unsigned short* idx, int nidx, const rdVec3D* verts);
 
 /// Determines if the two convex polygons overlap on the xy-plane.
 ///  @param[in]		polya		Polygon A vertices.	[(x, y, z) * @p npolya]
@@ -624,8 +727,8 @@ void rdCalcPolyCenter(float* tc, const unsigned short* idx, int nidx, const floa
 ///  @param[in]		polyb		Polygon B vertices.	[(x, y, z) * @p npolyb]
 ///  @param[in]		npolyb		The number of vertices in polygon B.
 /// @return True if the two polygons overlap.
-bool rdOverlapPolyPoly2D(const float* polya, const int npolya,
-						 const float* polyb, const int npolyb);
+bool rdOverlapPolyPoly2D(const rdVec3D* polya, const int npolya,
+						 const rdVec3D* polyb, const int npolyb);
 
 /// @}
 /// @name Miscellaneous functions.
@@ -697,8 +800,14 @@ inline void rdSwapEndian(float* v)
 	rdSwapByte(x+0, x+3); rdSwapByte(x+1, x+2);
 }
 
-void rdRandomPointInConvexPoly(const float* pts, const int npts, float* areas,
-							   const float s, const float t, float* out);
+inline void rdSwapEndian(rdVec3D* v)
+{
+	unsigned char* x = (unsigned char*)v;
+	rdSwapByte(x+0, x+3); rdSwapByte(x+1, x+2);
+}
+
+void rdRandomPointInConvexPoly(const rdVec3D* pts, const int npts, float* areas,
+							   const float s, const float t, rdVec3D* out);
 
 /// Counts the number of vertices in the polygon.
 ///  @param[in]		p	The polygon.
@@ -740,7 +849,7 @@ TypeToRetrieveAs* rdGetThenAdvanceBufferPointer(unsigned char*& buffer, const rd
 
 /**
 
-@fn float rdTriArea2D(const float* a, const float* b, const float* c)
+@fn float rdTriArea2D(const rdVec3D* a, const rdVec3D* b, const rdVec3D* c)
 @par
 
 The vertices are projected onto the xy-plane, so the z-values are ignored.

@@ -166,8 +166,8 @@ Editor::Editor() :
 	for (int i = 0; i < MAX_TOOLS; i++)
 		m_toolStates[i] = 0;
 
-	rdVset(m_recastDrawOffset, 0.0f,0.0f,0.0f);
-	rdVset(m_detourDrawOffset, 0.0f,0.0f,4.0f);
+	m_recastDrawOffset.init(0.0f,0.0f,0.0f);
+	m_detourDrawOffset.init(0.0f,0.0f,4.0f);
 }
 
 Editor::~Editor()
@@ -209,9 +209,9 @@ void Editor::handleRender()
 	duDebugDrawTriMesh(&m_dd, m_geom->getMesh()->getVerts(), m_geom->getMesh()->getVertCount(),
 					   m_geom->getMesh()->getTris(), m_geom->getMesh()->getNormals(), m_geom->getMesh()->getTriCount(), 0, 1.0f, nullptr);
 	// Draw bounds
-	const float* bmin = m_geom->getMeshBoundsMin();
-	const float* bmax = m_geom->getMeshBoundsMax();
-	duDebugDrawBoxWire(&m_dd, bmin[0],bmin[1],bmin[2], bmax[0],bmax[1],bmax[2], duRGBA(255,255,255,128), 1.0f, nullptr);
+	const rdVec3D* bmin = m_geom->getMeshBoundsMin();
+	const rdVec3D* bmax = m_geom->getMeshBoundsMax();
+	duDebugDrawBoxWire(&m_dd, bmin->x,bmin->y,bmin->z, bmax->x,bmax->y,bmax->z, duRGBA(255,255,255,128), 1.0f, nullptr);
 }
 
 void Editor::handleRenderOverlay(double* /*proj*/, double* /*model*/, int* /*view*/)
@@ -347,8 +347,8 @@ void Editor::handleCommonSettings()
 	
 	if (m_geom)
 	{
-		const float* bmin = m_geom->getNavMeshBoundsMin();
-		const float* bmax = m_geom->getNavMeshBoundsMax();
+		const rdVec3D* bmin = m_geom->getNavMeshBoundsMin();
+		const rdVec3D* bmax = m_geom->getNavMeshBoundsMax();
 		int gw = 0, gh = 0;
 		rcCalcGridSize(bmin, bmax, m_cellSize, &gw, &gh);
 		char text[64];
@@ -381,26 +381,26 @@ void Editor::handleCommonSettings()
 		ImGui::Separator();
 		ImGui::Text("Bounding");
 
-		float* navMeshBMin = m_geom->getNavMeshBoundsMin();
-		float* navMeshBMax = m_geom->getNavMeshBoundsMax();
+		rdVec3D* navMeshBMin = m_geom->getNavMeshBoundsMin();
+		rdVec3D* navMeshBMax = m_geom->getNavMeshBoundsMax();
 
-		const float* meshBMin = m_geom->getMeshBoundsMin();
-		const float* meshBMax = m_geom->getMeshBoundsMax();
+		const rdVec3D* meshBMin = m_geom->getMeshBoundsMin();
+		const rdVec3D* meshBMax = m_geom->getMeshBoundsMax();
 
 		ImGui::PushItemWidth(75);
-		ImGui::SliderFloat("##BoundingMinsX", &navMeshBMin[0], meshBMin[0], rdMin(meshBMax[0], navMeshBMax[0]));
+		ImGui::SliderFloat("##BoundingMinsX", &navMeshBMin->x, meshBMin->x, rdMin(meshBMax->x, navMeshBMax->x));
 		ImGui::SameLine();
-		ImGui::SliderFloat("##BoundingMinsY", &navMeshBMin[1], meshBMin[1], rdMin(meshBMax[1], navMeshBMax[1]));
+		ImGui::SliderFloat("##BoundingMinsY", &navMeshBMin->y, meshBMin->y, rdMin(meshBMax->y, navMeshBMax->y));
 		ImGui::SameLine();
-		ImGui::SliderFloat("##BoundingMinsZ", &navMeshBMin[2], meshBMin[2], rdMin(meshBMax[2], navMeshBMax[2]));
+		ImGui::SliderFloat("##BoundingMinsZ", &navMeshBMin->z, meshBMin->z, rdMin(meshBMax->z, navMeshBMax->z));
 		ImGui::SameLine();
 		ImGui::Text("Mins");
 
-		ImGui::SliderFloat("##BoundingMaxsX", &navMeshBMax[0], rdMax(meshBMin[0], navMeshBMin[0]), meshBMax[0]);
+		ImGui::SliderFloat("##BoundingMaxsX", &navMeshBMax->x, rdMax(meshBMin->x, navMeshBMin->x), meshBMax->x);
 		ImGui::SameLine();
-		ImGui::SliderFloat("##BoundingMaxsY", &navMeshBMax[1], rdMax(meshBMin[1], navMeshBMin[1]), meshBMax[1]);
+		ImGui::SliderFloat("##BoundingMaxsY", &navMeshBMax->y, rdMax(meshBMin->y, navMeshBMin->y), meshBMax->y);
 		ImGui::SameLine();
-		ImGui::SliderFloat("##BoundingMaxsZ", &navMeshBMax[2], rdMax(meshBMin[2], navMeshBMin[2]), meshBMax[2]);
+		ImGui::SliderFloat("##BoundingMaxsZ", &navMeshBMax->z, rdMax(meshBMin->z, navMeshBMin->z), meshBMax->z);
 		ImGui::SameLine();
 		ImGui::Text("Maxs");
 		ImGui::PopItemWidth();
@@ -492,7 +492,7 @@ void Editor::handleCommonSettings()
 	ImGui::Separator();
 }
 
-void Editor::handleClick(const float* s, const float* p, const int v, bool shift)
+void Editor::handleClick(const rdVec3D* s, const rdVec3D* p, const int v, bool shift)
 {
 	if (m_tool)
 		m_tool->handleClick(s, p, v, shift);
@@ -611,10 +611,12 @@ unsigned char GetBestTraverseType(void* userData, const float traverseDist, cons
 	return (unsigned char)bestTraverseType;
 }
 
-static bool polyEdgeFaceAgainst(const float* v1, const float* v2, const float* n1, const float* n2)
+static bool polyEdgeFaceAgainst(const rdVec2D* v1, const rdVec2D* v2, const rdVec2D* n1, const rdVec2D* n2)
 {
-	const float delta[2] = { v2[0] - v1[0], v2[1] - v1[1] };
-	return (rdVdot2D(delta, n1) >= 0 && rdVdot2D(delta, n2) < 0);
+	rdVec2D delta;
+	rdVsub2D(&delta, v2, v1);
+
+	return (rdVdot2D(&delta, n1) >= 0 && rdVdot2D(&delta, n2) < 0);
 }
 
 // NOTE: we don't want to collide with trigger area's as this would otherwise
@@ -633,12 +635,12 @@ static const int TRAVERSE_LINK_TRACE_MASK = TRACE_WORLD|TRACE_CLIP|TRACE_TRIGGER
 // avoiding 2 additional ray casts will save a lot on build times.
 static const float TRAVERSE_LINK_TRIPPLE_TRACE_THRESH = 100.f;
 
-static bool raycastMesh(const InputGeom* geom, const float* src, const float* dst)
+static bool raycastMesh(const InputGeom* geom, const rdVec3D* src, const rdVec3D* dst)
 {
 	return geom->raycastMesh(src, dst, TRAVERSE_LINK_TRACE_MASK);
 }
 
-static bool traverseLinkOffsetIntersectsGeom(const InputGeom* geom, const float* basePos, const float* offsetPos)
+static bool traverseLinkOffsetIntersectsGeom(const InputGeom* geom, const rdVec3D* basePos, const rdVec3D* offsetPos)
 {
 	// We need to fire a raycast from out initial
 	// high pos to our offset position to make
@@ -666,7 +668,7 @@ static bool traverseLinkOffsetIntersectsGeom(const InputGeom* geom, const float*
 	return false;
 }
 
-static bool traverseLinkIntersectsPlaneOverPlane(const InputGeom* geom, const float* lowPos, const float* highPos, const float walkableHeight)
+static bool traverseLinkIntersectsPlaneOverPlane(const InputGeom* geom, const rdVec3D* lowPos, const rdVec3D* highPos, const float walkableHeight)
 {
 	// Make sure we have at least a clearance of
 	// the tile's walkable height in order to
@@ -697,13 +699,13 @@ static bool traverseLinkIntersectsPlaneOverPlane(const InputGeom* geom, const fl
 	// high enough for a ray to reach the other
 	// side of the navmesh unobstructed.
 
-	float rayMidStart[3];
-	rdVsad(rayMidStart, lowPos, highPos, 0.5f);
+	rdVec3D rayMidStart;
+	rdVsad(&rayMidStart, lowPos, highPos, 0.5f);
 
-	float rayMidEnd[3];
-	rdVset(rayMidEnd, rayMidStart[0], rayMidStart[1], rayMidStart[2]+walkableHeight);
+	rdVec3D rayMidEnd;
+	rdVset(&rayMidEnd, rayMidStart.x, rayMidStart.y, rayMidStart.z+walkableHeight);
 
-	if (raycastMesh(geom, rayMidStart, rayMidEnd))
+	if (raycastMesh(geom, &rayMidStart, &rayMidEnd))
 		return true;
 
 	const float distance = rdVdist(lowPos, highPos);
@@ -711,24 +713,24 @@ static bool traverseLinkIntersectsPlaneOverPlane(const InputGeom* geom, const fl
 	if (distance < TRAVERSE_LINK_TRIPPLE_TRACE_THRESH)
 		return false;
 
-	float rayMidMidStart[3];
+	rdVec3D rayMidMidStart;
 
-	rdVsad(rayMidMidStart, rayMidStart, lowPos, 0.5f);
-	rdVset(rayMidEnd, rayMidMidStart[0], rayMidMidStart[1], rayMidMidStart[2]+walkableHeight);
+	rdVsad(&rayMidMidStart, &rayMidStart, lowPos, 0.5f);
+	rdVset(&rayMidEnd, rayMidMidStart.x, rayMidMidStart.y, rayMidMidStart.z+walkableHeight);
 
-	if (raycastMesh(geom, rayMidStart, rayMidEnd))
+	if (raycastMesh(geom, &rayMidStart, &rayMidEnd))
 		return true;
 
-	rdVsad(rayMidMidStart, rayMidStart, highPos, 0.5f);
-	rdVset(rayMidEnd, rayMidMidStart[0], rayMidMidStart[1], rayMidMidStart[2]+walkableHeight);
+	rdVsad(&rayMidMidStart, &rayMidStart, highPos, 0.5f);
+	rdVset(&rayMidEnd, rayMidMidStart.x, rayMidMidStart.y, rayMidMidStart.z+walkableHeight);
 
-	if (raycastMesh(geom, rayMidStart, rayMidEnd))
+	if (raycastMesh(geom, &rayMidStart, &rayMidEnd))
 		return true;
 
 	return false;
 }
 
-static bool traverseLinkIntersectsOverhangOverPoint(const InputGeom* geom, const float* startPos, const float walkableHeight)
+static bool traverseLinkIntersectsOverhangOverPoint(const InputGeom* geom, const rdVec3D* startPos, const float walkableHeight)
 {
 	// Make sure we have enough clearance over
 	// the kink of the link. The kink is formed
@@ -760,17 +762,17 @@ static bool traverseLinkIntersectsOverhangOverPoint(const InputGeom* geom, const
 	// will make the NPC extend well beyond their walkable height on
 	// the kind point of the traverse portal. We need to accommodate
 	// for these to avoid them clipping into geometry.
-	const float minClearanceHeight[3] = {
-		startPos[0],
-		startPos[1],
-		startPos[2] + (walkableHeight*2)
+	const rdVec3D minClearanceHeight = {
+		startPos->x,
+		startPos->y,
+		startPos->z + (walkableHeight*2)
 	};
 
-	return raycastMesh(geom, minClearanceHeight, startPos);
+	return raycastMesh(geom, &minClearanceHeight, startPos);
 }
 
-static bool traverseLinkInLOS(void* userData, const float* lowPos, const float* highPos, const float* lowNorm,
-	const float* highNorm, const float walkableHeight, const float walkableRadius, const float slopeAngle)
+static bool traverseLinkInLOS(void* userData, const rdVec3D* lowPos, const rdVec3D* highPos, const rdVec2D* lowNorm,
+	const rdVec2D* highNorm, const float walkableHeight, const float walkableRadius, const float slopeAngle)
 {
 	Editor* editor = (Editor*)userData;
 	InputGeom* geom = editor->getInputGeom();
@@ -821,7 +823,7 @@ static bool traverseLinkInLOS(void* userData, const float* lowPos, const float* 
 	if (!polyEdgeFaceAgainst(lowPos, highPos, lowNorm, highNorm))
 		return false;
 
-	const float* targetRayPos = highPos;
+	const rdVec3D* targetRayPos = highPos;
 
 	// We offset the highest point with at least the
 	// walkable radius, and perform a raycast test
@@ -850,18 +852,18 @@ static bool traverseLinkInLOS(void* userData, const float* lowPos, const float* 
 	// high positions are angled in such way no LOS
 	// is possible, or when there's an actual object
 	// between the 2 positions.
-	float offsetRayPos[3];
+	rdVec3D offsetRayPos;
 
 	if (offsetAmount > 0)
 	{
-		offsetRayPos[0] = highPos[0] + highNorm[0] * offsetAmount;
-		offsetRayPos[1] = highPos[1] + highNorm[1] * offsetAmount;
-		offsetRayPos[2] = highPos[2];
+		offsetRayPos.x = highPos->x + highNorm->x * offsetAmount;
+		offsetRayPos.y = highPos->y + highNorm->y * offsetAmount;
+		offsetRayPos.z = highPos->z;
 
-		if (traverseLinkOffsetIntersectsGeom(geom, highPos, offsetRayPos))
+		if (traverseLinkOffsetIntersectsGeom(geom, highPos, &offsetRayPos))
 			return false;
 
-		targetRayPos = offsetRayPos;
+		targetRayPos = &offsetRayPos;
 	}
 
 	// Check if the path between the ground position and the kink point
@@ -1081,8 +1083,8 @@ void Editor::renderMeshOffsetOptions()
 
 	ImGui::PushItemWidth(230);
 
-	ImGui::SliderFloat3("Recast##RenderOffset", m_recastDrawOffset, -500, 500);
-	ImGui::SliderFloat3("Detour##RenderOffset", m_detourDrawOffset, -500, 500);
+	ImGui::SliderFloat3("Recast##RenderOffset", (float*)&m_recastDrawOffset, -500, 500);
+	ImGui::SliderFloat3("Detour##RenderOffset", (float*)&m_detourDrawOffset, -500, 500);
 
 	ImGui::PopItemWidth();
 }

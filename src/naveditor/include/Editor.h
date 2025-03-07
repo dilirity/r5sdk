@@ -215,7 +215,7 @@ struct EditorTool
 	virtual void init(class Editor* editor) = 0;
 	virtual void reset() = 0;
 	virtual void handleMenu() = 0;
-	virtual void handleClick(const float* s, const float* p, const int v, bool shift) = 0;
+	virtual void handleClick(const rdVec3D* s, const rdVec3D* p, const int v, bool shift) = 0;
 	virtual void handleRender() = 0;
 	virtual void handleRenderOverlay(double* proj, double* model, int* view) = 0;
 	virtual void handleToggle() = 0;
@@ -273,8 +273,8 @@ protected:
 	float m_detailSampleMaxError;
 	int m_partitionType;
 
-	float m_navMeshBMin[3];
-	float m_navMeshBMax[3];
+	rdVec3D m_navMeshBMin;
+	rdVec3D m_navMeshBMax;
 
 	NavMeshType_e m_selectedNavMeshType;
 	NavMeshType_e m_loadedNavMeshType;
@@ -290,8 +290,8 @@ protected:
 	EditorDebugDraw m_dd;
 	unsigned int m_navMeshDrawFlags;
 	duDrawTraverseLinkParams m_traverseLinkDrawParams;
-	float m_recastDrawOffset[3];
-	float m_detourDrawOffset[3];
+	rdVec3D m_recastDrawOffset;
+	rdVec3D m_detourDrawOffset;
 
 public:
 	std::string m_modelName;
@@ -311,13 +311,13 @@ public:
 	void setToolState(int type, EditorToolState* s) { m_toolStates[type] = s; }
 
 	EditorDebugDraw& getDebugDraw() { return m_dd; }
-	const float* getRecastDrawOffset() const { return m_recastDrawOffset; }
-	const float* getDetourDrawOffset() const { return m_detourDrawOffset; }
+	const rdVec3D* getRecastDrawOffset() const { return &m_recastDrawOffset; }
+	const rdVec3D* getDetourDrawOffset() const { return &m_detourDrawOffset; }
 
 	virtual void handleSettings();
 	virtual void handleTools();
 	virtual void handleDebugMode();
-	virtual void handleClick(const float* s, const float* p, const int v, bool shift);
+	virtual void handleClick(const rdVec3D* s, const rdVec3D* p, const int v, bool shift);
 	virtual void handleToggle();
 	virtual void handleStep();
 	virtual void handleRender();

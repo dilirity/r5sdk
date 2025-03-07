@@ -18,19 +18,20 @@
 
 #ifndef DETOUROBSTACLEAVOIDANCE_H
 #define DETOUROBSTACLEAVOIDANCE_H
+#include "Shared/Include/SharedCommon.h"
 
 struct dtObstacleCircle
 {
-	float p[3];				///< Position of the obstacle
-	float vel[3];			///< Velocity of the obstacle
-	float dvel[3];			///< Velocity of the obstacle
+	rdVec3D p;				///< Position of the obstacle
+	rdVec3D vel;			///< Velocity of the obstacle
+	rdVec3D dvel;			///< Velocity of the obstacle
 	float rad;				///< Radius of the obstacle
-	float dp[3], np[3];		///< Use for side selection during sampling.
+	rdVec3D dp, np;			///< Use for side selection during sampling.
 };
 
 struct dtObstacleSegment
 {
-	float p[3], q[3];		///< End points of the obstacle segment
+	rdVec3D p, q;			///< End points of the obstacle segment
 	bool touch;
 };
 
@@ -43,13 +44,13 @@ public:
 	
 	bool init(const int maxSamples);
 	void reset();
-	void addSample(const float* vel, const float ssize, const float pen,
+	void addSample(const rdVec3D* vel, const float ssize, const float pen,
 				   const float vpen, const float vcpen, const float spen, const float tpen);
 	
 	void normalizeSamples();
 	
 	inline int getSampleCount() const { return m_nsamples; }
-	inline const float* getSampleVelocity(const int i) const { return &m_vel[i*3]; }
+	inline const rdVec3D* getSampleVelocity(const int i) const { return &m_vel[i]; }
 	inline float getSampleSize(const int i) const { return m_ssize[i]; }
 	inline float getSamplePenalty(const int i) const { return m_pen[i]; }
 	inline float getSampleDesiredVelocityPenalty(const int i) const { return m_vpen[i]; }
@@ -64,7 +65,7 @@ private:
 
 	int m_nsamples;
 	int m_maxSamples;
-	float* m_vel;
+	rdVec3D* m_vel;
 	float* m_ssize;
 	float* m_pen;
 	float* m_vpen;
@@ -77,7 +78,7 @@ dtObstacleAvoidanceDebugData* dtAllocObstacleAvoidanceDebugData();
 void dtFreeObstacleAvoidanceDebugData(dtObstacleAvoidanceDebugData* ptr);
 
 
-static const int DT_MAX_PATTERN_DIVS = 32;	///< Max numver of adaptive divs.
+static const int DT_MAX_PATTERN_DIVS = 32;	///< Max number of adaptive divs.
 static const int DT_MAX_PATTERN_RINGS = 4;	///< Max number of adaptive rings.
 
 struct dtObstacleAvoidanceParams
@@ -104,18 +105,18 @@ public:
 	
 	void reset();
 
-	void addCircle(const float* pos, const float rad,
-				   const float* vel, const float* dvel);
+	void addCircle(const rdVec3D* pos, const float rad,
+				   const rdVec3D* vel, const rdVec3D* dvel);
 				   
-	void addSegment(const float* p, const float* q);
+	void addSegment(const rdVec3D* p, const rdVec3D* q);
 
-	int sampleVelocityGrid(const float* pos, const float rad, const float vmax,
-						   const float* vel, const float* dvel, float* nvel,
+	int sampleVelocityGrid(const rdVec3D* pos, const float rad, const float vmax,
+						   const rdVec3D* vel, const rdVec3D* dvel, rdVec3D* nvel,
 						   const dtObstacleAvoidanceParams* params,
 						   dtObstacleAvoidanceDebugData* debug = 0);
 
-	int sampleVelocityAdaptive(const float* pos, const float rad, const float vmax,
-							   const float* vel, const float* dvel, float* nvel,
+	int sampleVelocityAdaptive(const rdVec3D* pos, const float rad, const float vmax,
+							   const rdVec3D* vel, const rdVec3D* dvel, rdVec3D* nvel,
 							   const dtObstacleAvoidanceParams* params, 
 							   dtObstacleAvoidanceDebugData* debug = 0);
 	
@@ -130,11 +131,11 @@ private:
 	dtObstacleAvoidanceQuery(const dtObstacleAvoidanceQuery&);
 	dtObstacleAvoidanceQuery& operator=(const dtObstacleAvoidanceQuery&);
 
-	void prepare(const float* pos, const float* dvel);
+	void prepare(const rdVec3D* pos, const rdVec3D* dvel);
 
-	float processSample(const float* vcand, const float cs,
-						const float* pos, const float rad,
-						const float* vel, const float* dvel,
+	float processSample(const rdVec3D* vcand, const float cs,
+						const rdVec3D* pos, const float rad,
+						const rdVec3D* vel, const rdVec2D* dvel,
 						const float minPenalty,
 						dtObstacleAvoidanceDebugData* debug);
 

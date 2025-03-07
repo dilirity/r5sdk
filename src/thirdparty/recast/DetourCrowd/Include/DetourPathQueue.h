@@ -32,7 +32,7 @@ class dtPathQueue
 	{
 		dtPathQueueRef ref;
 		/// Path find start and end location.
-		float startPos[3], endPos[3];
+		rdVec3D startPos, endPos;
 		dtPolyRef startRef, endRef;
 		/// Result.
 		dtPolyRef* path;
@@ -62,7 +62,7 @@ public:
 	void update(const int maxIters);
 	
 	dtPathQueueRef request(dtPolyRef startRef, dtPolyRef endRef,
-						   const float* startPos, const float* endPos, 
+						   const rdVec3D* startPos, const rdVec3D* endPos,
 						   const dtQueryFilter* filter);
 	
 	dtStatus getRequestStatus(dtPathQueueRef ref) const;

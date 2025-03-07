@@ -87,9 +87,9 @@ static dtStatus Detour_AddTile(dtNavMesh* nav, void* unused, unsigned char* data
 // Purpose: finds the nearest polygon to specified center point.
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
-static dtStatus Detour_FindNearestPolyInBounds(dtNavMeshQuery* const query, const float* const center,
-    const float* const halfExtents, const dtQueryFilter* const filter,
-    dtPolyRef* const nearestRef, float* const nearestPt)
+static dtStatus Detour_FindNearestPolyInBounds(dtNavMeshQuery* const query, const rdVec3D* const center,
+    const rdVec3D* const halfExtents, const dtQueryFilter* const filter,
+    dtPolyRef* const nearestRef, rdVec3D* const nearestPt)
 {
     // note(kawe): the SDK's implementation fixes the following issue:
     // https://github.com/recastnavigation/recastnavigation/issues/107
@@ -104,7 +104,7 @@ static dtStatus Detour_FindNearestPolyInBounds(dtNavMeshQuery* const query, cons
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
 static dtStatus Detour_FindPath(dtNavMeshQuery* query, dtPolyRef startRef, dtPolyRef endRef,
-    const float* startPos, const float* endPos, const dtQueryFilter* filter, dtPolyRef* path,
+    const rdVec3D* startPos, const rdVec3D* endPos, const dtQueryFilter* filter, dtPolyRef* path,
     unsigned char* jump, int* pathCount, const int maxPath)
 {
     // note(kawe): replaced with SDK's version, because the implementation in
@@ -116,9 +116,9 @@ static dtStatus Detour_FindPath(dtNavMeshQuery* query, dtPolyRef startRef, dtPol
 // Purpose: finds the straight path from the start to the end position within the polygon corridor.
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
-static dtStatus Detour_FindStraightPath(dtNavMeshQuery* const query, const float* const startPos, 
-    const float* const endPos, const dtPolyRef* const path, const unsigned char* const jumpTypes,
-    const int pathSize, float* const straightPath, unsigned char* const straightPathFlags,
+static dtStatus Detour_FindStraightPath(dtNavMeshQuery* const query, const rdVec3D* const startPos, 
+    const rdVec3D* const endPos, const dtPolyRef* const path, const unsigned char* const jumpTypes,
+    const int pathSize, rdVec3D* const straightPath, unsigned char* const straightPathFlags,
     dtPolyRef* const straightPathRefs, unsigned char* const straightPathJumps,
     int* const straightPathCount, const int unused, const int jumpFilter, const int options)
 {
@@ -151,8 +151,8 @@ static dtStatus Detour_FindStraightPath(dtNavMeshQuery* const query, const float
 // Purpose: moves from the start to the end position constrained to the navigation mesh.
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
-static dtStatus Detour_MoveAlongSurface(dtNavMeshQuery* const query, dtPolyRef startRef, const float* startPos,
-    const float* endPos, const dtQueryFilter* filter, float* resultPos, dtPolyRef* visitedPolys, 
+static dtStatus Detour_MoveAlongSurface(dtNavMeshQuery* const query, dtPolyRef startRef, const rdVec3D* startPos,
+    const rdVec3D* endPos, const dtQueryFilter* filter, rdVec3D* resultPos, dtPolyRef* visitedPolys,
     int* visitedCount, const int maxVisitedSize, const unsigned char options)
 {
     const dtStatus stat = query->moveAlongSurface(startRef, startPos, endPos, filter, resultPos,
@@ -161,7 +161,7 @@ static dtStatus Detour_MoveAlongSurface(dtNavMeshQuery* const query, dtPolyRef s
     if (dtStatusSucceed(stat) && navmesh_move_along_surface_asserts->GetBool() && !*visitedCount)
     {
         Error(eDLL_T::SERVER, 0, "%s - Failed to visit any polygons from <%g, %g, %g> to <%g, %g, %g>\n",
-            __FUNCTION__,  startPos[0], startPos[1], startPos[2], endPos[0], endPos[1], endPos[2]);
+            __FUNCTION__, startPos->x, startPos->y, startPos->z, endPos->x, endPos->y, endPos->z);
     }
 
     return stat;
@@ -172,7 +172,7 @@ static dtStatus Detour_MoveAlongSurface(dtNavMeshQuery* const query, dtPolyRef s
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
 static dtStatus Detour_Raycast(dtNavMeshQuery* const query, const dtPolyRef startRef,
-    const float* const startPos, const float* const endPos,
+    const rdVec3D* const startPos, const rdVec3D* const endPos,
     const dtQueryFilter* const filter, dtRaycastHit* const hit)
 {
     // note(kawe): engine's implementation has been replaced with the SDK's
@@ -190,7 +190,7 @@ static dtStatus Detour_Raycast(dtNavMeshQuery* const query, const dtPolyRef star
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
 static dtStatus Detour_ClosestPointOnPoly(dtNavMeshQuery* query, const dtPolyRef ref,
-    const float* pos, float* closest, bool* posOverPoly, float* dist)
+    const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist)
 {
     // note(kawe): function has been replaced with the SDK's variant due to:
     // https://github.com/recastnavigation/recastnavigation/issues/556
@@ -205,7 +205,7 @@ static dtStatus Detour_ClosestPointOnPoly(dtNavMeshQuery* query, const dtPolyRef
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
 static dtStatus Detour_ClosestPointOnPolyBoundary(dtNavMeshQuery* query,
-    const dtPolyRef ref, const float* pos, float* closest, float* dist)
+    const dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, float* dist)
 {
     // note(kawe): function has been replaced with the SDK's variant due to:
     // https://github.com/recastnavigation/recastnavigation/issues/556
@@ -219,7 +219,7 @@ static dtStatus Detour_ClosestPointOnPolyBoundary(dtNavMeshQuery* query,
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
 static dtStatus Detour_GetPolyHeight(dtNavMeshQuery* query, const dtPolyRef ref,
-    const float* pos, float* height, float* normal)
+    const rdVec3D* pos, float* height, rdVec3D* normal)
 {
     // note(kawe): see:
     // https://github.com/recastnavigation/recastnavigation/issues/556
@@ -231,12 +231,11 @@ static dtStatus Detour_GetPolyHeight(dtNavMeshQuery* query, const dtPolyRef ref,
     // the new closestPointOnPoly() check below since we want it to be as
     // permissive and robust as possible, getPolHeight now discards the 
     // query if the point happens to reside outside polygon's XY bounds.
-    float closest[3];
-    const dtStatus stat = query->closestPointOnPoly(ref, pos, closest, nullptr, normal);
+    rdVec3D closest;
     const dtStatus stat = query->closestPointOnPoly(ref, pos, &closest, nullptr, nullptr, normal);
 
     if (dtStatusSucceed(stat))
-        *height = closest[2];
+        *height = closest.z;
 
     return stat;
 }

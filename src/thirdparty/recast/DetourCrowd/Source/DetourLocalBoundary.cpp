@@ -26,7 +26,7 @@ dtLocalBoundary::dtLocalBoundary() :
 	m_nsegs(0),
 	m_npolys(0)
 {
-	rdVset(m_center, FLT_MAX,FLT_MAX,FLT_MAX);
+	m_center.init(FLT_MAX,FLT_MAX,FLT_MAX);
 }
 
 dtLocalBoundary::~dtLocalBoundary()
@@ -35,12 +35,12 @@ dtLocalBoundary::~dtLocalBoundary()
 
 void dtLocalBoundary::reset()
 {
-	rdVset(m_center, FLT_MAX,FLT_MAX,FLT_MAX);
+	m_center.init(FLT_MAX,FLT_MAX,FLT_MAX);
 	m_npolys = 0;
 	m_nsegs = 0;
 }
 
-void dtLocalBoundary::addSegment(const float dist, const float* s)
+void dtLocalBoundary::addSegment(const float dist, const rdVec3D* s, const rdVec3D* e)
 {
 	// Insert neighbour based on the distance.
 	Segment* seg = 0;
@@ -73,26 +73,27 @@ void dtLocalBoundary::addSegment(const float dist, const float* s)
 	}
 	
 	seg->d = dist;
-	memcpy(seg->s, s, sizeof(float)*6);
+	seg->s = *s;
+	seg->e = *e;
 	
 	if (m_nsegs < MAX_LOCAL_SEGS)
 		m_nsegs++;
 }
 
-void dtLocalBoundary::update(dtPolyRef ref, const float* pos, const float collisionQueryRange,
+void dtLocalBoundary::update(dtPolyRef ref, const rdVec3D* pos, const float collisionQueryRange,
 							 dtNavMeshQuery* navquery, const dtQueryFilter* filter)
 {
 	static const int MAX_SEGS_PER_POLY = RD_VERTS_PER_POLYGON*3;
 	
 	if (!ref)
 	{
-		rdVset(m_center, FLT_MAX,FLT_MAX,FLT_MAX);
+		m_center.init(FLT_MAX,FLT_MAX,FLT_MAX);
 		m_nsegs = 0;
 		m_npolys = 0;
 		return;
 	}
 	
-	rdVcopy(m_center, pos);
+	rdVcopy(&m_center, pos);
 	
 	// First query non-overlapping polygons.
 	navquery->findLocalNeighbourhood(ref, pos, collisionQueryRange,
@@ -100,20 +101,20 @@ void dtLocalBoundary::update(dtPolyRef ref, const float* pos, const float collis
 	
 	// Secondly, store all polygon edges.
 	m_nsegs = 0;
-	float segs[MAX_SEGS_PER_POLY*6];
+	rdVec3D segs[MAX_SEGS_PER_POLY*2];
 	int nsegs = 0;
 	for (int j = 0; j < m_npolys; ++j)
 	{
 		navquery->getPolyWallSegments(m_polys[j], filter, segs, 0, &nsegs, MAX_SEGS_PER_POLY);
 		for (int k = 0; k < nsegs; ++k)
 		{
-			const float* s = &segs[k*6];
+			const rdVec3D* s = &segs[k*2];
 			// Skip too distant segments.
 			float tseg;
-			const float distSqr = rdDistancePtSegSqr2D(pos, s, s+3, tseg);
+			const float distSqr = rdDistancePtSegSqr2D(pos, &s[0], &s[1], tseg);
 			if (distSqr > rdSqr(collisionQueryRange))
 				continue;
-			addSegment(distSqr, s);
+			addSegment(distSqr, &s[0], &s[1]);
 		}
 	}
 }
