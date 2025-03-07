@@ -430,7 +430,6 @@ inline float rdVdist2DSqr(const rdVec2D* v1, const rdVec2D* v2)
 ///  @param[in,out]	v	The vector to normalize. [(x, y, z)]
 inline void rdVnormalize(rdVec3D* v)
 {
-	// math_refactor(kawe): use rdVmag here.
 	const float s = rdMathSqrtf(rdSqr(v->x) + rdSqr(v->y) + rdSqr(v->z));
 	if (rdLikely(s > 0))
 	{
@@ -445,7 +444,6 @@ inline void rdVnormalize(rdVec3D* v)
 ///  @param[in,out]	v	The vector to normalize. [(x, y, z)]
 inline void rdVnormalize2D(rdVec2D* v)
 {
-	// math_refactor(kawe): use rdVmag2D here.
 	const float s = rdMathSqrtf(rdSqr(v->x) + rdSqr(v->y));
 	if (rdLikely(s > 0))
 	{
