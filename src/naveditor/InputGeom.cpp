@@ -223,7 +223,7 @@ bool InputGeom::loadGeomSet(rcContext* ctx, const std::string& filepath)
 					   &yaw,
 					   &bidir, &jump, &order, &area, &flags);
 
-				if (std::isnan(yaw)) // math_refactor(kawe): use rdMathIsfinite
+				if (!rdMathIsfinite(yaw))
 				{
 					const rdVec3D offset(0.0f,0.0f,rad);
 					yaw = dtCalcOffMeshRefYaw(&verts[0], &verts[1]);
