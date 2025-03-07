@@ -461,9 +461,9 @@ bool rdPointInCylinder(const rdVec3D* pt, const rdVec3D* pos, const float radius
 {
 	const float dx = pt->x - pos->x;
 	const float dy = pt->y - pos->y;
-	const float distSquared = dx*dx + dy*dy;
+	const float distSquared = rdSqr(dx) + rdSqr(dy);
 
-	if (distSquared <= radius * radius &&
+	if (distSquared <= rdSqr(radius) &&
 		pt->z >= pos->z && pt->z <= (pos->z + height))
 	{
 		return true;
@@ -635,7 +635,7 @@ float rdDistancePtLine2D(const rdVec2D* pt, const rdVec2D* p, const rdVec2D* q)
 	if (d != 0) t /= d;
 	dx = p->x + t * pqx - pt->x;
 	dy = p->y + t * pqy - pt->y;
-	return dx * dx + dy * dy;
+	return rdSqr(dx) + rdSqr(dy);
 }
 
 void rdCalcEdgeNormal2D(const rdVec2D* dir, rdVec2D* out)
