@@ -193,7 +193,7 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 	dtPolyRef polys[MAX_POLYS];
 	unsigned char jumps[MAX_POLYS];
 	rdVec3D straight[MAX_POLYS];
-	const rdVec3D polyPickExt(2,4,2); // math_refactor(kawe): missed XZY -> XYZ coordinate conversion here!
+	const rdVec3D polyPickExt(2,2,4);
 	
 	for (Test* iter = m_tests; iter; iter = iter->next)
 	{

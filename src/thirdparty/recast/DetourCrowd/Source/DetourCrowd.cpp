@@ -1162,9 +1162,9 @@ void dtCrowd::update(const float dt, dtCrowdAgentDebugInfo* debug)
 				{
 					// Agents on top of each other, try to choose diverging separation directions.
 					if (idx0 > idx1)
-						rdVset(&diff, -ag->dvel[1],0,ag->dvel[0]); // math_refactor(kawe): possible missed XZY -> XYZ coordinate system conversion here.
+						diff.init(-ag->dvel[1], ag->dvel[0], 0);
 					else
-						rdVset(&diff, ag->dvel[1],0,-ag->dvel[0]); // math_refactor(kawe): possible missed XZY -> XYZ coordinate system conversion here.
+						diff.init(ag->dvel[1], -ag->dvel[0], 0);
 					pen = 0.01f;
 				}
 				else

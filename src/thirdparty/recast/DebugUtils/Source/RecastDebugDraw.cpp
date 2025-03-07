@@ -104,13 +104,13 @@ void duDebugDrawTriMeshSlope(duDebugDraw* dd, const rdVec3D* verts, int /*nverts
 		const rdVec3D* vb = &verts[tris[(i*3)+1]];
 		const rdVec3D* vc = &verts[tris[(i*3)+2]];
 		
-		int ax = 0, ay = 0;
+		int ax = 2, ay = 2;
 		const float absNorm = rdAbs((*norm)[ax]);
 
+		if (rdAbs(norm->x) > absNorm)
+			ax = 0;
 		if (rdAbs(norm->y) > absNorm)
 			ax = 1;
-		if (rdAbs(norm->z) > absNorm) // math_refactor(kawe): should this use X?
-			ax = 2;
 		ax = (1<<ax)&3; // +1 mod 3
 		ay = (1<<ax)&3; // +1 mod 3
 		

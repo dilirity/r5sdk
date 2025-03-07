@@ -538,9 +538,9 @@ bool rdOverlapPolyPoly2D(const rdVec3D* polya, const int npolya,
 	
 	for (int i = 0, j = npolya-1; i < npolya; j=i++)
 	{
-		const rdVec2D* va = &polya[j];
-		const rdVec2D* vb = &polya[i];
-		const rdVec2D n(vb->y-va->y, -(vb->x-va->x)); // math_refactor(kawe): this is a bug, -x was set to z while it should've been set to y. needs testing.
+		const rdVec3D* va = &polya[j];
+		const rdVec3D* vb = &polya[i];
+		const rdVec2D n(-(vb->y-va->y), vb->x-va->x);
 		float amin,amax,bmin,bmax;
 		projectPoly(&n, polya, npolya, amin,amax);
 		projectPoly(&n, polyb, npolyb, bmin,bmax);
@@ -552,9 +552,9 @@ bool rdOverlapPolyPoly2D(const rdVec3D* polya, const int npolya,
 	}
 	for (int i = 0, j = npolyb-1; i < npolyb; j=i++)
 	{
-		const rdVec2D* va = &polyb[j];
-		const rdVec2D* vb = &polyb[i];
-		const rdVec2D n(vb->y-va->y, -(vb->x-va->x)); // math_refactor(kawe): this is a bug, -x was set to z while it should've been set to y. needs testing.
+		const rdVec3D* va = &polyb[j];
+		const rdVec3D* vb = &polyb[i];
+		const rdVec2D n(-(vb->y-va->y), vb->x-va->x);
 		float amin,amax,bmin,bmax;
 		projectPoly(&n, polya, npolya, amin,amax);
 		projectPoly(&n, polyb, npolyb, bmin,bmax);

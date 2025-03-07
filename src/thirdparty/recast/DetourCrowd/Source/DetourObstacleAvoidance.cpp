@@ -564,8 +564,7 @@ int dtObstacleAvoidanceQuery::sampleVelocityAdaptive(const rdVec3D* pos, const f
 
 	// Start sampling.
 	float cr = vmax * (1.0f - m_params.velBias);
-	rdVec3D res;
-	rdVset(&res, dvel->x * m_params.velBias, 0, dvel->z * m_params.velBias); // math_refactor(kawe): probably a missed xzy -> xyz conversion here!
+	rdVec3D res(dvel->x * m_params.velBias, dvel->y * m_params.velBias, 0);
 	int ns = 0;
 
 	for (int k = 0; k < depth; ++k)

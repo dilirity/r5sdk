@@ -1409,7 +1409,7 @@ void NavMeshTesterTool::handleRender()
 				else
 				{
 					unsigned int col = duRGBA(192,32,16,192);
-					if (rdTriArea2D(&m_spos, &s[0], &s[1]) < 0.0f)
+					if (rdTriArea2D(&m_spos, &s[1], &s[0]) < 0.0f)
 						col = duRGBA(96,32,16,192);
 					
 					dd.vertex(p0.x,p0.y,p0.z+agentClimb,col);
