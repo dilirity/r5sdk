@@ -233,6 +233,7 @@ static dtStatus Detour_GetPolyHeight(dtNavMeshQuery* query, const dtPolyRef ref,
     // query if the point happens to reside outside polygon's XY bounds.
     float closest[3];
     const dtStatus stat = query->closestPointOnPoly(ref, pos, closest, nullptr, normal);
+    const dtStatus stat = query->closestPointOnPoly(ref, pos, &closest, nullptr, nullptr, normal);
 
     if (dtStatusSucceed(stat))
         *height = closest[2];
