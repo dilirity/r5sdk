@@ -1393,7 +1393,7 @@ void NavMeshTesterTool::handleRender()
 				rdVec3D delta, norm, p0, p1;
 				rdVsub(&delta, &s[1], &s[0]);
 				rdVmad(&p0, s, &delta, 0.5f);
-				norm.x = -delta.y; // math_refactor(kawe): confirm this is correct.
+				norm.x = -delta.y;
 				norm.y = delta.x;
 				norm.z = 0;
 				rdVnormalize(&norm);

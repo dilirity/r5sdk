@@ -336,7 +336,7 @@ static bool rasterizeTri(const rdVec3D* v0, const rdVec3D* v1, const rdVec3D* v2
 	y1 = rdClamp(y1, 0, h - 1);
 
 	// Clip the triangle into all grid cells it touches.
-	rdVec3D buf[7*4]; // math_refactor(kawe): confirm this conversion is correct.
+	rdVec3D buf[7*4];
 	rdVec3D* in = buf;
 	rdVec3D* inRow = &buf[7];
 	rdVec3D* p1 = &inRow[7];
