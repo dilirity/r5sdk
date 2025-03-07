@@ -189,7 +189,7 @@ void TestCase::doTests(dtNavMesh* navmesh, dtNavMeshQuery* navquery)
 	
 	resetTimes();
 	
-	static const int MAX_POLYS = 256; // math_refactor(kawe): increase this to 512.
+	static const int MAX_POLYS = 512;
 	dtPolyRef polys[MAX_POLYS];
 	unsigned char jumps[MAX_POLYS];
 	rdVec3D straight[MAX_POLYS];
