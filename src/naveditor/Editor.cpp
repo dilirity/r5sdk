@@ -25,7 +25,6 @@
 #include "DetourCrowd/Include/DetourCrowd.h"
 #include "DebugUtils/Include/RecastDebugDraw.h"
 #include "DebugUtils/Include/DetourDebugDraw.h"
-#include "NavEditor/Include/GameUtils.h"
 #include "NavEditor/Include/InputGeom.h"
 #include "NavEditor/Include/Editor.h"
 

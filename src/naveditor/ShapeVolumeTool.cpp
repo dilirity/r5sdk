@@ -22,7 +22,6 @@
 #include "NavEditor/Include/ShapeVolumeTool.h"
 #include "NavEditor/Include/InputGeom.h"
 #include "NavEditor/Include/Editor.h"
-#include "naveditor/include/GameUtils.h"
 
 #include "coordsize.h"
 

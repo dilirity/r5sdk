@@ -25,7 +25,6 @@
 #include "DebugUtils/Include/RecastDebugDraw.h"
 #include "Detour/Include/DetourNavMesh.h"
 #include "NavEditor/Include/Editor.h"
-#include <naveditor/include/GameUtils.h>
 
 static char* parseRow(char* buf, char* bufEnd, char* row, int len)
 {
