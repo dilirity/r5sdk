@@ -20,9 +20,6 @@
 #define DEBUGDRAW_H
 #include "Shared/Include/SharedCommon.h"
 
-// Some math headers don't have PI defined.
-static const float DU_PI = 3.14159265f; // math_refactor(kawe): remove this and use RD_PI.
-
 enum duDebugDrawPrimitives
 {
 	DU_DRAW_POINTS,

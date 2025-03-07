@@ -86,7 +86,7 @@ void duDebugDrawTriMeshSlope(duDebugDraw* dd, const rdVec3D* verts, int /*nverts
 	
 	dd->texture(true);
 
-	const float walkableThr = rdMathCosf(walkableSlopeAngle/180.0f*DU_PI);
+	const float walkableThr = rdMathCosf(walkableSlopeAngle/180.0f*RD_PI);
 	const unsigned int unwalkable = duRGBA(192,128,0,255);
 	
 	dd->begin(DU_DRAW_TRIS, 1.0f, offset);
