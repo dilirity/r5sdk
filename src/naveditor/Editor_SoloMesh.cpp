@@ -163,9 +163,9 @@ bool Editor_SoloMesh::handleBuild()
 	
 	cleanup();
 	
-	const float* bmin = m_geom->getNavMeshBoundsMin();
-	const float* bmax = m_geom->getNavMeshBoundsMax();
-	const float* verts = m_geom->getMesh()->getVerts();
+	const rdVec3D* bmin = m_geom->getNavMeshBoundsMin();
+	const rdVec3D* bmax = m_geom->getNavMeshBoundsMax();
+	const rdVec3D* verts = m_geom->getMesh()->getVerts();
 	const int nverts = m_geom->getMesh()->getVertCount();
 	const int* tris = m_geom->getMesh()->getTris();
 	const int ntris = m_geom->getMesh()->getTriCount();
@@ -194,9 +194,9 @@ bool Editor_SoloMesh::handleBuild()
 	// Set the area where the navigation will be build.
 	// Here the bounds of the input mesh are used, but the
 	// area could be specified by an user defined box, etc.
-	rdVcopy(m_cfg.bmin, bmin);
-	rdVcopy(m_cfg.bmax, bmax);
-	rcCalcGridSize(m_cfg.bmin, m_cfg.bmax, m_cfg.cs, &m_cfg.width, &m_cfg.height);
+	m_cfg.bmin = *bmin;
+	m_cfg.bmax = *bmax;
+	rcCalcGridSize(&m_cfg.bmin, &m_cfg.bmax, m_cfg.cs, &m_cfg.width, &m_cfg.height);
 
 	// Reset build times gathering.
 	m_ctx->resetTimers();
@@ -219,7 +219,7 @@ bool Editor_SoloMesh::handleBuild()
 		m_ctx->log(RC_LOG_ERROR, "buildNavigation: Out of memory 'solid'.");
 		return false;
 	}
-	if (!rcCreateHeightfield(m_ctx, *m_solid, m_cfg.width, m_cfg.height, m_cfg.bmin, m_cfg.bmax, m_cfg.cs, m_cfg.ch))
+	if (!rcCreateHeightfield(m_ctx, *m_solid, m_cfg.width, m_cfg.height, &m_cfg.bmin, &m_cfg.bmax, m_cfg.cs, m_cfg.ch))
 	{
 		m_ctx->log(RC_LOG_ERROR, "buildNavigation: Could not create solid heightfield.");
 		return false;
@@ -493,8 +493,8 @@ bool Editor_SoloMesh::handleBuild()
 		params.walkableHeight = m_agentHeight;
 		params.walkableRadius = m_agentRadius;
 		params.walkableClimb = m_agentMaxClimb;
-		rdVcopy(params.bmin, m_pmesh->bmin);
-		rdVcopy(params.bmax, m_pmesh->bmax);
+		params.bmin = m_pmesh->bmin;
+		params.bmax = m_pmesh->bmax;
 		params.cs = m_cfg.cs;
 		params.ch = m_cfg.ch;
 		params.buildBvTree = true;

@@ -215,8 +215,8 @@ void CAI_Utility::DrawNavMeshBVTree(
             continue;
 
         const float flCellSize = 1.0f / pTile->header->bvQuantFactor;
-        const float* tileBmin = pTile->header->bmin;
-        const float* tileBmax = pTile->header->bmax;
+        const rdVec3D* tileBmin = &pTile->header->bmin;
+        const rdVec3D* tileBmax = &pTile->header->bmax;
 
         for (int j = 0, nc = pTile->header->bvNodeCount; j < nc; ++j)
         {
@@ -228,13 +228,13 @@ void CAI_Utility::DrawNavMeshBVTree(
             vTransforms.xmm[1] = LoadGatherSIMD(0.0f, 1.0f, 0.0f, 0.0f);
             vTransforms.xmm[2] = LoadGatherSIMD(0.0f, 0.0f, 1.0f, 0.0f);
 
-            const Vector3D mins(tileBmax[0]-pNode->bmax[0]*flCellSize,
-                                tileBmin[1]+pNode->bmin[1]*flCellSize,
-                                tileBmin[2]+pNode->bmin[2]*flCellSize);
+            const Vector3D mins(tileBmax->x-pNode->bmax[0]*flCellSize,
+                                tileBmin->y+pNode->bmin[1]*flCellSize,
+                                tileBmin->z+pNode->bmin[2]*flCellSize);
 
-            const Vector3D maxs(tileBmax[0]-pNode->bmin[0]*flCellSize,
-                                tileBmin[1]+pNode->bmax[1]*flCellSize,
-                                tileBmin[2]+pNode->bmax[2]*flCellSize);
+            const Vector3D maxs(tileBmax->x-pNode->bmin[0]*flCellSize,
+                                tileBmin->y+pNode->bmax[1]*flCellSize,
+                                tileBmin->z+pNode->bmax[2]*flCellSize);
 
             v_RenderBox(vTransforms.mat, mins, maxs,
                 Color(188, 188, 188, 255), bDepthBuffer);
@@ -296,8 +296,8 @@ void CAI_Utility::DrawNavMeshPortals(const dtNavMesh* pMesh,
                         continue;
 
                     // Create new links
-                    const float* va = &pTile->verts[pPoly->verts[v] * 3];
-                    const float* vb = &pTile->verts[pPoly->verts[(v + 1) % nv] * 3];
+                    const rdVec3D* va = &pTile->verts[pPoly->verts[v] * 3];
+                    const rdVec3D* vb = &pTile->verts[pPoly->verts[(v + 1) % nv] * 3];
 
                     /*****************
                      Vertex indices:
@@ -306,7 +306,7 @@ void CAI_Utility::DrawNavMeshPortals(const dtNavMesh* pMesh,
                      va + = 2 |      |
                      vb + = 3 +------+
                      *****************/
-                    fltx4 xVerts = LoadGatherSIMD(va[2], vb[2], va[2], vb[2]);
+                    fltx4 xVerts = LoadGatherSIMD(va->z, vb->z, va->z, vb->z);
                     Vector4D* vVerts = reinterpret_cast<Vector4D*>(&xVerts);
 
                     xVerts = SubSIMD(xVerts, LoadGatherSIMD(flPadZ, flPadZ, 0.0f, 0.0f));
@@ -315,44 +315,44 @@ void CAI_Utility::DrawNavMeshPortals(const dtNavMesh* pMesh,
                     if (nSide == 0 || nSide == 4)
                     {
                         Color col = nSide == 0 ? Color(188, 0, 0, 255) : Color(188, 0, 188, 255);
-                        const float x = va[0] + ((nSide == 0) ? -flPadX : flPadX);
+                        const float x = va->x + ((nSide == 0) ? -flPadX : flPadX);
 
-                        fltx4 xOrigin = LoadGatherSIMD(x, va[1], vVerts->x, 0);
-                        fltx4 xDest = LoadGatherSIMD(x, va[1], vVerts->z, 0);
+                        fltx4 xOrigin = LoadGatherSIMD(x, va->y, vVerts->x, 0);
+                        fltx4 xDest = LoadGatherSIMD(x, va->y, vVerts->z, 0);
                         v_RenderLine(*reinterpret_cast<Vector3D*>(&xOrigin), 
                             *reinterpret_cast<Vector3D*>(&xDest), col, bDepthBuffer);
-                        xOrigin = LoadGatherSIMD(x, va[1], vVerts->z, 0);
-                        xDest = LoadGatherSIMD(x, vb[1], vVerts->w, 0);
+                        xOrigin = LoadGatherSIMD(x, va->y, vVerts->z, 0);
+                        xDest = LoadGatherSIMD(x, vb->y, vVerts->w, 0);
                         v_RenderLine(*reinterpret_cast<Vector3D*>(&xOrigin), 
                             *reinterpret_cast<Vector3D*>(&xDest), col, bDepthBuffer);
-                        xOrigin = LoadGatherSIMD(x, vb[1], vVerts->w, 0);
-                        xDest = LoadGatherSIMD(x, vb[1], vVerts->y, 0);
+                        xOrigin = LoadGatherSIMD(x, vb->y, vVerts->w, 0);
+                        xDest = LoadGatherSIMD(x, vb->y, vVerts->y, 0);
                         v_RenderLine(*reinterpret_cast<Vector3D*>(&xOrigin), 
                             *reinterpret_cast<Vector3D*>(&xDest), col, bDepthBuffer);
-                        xOrigin = LoadGatherSIMD(x, vb[1], vVerts->y, 0);
-                        xDest = LoadGatherSIMD(x, va[1], vVerts->x, 0);
+                        xOrigin = LoadGatherSIMD(x, vb->y, vVerts->y, 0);
+                        xDest = LoadGatherSIMD(x, va->y, vVerts->x, 0);
                         v_RenderLine(*reinterpret_cast<Vector3D*>(&xOrigin), 
                             *reinterpret_cast<Vector3D*>(&xDest), col, bDepthBuffer);
                     }
                     else if (nSide == 2 || nSide == 6)
                     {
                         Color col = nSide == 2 ? Color(0, 188, 0, 255) : Color(188, 188, 0, 255);
-                        const float y = va[1] + ((nSide == 2) ? -flPadX : flPadX);
+                        const float y = va->y + ((nSide == 2) ? -flPadX : flPadX);
 
-                        fltx4 xOrigin = LoadGatherSIMD(va[0], y, vVerts->x, 0);
-                        fltx4 xDest = LoadGatherSIMD(va[0], y, vVerts->z, 0);
+                        fltx4 xOrigin = LoadGatherSIMD(va->x, y, vVerts->x, 0);
+                        fltx4 xDest = LoadGatherSIMD(va->x, y, vVerts->z, 0);
                         v_RenderLine(*reinterpret_cast<Vector3D*>(&xOrigin),
                             *reinterpret_cast<Vector3D*>(&xDest), col, bDepthBuffer);
-                        xOrigin = LoadGatherSIMD(va[0], y, vVerts->z, 0);
-                        xDest = LoadGatherSIMD(vb[0], y, vVerts->w, 0);
+                        xOrigin = LoadGatherSIMD(va->x, y, vVerts->z, 0);
+                        xDest = LoadGatherSIMD(vb->x, y, vVerts->w, 0);
                         v_RenderLine(*reinterpret_cast<Vector3D*>(&xOrigin),
                             *reinterpret_cast<Vector3D*>(&xDest), col, bDepthBuffer);
-                        xOrigin = LoadGatherSIMD(vb[0], y, vVerts->w, 0);
-                        xDest = LoadGatherSIMD(vb[0], y, vVerts->y, 0);
+                        xOrigin = LoadGatherSIMD(vb->x, y, vVerts->w, 0);
+                        xDest = LoadGatherSIMD(vb->x, y, vVerts->y, 0);
                         v_RenderLine(*reinterpret_cast<Vector3D*>(&xOrigin),
                             *reinterpret_cast<Vector3D*>(&xDest), col, bDepthBuffer);
-                        xOrigin = LoadGatherSIMD(vb[0], y, vVerts->y, 0);
-                        xDest = LoadGatherSIMD(va[0], y, vVerts->x, 0);
+                        xOrigin = LoadGatherSIMD(vb->x, y, vVerts->y, 0);
+                        xDest = LoadGatherSIMD(va->x, y, vVerts->x, 0);
                         v_RenderLine(*reinterpret_cast<Vector3D*>(&xOrigin),
                             *reinterpret_cast<Vector3D*>(&xDest), col, bDepthBuffer);
                     }
@@ -408,8 +408,8 @@ void CAI_Utility::DrawNavMeshPolyBoundaries(const dtNavMesh* pMesh,
             if (pPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
             {
                 const dtOffMeshConnection* con = &pTile->offMeshCons[j - pTile->header->offMeshBase];
-                v_RenderLine(Vector3D(con->pos[0], con->pos[1], con->pos[2]),
-                    Vector3D(con->pos[3], con->pos[4], con->pos[5]), Color(188, 0, 188, 255), bDepthBuffer);
+                v_RenderLine(Vector3D(con->posa.x, con->posa.y, con->posa.z),
+                    Vector3D(con->posb.x, con->posb.y, con->posb.z), Color(188, 0, 188, 255), bDepthBuffer);
 
                 continue;
             }
@@ -458,20 +458,20 @@ void CAI_Utility::DrawNavMeshPolyBoundaries(const dtNavMesh* pMesh,
                         : Color(20, 140, 255, 255);
                 }
 
-                const float* v0 = &pTile->verts[pPoly->verts[e] * 3];
-                const float* v1 = &pTile->verts[pPoly->verts[(e + 1) % ne] * 3];
+                const rdVec3D* v0 = &pTile->verts[pPoly->verts[e] * 3];
+                const rdVec3D* v1 = &pTile->verts[pPoly->verts[(e + 1) % ne] * 3];
 
                 // Draw detail mesh edges, this is really slow.
                 for (int k = 0, ke = pd->triCount; k < ke; ++k)
                 {
                     const unsigned char* t = &pTile->detailTris[(pd->triBase + k) * 4];
-                    const float* tv[3];
+                    const rdVec3D* tv[3];
                     for (int m = 0; m < 3; ++m)
                     {
                         if (t[m] < pPoly->vertCount)
-                            tv[m] = &pTile->verts[pPoly->verts[t[m]] * 3];
+                            tv[m] = &pTile->verts[pPoly->verts[t[m]]];
                         else
-                            tv[m] = &pTile->detailVerts[(pd->vertBase + (t[m] - pPoly->vertCount)) * 3];
+                            tv[m] = &pTile->detailVerts[(pd->vertBase + (t[m] - pPoly->vertCount))];
                     }
                     for (int m = 0, n = 2; m < 3; n = m++)
                     {
@@ -486,7 +486,7 @@ void CAI_Utility::DrawNavMeshPolyBoundaries(const dtNavMesh* pMesh,
                                 continue;
                         }
 
-                        v_RenderLine(Vector3D(tv[n][0], tv[n][1], tv[n][2]), Vector3D(tv[m][0], tv[m][1], tv[m][2]), col, bDepthBuffer);
+                        v_RenderLine(Vector3D(tv[n]->x, tv[n]->y, tv[n]->z), Vector3D(tv[m]->x, tv[m]->y, tv[m]->z), col, bDepthBuffer);
                     }
                 }
             }

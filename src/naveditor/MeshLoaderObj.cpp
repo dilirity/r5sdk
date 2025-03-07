@@ -48,17 +48,17 @@ void rcMeshLoaderObj::addVertex(float x, float y, float z, int& cap)
 	if (m_vertCount+1 > cap)
 	{
 		cap = !cap ? 8 : cap*2;
-		float* nv = new float[cap*3];
+		rdVec3D* nv = new rdVec3D[cap];
 		if (m_vertCount)
-			memcpy(nv, m_verts, m_vertCount*3*sizeof(float));
+			memcpy(nv, m_verts, m_vertCount*sizeof(rdVec3D));
 		delete [] m_verts;
 		m_verts = nv;
 	}
-	float* dst = &m_verts[m_vertCount*3];
+	rdVec3D* dst = &m_verts[m_vertCount];
 
-	*dst++ = x * m_scale;
-	*dst++ = y * m_scale;
-	*dst++ = z * m_scale;
+	dst->x = x * m_scale;
+	dst->y = y * m_scale;
+	dst->z = z * m_scale;
 
 	m_vertCount++;
 }
@@ -218,34 +218,18 @@ bool rcMeshLoaderObj::load(const std::string& filename)
 	}
 
 	delete [] buf;
+	m_normals = new rdVec3D[m_triCount];
 
 	// Calculate normals.
-	m_normals = new float[m_triCount*3];
-	for (int i = 0; i < m_triCount*3; i += 3)
+	for (int i = 0; i < m_triCount; i++)
 	{
-		const float* v0 = &m_verts[m_tris[i]*3];
-		const float* v1 = &m_verts[m_tris[i+1]*3];
-		const float* v2 = &m_verts[m_tris[i+2]*3];
-		float e0[3], e1[3];
-		for (int j = 0; j < 3; ++j)
-		{
-			e0[j] = v1[j] - v0[j];
-			e1[j] = v2[j] - v0[j];
-		}
-		float* n = &m_normals[i];
-		n[0] = e0[1]*e1[2] - e0[2]*e1[1];
-		n[1] = e0[2]*e1[0] - e0[0]*e1[2];
-		n[2] = e0[0]*e1[1] - e0[1]*e1[0];
-		float d = sqrtf(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
-		if (d > 0)
-		{
-			d = 1.0f/d;
-			n[0] *= d;
-			n[1] *= d;
-			n[2] *= d;
-		}
+		const rdVec3D* v0 = &m_verts[m_tris[i*3]];
+		const rdVec3D* v1 = &m_verts[m_tris[i*3+1]];
+		const rdVec3D* v2 = &m_verts[m_tris[i*3+2]];
+
+		rdTriNormal(v0, v1, v2, &m_normals[i]);
 	}
-	
+
 	m_filename = filename;
 	return true;
 }

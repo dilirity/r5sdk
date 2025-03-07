@@ -183,35 +183,35 @@ void Editor_Debug::handleRender()
 {
 	if (m_chf)
 	{
-		duDebugDrawCompactHeightfieldRegions(&m_dd, *m_chf, m_recastDrawOffset);
-//		duDebugDrawCompactHeightfieldSolid(&dd, *m_chf, m_recastRenderOffset);
+		duDebugDrawCompactHeightfieldRegions(&m_dd, *m_chf, &m_recastDrawOffset);
+//		duDebugDrawCompactHeightfieldSolid(&dd, *m_chf, &m_recastRenderOffset);
 	}
 		
 	if (m_navMesh)
-		duDebugDrawNavMesh(&m_dd, *m_navMesh, m_detourDrawOffset, DU_DRAW_DETOURMESH_OFFMESHCONS, m_traverseLinkDrawParams);
+		duDebugDrawNavMesh(&m_dd, *m_navMesh, &m_detourDrawOffset, DU_DRAW_DETOURMESH_OFFMESHCONS, m_traverseLinkDrawParams);
 
 	if (m_ref && m_navMesh)
-		duDebugDrawNavMeshPoly(&m_dd, *m_navMesh, m_ref, m_detourDrawOffset, m_navMeshDrawFlags, duRGBA(255,0,0,128));
+		duDebugDrawNavMeshPoly(&m_dd, *m_navMesh, m_ref, &m_detourDrawOffset, m_navMeshDrawFlags, duRGBA(255,0,0,128));
 
-/*	float bmin[3], bmax[3];
-	rdVsub(bmin, m_center, m_halfExtents);
-	rdVadd(bmax, m_center, m_halfExtents);
-	duDebugDrawBoxWire(&dd, bmin[0],bmin[1],bmin[2], bmax[0],bmax[1],bmax[2], duRGBA(255,255,255,128), 1.0f);
-	duDebugDrawCross(&dd, m_center[0], m_center[1], m_center[2], 1.0f, duRGBA(255,255,255,128), 2.0f);*/
+	/*rdVec3D bmin, bmax;
+	rdVsub(&bmin, &m_center, &m_halfExtents);
+	rdVadd(&bmax, &m_center, &m_halfExtents);
+	duDebugDrawBoxWire(&m_dd, bmin.x,bmin.y,bmin.z, bmax.x,bmax.y,bmax.z, duRGBA(255,255,255,128), 1.0f);
+	duDebugDrawCross(&m_dd, m_center.x, m_center.y, m_center.z, 1.0f, duRGBA(255,255,255,128), 2.0f);*/
 
 	if (m_cset)
 	{
-		duDebugDrawRawContours(&m_dd, *m_cset, m_recastDrawOffset, 0.25f);
-		duDebugDrawContours(&m_dd, *m_cset, m_recastDrawOffset);
+		duDebugDrawRawContours(&m_dd, *m_cset, &m_recastDrawOffset, 0.25f);
+		duDebugDrawContours(&m_dd, *m_cset, &m_recastDrawOffset);
 	}
 	
 	if (m_pmesh)
 	{
-		duDebugDrawPolyMesh(&m_dd, *m_pmesh, m_recastDrawOffset);
+		duDebugDrawPolyMesh(&m_dd, *m_pmesh, &m_recastDrawOffset);
 	}
 	
 	/*
-	dd.depthMask(false);
+	m_dd.depthMask(false);
 	{
 		const float bmin[3] = {-32.000004f,-11.488281f,-115.343544f};
 		const float cs = 0.300000f;
@@ -262,24 +262,24 @@ void Editor_Debug::handleRender()
 		const int nverts = sizeof(verts)/(sizeof(int)*4);
 
 		const unsigned int colln = duRGBA(255,255,255,128);
-		dd.begin(DU_DRAW_LINES, 1.0f);
+		m_dd.begin(DU_DRAW_LINES, 1.0f);
 		for (int i = 0, j = nverts-1; i < nverts; j=i++)
 		{
 			const int* va = &verts[j*4];
 			const int* vb = &verts[i*4];
-			dd.vertex(bmin[0]+va[0]*cs, bmin[1]+va[1]*ch+j*0.01f, bmin[2]+va[2]*cs, colln);
-			dd.vertex(bmin[0]+vb[0]*cs, bmin[1]+vb[1]*ch+i*0.01f, bmin[2]+vb[2]*cs, colln);
+			m_dd.vertex(bmin[0]+va[0]*cs, bmin[1]+va[1]*ch+j*0.01f, bmin[2]+va[2]*cs, colln);
+			m_dd.vertex(bmin[0]+vb[0]*cs, bmin[1]+vb[1]*ch+i*0.01f, bmin[2]+vb[2]*cs, colln);
 		}
-		dd.end();
+		m_dd.end();
 
 		const unsigned int colpt = duRGBA(255,255,255,255);
-		dd.begin(DU_DRAW_POINTS, 3.0f);
+		m_dd.begin(DU_DRAW_POINTS, 3.0f);
 		for (int i = 0, j = nverts-1; i < nverts; j=i++)
 		{
 			const int* va = &verts[j*4];
-			dd.vertex(bmin[0]+va[0]*cs, bmin[1]+va[1]*ch+j*0.01f, bmin[2]+va[2]*cs, colpt);
+			m_dd.vertex(bmin[0]+va[0]*cs, bmin[1]+va[1]*ch+j*0.01f, bmin[2]+va[2]*cs, colpt);
 		}
-		dd.end();
+		m_dd.end();
 
 		extern int triangulate(int n, const int* verts, int* indices, int* tris);
 
@@ -296,16 +296,16 @@ void Editor_Debug::handleRender()
 		}
 				
 		const unsigned int coltri = duRGBA(255,255,255,64);
-		dd.begin(DU_DRAW_TRIS);
+		m_dd.begin(DU_DRAW_TRIS);
 		for (int i = 0; i < ntris*3; ++i)
 		{
 			const int* va = &verts[indices[tris[i]]*4];
-			dd.vertex(bmin[0]+va[0]*cs, bmin[1]+va[1]*ch, bmin[2]+va[2]*cs, coltri);
+			m_dd.vertex(bmin[0]+va[0]*cs, bmin[1]+va[1]*ch, bmin[2]+va[2]*cs, coltri);
 		}
-		dd.end();
+		m_dd.end();
 		
 	}
-	dd.depthMask(true);*/
+	m_dd.depthMask(true);*/
 }
 
 void Editor_Debug::handleRenderOverlay(double* /*proj*/, double* /*model*/, int* /*view*/)
@@ -317,29 +317,29 @@ void Editor_Debug::handleMeshChanged(InputGeom* geom)
 	m_geom = geom;
 }
 
-const float* Editor_Debug::getBoundsMin()
+const rdVec3D* Editor_Debug::getBoundsMin()
 {
 	if (m_cset)
-		return m_cset->bmin;
+		return &m_cset->bmin;
 	if (m_chf)
-		return m_chf->bmin;
+		return &m_chf->bmin;
 	if (m_navMesh)
-		return m_bmin;
+		return &m_bmin;
 	return 0;
 }
 
-const float* Editor_Debug::getBoundsMax()
+const rdVec3D* Editor_Debug::getBoundsMax()
 {
 	if (m_cset)
-		return m_cset->bmax;
+		return &m_cset->bmax;
 	if (m_chf)
-		return m_chf->bmax;
+		return &m_chf->bmax;
 	if (m_navMesh)
-		return m_bmax;
+		return &m_bmax;
 	return 0;
 }
 
-void Editor_Debug::handleClick(const float* s, const float* p, const int v, bool shift)
+void Editor_Debug::handleClick(const rdVec3D* s, const rdVec3D* p, const int v, bool shift)
 {
 	if (m_tool)
 		m_tool->handleClick(s, p, v, shift);

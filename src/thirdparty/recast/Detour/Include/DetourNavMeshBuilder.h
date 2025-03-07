@@ -46,7 +46,7 @@ struct dtNavMeshCreateParams
 	/// @{
 
 	const unsigned int* detailMeshes;		///< The height detail sub-mesh data. [Size: 4 * #polyCount]
-	const float* detailVerts;				///< The detail mesh vertices. [Size: 3 * #detailVertsCount] [Unit: wu]
+	const rdVec3D* detailVerts;				///< The detail mesh vertices. [Size: 3 * #detailVertsCount] [Unit: wu]
 	int detailVertsCount;					///< The number of vertices in the detail mesh.
 	const unsigned char* detailTris;		///< The detail mesh triangles. [Size: 4 * #detailTriCount]
 	int detailTriCount;						///< The number of triangles in the detail mesh.
@@ -59,9 +59,9 @@ struct dtNavMeshCreateParams
 	/// @{
 
 	/// Off-mesh connection vertices. [(ax, ay, az, bx, by, bz) * #offMeshConCount] [Unit: wu]
-	const float* offMeshConVerts;
+	const rdVec3D* offMeshConVerts;
 	/// Off-mesh connection reference positions. [(x, y, z) * #offMeshConCount] [Unit: wu]
-	const float* offMeshConRefPos;
+	const rdVec3D* offMeshConRefPos;
 	/// Off-mesh connection radii. [Size: #offMeshConCount] [Unit: wu]
 	const float* offMeshConRad;
 	/// Off-mesh connection reference yaw. [Size: #offMeshConCount] [Unit: wu]
@@ -93,8 +93,8 @@ struct dtNavMeshCreateParams
 	int tileX;				///< The tile's x-grid location within the multi-tile destination mesh. (Along the x-axis.)
 	int tileY;				///< The tile's y-grid location within the multi-tile destination mesh. (Along the z-axis.)
 	int tileLayer;			///< The tile's layer within the layered destination mesh. [Limit: >= 0] (Along the y-axis.)
-	float bmin[3];			///< The minimum bounds of the tile. [(x, y, z)] [Unit: wu]
-	float bmax[3];			///< The maximum bounds of the tile. [(x, y, z)] [Unit: wu]
+	rdVec3D bmin;			///< The minimum bounds of the tile. [(x, y, z)] [Unit: wu]
+	rdVec3D bmax;			///< The maximum bounds of the tile. [(x, y, z)] [Unit: wu]
 
 	/// @}
 	/// @name General Configuration Attributes

@@ -258,7 +258,7 @@ void NavMeshPruneTool::handleMenu()
 	}
 }
 
-void NavMeshPruneTool::handleClick(const float* s, const float* p, const int /*v*/, bool shift)
+void NavMeshPruneTool::handleClick(const rdVec3D* s, const rdVec3D* p, const int /*v*/, bool shift)
 {
 	rdIgnoreUnused(s);
 	rdIgnoreUnused(shift);
@@ -271,14 +271,14 @@ void NavMeshPruneTool::handleClick(const float* s, const float* p, const int /*v
 	dtNavMeshQuery* query = m_editor->getNavMeshQuery();
 	if (!query) return;
 	
-	rdVcopy(m_hitPos, p);
+	m_hitPos = *p;
 	m_hitPosSet = true;
 	
-	const float halfExtents[3] = { 64, 64, 128 };
+	const rdVec3D halfExtents(64, 64, 128);
 	dtQueryFilter filter;
 	dtPolyRef ref = 0;
 
-	if (dtStatusSucceed(query->findNearestPoly(p, halfExtents, &filter, &ref, 0)) && ref)
+	if (dtStatusSucceed(query->findNearestPoly(p, &halfExtents, &filter, &ref, 0)) && ref)
 	{
 		if (!m_flags)
 		{
@@ -321,7 +321,7 @@ void NavMeshPruneTool::handleRender()
 	}
 
 	const dtNavMesh* nav = m_editor->getNavMesh();
-	const float* drawOffset = m_editor->getDetourDrawOffset();
+	const rdVec3D* drawOffset = m_editor->getDetourDrawOffset();
 	const unsigned int drawFlags = m_editor->getNavMeshDrawFlags();
 
 	if (m_flags && nav)

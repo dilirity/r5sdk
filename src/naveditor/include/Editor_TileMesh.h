@@ -37,7 +37,7 @@ protected:
 	float m_tileMemUsage;
 	int m_tileTriCount;
 
-	unsigned char* buildTileMesh(const int tx, const int ty, const float* bmin, const float* bmax, int& dataSize);
+	unsigned char* buildTileMesh(const int tx, const int ty, const rdVec3D* bmin, const rdVec3D* bmax, int& dataSize);
 	
 	void saveAll(const char* path, const dtNavMesh* mesh);
 	dtNavMesh* loadAll(const char* path);
@@ -55,11 +55,11 @@ public:
 	virtual bool handleBuild();
 	virtual void collectSettings(struct BuildSettings& settings);
 	
-	void getTilePos(const float* pos, int& tx, int& ty);
-	void getTileExtents(int tx, int ty, float* bmin, float* bmax);
+	void getTilePos(const rdVec3D* pos, int& tx, int& ty);
+	void getTileExtents(int tx, int ty, rdVec3D* bmin, rdVec3D* bmax);
 
-	void buildTile(const float* pos);
-	void removeTile(const float* pos);
+	void buildTile(const rdVec3D* pos);
+	void removeTile(const rdVec3D* pos);
 	void buildAllTiles();
 	void removeAllTiles();
 

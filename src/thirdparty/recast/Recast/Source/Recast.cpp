@@ -278,35 +278,35 @@ rcPolyMeshDetail::rcPolyMeshDetail()
 {
 }
 
-void rcCalcBounds(const float* verts, int numVerts, float* minBounds, float* maxBounds)
+void rcCalcBounds(const rdVec3D* verts, int numVerts, rdVec3D* minBounds, rdVec3D* maxBounds)
 {
 	// Calculate bounding box.
 	rdVcopy(minBounds, verts);
 	rdVcopy(maxBounds, verts);
 	for (int i = 1; i < numVerts; ++i)
 	{
-		const float* v = &verts[i * 3];
+		const rdVec3D* v = &verts[i];
 		rdVmin(minBounds, v);
 		rdVmax(maxBounds, v);
 	}
 }
 
-void rcCalcGridSize(const float* minBounds, const float* maxBounds, const float cellSize, int* sizeX, int* sizeY)
+void rcCalcGridSize(const rdVec3D* minBounds, const rdVec3D* maxBounds, const float cellSize, int* sizeX, int* sizeY)
 {
-	*sizeX = (int)((maxBounds[0] - minBounds[0]) / cellSize + 0.5f);
-	*sizeY = (int)((maxBounds[1] - minBounds[1]) / cellSize + 0.5f);
+	*sizeX = (int)((maxBounds->x - minBounds->x) / cellSize + 0.5f);
+	*sizeY = (int)((maxBounds->y - minBounds->y) / cellSize + 0.5f);
 }
 
 bool rcCreateHeightfield(rcContext* context, rcHeightfield& heightfield, int sizeX, int sizeZ,
-                         const float* minBounds, const float* maxBounds,
+                         const rdVec3D* minBounds, const rdVec3D* maxBounds,
                          float cellSize, float cellHeight)
 {
 	rdIgnoreUnused(context);
 
 	heightfield.width = sizeX;
 	heightfield.height = sizeZ;
-	rdVcopy(heightfield.bmin, minBounds);
-	rdVcopy(heightfield.bmax, maxBounds);
+	heightfield.bmin = *minBounds;
+	heightfield.bmax = *maxBounds;
 	heightfield.cs = cellSize;
 	heightfield.ch = cellHeight;
 	heightfield.spans = (rcSpan**)rdAlloc(sizeof(rcSpan*) * heightfield.width * heightfield.height, RD_ALLOC_PERM);
@@ -319,7 +319,7 @@ bool rcCreateHeightfield(rcContext* context, rcHeightfield& heightfield, int siz
 }
 
 void rcMarkWalkableTriangles(rcContext* context, const float walkableSlopeAngle,
-                             const float* verts, const int numVerts,
+                             const rdVec3D* verts, const int numVerts,
                              const int* tris, const int numTris,
                              unsigned char* triAreaIDs, const bool ignoreWindingOrder)
 {
@@ -327,15 +327,14 @@ void rcMarkWalkableTriangles(rcContext* context, const float walkableSlopeAngle,
 	rdIgnoreUnused(numVerts);
 
 	const float walkableThr = rdMathCosf(walkableSlopeAngle / 180.0f * RD_PI);
-
-	float norm[3];
+	rdVec3D norm;
 
 	for (int i = 0; i < numTris; ++i)
 	{
 		const int* tri = &tris[i * 3];
-		rdTriNormal(&verts[tri[0] * 3], &verts[tri[1] * 3], &verts[tri[2] * 3], norm);
+		rdTriNormal(&verts[tri[0]], &verts[tri[1]], &verts[tri[2]], &norm);
 		// Check if the face is walkable.
-		if ((ignoreWindingOrder ? rdMathFabsf(norm[2]) : norm[2]) > walkableThr)
+		if ((ignoreWindingOrder ? rdMathFabsf(norm.z) : norm.z) > walkableThr)
 		{
 			triAreaIDs[i] = RC_WALKABLE_AREA;
 		}
@@ -343,7 +342,7 @@ void rcMarkWalkableTriangles(rcContext* context, const float walkableSlopeAngle,
 }
 
 void rcClearUnwalkableTriangles(rcContext* context, const float walkableSlopeAngle,
-                                const float* verts, int numVerts,
+                                const rdVec3D* verts, int numVerts,
                                 const int* tris, int numTris,
                                 unsigned char* triAreaIDs, const bool ignoreWindingOrder)
 {
@@ -352,14 +351,14 @@ void rcClearUnwalkableTriangles(rcContext* context, const float walkableSlopeAng
 
 	// The minimum Z value for a face normal of a triangle with a walkable slope.
 	const float walkableLimitZ = rdMathCosf(walkableSlopeAngle / 180.0f * RD_PI);
+	rdVec3D faceNormal;
 
-	float faceNormal[3];
 	for (int i = 0; i < numTris; ++i)
 	{
 		const int* tri = &tris[i * 3];
-		rdTriNormal(&verts[tri[0] * 3], &verts[tri[1] * 3], &verts[tri[2] * 3], faceNormal);
+		rdTriNormal(&verts[tri[0]], &verts[tri[1]], &verts[tri[2]], &faceNormal);
 		// Check if the face is walkable.
-		if ((ignoreWindingOrder ? rdMathFabsf(faceNormal[2]) : faceNormal[2]) <= walkableLimitZ)
+		if ((ignoreWindingOrder ? rdMathFabsf(faceNormal.z) : faceNormal.z) <= walkableLimitZ)
 		{
 			triAreaIDs[i] = RC_NULL_AREA;
 		}
@@ -406,9 +405,9 @@ bool rcBuildCompactHeightfield(rcContext* context, const int walkableHeight, con
 	compactHeightfield.walkableHeight = walkableHeight;
 	compactHeightfield.walkableClimb = walkableClimb;
 	compactHeightfield.maxRegions = 0;
-	rdVcopy(compactHeightfield.bmin, heightfield.bmin);
-	rdVcopy(compactHeightfield.bmax, heightfield.bmax);
-	compactHeightfield.bmax[2] += walkableHeight * heightfield.ch;
+	compactHeightfield.bmin = heightfield.bmin;
+	compactHeightfield.bmax = heightfield.bmax;
+	compactHeightfield.bmax.z += walkableHeight * heightfield.ch;
 	compactHeightfield.cs = heightfield.cs;
 	compactHeightfield.ch = heightfield.ch;
 	compactHeightfield.cells = (rcCompactCell*)rdAlloc(sizeof(rcCompactCell) * xSize * ySize, RD_ALLOC_PERM);

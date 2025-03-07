@@ -828,16 +828,16 @@ bool rcBuildContours(rcContext* ctx, const rcCompactHeightfield& chf,
 	
 	rcScopedTimer timer(ctx, RC_TIMER_BUILD_CONTOURS);
 	
-	rdVcopy(cset.bmin, chf.bmin);
-	rdVcopy(cset.bmax, chf.bmax);
+	cset.bmin = chf.bmin;
+	cset.bmax = chf.bmax;
 	if (borderSize > 0)
 	{
 		// If the heightfield was build with bordersize, remove the offset.
 		const float pad = borderSize*chf.cs;
-		cset.bmin[0] += pad;
-		cset.bmin[1] += pad;
-		cset.bmax[0] -= pad;
-		cset.bmax[1] -= pad;
+		cset.bmin.x += pad;
+		cset.bmin.y += pad;
+		cset.bmax.x -= pad;
+		cset.bmax.y -= pad;
 	}
 	cset.cs = chf.cs;
 	cset.ch = chf.ch;

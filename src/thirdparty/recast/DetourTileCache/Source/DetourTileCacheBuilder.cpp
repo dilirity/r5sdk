@@ -2090,16 +2090,16 @@ dtStatus dtBuildTileCachePolyMesh(dtTileCacheAlloc* alloc,
 	return DT_SUCCESS;
 }
 
-dtStatus dtMarkCylinderArea(dtTileCacheLayer& layer, const float* orig, const float cs, const float ch,
-							const float* pos, const float radius, const float height, const unsigned char areaId)
+dtStatus dtMarkCylinderArea(dtTileCacheLayer& layer, const rdVec3D* orig, const float cs, const float ch,
+							const rdVec3D* pos, const float radius, const float height, const unsigned char areaId)
 {
-	float bmin[3], bmax[3];
-	bmin[0] = pos[0] - radius;
-	bmin[1] = pos[1] - radius;
-	bmin[2] = pos[2];
-	bmax[0] = pos[0] + radius;
-	bmax[1] = pos[1] + radius;
-	bmax[2] = pos[2] + height;
+	rdVec3D bmin, bmax;
+	bmin.x = pos->x - radius;
+	bmin.y = pos->y - radius;
+	bmin.z = pos->z;
+	bmax.x = pos->x + radius;
+	bmax.y = pos->y + radius;
+	bmax.z = pos->z + height;
 	const float r2 = rdSqr(radius/cs + 0.5f);
 
 	const int w = (int)layer.header->width;
@@ -2107,15 +2107,15 @@ dtStatus dtMarkCylinderArea(dtTileCacheLayer& layer, const float* orig, const fl
 	const float ics = 1.0f/cs;
 	const float ich = 1.0f/ch;
 	
-	const float px = (pos[0]-orig[0])*ics;
-	const float py = (pos[1]-orig[1])*ics;
+	const float px = (pos->x-orig->x)*ics;
+	const float py = (pos->y-orig->y)*ics;
 	
-	int minx = (int)rdMathFloorf((bmin[0]-orig[0])*ics);
-	int miny = (int)rdMathFloorf((bmin[1]-orig[1])*ics);
-	int minz = (int)rdMathFloorf((bmin[2]-orig[2])*ich);
-	int maxx = (int)rdMathFloorf((bmax[0]-orig[0])*ics);
-	int maxy = (int)rdMathFloorf((bmax[1]-orig[1])*ics);
-	int maxz = (int)rdMathFloorf((bmax[2]-orig[2])*ich);
+	int minx = (int)rdMathFloorf((bmin.x-orig->x)*ics);
+	int miny = (int)rdMathFloorf((bmin.y-orig->y)*ics);
+	int minz = (int)rdMathFloorf((bmin.z-orig->z)*ich);
+	int maxx = (int)rdMathFloorf((bmax.x-orig->x)*ics);
+	int maxy = (int)rdMathFloorf((bmax.y-orig->y)*ics);
+	int maxz = (int)rdMathFloorf((bmax.z-orig->z)*ich);
 
 	if (maxx < 0) return DT_SUCCESS;
 	if (minx >= w) return DT_SUCCESS;
@@ -2145,20 +2145,20 @@ dtStatus dtMarkCylinderArea(dtTileCacheLayer& layer, const float* orig, const fl
 	return DT_SUCCESS;
 }
 
-dtStatus dtMarkBoxArea(dtTileCacheLayer& layer, const float* orig, const float cs, const float ch,
-					   const float* bmin, const float* bmax, const unsigned char areaId)
+dtStatus dtMarkBoxArea(dtTileCacheLayer& layer, const rdVec3D* orig, const float cs, const float ch,
+					   const rdVec3D* bmin, const rdVec3D* bmax, const unsigned char areaId)
 {
 	const int w = (int)layer.header->width;
 	const int h = (int)layer.header->height;
 	const float ics = 1.0f/cs;
 	const float ich = 1.0f/ch;
 
-	int minx = (int)rdMathFloorf((bmin[0]-orig[0])*ics);
-	int miny = (int)rdMathFloorf((bmin[1]-orig[1])*ics);
-	int minz = (int)rdMathFloorf((bmin[2]-orig[2])*ich);
-	int maxx = (int)rdMathFloorf((bmax[0]-orig[0])*ics);
-	int maxy = (int)rdMathFloorf((bmax[1]-orig[1])*ics);
-	int maxz = (int)rdMathFloorf((bmax[2]-orig[2])*ich);
+	int minx = (int)rdMathFloorf((bmin->x-orig->x)*ics);
+	int miny = (int)rdMathFloorf((bmin->y-orig->y)*ics);
+	int minz = (int)rdMathFloorf((bmin->z-orig->z)*ich);
+	int maxx = (int)rdMathFloorf((bmax->x-orig->x)*ics);
+	int maxy = (int)rdMathFloorf((bmax->y-orig->y)*ics);
+	int maxz = (int)rdMathFloorf((bmax->z-orig->z)*ich);
 	
 	if (maxx < 0) return DT_SUCCESS;
 	if (minx >= w) return DT_SUCCESS;
@@ -2184,24 +2184,24 @@ dtStatus dtMarkBoxArea(dtTileCacheLayer& layer, const float* orig, const float c
 	return DT_SUCCESS;
 }
 
-dtStatus dtMarkBoxArea(dtTileCacheLayer& layer, const float* orig, const float cs, const float ch,
-					   const float* center, const float* halfExtents, const float* rotAux, const unsigned char areaId)
+dtStatus dtMarkBoxArea(dtTileCacheLayer& layer, const rdVec3D* orig, const float cs, const float ch,
+					   const rdVec3D* center, const rdVec3D* halfExtents, const rdVec2D* rotAux, const unsigned char areaId)
 {
 	const int w = (int)layer.header->width;
 	const int h = (int)layer.header->height;
 	const float ics = 1.0f/cs;
 	const float ich = 1.0f/ch;
 
-	float cx = (center[0] - orig[0])*ics;
-	float cy = (center[1] - orig[1])*ics;
+	float cx = (center->x - orig->x)*ics;
+	float cy = (center->y - orig->y)*ics;
 	
-	float maxr = 1.41f*rdMax(halfExtents[0], halfExtents[1]);
+	float maxr = 1.41f*rdMax(halfExtents->x, halfExtents->y);
 	int minx = (int)rdMathFloorf(cx - maxr*ics);
 	int maxx = (int)rdMathFloorf(cx + maxr*ics);
 	int miny = (int)rdMathFloorf(cy - maxr*ics);
 	int maxy = (int)rdMathFloorf(cy + maxr*ics);
-	int minz = (int)rdMathFloorf((center[2]-halfExtents[2]-orig[2])*ich);
-	int maxz = (int)rdMathFloorf((center[2]+halfExtents[2]-orig[2])*ich);
+	int minz = (int)rdMathFloorf((center->z-halfExtents->z-orig->z)*ich);
+	int maxz = (int)rdMathFloorf((center->z+halfExtents->z-orig->z)*ich);
 
 	if (maxx < 0) return DT_SUCCESS;
 	if (minx >= w) return DT_SUCCESS;
@@ -2213,8 +2213,8 @@ dtStatus dtMarkBoxArea(dtTileCacheLayer& layer, const float* orig, const float c
 	if (miny < 0) miny = 0;
 	if (maxy >= h) maxy = h-1;
 	
-	float xhalf = halfExtents[0]*ics + 0.5f;
-	float yhalf = halfExtents[1]*ics + 0.5f;
+	float xhalf = halfExtents->x*ics + 0.5f;
+	float yhalf = halfExtents->y*ics + 0.5f;
 
 	for (int y = miny; y <= maxy; ++y)
 	{
@@ -2222,10 +2222,10 @@ dtStatus dtMarkBoxArea(dtTileCacheLayer& layer, const float* orig, const float c
 		{			
 			float x2 = 2.0f*(float(x) - cx);
 			float y2 = 2.0f*(float(y) - cy);
-			float xrot = rotAux[1]*x2 + rotAux[0]*y2;
+			float xrot = rotAux->y*x2 + rotAux->x*y2;
 			if (xrot > xhalf || xrot < -xhalf)
 				continue;
-			float yrot = rotAux[1]*y2 - rotAux[0]*x2;
+			float yrot = rotAux->y*y2 - rotAux->x*x2;
 			if (yrot > yhalf || yrot < -yhalf)
 				continue;
 			const int z = layer.heights[x+y*w];
@@ -2377,12 +2377,12 @@ bool dtTileCacheHeaderSwapEndian(unsigned char* data, const int dataSize)
 	rdSwapEndian(&header->tx);
 	rdSwapEndian(&header->ty);
 	rdSwapEndian(&header->tlayer);
-	rdSwapEndian(&header->bmin[0]);
-	rdSwapEndian(&header->bmin[1]);
-	rdSwapEndian(&header->bmin[2]);
-	rdSwapEndian(&header->bmax[0]);
-	rdSwapEndian(&header->bmax[1]);
-	rdSwapEndian(&header->bmax[2]);
+	rdSwapEndian(&header->bmin.x);
+	rdSwapEndian(&header->bmin.y);
+	rdSwapEndian(&header->bmin.z);
+	rdSwapEndian(&header->bmax.x);
+	rdSwapEndian(&header->bmax.y);
+	rdSwapEndian(&header->bmax.z);
 	rdSwapEndian(&header->hmin);
 	rdSwapEndian(&header->hmax);
 	

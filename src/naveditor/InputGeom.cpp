@@ -25,7 +25,6 @@
 #include "DebugUtils/Include/RecastDebugDraw.h"
 #include "Detour/Include/DetourNavMesh.h"
 #include "NavEditor/Include/Editor.h"
-#include <naveditor/include/GameUtils.h>
 
 static char* parseRow(char* buf, char* bufEnd, char* row, int len)
 {
@@ -70,10 +69,10 @@ InputGeom::InputGeom() :
 	m_offMeshConCount(0),
 	m_volumeCount(0)
 {
-	rdVset(m_meshBMin, 0.0f, 0.0f, 0.0f);
-	rdVset(m_meshBMax, 0.0f, 0.0f, 0.0f);
-	rdVset(m_navMeshBMin, 0.0f, 0.0f, 0.0f);
-	rdVset(m_navMeshBMax, 0.0f, 0.0f, 0.0f);
+	m_meshBMin.init(0.0f,0.0f,0.0f);
+	m_meshBMax.init(0.0f,0.0f,0.0f);
+	m_navMeshBMin.init(0.0f,0.0f,0.0f);
+	m_navMeshBMax.init(0.0f,0.0f,0.0f);
 }
 
 InputGeom::~InputGeom()
@@ -117,9 +116,9 @@ bool InputGeom::loadMesh(rcContext* ctx, const std::string& filepath, const Mesh
 		return false;
 	}
 
-	rcCalcBounds(m_mesh->getVerts(), m_mesh->getVertCount(), m_meshBMin, m_meshBMax);
-	rdVcopy(m_navMeshBMin, m_meshBMin);
-	rdVcopy(m_navMeshBMax, m_meshBMax);
+	rcCalcBounds(m_mesh->getVerts(), m_mesh->getVertCount(), &m_meshBMin, &m_meshBMax);
+	m_navMeshBMin = m_meshBMin;
+	m_navMeshBMax = m_meshBMax;
 
 	m_chunkyMesh = new rcChunkyTriMesh;
 	if (!m_chunkyMesh)
@@ -210,24 +209,24 @@ bool InputGeom::loadGeomSet(rcContext* ctx, const std::string& filepath)
 			// Off-mesh connection
 			if (m_offMeshConCount < MAX_OFFMESH_CONNECTIONS)
 			{
-				float* verts = &m_offMeshConVerts[m_offMeshConCount*3*2];
-				float* refs = &m_offMeshConRefPos[m_offMeshConCount*3];
+				rdVec3D* verts = &m_offMeshConVerts[m_offMeshConCount*2];
+				rdVec3D* refs = &m_offMeshConRefPos[m_offMeshConCount];
 				float rad;
 				float yaw;
 				int bidir = 0, jump = 0, order = 0, area = 0, flags = 0;
 				sscanf(row+1, "%f %f %f %f %f %f %f %f %f %f %f %d %d %d %d %d",
-					   &verts[0], &verts[1], &verts[2],
-					   &verts[3], &verts[4], &verts[5],
-					   &refs[0], &refs[1], &refs[2],
+					   &verts[0].x, &verts[0].y, &verts[0].z,
+					   &verts[1].x, &verts[1].y, &verts[1].z,
+					   &refs->x, &refs->y, &refs->z,
 					   &rad,
 					   &yaw,
 					   &bidir, &jump, &order, &area, &flags);
 
-				if (std::isnan(yaw))
+				if (!rdMathIsfinite(yaw))
 				{
-					const float offset[3] = { 0.0f,0.0f,rad };
-					yaw = dtCalcOffMeshRefYaw(&verts[0], &verts[3]);
-					dtCalcOffMeshRefPos(verts, yaw, offset, refs);
+					const rdVec3D offset(0.0f,0.0f,rad);
+					yaw = dtCalcOffMeshRefYaw(&verts[0], &verts[1]);
+					dtCalcOffMeshRefPos(verts, yaw, &offset, refs);
 				}
 
 				m_offMeshConRads[m_offMeshConCount] = rad;
@@ -249,8 +248,8 @@ bool InputGeom::loadGeomSet(rcContext* ctx, const std::string& filepath)
 				ShapeVolume* vol = &m_volumes[m_volumeCount++];
 
 				sscanf(row+1, "%hu %hhu %f %f %f %f %f %f", &vol->flags, &vol->area, 
-					&vol->verts[0], &vol->verts[1], &vol->verts[2],
-					&vol->verts[3], &vol->verts[4], &vol->verts[5]);
+					&vol->verts[0].x, &vol->verts[0].y, &vol->verts[0].z,
+					&vol->verts[1].x, &vol->verts[1].y, &vol->verts[1].z);
 
 				vol->hmin = 0.0f;
 				vol->hmax = 0.0f;
@@ -266,8 +265,8 @@ bool InputGeom::loadGeomSet(rcContext* ctx, const std::string& filepath)
 				ShapeVolume* vol = &m_volumes[m_volumeCount++];
 
 				sscanf(row + 1, "%hu %hhu %f %f %f %f %f", &vol->flags, &vol->area,
-					&vol->verts[0], &vol->verts[1], &vol->verts[2],
-					&vol->verts[3], &vol->verts[4]);
+					&vol->verts[0].x, &vol->verts[0].y, &vol->verts[0].z,
+					&vol->verts[1].x, &vol->verts[1].y);
 
 				vol->hmin = 0.0f;
 				vol->hmax = 0.0f;
@@ -286,7 +285,7 @@ bool InputGeom::loadGeomSet(rcContext* ctx, const std::string& filepath)
 				{
 					row[0] = '\0';
 					src = parseRow(src, srcEnd, row, sizeof(row)/sizeof(char));
-					sscanf(row, "%f %f %f", &vol->verts[i*3+0], &vol->verts[i*3+1], &vol->verts[i*3+2]);
+					sscanf(row, "%f %f %f", &vol->verts[i].x, &vol->verts[i].y, &vol->verts[i].z);
 				}
 
 				vol->type = VOLUME_CONVEX;
@@ -312,18 +311,18 @@ bool InputGeom::loadGeomSet(rcContext* ctx, const std::string& filepath)
 							&m_buildSettings.detailSampleDist,
 							&m_buildSettings.detailSampleMaxError,
 							&m_buildSettings.partitionType,
-							&m_buildSettings.navMeshBMin[0],
-							&m_buildSettings.navMeshBMin[1],
-							&m_buildSettings.navMeshBMin[2],
-							&m_buildSettings.navMeshBMax[0],
-							&m_buildSettings.navMeshBMax[1],
-							&m_buildSettings.navMeshBMax[2],
+							&m_buildSettings.navMeshBMin.x,
+							&m_buildSettings.navMeshBMin.y,
+							&m_buildSettings.navMeshBMin.z,
+							&m_buildSettings.navMeshBMax.x,
+							&m_buildSettings.navMeshBMax.y,
+							&m_buildSettings.navMeshBMax.z,
 							&m_buildSettings.tileSize);
 
 			// Copy the original values over so we can reset to them in the
 			// editor after changes have been made.
-			rdVcopy(m_buildSettings.origNavMeshBMin, m_buildSettings.navMeshBMin);
-			rdVcopy(m_buildSettings.origNavMeshBMax, m_buildSettings.navMeshBMax);
+			m_buildSettings.origNavMeshBMin = m_buildSettings.navMeshBMin;
+			m_buildSettings.origNavMeshBMax = m_buildSettings.navMeshBMax;
 		}
 	}
 	
@@ -390,20 +389,20 @@ bool InputGeom::saveGeomSet(const BuildSettings* settings)
 			settings->detailSampleDist,
 			settings->detailSampleMaxError,
 			settings->partitionType,
-			settings->navMeshBMin[0],
-			settings->navMeshBMin[1],
-			settings->navMeshBMin[2],
-			settings->navMeshBMax[0],
-			settings->navMeshBMax[1],
-			settings->navMeshBMax[2],
+			settings->navMeshBMin.x,
+			settings->navMeshBMin.y,
+			settings->navMeshBMin.z,
+			settings->navMeshBMax.x,
+			settings->navMeshBMax.y,
+			settings->navMeshBMax.z,
 			settings->tileSize);
 	}
 	
 	// Store off-mesh links.
 	for (int i = 0; i < m_offMeshConCount; ++i)
 	{
-		const float* verts = &m_offMeshConVerts[i*3*2];
-		const float* refs = &m_offMeshConRefPos[i*3];
+		const rdVec3D* verts = &m_offMeshConVerts[i*2];
+		const rdVec3D* refs = &m_offMeshConRefPos[i];
 		const float rad = m_offMeshConRads[i];
 		const float yaw = m_offMeshConRefYaws[i];
 		const int bidir = m_offMeshConDirs[i];
@@ -412,9 +411,9 @@ bool InputGeom::saveGeomSet(const BuildSettings* settings)
 		const int area = m_offMeshConAreas[i];
 		const int flags = m_offMeshConFlags[i];
 		fprintf(fp, "o %f %f %f %f %f %f %f %f %f %f %f %d %d %d %d %d\n",
-				verts[0], verts[1], verts[2],
-				verts[3], verts[4], verts[5],
-				refs[0], refs[1], refs[2],
+				verts[0].x, verts[0].y, verts[0].z,
+				verts[1].x, verts[1].y, verts[1].z,
+				refs->x, refs->y, refs->z,
 				rad,
 				yaw,
 				bidir, jump, order, area, flags);
@@ -429,18 +428,18 @@ bool InputGeom::saveGeomSet(const BuildSettings* settings)
 		{
 		case VOLUME_BOX:
 			fprintf(fp, "b %hu %hhu %f %f %f %f %f %f\n", vol->flags, vol->area,
-				vol->verts[0], vol->verts[1], vol->verts[2],
-				vol->verts[3], vol->verts[4], vol->verts[5]);
+				vol->verts[0].x, vol->verts[0].y, vol->verts[0].z,
+				vol->verts[1].x, vol->verts[1].y, vol->verts[1].z);
 			break;
 		case VOLUME_CYLINDER:
 			fprintf(fp, "c %hu %hhu %f %f %f %f %f\n", vol->flags, vol->area,
-				vol->verts[0], vol->verts[1], vol->verts[2],
-				vol->verts[3], vol->verts[4]);
+				vol->verts[0].x, vol->verts[0].y, vol->verts[0].z,
+				vol->verts[1].x, vol->verts[1].y);
 			break;
 		case VOLUME_CONVEX:
 			fprintf(fp, "p %d %hu %hhu %f %f\n", vol->nverts, vol->flags, vol->area, vol->hmin, vol->hmax);
 			for (int j = 0; j < vol->nverts; ++j)
-				fprintf(fp, "%f %f %f\n", vol->verts[j*3+0], vol->verts[j*3+1], vol->verts[j*3+2]);
+				fprintf(fp, "%f %f %f\n", vol->verts[j].x, vol->verts[j].y, vol->verts[j].z);
 		}
 	}
 	
@@ -452,14 +451,14 @@ bool InputGeom::saveGeomSet(const BuildSettings* settings)
 static const int MAX_CHUNK_INDICES = 0xffff;
 static int s_chunkIndices[MAX_CHUNK_INDICES];
 
-bool InputGeom::raycastMesh(const float* src, const float* dst, const unsigned int mask, int* vidx, float* tmin) const
+bool InputGeom::raycastMesh(const rdVec3D* src, const rdVec3D* dst, const unsigned int mask, int* vidx, float* tmin) const
 {
 	if (vidx)
 		*vidx = -1;
 
 	// Prune hit ray.
 	float btmin = 0, btmax = 1;
-	if (!rdIntersectSegmentAABB(src, dst, m_meshBMin, m_meshBMax, btmin, btmax))
+	if (!rdIntersectSegmentAABB(src, dst, &m_meshBMin, &m_meshBMax, btmin, btmax))
 		return false;
 
 	bool hit = false;
@@ -485,12 +484,12 @@ bool InputGeom::raycastMesh(const float* src, const float* dst, const unsigned i
 
 		if (vol.type == VOLUME_BOX)
 		{
-			if (rdIntersectSegmentAABB(src, dst, &vol.verts[0], &vol.verts[3], tsmin, tsmax))
+			if (rdIntersectSegmentAABB(src, dst, &vol.verts[0], &vol.verts[1], tsmin, tsmax))
 				isect = true;
 		}
 		else if (vol.type == VOLUME_CYLINDER)
 		{
-			if (rdIntersectSegmentCylinder(src, dst, &vol.verts[0], vol.verts[3], vol.verts[4], tsmin, tsmax))
+			if (rdIntersectSegmentCylinder(src, dst, &vol.verts[0], vol.verts[1].x, vol.verts[1].y, tsmin, tsmax))
 				isect = true;
 		}
 		else if (vol.type == VOLUME_CONVEX)
@@ -533,19 +532,19 @@ bool InputGeom::raycastMesh(const float* src, const float* dst, const unsigned i
 	if (!traceWorld)
 		return false;
 
-	float p[3], q[3];
-	p[0] = src[0] + (dst[0]-src[0]) * btmin;
-	p[1] = src[1] + (dst[1]-src[1]) * btmin;
-	p[2] = src[2] + (dst[2]-src[2]) * btmin;
-	q[0] = src[0] + (dst[0]-src[0]) * btmax;
-	q[1] = src[1] + (dst[1]-src[1]) * btmax;
-	q[2] = src[2] + (dst[2]-src[2]) * btmax;
+	rdVec3D p, q;
+	p.x = src->x + (dst->x-src->x) * btmin;
+	p.y = src->y + (dst->y-src->y) * btmin;
+	p.z = src->z + (dst->z-src->z) * btmin;
+	q.x = src->x + (dst->x-src->x) * btmax;
+	q.y = src->y + (dst->y-src->y) * btmax;
+	q.z = src->z + (dst->z-src->z) * btmax;
 	
-	const int ncid = rcGetChunksOverlappingSegment(m_chunkyMesh, p, q, s_chunkIndices, MAX_CHUNK_INDICES);
+	const int ncid = rcGetChunksOverlappingSegment(m_chunkyMesh, &p, &q, s_chunkIndices, MAX_CHUNK_INDICES);
 	if (!ncid)
 		return false;
 
-	const float* verts = m_mesh->getVerts();
+	const rdVec3D* verts = m_mesh->getVerts();
 	
 	for (int i = 0; i < ncid; ++i)
 	{
@@ -557,9 +556,9 @@ bool InputGeom::raycastMesh(const float* src, const float* dst, const unsigned i
 		{
 			float t = 1;
 			if (rdIntersectSegmentTriangle(src, dst,
-										   &verts[tris[j]*3],
-										   &verts[tris[j+1]*3],
-										   &verts[tris[j+2]*3], t))
+										   &verts[tris[j]],
+										   &verts[tris[j+1]],
+										   &verts[tris[j+2]], t))
 			{
 				// Caller isn't interested in finding the closest intersection; return out.
 				if (!tmin)
@@ -581,21 +580,21 @@ bool InputGeom::raycastMesh(const float* src, const float* dst, const unsigned i
 	return hit;
 }
 
-int InputGeom::addOffMeshConnection(const float* spos, const float* epos, const float rad,
+int InputGeom::addOffMeshConnection(const rdVec3D* spos, const rdVec3D* epos, const float rad,
 									 unsigned char bidir, unsigned char jump, unsigned char order,
 									 unsigned char area, unsigned short flags)
 {
 	if (m_offMeshConCount >= MAX_OFFMESH_CONNECTIONS) return -1;
 	rdAssert(jump < DT_MAX_TRAVERSE_TYPES);
 
-	float* verts = &m_offMeshConVerts[m_offMeshConCount*3*2];
+	rdVec3D* verts = &m_offMeshConVerts[m_offMeshConCount*2];
 	rdVcopy(&verts[0], spos);
-	rdVcopy(&verts[3], epos);
+	rdVcopy(&verts[1], epos);
 
-	float* refs = &m_offMeshConRefPos[m_offMeshConCount*3];
+	rdVec3D* refs = &m_offMeshConRefPos[m_offMeshConCount];
 	const float yaw = dtCalcOffMeshRefYaw(spos, epos);
-	const float offset[3] = { 0.0f,0.0f,rad };
-	dtCalcOffMeshRefPos(spos, yaw, offset, refs);
+	const rdVec3D offset(0.0f,0.0f,rad);
+	dtCalcOffMeshRefPos(spos, yaw, &offset, refs);
 
 	m_offMeshConRads[m_offMeshConCount] = rad;
 	m_offMeshConRefYaws[m_offMeshConCount] = yaw;
@@ -613,13 +612,13 @@ void InputGeom::deleteOffMeshConnection(int i)
 {
 	m_offMeshConCount--;
 
-	float* vertsSrc = &m_offMeshConVerts[m_offMeshConCount*3*2];
-	float* vertsDst = &m_offMeshConVerts[i*3*2];
+	rdVec3D* vertsSrc = &m_offMeshConVerts[m_offMeshConCount*2];
+	rdVec3D* vertsDst = &m_offMeshConVerts[i*2];
 	rdVcopy(&vertsDst[0], &vertsSrc[0]);
-	rdVcopy(&vertsDst[3], &vertsSrc[3]);
+	rdVcopy(&vertsDst[1], &vertsSrc[1]);
 
-	float* refSrc = &m_offMeshConRefPos[m_offMeshConCount*3];
-	float* refDst = &m_offMeshConRefPos[i*3];
+	rdVec3D* refSrc = &m_offMeshConRefPos[m_offMeshConCount];
+	rdVec3D* refDst = &m_offMeshConRefPos[i];
 	rdVcopy(&refDst[0], &refSrc[0]);
 
 	m_offMeshConRads[i] = m_offMeshConRads[m_offMeshConCount];
@@ -631,7 +630,7 @@ void InputGeom::deleteOffMeshConnection(int i)
 	m_offMeshConFlags[i] = m_offMeshConFlags[m_offMeshConCount];
 }
 
-void InputGeom::drawOffMeshConnections(duDebugDraw* dd, const float* offset, const int hilightIdx)
+void InputGeom::drawOffMeshConnections(duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx)
 {
 	const unsigned int baseColor = duRGBA(0,0,0,64);
 	dd->depthMask(false);
@@ -639,42 +638,42 @@ void InputGeom::drawOffMeshConnections(duDebugDraw* dd, const float* offset, con
 	dd->begin(DU_DRAW_LINES, 2.0f, offset);
 	for (int i = 0; i < m_offMeshConCount; ++i)
 	{
-		float* v = &m_offMeshConVerts[i*3*2];
+		rdVec3D* v = &m_offMeshConVerts[i*2];
 
-		dd->vertex(v[0],v[1],v[2], baseColor);
-		dd->vertex(v[0],v[1],v[2]+10.0f, baseColor);
+		dd->vertex(v[0].x,v[0].y,v[0].z, baseColor);
+		dd->vertex(v[0].x,v[0].y,v[0].z+10.0f, baseColor);
 		
-		dd->vertex(v[3],v[4],v[5], baseColor);
-		dd->vertex(v[3],v[4],v[5]+10.0f, baseColor);
+		dd->vertex(v[1].x,v[1].y,v[1].z, baseColor);
+		dd->vertex(v[1].x,v[1].y,v[1].z+10.0f, baseColor);
 		
-		duAppendCircle(dd, v[0],v[1],v[2]+5.0f, m_offMeshConRads[i], baseColor);
-		duAppendCircle(dd, v[3],v[4],v[5]+5.0f, m_offMeshConRads[i], baseColor);
+		duAppendCircle(dd, v[0].x,v[0].y,v[0].z+5.0f, m_offMeshConRads[i], baseColor);
+		duAppendCircle(dd, v[1].x,v[1].y,v[1].z+5.0f, m_offMeshConRads[i], baseColor);
 
 		const unsigned int conColor = hilightIdx == i ? duRGBA(192,0,128,192) : duRGBA(152,0,78,192);
 
-		duAppendArc(dd, v[0], v[1], v[2], v[3], v[4], v[5], 0.25f,
+		duAppendArc(dd, v[0].x, v[0].y, v[0].z, v[0].x, v[0].y, v[0].z, 0.25f,
 			(m_offMeshConDirs[i] & DT_OFFMESH_CON_BIDIR) ? 30.0f : 0.0f, 30.0f, conColor);
 
-		float* r = &m_offMeshConRefPos[i*3];
-		float refPosDir[3];
+		rdVec3D* r = &m_offMeshConRefPos[i];
+		rdVec3D refPosDir;
 
-		const float arrowLength[3] = { 35.f, 35.f, 0.f };
-		dtCalcOffMeshRefPos(r, m_offMeshConRefYaws[i], arrowLength, refPosDir);
+		const rdVec3D arrowLength(35.f, 35.f, 0.f);
+		dtCalcOffMeshRefPos(r, m_offMeshConRefYaws[i], &arrowLength, &refPosDir);
 
-		duAppendArrow(dd, r[0],r[1],r[2], refPosDir[0],refPosDir[1],refPosDir[2], 0.f, 10.f, duRGBA(255,255,0,255));
+		duAppendArrow(dd, r->x,r->y,r->z, refPosDir[0],refPosDir[1],refPosDir[2], 0.f, 10.f, duRGBA(255,255,0,255));
 	}	
 	dd->end();
 
 	dd->depthMask(true);
 }
 
-int InputGeom::addBoxVolume(const float* bmin, const float* bmax,
+int InputGeom::addBoxVolume(const rdVec3D* bmin, const rdVec3D* bmax,
 						 unsigned short flags, unsigned char area)
 {
 	if (m_volumeCount >= MAX_VOLUMES) return -1;
 	ShapeVolume* vol = &m_volumes[m_volumeCount++];
 	rdVcopy(&vol->verts[0], bmin);
-	rdVcopy(&vol->verts[3], bmax);
+	rdVcopy(&vol->verts[1], bmax);
 	vol->hmin = 0.0f;
 	vol->hmax = 0.0f;
 	vol->nverts = 6;
@@ -685,14 +684,14 @@ int InputGeom::addBoxVolume(const float* bmin, const float* bmax,
 	return m_volumeCount-1;
 }
 
-int InputGeom::addCylinderVolume(const float* pos, const float radius,
+int InputGeom::addCylinderVolume(const rdVec3D* pos, const float radius,
 						 const float height, unsigned short flags, unsigned char area)
 {
 	if (m_volumeCount >= MAX_VOLUMES) return -1;
 	ShapeVolume* vol = &m_volumes[m_volumeCount++];
 	rdVcopy(vol->verts, pos);
-	vol->verts[3] = radius;
-	vol->verts[4] = height;
+	vol->verts[1].x = radius;
+	vol->verts[1].y = height;
 	vol->hmin = 0.0f;
 	vol->hmax = 0.0f;
 	vol->nverts = 5;
@@ -703,12 +702,12 @@ int InputGeom::addCylinderVolume(const float* pos, const float radius,
 	return m_volumeCount-1;
 }
 
-int InputGeom::addConvexVolume(const float* verts, const int nverts,
+int InputGeom::addConvexVolume(const rdVec3D* verts, const int nverts,
 								const float minh, const float maxh, unsigned short flags, unsigned char area)
 {
 	if (m_volumeCount >= MAX_VOLUMES) return -1;
 	ShapeVolume* vol = &m_volumes[m_volumeCount++];
-	memcpy(vol->verts, verts, sizeof(float)*3*nverts);
+	memcpy(vol->verts, verts, sizeof(rdVec3D)*nverts);
 	vol->hmin = minh;
 	vol->hmax = maxh;
 	vol->nverts = nverts;
@@ -728,7 +727,7 @@ void InputGeom::deleteShapeVolume(int i)
 static const int FACE_ALPHA = 168;
 static const int WIRE_ALPHA = 220;
 
-void InputGeom::drawBoxVolumes(struct duDebugDraw* dd, const float* offset, const int hilightIdx)
+void InputGeom::drawBoxVolumes(struct duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx)
 {
 	for (int i = 0; i < m_volumeCount; ++i)
 	{
@@ -746,8 +745,8 @@ void InputGeom::drawBoxVolumes(struct duDebugDraw* dd, const float* offset, cons
 		unsigned int fcol[6] = { faceCol, faceCol, faceCol, faceCol, faceCol, faceCol };
 
 		duDebugDrawBox(dd, 
-			vol->verts[0],vol->verts[1],vol->verts[2],
-			vol->verts[3],vol->verts[4],vol->verts[5], 
+			vol->verts[0].x,vol->verts[0].y,vol->verts[0].z,
+			vol->verts[1].x,vol->verts[1].y,vol->verts[1].z,
 			fcol, offset);
 
 		const unsigned int wireCol = vol->area == RC_NULL_AREA
@@ -755,13 +754,13 @@ void InputGeom::drawBoxVolumes(struct duDebugDraw* dd, const float* offset, cons
 			: duTransCol(dd->areaToFaceCol(vol->area), WIRE_ALPHA);
 
 		duDebugDrawBoxWire(dd,
-			vol->verts[0],vol->verts[1],vol->verts[2],
-			vol->verts[3],vol->verts[4],vol->verts[5], 
+			vol->verts[0].x,vol->verts[0].y,vol->verts[0].z,
+			vol->verts[1].x,vol->verts[1].y,vol->verts[1].z,
 			wireCol, 2.0f, offset);
 	}
 }
 
-void InputGeom::drawCylinderVolumes(struct duDebugDraw* dd, const float* offset, const int hilightIdx)
+void InputGeom::drawCylinderVolumes(struct duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx)
 {
 	for (int i = 0; i < m_volumeCount; ++i)
 	{
@@ -776,24 +775,24 @@ void InputGeom::drawCylinderVolumes(struct duDebugDraw* dd, const float* offset,
 			? duRGBA(255, 0, 0, faceAlpha) // Use red for visibility (null acts as deletion).
 			: duTransCol(dd->areaToFaceCol(vol->area), faceAlpha);
 
-		const float radius = vol->verts[3];
-		const float height = vol->verts[4];
+		const float radius = vol->verts[1].x;
+		const float height = vol->verts[1].y;
 
 		duDebugDrawCylinder(dd, 
-			vol->verts[0]-radius,vol->verts[1]-radius,vol->verts[2]+0.1f,
-			vol->verts[0]+radius,vol->verts[1]+radius,vol->verts[2]+height, faceCol, offset);
+			vol->verts[0].x-radius,vol->verts[0].y-radius,vol->verts[0].z+0.1f,
+			vol->verts[0].x+radius,vol->verts[0].y+radius,vol->verts[0].z+height, faceCol, offset);
 
 		const unsigned int wireCol = vol->area == RC_NULL_AREA
 			? duRGBA(255, 0, 0, WIRE_ALPHA)
 			: duTransCol(dd->areaToFaceCol(vol->area), WIRE_ALPHA);
 
 		duDebugDrawCylinderWire(dd, 
-			vol->verts[0]-radius,vol->verts[1]-radius,vol->verts[2]+0.1f,
-			vol->verts[0]+radius,vol->verts[1]+radius,vol->verts[2]+height, wireCol, 2.0f, offset);
+			vol->verts[0].x-radius,vol->verts[0].y-radius,vol->verts[0].z+0.1f,
+			vol->verts[0].x+radius,vol->verts[0].y+radius,vol->verts[0].z+height, wireCol, 2.0f, offset);
 	}
 }
 
-void InputGeom::drawConvexVolumes(struct duDebugDraw* dd, const float* offset, const int hilightIdx)
+void InputGeom::drawConvexVolumes(struct duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx)
 {
 	dd->begin(DU_DRAW_TRIS, 1.0f, offset);
 	
@@ -814,20 +813,20 @@ void InputGeom::drawConvexVolumes(struct duDebugDraw* dd, const float* offset, c
 
 		for (int j = 0, k = vol->nverts-1; j < vol->nverts; k = j++)
 		{
-			const float* va = &vol->verts[k*3];
-			const float* vb = &vol->verts[j*3];
+			const rdVec3D* va = &vol->verts[k];
+			const rdVec3D* vb = &vol->verts[j];
 
-			dd->vertex(va[0],va[1],vol->hmax, col);
-			dd->vertex(vb[0],vb[1],vol->hmax, col);
-			dd->vertex(vol->verts[0],vol->verts[1],vol->hmax, col);
+			dd->vertex(va->x,va->y,vol->hmax, col);
+			dd->vertex(vb->x,vb->y,vol->hmax, col);
+			dd->vertex(vol->verts->x,vol->verts->y,vol->hmax, col);
 
-			dd->vertex(vb[0],vb[1],vol->hmax, col);
-			dd->vertex(va[0],va[1],vol->hmax, col);
-			dd->vertex(va[0],va[1],vol->hmin, duDarkenCol(col));
+			dd->vertex(vb->x,vb->y,vol->hmax, col);
+			dd->vertex(va->x,va->y,vol->hmax, col);
+			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
 
-			dd->vertex(vb[0],vb[1],vol->hmin, duDarkenCol(col));
-			dd->vertex(vb[0],vb[1],vol->hmax, col);
-			dd->vertex(va[0],va[1],vol->hmin, duDarkenCol(col));
+			dd->vertex(vb->x,vb->y,vol->hmin, duDarkenCol(col));
+			dd->vertex(vb->x,vb->y,vol->hmax, col);
+			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
 		}
 	}
 	
@@ -850,14 +849,14 @@ void InputGeom::drawConvexVolumes(struct duDebugDraw* dd, const float* offset, c
 
 		for (int j = 0, k = vol->nverts-1; j < vol->nverts; k = j++)
 		{
-			const float* va = &vol->verts[k*3];
-			const float* vb = &vol->verts[j*3];
-			dd->vertex(vb[0],vb[1],vol->hmin, duDarkenCol(col));
-			dd->vertex(va[0],va[1],vol->hmin, duDarkenCol(col));
-			dd->vertex(vb[0],vb[1],vol->hmax, col);
-			dd->vertex(va[0],va[1],vol->hmax, col);
-			dd->vertex(va[0],va[1],vol->hmax, col);
-			dd->vertex(va[0],va[1],vol->hmin, duDarkenCol(col));
+			const rdVec3D* va = &vol->verts[k];
+			const rdVec3D* vb = &vol->verts[j];
+			dd->vertex(vb->x,vb->y,vol->hmin, duDarkenCol(col));
+			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
+			dd->vertex(vb->x,vb->y,vol->hmax, col);
+			dd->vertex(va->x,va->y,vol->hmax, col);
+			dd->vertex(va->x,va->y,vol->hmax, col);
+			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
 		}
 	}
 	dd->end();
@@ -879,9 +878,9 @@ void InputGeom::drawConvexVolumes(struct duDebugDraw* dd, const float* offset, c
 
 		for (int j = 0; j < vol->nverts; ++j)
 		{
-			dd->vertex(vol->verts[j*3+0],vol->verts[j*3+1],vol->hmax, col);
-			dd->vertex(vol->verts[j*3+0],vol->verts[j*3+1],vol->hmin, col);
-			dd->vertex(vol->verts[j*3+0],vol->verts[j*3+1]+0.1f,vol->verts[j*3+2], col);
+			dd->vertex(vol->verts[j].x,vol->verts[j].y,vol->hmax, col);
+			dd->vertex(vol->verts[j].x,vol->verts[j].y,vol->hmin, col);
+			dd->vertex(vol->verts[j].x,vol->verts[j].y+0.1f,vol->verts[j].z, col);
 		}
 	}
 	dd->end();

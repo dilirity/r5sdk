@@ -195,7 +195,7 @@ void DebugDrawGL::texture(bool state)
 	}
 }
 
-void DebugDrawGL::begin(const duDebugDrawPrimitives prim, const float size, const float* offset)
+void DebugDrawGL::begin(const duDebugDrawPrimitives prim, const float size, const rdVec3D* offset)
 {
 	switch (prim)
 	{
@@ -216,40 +216,38 @@ void DebugDrawGL::begin(const duDebugDrawPrimitives prim, const float size, cons
 	};
 
 	if (offset)
-		rdVcopy(m_drawOffset,offset);
+		rdVcopy(&m_drawOffset,offset);
 }
 
-void DebugDrawGL::vertex(const float* pos, unsigned int color)
+void DebugDrawGL::vertex(const rdVec3D* pos, unsigned int color)
 {
 	glColor4ubv((GLubyte*)&color);
 
-	float opos[3];
-	rdVadd(opos,pos,m_drawOffset);
+	rdVec3D opos;
+	rdVadd(&opos,pos,&m_drawOffset);
 
-	glVertex3fv(opos);
+	glVertex3fv((GLfloat*)&opos);
 }
 
 void DebugDrawGL::vertex(const float x, const float y, const float z, unsigned int color)
 {
 	glColor4ubv((GLubyte*)&color);
 
-	float opos[3];
+	rdVec3D opos(x,y,z);
+	rdVadd(&opos,&opos,&m_drawOffset);
 
-	rdVset(opos, x,y,z);
-	rdVadd(opos,opos,m_drawOffset);
-
-	glVertex3fv(opos);
+	glVertex3fv((GLfloat*)&opos);
 }
 
-void DebugDrawGL::vertex(const float* pos, unsigned int color, const float* uv)
+void DebugDrawGL::vertex(const rdVec3D* pos, unsigned int color, const rdVec2D* uv)
 {
 	glColor4ubv((GLubyte*)&color);
-	glTexCoord2fv(uv);
+	glTexCoord2fv((GLfloat*)uv);
 
-	float opos[3];
-	rdVadd(opos,pos,m_drawOffset);
+	rdVec3D opos;
+	rdVadd(&opos,pos,&m_drawOffset);
 
-	glVertex3fv(opos);
+	glVertex3fv((GLfloat*)&opos);
 }
 
 void DebugDrawGL::vertex(const float x, const float y, const float z, unsigned int color, const float u, const float v)
@@ -257,12 +255,10 @@ void DebugDrawGL::vertex(const float x, const float y, const float z, unsigned i
 	glColor4ubv((GLubyte*)&color);
 	glTexCoord2f(u,v);
 
-	float opos[3];
+	rdVec3D opos(x,y,z);
+	rdVadd(&opos,&opos,&m_drawOffset);
 
-	rdVset(opos, x,y,z);
-	rdVadd(opos,opos,m_drawOffset);
-
-	glVertex3fv(opos);
+	glVertex3fv((GLfloat*)&opos);
 }
 
 void DebugDrawGL::end()
@@ -271,7 +267,7 @@ void DebugDrawGL::end()
 	glLineWidth(1.0f);
 	glPointSize(1.0f);
 
-	rdVset(m_drawOffset, 0.0f,0.0f,0.0f);
+	m_drawOffset.init(0.0f,0.0f,0.0f);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -328,5 +324,3 @@ bool FileIO::read(void* ptr, const rdSizeType size)
 	size_t readLen = fread(ptr, size, 1, m_fp);
 	return readLen == 1;
 }
-
-

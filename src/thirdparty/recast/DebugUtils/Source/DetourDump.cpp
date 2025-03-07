@@ -83,24 +83,24 @@ bool duDumpTraverseLinkDetail(const dtNavMesh& mesh, const dtNavMeshQuery* query
 
 				io->write("\t{\n", 3);
 
-				float startPos[3];
-				float endPos[3];
+				rdVec3D startPos;
+				rdVec3D endPos;
 
-				query->getEdgeMidPoint(mesh.getPolyRefBase(tile) | (dtPolyRef)j, link->ref, startPos);
-				query->getEdgeMidPoint(link->ref, mesh.getPolyRefBase(tile) | (dtPolyRef)j, endPos);
+				query->getEdgeMidPoint(mesh.getPolyRefBase(tile) | (dtPolyRef)j, link->ref, &startPos);
+				query->getEdgeMidPoint(link->ref, mesh.getPolyRefBase(tile) | (dtPolyRef)j, &endPos);
 
 				// note(amos): the lowest is the highest in reverse as we
 				// always have a reverse link; store the absolute value!!
-				const float slope = rdMathFabsf(rdCalcSlopeAngle(startPos, endPos));
-				const float elevation = rdMathFabsf(startPos[2] - endPos[2]);
+				const float slope = rdMathFabsf(rdCalcSlopeAngle(&startPos, &endPos));
+				const float elevation = rdMathFabsf(startPos.z - endPos.z);
 
 				//const bool hasReverseLink = link->reverseLink != DT_NULL_TRAVERSE_REVERSE_LINK;
 
 				bufCount = snprintf(buf, sizeof(buf), "\t\tlink: %d\n", k);
 				io->write(buf, bufCount);
-				bufCount = snprintf(buf, sizeof(buf), "\t\tstartPos: <%g, %g, %g>\n", startPos[0], startPos[1], startPos[2]);
+				bufCount = snprintf(buf, sizeof(buf), "\t\tstartPos: <%g, %g, %g>\n", startPos.x, startPos.y, startPos.z);
 				io->write(buf, bufCount);
-				bufCount = snprintf(buf, sizeof(buf), "\t\tendPos: <%g, %g, %g>\n", endPos[0], endPos[1], endPos[2]);
+				bufCount = snprintf(buf, sizeof(buf), "\t\tendPos: <%g, %g, %g>\n", endPos.x, endPos.y, endPos.z);
 				io->write(buf, bufCount);
 				bufCount = snprintf(buf, sizeof(buf), "\t\tslope: %g\n", slope);
 				io->write(buf, bufCount);

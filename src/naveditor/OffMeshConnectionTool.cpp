@@ -39,8 +39,8 @@ OffMeshConnectionTool::OffMeshConnectionTool() :
 	m_selectedOffMeshIndex(-1),
 	m_copiedOffMeshIndex(-1)
 {
-	rdVset(m_hitPos, 0.0f,0.0f,0.0f);
-	rdVset(m_refOffset, 0.0f,0.0f,0.0f);
+	m_hitPos.init(0.0f,0.0f,0.0f);
+	m_refOffset.init(0.0f,0.0f,0.0f);
 	memset(&m_copyOffMeshInstance, 0, sizeof(OffMeshConnection));
 }
 
@@ -68,7 +68,7 @@ void OffMeshConnectionTool::init(Editor* editor)
 		m_radius = agentRadius;
 		m_lastSelectedAgentRadius = agentRadius;
 
-		rdVset(m_refOffset, 0.0f,0.0f, agentRadius);
+		m_refOffset.init(0.0f,0.0f, agentRadius);
 	}
 }
 
@@ -95,8 +95,8 @@ void OffMeshConnectionTool::renderModifyMenu()
 	if (m_selectedOffMeshIndex == -1)
 		return;
 
-	float* verts = &geom->getOffMeshConnectionVerts()[m_selectedOffMeshIndex*6];
-	float* refs = &geom->getOffMeshConnectionRefPos()[m_selectedOffMeshIndex*3];
+	rdVec3D* verts = &geom->getOffMeshConnectionVerts()[m_selectedOffMeshIndex*2];
+	rdVec3D* refs = &geom->getOffMeshConnectionRefPos()[m_selectedOffMeshIndex];
 	float& rad = geom->getOffMeshConnectionRads()[m_selectedOffMeshIndex];
 	float& yaw = geom->getOffMeshConnectionRefYaws()[m_selectedOffMeshIndex];
 	unsigned char& dir = geom->getOffMeshConnectionDirs()[m_selectedOffMeshIndex];
@@ -107,11 +107,11 @@ void OffMeshConnectionTool::renderModifyMenu()
 
 	if (m_copiedOffMeshIndex != m_selectedOffMeshIndex)
 	{
-		rdVcopy(&m_copyOffMeshInstance.pos[0], &verts[0]);
-		rdVcopy(&m_copyOffMeshInstance.pos[3], &verts[3]);
-		rdVcopy(m_copyOffMeshInstance.refPos, refs);
+		m_copyOffMeshInstance.posa = verts[0];
+		m_copyOffMeshInstance.posb = verts[1];
+		m_copyOffMeshInstance.refPos = *refs;
 
-		rdVset(m_refOffset, 0.f,0.f,rad);
+		m_refOffset.init(0.f,0.f,rad);
 
 		m_copyOffMeshInstance.rad = rad;
 		m_copyOffMeshInstance.refYaw = yaw;
@@ -126,27 +126,27 @@ void OffMeshConnectionTool::renderModifyMenu()
 
 	ImGui::PushItemWidth(60);
 
-	ImGui::SliderFloat("##OffMeshConnectionModifyStartX", &verts[0], m_copyOffMeshInstance.pos[0]-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.pos[0]+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyStartX", &verts[0].x, m_copyOffMeshInstance.posa.x - VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posa.x + VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyStartY", &verts[1], m_copyOffMeshInstance.pos[1]-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.pos[1]+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyStartY", &verts[0].y, m_copyOffMeshInstance.posa.y - VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posa.y + VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyStartZ", &verts[2], m_copyOffMeshInstance.pos[2]-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.pos[2]+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyStartZ", &verts[0].z, m_copyOffMeshInstance.posa.z - VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posa.z + VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
 	ImGui::Text("Start");
 
-	ImGui::SliderFloat("##OffMeshConnectionModifyEndX", &verts[3], m_copyOffMeshInstance.pos[3]-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.pos[3]+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyEndX", &verts[1].x, m_copyOffMeshInstance.posb.x-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posb.x+VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyEndY", &verts[4], m_copyOffMeshInstance.pos[4]-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.pos[4]+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyEndY", &verts[1].y, m_copyOffMeshInstance.posb.y-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posb.y+VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyEndZ", &verts[5], m_copyOffMeshInstance.pos[5]-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.pos[5]+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyEndZ", &verts[1].z, m_copyOffMeshInstance.posb.z-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posb.z+VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
 	ImGui::Text("End");
 
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefX", &refs[0], m_copyOffMeshInstance.refPos[0]-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.refPos[0]+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyRefX", &refs->x, m_copyOffMeshInstance.refPos.x-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.refPos.x+VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefY", &refs[1], m_copyOffMeshInstance.refPos[1]-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.refPos[1]+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyRefY", &refs->y, m_copyOffMeshInstance.refPos.y-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.refPos.y+VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefZ", &refs[2], m_copyOffMeshInstance.refPos[2]-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.refPos[2]+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyRefZ", &refs->z, m_copyOffMeshInstance.refPos.z-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.refPos.z+VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
 	ImGui::Text("Ref");
 
@@ -167,26 +167,26 @@ void OffMeshConnectionTool::renderModifyMenu()
 		jump = (unsigned char)traverseType;
 
 	ImGui::PushItemWidth(60);
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefOffsetX", &m_refOffset[0], -VALUE_ADJUST_WINDOW, VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyRefOffsetX", &m_refOffset.x, -VALUE_ADJUST_WINDOW, VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefOffsetY", &m_refOffset[1], -VALUE_ADJUST_WINDOW, VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyRefOffsetY", &m_refOffset.y, -VALUE_ADJUST_WINDOW, VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefOffsetZ", &m_refOffset[2], -VALUE_ADJUST_WINDOW, VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##OffMeshConnectionModifyRefOffsetZ", &m_refOffset.z, -VALUE_ADJUST_WINDOW, VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
 	ImGui::Text("Ref Offset");
 	ImGui::PopItemWidth();
 
 	if (ImGui::Button("Recalculate Reference##OffMeshConnectionModify"))
 	{
-		yaw = dtCalcOffMeshRefYaw(&verts[0], &verts[3]);
-		dtCalcOffMeshRefPos(verts, yaw, m_refOffset, refs);
+		yaw = dtCalcOffMeshRefYaw(&verts[0], &verts[1]);
+		dtCalcOffMeshRefPos(verts, yaw, &m_refOffset, refs);
 	}
 
 	if (ImGui::Button("Reset Connection##OffMeshConnectionModify"))
 	{
-		rdVcopy(&verts[0], &m_copyOffMeshInstance.pos[0]);
-		rdVcopy(&verts[3], &m_copyOffMeshInstance.pos[3]);
-		rdVcopy(refs, m_copyOffMeshInstance.refPos);
+		rdVcopy(&verts[0], &m_copyOffMeshInstance.posa);
+		rdVcopy(&verts[1], &m_copyOffMeshInstance.posb);
+		rdVcopy(refs, &m_copyOffMeshInstance.refPos);
 
 		rad = m_copyOffMeshInstance.rad;
 		yaw = m_copyOffMeshInstance.refYaw;
@@ -225,7 +225,7 @@ void OffMeshConnectionTool::handleMenu()
 	renderModifyMenu();
 }
 
-void OffMeshConnectionTool::handleClick(const float* /*s*/, const float* p, const int /*v*/, bool shift)
+void OffMeshConnectionTool::handleClick(const rdVec3D* /*s*/, const rdVec3D* p, const int /*v*/, bool shift)
 {
 	if (!m_editor) return;
 	InputGeom* geom = m_editor->getInputGeom();
@@ -237,10 +237,10 @@ void OffMeshConnectionTool::handleClick(const float* /*s*/, const float* p, cons
 		// Find nearest link end-point
 		float nearestDist = FLT_MAX;
 		int nearestIndex = -1;
-		const float* verts = geom->getOffMeshConnectionVerts();
+		const rdVec3D* verts = geom->getOffMeshConnectionVerts();
 		for (int i = 0; i < geom->getOffMeshConnectionCount()*2; ++i)
 		{
-			const float* v = &verts[i*3];
+			const rdVec3D* v = &verts[i];
 			float d = rdVdist2DSqr(p, v);
 			if (d < nearestDist)
 			{
@@ -248,7 +248,7 @@ void OffMeshConnectionTool::handleClick(const float* /*s*/, const float* p, cons
 				nearestIndex = i/2; // Each link has two vertices.
 			}
 		}
-		// If end point close enough, select it it.
+		// If end point close enough, select it.
 		if (nearestIndex != -1 &&
 			rdMathSqrtf(nearestDist) < m_radius)
 		{
@@ -260,7 +260,7 @@ void OffMeshConnectionTool::handleClick(const float* /*s*/, const float* p, cons
 		// Create	
 		if (!m_hitPosSet)
 		{
-			rdVcopy(m_hitPos, p);
+			m_hitPos = *p;
 			m_hitPosSet = true;
 		}
 		else
@@ -272,7 +272,7 @@ void OffMeshConnectionTool::handleClick(const float* /*s*/, const float* p, cons
 #else
 				;
 #endif;
-			m_selectedOffMeshIndex = geom->addOffMeshConnection(m_hitPos, p, m_radius, m_bidir ? 1 : 0,
+			m_selectedOffMeshIndex = geom->addOffMeshConnection(&m_hitPos, p, m_radius, m_bidir ? 1 : 0,
 				(unsigned char)m_traverseType, m_invertVertexLookupOrder ? 1 : 0, area, flags);
 			m_hitPosSet = false;
 		}

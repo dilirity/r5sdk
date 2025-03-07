@@ -13,26 +13,26 @@ inline bool(*v_Detour_IsGoalPolyReachable)(dtNavMesh* const nav, const dtPolyRef
 inline dtStatus(*dtNavMesh__Init)(dtNavMesh* thisptr, unsigned char* data, int flags);
 inline dtStatus(*dtNavMesh__addTile)(dtNavMesh* thisptr, void* unused, unsigned char* data, int dataSize, int flags, dtTileRef lastRef);
 
-inline dtStatus(*dtNavMeshQuery__findNearestPolyInBounds)(dtNavMeshQuery* query, const float* center, const float* halfExtents,
-	const dtQueryFilter* filter, dtPolyRef* nearestRef, float* nearestPt);
+inline dtStatus(*dtNavMeshQuery__findNearestPolyInBounds)(dtNavMeshQuery* query, const rdVec3D* center, const rdVec3D* halfExtents,
+	const dtQueryFilter* filter, dtPolyRef* nearestRef, rdVec3D* nearestPt);
 
 inline dtStatus(*dtNavMeshQuery__findPath)(dtNavMeshQuery* query, dtPolyRef startRef, dtPolyRef endRef,
-	const float* startPos, const float* endPos, const dtQueryFilter* filter, dtPolyRef* path, unsigned char* jump, int* pathCount, const int maxPath);
+	const rdVec3D* startPos, const rdVec3D* endPos, const dtQueryFilter* filter, dtPolyRef* path, unsigned char* jump, int* pathCount, const int maxPath);
 
-inline dtStatus(*dtNavMeshQuery__findStraightPath)(dtNavMeshQuery* query, const float* startPos, const float* endPos,
-	const dtPolyRef* path, const unsigned char* jumpTypes, const int pathSize, float* straightPath, unsigned char* straightPathFlags,
+inline dtStatus(*dtNavMeshQuery__findStraightPath)(dtNavMeshQuery* query, const rdVec3D* startPos, const rdVec3D* endPos,
+	const dtPolyRef* path, const unsigned char* jumpTypes, const int pathSize, rdVec3D* straightPath, unsigned char* straightPathFlags,
 	dtPolyRef* straightPathRefs, unsigned char* straightPathJumps, int* straightPathCount, const int unused, const int jumpFilter, const int options);
 
-inline dtStatus(*dtNavMeshQuery__moveAlongSurface)(dtNavMeshQuery* const query, dtPolyRef startRef, const float* startPos,
-	const float* endPos, const dtQueryFilter* filter, float* resultPos, dtPolyRef* visitedPolys,
+inline dtStatus(*dtNavMeshQuery__moveAlongSurface)(dtNavMeshQuery* const query, dtPolyRef startRef, const rdVec3D* startPos,
+	const rdVec3D* endPos, const dtQueryFilter* filter, rdVec3D* resultPos, dtPolyRef* visitedPolys,
 	int* visitedCount, const int maxVisitedSize, const unsigned char options);
 
-inline dtStatus(*dtNavMeshQuery__raycast)(dtNavMeshQuery* query, const dtPolyRef startRef, const float* startPos, const float* endPos,
+inline dtStatus(*dtNavMeshQuery__raycast)(dtNavMeshQuery* query, const dtPolyRef startRef, const rdVec3D* startPos, const rdVec3D* endPos,
 	const dtQueryFilter* filter, dtRaycastHit* hit);
 
-inline dtStatus(*dtNavMeshQuery__closestPointOnPoly)(dtNavMeshQuery* query, const dtPolyRef ref, const float* pos, float* closest, bool* posOverPoly, float* dist);
-inline dtStatus(*dtNavMeshQuery__closestPointOnPolyBoundary)(dtNavMeshQuery* query, const dtPolyRef ref, const float* pos, float* closest, float* dist);
-inline dtStatus(*dtNavMeshQuery__getPolyHeight)(dtNavMeshQuery* query, const dtPolyRef ref, const float* pos, float* height, float* normal);
+inline dtStatus(*dtNavMeshQuery__closestPointOnPoly)(dtNavMeshQuery* query, const dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist);
+inline dtStatus(*dtNavMeshQuery__closestPointOnPolyBoundary)(dtNavMeshQuery* query, const dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, float* dist);
+inline dtStatus(*dtNavMeshQuery__getPolyHeight)(dtNavMeshQuery* query, const dtPolyRef ref, const rdVec3D* pos, float* height, rdVec3D* normal);
 
 inline dtNode*(*dtNodePool__getPool)(dtNodePool* pool, const dtPolyRef id, const unsigned char state);
 

@@ -45,7 +45,7 @@ struct ShapeVolume
 	{
 		for (int i = 0; i < MAX_SHAPEVOL_PTS; i++)
 		{
-			rdVset(&verts[i*3], 0.f,0.f,0.f);
+			verts[i].init(0.f,0.f,0.f);
 		}
 		hmin = 0.f;
 		hmax = 0.f;
@@ -55,7 +55,7 @@ struct ShapeVolume
 		type = VOLUME_INVALID;
 	}
 
-	float verts[MAX_SHAPEVOL_PTS*3];
+	rdVec3D verts[MAX_SHAPEVOL_PTS];
 	float hmin, hmax;
 	int nverts;
 	unsigned short flags;
@@ -97,11 +97,11 @@ struct BuildSettings
 	// Partition type, see SamplePartitionType
 	int partitionType;
 	// Bounds of the area to mesh
-	float navMeshBMin[3];
-	float navMeshBMax[3];
+	rdVec3D navMeshBMin;
+	rdVec3D navMeshBMax;
 	// Original bounds of the area to mesh.
-	float origNavMeshBMin[3];
-	float origNavMeshBMax[3];
+	rdVec3D origNavMeshBMin;
+	rdVec3D origNavMeshBMax;
 	// Size of the tiles in voxels
 	int tileSize;
 };
@@ -116,16 +116,16 @@ class InputGeom
 
 	rcChunkyTriMesh* m_chunkyMesh;
 	IMeshLoader* m_mesh;
-	float m_meshBMin[3], m_meshBMax[3];
-	float m_navMeshBMin[3], m_navMeshBMax[3];
+	rdVec3D m_meshBMin, m_meshBMax;
+	rdVec3D m_navMeshBMin, m_navMeshBMax;
 	BuildSettings m_buildSettings;
 	bool m_hasBuildSettings;
 	
 	/// @name Off-Mesh connections.
 	///@{
 	static const int MAX_OFFMESH_CONNECTIONS = 1024;
-	float m_offMeshConVerts[MAX_OFFMESH_CONNECTIONS*3*2];
-	float m_offMeshConRefPos[MAX_OFFMESH_CONNECTIONS*3];
+	rdVec3D m_offMeshConVerts[MAX_OFFMESH_CONNECTIONS*2];
+	rdVec3D m_offMeshConRefPos[MAX_OFFMESH_CONNECTIONS];
 	float m_offMeshConRads[MAX_OFFMESH_CONNECTIONS];
 	float m_offMeshConRefYaws[MAX_OFFMESH_CONNECTIONS];
 	unsigned char m_offMeshConDirs[MAX_OFFMESH_CONNECTIONS];
@@ -156,26 +156,26 @@ public:
 	
 	/// Method to return static mesh data.
 	const IMeshLoader* getMesh() const { return m_mesh; }
-	const float* getMeshBoundsMin() const { return m_meshBMin; }
-	const float* getMeshBoundsMax() const { return m_meshBMax; }
+	const rdVec3D* getMeshBoundsMin() const { return &m_meshBMin; }
+	const rdVec3D* getMeshBoundsMax() const { return &m_meshBMax; }
 
-	float* getNavMeshBoundsMin() { return m_hasBuildSettings ? m_buildSettings.navMeshBMin : m_navMeshBMin; }
-	float* getNavMeshBoundsMax() { return m_hasBuildSettings ? m_buildSettings.navMeshBMax : m_navMeshBMax; }
+	rdVec3D* getNavMeshBoundsMin() { return m_hasBuildSettings ? &m_buildSettings.navMeshBMin : &m_navMeshBMin; }
+	rdVec3D* getNavMeshBoundsMax() { return m_hasBuildSettings ? &m_buildSettings.navMeshBMax : &m_navMeshBMax; }
 
-	const float* getNavMeshBoundsMin() const { return m_hasBuildSettings ? m_buildSettings.navMeshBMin : m_navMeshBMin; }
-	const float* getNavMeshBoundsMax() const { return m_hasBuildSettings ? m_buildSettings.navMeshBMax : m_navMeshBMax; }
+	const rdVec3D* getNavMeshBoundsMin() const { return m_hasBuildSettings ? &m_buildSettings.navMeshBMin : &m_navMeshBMin; }
+	const rdVec3D* getNavMeshBoundsMax() const { return m_hasBuildSettings ? &m_buildSettings.navMeshBMax : &m_navMeshBMax; }
 
-	const float* getOriginalNavMeshBoundsMin() const { return m_hasBuildSettings ? m_buildSettings.origNavMeshBMin : m_meshBMin; }
-	const float* getOriginalNavMeshBoundsMax() const { return m_hasBuildSettings ? m_buildSettings.origNavMeshBMax : m_meshBMax; }
+	const rdVec3D* getOriginalNavMeshBoundsMin() const { return m_hasBuildSettings ? &m_buildSettings.origNavMeshBMin : &m_meshBMin; }
+	const rdVec3D* getOriginalNavMeshBoundsMax() const { return m_hasBuildSettings ? &m_buildSettings.origNavMeshBMax : &m_meshBMax; }
 
 	const rcChunkyTriMesh* getChunkyMesh() const { return m_chunkyMesh; }
 	const BuildSettings* getBuildSettings() const { return m_hasBuildSettings ? &m_buildSettings : 0; }
-	bool raycastMesh(const float* src, const float* dst, const unsigned int mask, int* vol = nullptr, float* tmin = nullptr) const;
+	bool raycastMesh(const rdVec3D* src, const rdVec3D* dst, const unsigned int mask, int* vol = nullptr, float* tmin = nullptr) const;
 
 	/// @name Off-Mesh connections.
 	///@{
 	int getOffMeshConnectionCount() { return m_offMeshConCount; }
-	float* getOffMeshConnectionVerts() { return m_offMeshConVerts; }
+	rdVec3D* getOffMeshConnectionVerts() { return m_offMeshConVerts; }
 	float* getOffMeshConnectionRads() { return m_offMeshConRads; }
 	unsigned char* getOffMeshConnectionDirs() { return m_offMeshConDirs; }
 	unsigned char* getOffMeshConnectionJumps() { return m_offMeshConJumps; }
@@ -183,29 +183,29 @@ public:
 	unsigned char* getOffMeshConnectionAreas() { return m_offMeshConAreas; }
 	unsigned short* getOffMeshConnectionFlags() { return m_offMeshConFlags; }
 	unsigned short* getOffMeshConnectionId() { return m_offMeshConId; }
-	float* getOffMeshConnectionRefPos() { return m_offMeshConRefPos; }
+	rdVec3D* getOffMeshConnectionRefPos() { return m_offMeshConRefPos; }
 	float* getOffMeshConnectionRefYaws() { return m_offMeshConRefYaws; }
-	int addOffMeshConnection(const float* spos, const float* epos, const float rad,
+	int addOffMeshConnection(const rdVec3D* spos, const rdVec3D* epos, const float rad,
 							  unsigned char bidir, unsigned char jump, unsigned char order, 
 							  unsigned char area, unsigned short flags);
 	void deleteOffMeshConnection(int i);
-	void drawOffMeshConnections(struct duDebugDraw* dd, const float* offset, const int hilightIdx = -1);
+	void drawOffMeshConnections(struct duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx = -1);
 	///@}
 
 	/// @name Shape Volumes.
 	///@{
 	int getShapeVolumeCount() const { return m_volumeCount; }
 	ShapeVolume* getShapeVolumes() { return m_volumes; }
-	int addBoxVolume(const float* bmin, const float* bmax,
+	int addBoxVolume(const rdVec3D* bmin, const rdVec3D* bmax,
 						 unsigned short flags, unsigned char area);
-	int addCylinderVolume(const float* pos, const float radius,
+	int addCylinderVolume(const rdVec3D* pos, const float radius,
 						 const float height, unsigned short flags, unsigned char area);
-	int addConvexVolume(const float* verts, const int nverts,
+	int addConvexVolume(const rdVec3D* verts, const int nverts,
 						 const float minh, const float maxh, unsigned short flags, unsigned char area);
 	void deleteShapeVolume(int i);
-	void drawBoxVolumes(struct duDebugDraw* dd, const float* offset, const int hilightIdx = -1);
-	void drawCylinderVolumes(struct duDebugDraw* dd, const float* offset, const int hilightIdx = -1);
-	void drawConvexVolumes(struct duDebugDraw* dd, const float* offset, const int hilightIdx = -1);
+	void drawBoxVolumes(struct duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx = -1);
+	void drawCylinderVolumes(struct duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx = -1);
+	void drawConvexVolumes(struct duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx = -1);
 	///@}
 	
 private:

@@ -78,9 +78,9 @@ end_header
 
 	for (size_t i = 0; i < m_vertCount; i++)
 	{
-		input.read((char*)&m_verts[i * 3 + 0], sizeof(float));
-		input.read((char*)&m_verts[i * 3 + 1], sizeof(float));
-		input.read((char*)&m_verts[i * 3 + 2], sizeof(float));
+		input.read((char*)&m_verts[i].x, sizeof(float));
+		input.read((char*)&m_verts[i].y, sizeof(float));
+		input.read((char*)&m_verts[i].z, sizeof(float));
 	}
 
 	for (size_t i = 0; i < m_triCount; i++)
@@ -96,30 +96,14 @@ end_header
 	}
 
 	// Calculate normals.
-	m_normals.resize(m_triCount*3);
-	for (int i = 0; i < m_triCount*3; i += 3)
+	m_normals.resize(m_triCount);
+	for (int i = 0; i < m_triCount; i++)
 	{
-		const float* v0 = &m_verts[m_tris[i]*3];
-		const float* v1 = &m_verts[m_tris[i+1]*3];
-		const float* v2 = &m_verts[m_tris[i+2]*3];
-		float e0[3], e1[3];
-		for (int j = 0; j < 3; ++j)
-		{
-			e0[j] = v1[j] - v0[j];
-			e1[j] = v2[j] - v0[j];
-		}
-		float* n = &m_normals[i];
-		n[0] = e0[1]*e1[2] - e0[2]*e1[1];
-		n[1] = e0[2]*e1[0] - e0[0]*e1[2];
-		n[2] = e0[0]*e1[1] - e0[1]*e1[0];
-		float d = sqrtf(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
-		if (d > 0)
-		{
-			d = 1.0f/d;
-			n[0] *= d;
-			n[1] *= d;
-			n[2] *= d;
-		}
+		const rdVec3D* v0 = &m_verts[m_tris[i*3]];
+		const rdVec3D* v1 = &m_verts[m_tris[i*3+1]];
+		const rdVec3D* v2 = &m_verts[m_tris[i*3+2]];
+
+		rdTriNormal(v0, v1, v2, &m_normals[i]);
 	}
 	
 	m_filename = filename;

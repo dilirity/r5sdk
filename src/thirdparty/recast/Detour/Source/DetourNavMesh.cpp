@@ -24,23 +24,23 @@
 #include "Detour/Include/DetourNode.h"
 
 
-inline bool overlapSlabs(const float* amin, const float* amax,
-						 const float* bmin, const float* bmax,
+inline bool overlapSlabs(const rdVec2D& amin, const rdVec2D& amax,
+						 const rdVec2D& bmin, const rdVec2D& bmax,
 						 const float px, const float pz)
 {
 	// Check for horizontal overlap.
 	// The segment is shrunken a little so that slabs which touch
 	// at end points are not connected.
-	const float minx = rdMax(amin[0]+px,bmin[0]+px);
-	const float maxx = rdMin(amax[0]-px,bmax[0]-px);
+	const float minx = rdMax(amin.x+px,bmin.x+px);
+	const float maxx = rdMin(amax.x-px,bmax.x-px);
 	if (minx > maxx)
 		return false;
 	
 	// Check vertical overlap.
-	const float ad = (amax[1]-amin[1]) / (amax[0]-amin[0]);
-	const float ak = amin[1] - ad*amin[0];
-	const float bd = (bmax[1]-bmin[1]) / (bmax[0]-bmin[0]);
-	const float bk = bmin[1] - bd*bmin[0];
+	const float ad = (amax.y-amin.y) / (amax.x-amin.x);
+	const float ak = amin.y - ad*amin.x;
+	const float bd = (bmax.y-bmin.y) / (bmax.x-bmin.x);
+	const float bk = bmin.y - bd*bmin.x;
 	const float aminy = ad*minx + ak;
 	const float amaxy = ad*maxx + ak;
 	const float bminy = bd*minx + bk;
@@ -60,54 +60,54 @@ inline bool overlapSlabs(const float* amin, const float* amax,
 	return false;
 }
 
-static float getSlabCoord(const float* va, const int side)
+static float getSlabCoord(const rdVec2D* va, const int side)
 {
 	if (side == 0 || side == 4)
-		return va[0];
+		return va->x;
 	else if (side == 2 || side == 6)
-		return va[1];
+		return va->y;
 	return 0;
 }
 
-static void calcSlabEndPoints(const float* va, const float* vb, float* bmin, float* bmax, const int side)
+static void calcSlabEndPoints(const rdVec3D* va, const rdVec3D* vb, rdVec2D* bmin, rdVec2D* bmax, const int side)
 {
 	if (side == 0 || side == 4)
 	{
-		if (va[1] < vb[1])
+		if (va->y < vb->y)
 		{
-			bmin[0] = va[1];
-			bmin[1] = va[2];
-			bmax[0] = vb[1];
-			bmax[1] = vb[2];
+			bmin->x = va->y;
+			bmin->y = va->z;
+			bmax->x = vb->y;
+			bmax->y = vb->z;
 		}
 		else
 		{
-			bmin[0] = vb[1];
-			bmin[1] = vb[2];
-			bmax[0] = va[1];
-			bmax[1] = va[2];
+			bmin->x = vb->y;
+			bmin->y = vb->z;
+			bmax->x = va->y;
+			bmax->y = va->z;
 		}
 	}
 	else if (side == 2 || side == 6)
 	{
-		if (va[0] < vb[0])
+		if (va->x < vb->x)
 		{
-			bmin[0] = va[0];
-			bmin[1] = va[2];
-			bmax[0] = vb[0];
-			bmax[1] = vb[2];
+			bmin->x = va->x;
+			bmin->y = va->z;
+			bmax->x = vb->x;
+			bmax->y = vb->z;
 		}
 		else
 		{
-			bmin[0] = vb[0];
-			bmin[1] = vb[2];
-			bmax[0] = va[0];
-			bmax[1] = va[2];
+			bmin->x = vb->x;
+			bmin->y = vb->z;
+			bmax->x = va->x;
+			bmax->y = va->z;
 		}
 	}
 }
 
-static void alignPortalLimits(const float* portal1Pos, const float* portal1Norm, const float* portal2Pos,
+static void alignPortalLimits(const rdVec3D* portal1Pos, const rdVec3D* portal1Norm, const rdVec3D* portal2Pos,
 	const float portalTmin, const float portalTmax, float& outPortalTmin, float& outPortalTmax, const float maxAlign)
 {
 	// note(amos): if we take an extreme scenario, where:
@@ -119,21 +119,21 @@ static void alignPortalLimits(const float* portal1Pos, const float* portal1Norm,
 	// during quantization, maxAlign should never be greater than 0.5.
 	rdAssert(maxAlign <= 0.5f);
 
-	float delta[3];
-	delta[0] = portal2Pos[0]-portal1Pos[0];
-	delta[1] = portal2Pos[1]-portal1Pos[1];
-	delta[2] = 0.0f;
-	rdVnormalize2D(delta);
+	rdVec3D delta;
+	delta.x = portal2Pos->x - portal1Pos->x;
+	delta.y = portal2Pos->y - portal1Pos->y;
+	delta.z = 0.0f;
+	rdVnormalize2D(&delta);
 
-	float cross[3];
-	rdVcross(cross, delta, portal1Norm);
+	rdVec3D cross;
+	rdVcross(&cross, &delta, portal1Norm);
 
-	if (maxAlign > 0 && (cross[2] < 0 || cross[2] > 0))
+	if (maxAlign > 0 && (cross.z < 0 || cross.z > 0))
 	{
 		const float span = portalTmax-portalTmin;
-		const float shiftAmount = maxAlign*rdMathFabsf(cross[2]) * span;
+		const float shiftAmount = maxAlign*rdMathFabsf(cross.z) * span;
 
-		if (cross[2] < 0)
+		if (cross.z < 0)
 		{
 			outPortalTmin = rdMin(portalTmax, portalTmin+shiftAmount);
 			outPortalTmax = rdMin(1.0f, portalTmax+shiftAmount);
@@ -193,7 +193,7 @@ bool dtMeshTile::linkCountAvailable(const int count) const
 	return true;
 }
 
-void dtMeshTile::getTightBounds(float* bminOut, float* bmaxOut) const
+void dtMeshTile::getTightBounds(rdVec3D* bminOut, rdVec3D* bmaxOut) const
 {
 	float hmin = FLT_MAX;
 	float hmax = -FLT_MAX;
@@ -202,7 +202,7 @@ void dtMeshTile::getTightBounds(float* bminOut, float* bmaxOut) const
 	{
 		for (int i = 0; i < header->detailVertCount; ++i)
 		{
-			const float h = detailVerts[i*3+2];
+			const float h = detailVerts[i].z;
 			hmin = rdMin(hmin, h);
 			hmax = rdMax(hmax, h);
 		}
@@ -211,7 +211,7 @@ void dtMeshTile::getTightBounds(float* bminOut, float* bmaxOut) const
 	{
 		for (int i = 0; i < header->vertCount; ++i)
 		{
-			const float h = verts[i*3+2];
+			const float h = verts[i].z;
 			hmin = rdMin(hmin, h);
 			hmax = rdMax(hmax, h);
 		}
@@ -220,11 +220,8 @@ void dtMeshTile::getTightBounds(float* bminOut, float* bmaxOut) const
 	hmin -= header->walkableClimb;
 	hmax += header->walkableClimb;
 
-	rdVcopy(bminOut, header->bmin);
-	rdVcopy(bmaxOut, header->bmax);
-
-	bminOut[2] = hmin;
-	bmaxOut[2] = hmax;
+	bminOut->init(header->bmin.x, header->bmin.y, hmin);
+	bmaxOut->init(header->bmax.x, header->bmax.y, hmax);
 }
 
 int dtCalcTraverseTableCellIndex(const int numPolyGroups,
@@ -309,7 +306,7 @@ dtNavMesh::dtNavMesh() :
 	m_polyBits = 0;
 #endif
 	memset(&m_params, 0, sizeof(dtNavMeshParams));
-	rdVset(m_orig, 0.0f,0.0f,0.0f);
+	rdVset(&m_orig, 0.0f,0.0f,0.0f);
 }
 
 dtNavMesh::~dtNavMesh()
@@ -344,8 +341,8 @@ dtNavMesh::~dtNavMesh()
 
 dtStatus dtNavMesh::init(const dtNavMeshParams* params)
 {
-	memcpy(&m_params, params, sizeof(dtNavMeshParams));
-	rdVcopy(m_orig, params->orig);
+	m_params = *params;
+	m_orig = params->orig;
 
 	m_tileWidth = params->tileWidth;
 	m_tileHeight = params->tileHeight;
@@ -400,10 +397,11 @@ dtStatus dtNavMesh::init(unsigned char* data, const int dataSize, const int tabl
 		return DT_FAILURE | DT_WRONG_VERSION;
 
 	dtNavMeshParams params;
-	rdVcopy(params.orig, header->bmin);
-	params.orig[0] = header->bmax[0];
-	params.tileWidth = header->bmax[0] - header->bmin[0];
-	params.tileHeight = header->bmax[1] - header->bmin[1];
+	params.orig.x = header->bmax.x;
+	params.orig.y = header->bmin.y;
+	params.orig.z = header->bmin.z;
+	params.tileWidth = header->bmax.x - header->bmin.x;
+	params.tileHeight = header->bmax.y - header->bmin.y;
 	params.maxTiles = 1;
 	params.maxPolys = header->polyCount;
 	params.polyGroupCount = 0;
@@ -427,20 +425,20 @@ dtStatus dtNavMesh::init(unsigned char* data, const int dataSize, const int tabl
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-int dtNavMesh::findConnectingPolys(const float* va, const float* vb,
+int dtNavMesh::findConnectingPolys(const rdVec3D* va, const rdVec3D* vb,
 								   const dtMeshTile* tile, int side,
-								   dtPolyRef* con, float* conarea, int maxcon) const
+								   dtPolyRef* con, rdVec2D* conarea, int maxcon) const
 {
 	const float near_thresh = 0.01f;
 
 	if (!tile) return 0;
 	
-	float amin[2], amax[2];
-	calcSlabEndPoints(va, vb, amin, amax, side);
+	rdVec2D amin, amax;
+	calcSlabEndPoints(va, vb, &amin, &amax, side);
 	const float apos = getSlabCoord(va, side);
 
 	// Remove links pointing to 'side' and compact the links array. 
-	float bmin[2], bmax[2];
+	rdVec2D bmin, bmax;
 	unsigned short m = DT_EXT_LINK | (unsigned short)side;
 	int n = 0;
 	
@@ -455,8 +453,8 @@ int dtNavMesh::findConnectingPolys(const float* va, const float* vb,
 			// Skip edges which do not point to the right side.
 			if (poly->neis[j] != m) continue;
 			
-			const float* vc = &tile->verts[poly->verts[j]*3];
-			const float* vd = &tile->verts[poly->verts[(j+1) % nv]*3];
+			const rdVec3D* vc = &tile->verts[poly->verts[j]];
+			const rdVec3D* vd = &tile->verts[poly->verts[(j+1) % nv]];
 			const float bpos = getSlabCoord(vc, side);
 			
 			// Segments are not close enough.
@@ -464,15 +462,15 @@ int dtNavMesh::findConnectingPolys(const float* va, const float* vb,
 				continue;
 			
 			// Check if the segments touch.
-			calcSlabEndPoints(vc,vd, bmin,bmax, side);
+			calcSlabEndPoints(vc,vd, &bmin,&bmax, side);
 			
 			if (!overlapSlabs(amin,amax, bmin,bmax, near_thresh, tile->header->walkableClimb)) continue;
 			
 			// Add return value.
 			if (n < maxcon)
 			{
-				conarea[n*2+0] = rdMax(amin[0], bmin[0]);
-				conarea[n*2+1] = rdMin(amax[0], bmax[0]);
+				conarea[n].x = rdMax(amin.x, bmin.x);
+				conarea[n].y = rdMin(amax.x, bmax.x);
 				con[n] = base | (dtPolyRef)i;
 				n++;
 			}
@@ -540,11 +538,11 @@ void dtNavMesh::connectExtLinks(dtMeshTile* tile, dtMeshTile* target, int side)
 				continue;
 			
 			// Create new links
-			const float* va = &tile->verts[poly->verts[j]*3];
-			const float* vb = &tile->verts[poly->verts[(j+1) % nv]*3];
+			const rdVec3D* va = &tile->verts[poly->verts[j]];
+			const rdVec3D* vb = &tile->verts[poly->verts[(j+1) % nv]];
 			dtPolyRef nei[4];
-			float neia[4*2];
-			int nnei = findConnectingPolys(va,vb, target, rdOppositeTile(dir), nei,neia,4);
+			rdVec2D neia[4];
+			const int nnei = findConnectingPolys(va,vb, target, rdOppositeTile(dir), nei,neia,4);
 
 			// If the portal edge has no neighbor, mark the edge as a boundary edge.
 			if (!nnei)
@@ -573,8 +571,8 @@ void dtNavMesh::connectExtLinks(dtMeshTile* tile, dtMeshTile* target, int side)
 					// Compress portal limits to a byte value.
 					if (dir == 0 || dir == 4)
 					{
-						float tmin = (neia[k*2+0]-va[1]) / (vb[1]-va[1]);
-						float tmax = (neia[k*2+1]-va[1]) / (vb[1]-va[1]);
+						float tmin = (neia[k].x-va->y) / (vb->y-va->y);
+						float tmax = (neia[k].y-va->y) / (vb->y-va->y);
 						if (tmin > tmax)
 							rdSwap(tmin,tmax);
 						link->bmin = (unsigned char)rdMathRoundf(rdClamp(tmin, 0.0f, 1.0f)*255.0f);
@@ -582,8 +580,8 @@ void dtNavMesh::connectExtLinks(dtMeshTile* tile, dtMeshTile* target, int side)
 					}
 					else if (dir == 2 || dir == 6)
 					{
-						float tmin = (neia[k*2+0]-va[0]) / (vb[0]-va[0]);
-						float tmax = (neia[k*2+1]-va[0]) / (vb[0]-va[0]);
+						float tmin = (neia[k].x-va->x) / (vb->x-va->x);
+						float tmax = (neia[k].y-va->x) / (vb->x-va->x);
 						if (tmin > tmax)
 							rdSwap(tmin,tmax);
 						link->bmin = (unsigned char)rdMathRoundf(rdClamp(tmin, 0.0f, 1.0f)*255.0f);
@@ -598,35 +596,35 @@ void dtNavMesh::connectExtLinks(dtMeshTile* tile, dtMeshTile* target, int side)
 dtPolyRef dtNavMesh::clampOffMeshVertToPoly(dtOffMeshConnection* con, dtMeshTile* conTile, 
 	const dtMeshTile* lookupTile, const bool start)
 {
-	const float* p = start ? &con->pos[0] : &con->pos[3];
-	const float halfExtents[3] = { con->rad, con->rad, con->rad };
+	const rdVec3D* p = start ? &con->posa : &con->posb;
+	const rdVec3D halfExtents(con->rad, con->rad, con->rad);
 
-	float nearestPt[3];
-	dtPolyRef ref = findNearestPolyInTile(lookupTile, p, halfExtents, nearestPt);
+	rdVec3D nearestPt;
+	dtPolyRef ref = findNearestPolyInTile(lookupTile, p, &halfExtents, &nearestPt);
 	if (!ref)
 		return 0;
 	// findNearestPoly may return too optimistic results, further check to make sure. 
-	if (rdSqr(nearestPt[0]-p[0])+rdSqr(nearestPt[1]-p[1]) > rdSqr(con->rad))
+	if (rdSqr(nearestPt.x-p->x)+rdSqr(nearestPt.y-p->y) > rdSqr(con->rad))
 		return 0;
 
 	const dtPoly* poly = &conTile->polys[con->poly];
 
 	// Make sure the location is on current mesh.
-	float* polyVert = &conTile->verts[poly->verts[start?0:1]*3];
-	rdVcopy(polyVert, nearestPt);
+	rdVec3D* polyVert = &conTile->verts[poly->verts[start?0:1]];
+	rdVcopy(polyVert, &nearestPt);
 
 	if (start)
 	{
 		// Offset the ref position towards the new start point.
-		float offset[3];
+		rdVec3D offset;
 
-		rdVsub(offset, con->refPos, con->pos);
-		rdVadd(con->refPos, nearestPt, offset);
+		rdVsub(&offset, &con->refPos, &con->posa);
+		rdVadd(&con->refPos, &nearestPt, &offset);
 	}
 
 	// Update the off-mesh connection positions as well.
-	float* conPos = &con->pos[start?0:3];
-	rdVcopy(conPos, nearestPt);
+	rdVec3D* conPos = start ? &con->posa : &con->posb;
+	rdVcopy(conPos, &nearestPt);
 
 	return ref;
 }
@@ -700,21 +698,21 @@ dtStatus dtNavMesh::connectOffMeshLinks(const dtTileRef tileRef)
 			return DT_FAILURE | DT_OUT_OF_MEMORY;
 
 		// connect to land points.
-		const float halfExtents[3] = { con->rad, con->rad, con->rad };
-		float bmin[3], bmax[3];
-		rdVsub(bmin, &con->pos[3], halfExtents);
-		rdVadd(bmax, &con->pos[3], halfExtents);
+		const rdVec3D halfExtents(con->rad, con->rad, con->rad);
+		rdVec3D bmin, bmax;
+		rdVsub(&bmin, &con->posb, &halfExtents);
+		rdVadd(&bmax, &con->posb, &halfExtents);
 
 		// Find tiles the query touches.
 		int tx, ty;
-		calcTileLoc(&con->pos[3], &tx, &ty);
+		calcTileLoc(&con->posb, &tx, &ty);
 
 		static const int MAX_NEIS = 32;
 		dtMeshTile* neis[MAX_NEIS];
 
 		const int nneis = getTilesAt(tx, ty, neis, MAX_NEIS);
 
-		const unsigned char side = rdClassifyPointOutsideBounds(&con->pos[3], header->bmin, header->bmax);
+		const unsigned char side = rdClassifyPointOutsideBounds(&con->posb, &header->bmin, &header->bmax);
 		const unsigned char oppositeSide = (side == 0xff) ? 0xff : rdOppositeTile(side);
 
 		for (int j = 0; j < nneis; ++j)
@@ -810,16 +808,16 @@ struct dtTraverseLinkConnectState
 	int landPolyIndex; ///< The index to the poly we are currently trying to connect to.
 
 	///< If these are set, the algorithm will check if we still have enough links available
-	///< on subsequent runs. This is a small optimization allowing the code to skip the checks
-	///< as the initial check is performed as soon as the function is called, so there's no
-	///< point in checking again as long as we haven't burned through available links yet.
+	///  on subsequent runs. This is a small optimization allowing the code to skip the checks
+	///  as the initial check is performed as soon as the function is called, so there's no
+	///  point in checking again as long as we haven't burned through available links yet.
 	bool firstBaseTileLinkUsed;
 	bool firstLandTileLinkUsed;
 };
 
 static dtStatus internalTryEstablishPortalPointsUsingSpatial(const dtTraverseLinkConnectParams& params, dtTraverseLinkConnectState& state,
-		const float* const baseDetailPolyEdgeSpos, const float* const baseDetailPolyEdgeEpos,
-		const float* const basePolyEdgeMid, const float* const baseEdgeDir, const float* const baseEdgeNorm,
+		const rdVec3D* const baseDetailPolyEdgeSpos, const rdVec3D* const baseDetailPolyEdgeEpos,
+		const rdVec3D* const basePolyEdgeMid, const rdVec3D* const baseEdgeDir, const rdVec3D* const baseEdgeNorm,
 		const int baseVertIdx, const int landVertIdx, const float baseTmin, const float baseTmax)
 {
 	rdAssert(state.landTile);
@@ -834,20 +832,20 @@ static dtStatus internalTryEstablishPortalPointsUsingSpatial(const dtTraverseLin
 	const dtPolyDetail* const landDetail = &state.landTile->detailMeshes[state.landPolyIndex];
 
 	// Polygon 2 edge
-	const float* const landPolySpos = &state.landTile->verts[landPoly->verts[landVertIdx]*3];
-	const float* const landPolyEpos = &state.landTile->verts[landPoly->verts[(landVertIdx+1) % landPoly->vertCount]*3];
+	const rdVec3D* const landPolySpos = &state.landTile->verts[landPoly->verts[landVertIdx]];
+	const rdVec3D* const landPolyEpos = &state.landTile->verts[landPoly->verts[(landVertIdx+1) % landPoly->vertCount]];
 
 	for (int landTriIdx = 0; landTriIdx < landDetail->triCount; ++landTriIdx)
 	{
 		const unsigned char* landTri = &state.landTile->detailTris[(landDetail->triBase+landTriIdx)*4];
-		const float* landTriVerts[3];
+		const rdVec3D* landTriVerts[3];
 
 		for (int r = 0; r < 3; ++r)
 		{
 			if (landTri[r] < landPoly->vertCount)
-				landTriVerts[r] = &state.landTile->verts[landPoly->verts[landTri[r]]*3];
+				landTriVerts[r] = &state.landTile->verts[landPoly->verts[landTri[r]]];
 			else
-				landTriVerts[r] = &state.landTile->detailVerts[(landDetail->vertBase+(landTri[r]-landPoly->vertCount))*3];
+				landTriVerts[r] = &state.landTile->detailVerts[(landDetail->vertBase+(landTri[r]-landPoly->vertCount))];
 		}
 		for (int r = 0, s = 2; r < 3; s = r++)
 		{
@@ -874,25 +872,25 @@ static dtStatus internalTryEstablishPortalPointsUsingSpatial(const dtTraverseLin
 				rdDistancePtLine2D(landTriVerts[r], landPolySpos, landPolyEpos) >= DT_DETAIL_EDGE_ALIGN_THRESHOLD)
 				continue;
 
-			const float* landDetailPolyEdgeSpos = landTriVerts[s];
-			const float* landDetailPolyEdgeEpos = landTriVerts[r];
+			const rdVec3D* landDetailPolyEdgeSpos = landTriVerts[s];
+			const rdVec3D* landDetailPolyEdgeEpos = landTriVerts[r];
 
-			float landPolyEdgeMid[3];
-			rdVsad(landPolyEdgeMid, landDetailPolyEdgeSpos, landDetailPolyEdgeEpos, 0.5f);
+			rdVec3D landPolyEdgeMid;
+			rdVsad(&landPolyEdgeMid, landDetailPolyEdgeSpos, landDetailPolyEdgeEpos, 0.5f);
 
-			const float dist = dtCalcLinkDistance(basePolyEdgeMid, landPolyEdgeMid);
+			const float dist = dtCalcLinkDistance(basePolyEdgeMid, &landPolyEdgeMid);
 			const unsigned char quantDist = dtQuantLinkDistance(dist);
 
 			if (quantDist == 0)
 				continue; // Link distance is greater than maximum supported.
 
-			float landEdgeDir[3];
-			rdVsub(landEdgeDir, landDetailPolyEdgeEpos, landDetailPolyEdgeSpos);
+			rdVec3D landEdgeDir;
+			rdVsub(&landEdgeDir, landDetailPolyEdgeEpos, landDetailPolyEdgeSpos);
 
-			const float elevation = rdMathFabsf(basePolyEdgeMid[2] - landPolyEdgeMid[2]);
-			const float slopeAngle = rdMathFabsf(rdCalcSlopeAngle(basePolyEdgeMid, landPolyEdgeMid));
+			const float elevation = rdMathFabsf(basePolyEdgeMid->z - landPolyEdgeMid.z);
+			const float slopeAngle = rdMathFabsf(rdCalcSlopeAngle(basePolyEdgeMid, &landPolyEdgeMid));
 			const bool baseOverlaps = rdCalcEdgeOverlap2D(baseDetailPolyEdgeSpos, baseDetailPolyEdgeEpos, landDetailPolyEdgeSpos, landDetailPolyEdgeEpos, baseEdgeDir) > params.minEdgeOverlap;
-			const bool landOverlaps = rdCalcEdgeOverlap2D(landDetailPolyEdgeSpos, landDetailPolyEdgeEpos, baseDetailPolyEdgeSpos, baseDetailPolyEdgeEpos, landEdgeDir) > params.minEdgeOverlap;
+			const bool landOverlaps = rdCalcEdgeOverlap2D(landDetailPolyEdgeSpos, landDetailPolyEdgeEpos, baseDetailPolyEdgeSpos, baseDetailPolyEdgeEpos, &landEdgeDir) > params.minEdgeOverlap;
 
 			const unsigned char traverseType = params.getTraverseType(params.userData, dist, elevation, slopeAngle, baseOverlaps, landOverlaps);
 
@@ -910,14 +908,14 @@ static dtStatus internalTryEstablishPortalPointsUsingSpatial(const dtTraverseLin
 			if (linkedTraverseType && (rdBitCellBit(traverseType) & *linkedTraverseType))
 				continue; // These 2 polygons are already linked with the same traverse type.
 
-			float landEdgeNorm[3];
-			rdCalcEdgeNormal2D(landEdgeDir, landEdgeNorm);
+			rdVec3D landEdgeNorm;
+			rdCalcEdgeNormal2D(&landEdgeDir, &landEdgeNorm);
 
-			const bool basePolyHigher = basePolyEdgeMid[2] > landPolyEdgeMid[2];
-			const float* const lowerEdgeMid = basePolyHigher ? landPolyEdgeMid : basePolyEdgeMid;
-			const float* const higherEdgeMid = basePolyHigher ? basePolyEdgeMid : landPolyEdgeMid;
-			const float* const lowerEdgeNorm = basePolyHigher ? landEdgeNorm : baseEdgeNorm;
-			const float* const higherEdgeNorm = basePolyHigher ? baseEdgeNorm : landEdgeNorm;
+			const bool basePolyHigher = basePolyEdgeMid->z > landPolyEdgeMid.z;
+			const rdVec3D* const lowerEdgeMid = basePolyHigher ? &landPolyEdgeMid : basePolyEdgeMid;
+			const rdVec3D* const higherEdgeMid = basePolyHigher ? basePolyEdgeMid : &landPolyEdgeMid;
+			const rdVec3D* const lowerEdgeNorm = basePolyHigher ? &landEdgeNorm : baseEdgeNorm;
+			const rdVec3D* const higherEdgeNorm = basePolyHigher ? baseEdgeNorm : &landEdgeNorm;
 
 			const float walkableHeight = basePolyHigher ? baseHeader->walkableHeight : landHeader->walkableHeight;
 			const float walkableRadius = basePolyHigher ? baseHeader->walkableRadius : landHeader->walkableRadius;
@@ -926,8 +924,8 @@ static dtStatus internalTryEstablishPortalPointsUsingSpatial(const dtTraverseLin
 				continue;
 
 			const unsigned char landSide = params.linkToNeighbor
-				? rdClassifyPointOutsideBounds(landPolyEdgeMid, baseHeader->bmin, baseHeader->bmax)
-				: rdClassifyPointInsideBounds(landPolyEdgeMid, landHeader->bmin, landHeader->bmax);
+				? rdClassifyPointOutsideBounds(&landPolyEdgeMid, &baseHeader->bmin, &baseHeader->bmax)
+				: rdClassifyPointInsideBounds(&landPolyEdgeMid, &landHeader->bmin, &landHeader->bmax);
 			const unsigned char baseSide = rdOppositeTile(landSide);
 
 			float landTmin;
@@ -936,11 +934,11 @@ static dtStatus internalTryEstablishPortalPointsUsingSpatial(const dtTraverseLin
 
 			float newLandTmin;
 			float newLandTmax;
-			alignPortalLimits(landPolyEdgeMid, landEdgeNorm, basePolyEdgeMid, landTmin, landTmax, newLandTmin, newLandTmax, params.maxPortalAlign);
+			alignPortalLimits(&landPolyEdgeMid, &landEdgeNorm, basePolyEdgeMid, landTmin, landTmax, newLandTmin, newLandTmax, params.maxPortalAlign);
 
 			float newBaseTmin;
 			float newBaseTmax;
-			alignPortalLimits(basePolyEdgeMid, baseEdgeNorm, landPolyEdgeMid, baseTmin, baseTmax, newBaseTmin, newBaseTmax, params.maxPortalAlign);
+			alignPortalLimits(basePolyEdgeMid, baseEdgeNorm, &landPolyEdgeMid, baseTmin, baseTmax, newBaseTmin, newBaseTmax, params.maxPortalAlign);
 
 			const unsigned int forwardIdx = state.baseTile->allocLink();
 			const unsigned int reverseIdx = state.landTile->allocLink();
@@ -1003,19 +1001,19 @@ static dtStatus internalTryConnectUsingSpatial(const dtTraverseLinkConnectParams
 	const dtPolyDetail* const baseDetail = &state.baseTile->detailMeshes[state.basePolyIndex];
 
 	// Polygon 1 edge
-	const float* const basePolySpos = &state.baseTile->verts[basePoly->verts[baseVertIdx]*3];
-	const float* const basePolyEpos = &state.baseTile->verts[basePoly->verts[(baseVertIdx+1) % basePoly->vertCount]*3];
+	const rdVec3D* const basePolySpos = &state.baseTile->verts[basePoly->verts[baseVertIdx]];
+	const rdVec3D* const basePolyEpos = &state.baseTile->verts[basePoly->verts[(baseVertIdx+1) % basePoly->vertCount]];
 
 	for (int baseTriIdx = 0; baseTriIdx < baseDetail->triCount; ++baseTriIdx)
 	{
-		const unsigned char* baseTri = &state.baseTile->detailTris[(baseDetail->triBase + baseTriIdx) * 4];
-		const float* baseTriVerts[3];
+		const unsigned char* baseTri = &state.baseTile->detailTris[(baseDetail->triBase + baseTriIdx)*4];
+		const rdVec3D* baseTriVerts[3];
 		for (int l = 0; l < 3; ++l)
 		{
 			if (baseTri[l] < basePoly->vertCount)
-				baseTriVerts[l] = &state.baseTile->verts[basePoly->verts[baseTri[l]] * 3];
+				baseTriVerts[l] = &state.baseTile->verts[basePoly->verts[baseTri[l]]];
 			else
-				baseTriVerts[l] = &state.baseTile->detailVerts[(baseDetail->vertBase+(baseTri[l] - basePoly->vertCount))*3];
+				baseTriVerts[l] = &state.baseTile->detailVerts[(baseDetail->vertBase+(baseTri[l] - basePoly->vertCount))];
 		}
 		for (int l = 0, m = 2; l < 3; m = l++)
 		{
@@ -1059,17 +1057,17 @@ static dtStatus internalTryConnectUsingSpatial(const dtTraverseLinkConnectParams
 				neis[0] = state.baseTile;
 			}
 
-			const float* const baseDetailPolyEdgeSpos = baseTriVerts[m];
-			const float* const baseDetailPolyEdgeEpos = baseTriVerts[l];
+			const rdVec3D* const baseDetailPolyEdgeSpos = baseTriVerts[m];
+			const rdVec3D* const baseDetailPolyEdgeEpos = baseTriVerts[l];
 
-			float basePolyEdgeMid[3];
-			rdVsad(basePolyEdgeMid, baseDetailPolyEdgeSpos, baseDetailPolyEdgeEpos, 0.5f);
+			rdVec3D basePolyEdgeMid;
+			rdVsad(&basePolyEdgeMid, baseDetailPolyEdgeSpos, baseDetailPolyEdgeEpos, 0.5f);
 
-			float baseEdgeDir[3];
-			rdVsub(baseEdgeDir, baseDetailPolyEdgeEpos, baseDetailPolyEdgeSpos);
+			rdVec3D baseEdgeDir;
+			rdVsub(&baseEdgeDir, baseDetailPolyEdgeEpos, baseDetailPolyEdgeSpos);
 
-			float baseEdgeNorm[3];
-			rdCalcEdgeNormal2D(baseEdgeDir, baseEdgeNorm);
+			rdVec3D baseEdgeNorm;
+			rdCalcEdgeNormal2D(&baseEdgeDir, &baseEdgeNorm);
 
 			float baseTmin;
 			float baseTmax;
@@ -1125,7 +1123,7 @@ static dtStatus internalTryConnectUsingSpatial(const dtTraverseLinkConnectParams
 							continue;
 
 						const dtStatus stat = internalTryEstablishPortalPointsUsingSpatial(params, state, baseDetailPolyEdgeSpos,
-							baseDetailPolyEdgeEpos, basePolyEdgeMid, baseEdgeDir, baseEdgeNorm, baseVertIdx, landVertIdx, baseTmin, baseTmax);
+							baseDetailPolyEdgeEpos, &basePolyEdgeMid, &baseEdgeDir, &baseEdgeNorm, baseVertIdx, landVertIdx, baseTmin, baseTmax);
 
 						if (dtStatusFailed(stat))
 							return stat;
@@ -1208,16 +1206,16 @@ dtStatus dtNavMesh::connectTraverseLinks(const dtTileRef tileRef, const dtTraver
 namespace
 {
 	template<bool onlyBoundary>
-	void closestPointOnDetailEdges(const dtMeshTile* tile, const dtPoly* poly, const float* pos, float* closest, float* dist, float* normal)
+	void closestPointOnDetailEdges(const dtMeshTile* tile, const dtPoly* poly, const rdVec3D* pos, rdVec3D* closest, float* dist, rdVec3D* normal)
 	{
 		const unsigned int ip = (unsigned int)(poly - tile->polys);
 		const dtPolyDetail* pd = &tile->detailMeshes[ip];
 
 		float dmin = FLT_MAX;
 		float tmin = 0;
-		const float* pmin = 0;
-		const float* pmax = 0;
-		const float* pv[3] = { 0, 0, 0 };
+		const rdVec3D* pmin = nullptr;
+		const rdVec3D* pmax = nullptr;
+		const rdVec3D* pv[3] = { nullptr, nullptr, nullptr };
 
 		for (int i = 0; i < pd->triCount; i++)
 		{
@@ -1229,13 +1227,13 @@ namespace
 			if (onlyBoundary && (tris[3] & ANY_BOUNDARY_EDGE) == 0)
 				continue;
 
-			const float* v[3];
+			const rdVec3D* v[3];
 			for (int j = 0; j < 3; ++j)
 			{
 				if (tris[j] < poly->vertCount)
-					v[j] = &tile->verts[poly->verts[tris[j]] * 3];
+					v[j] = &tile->verts[poly->verts[tris[j]]];
 				else
-					v[j] = &tile->detailVerts[(pd->vertBase + (tris[j] - poly->vertCount)) * 3];
+					v[j] = &tile->detailVerts[(pd->vertBase + (tris[j] - poly->vertCount))];
 			}
 
 			for (int k = 0, j = 2; k < 3; j = k++)
@@ -1277,7 +1275,7 @@ namespace
 	}
 }
 
-bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const float* pos, float* height, float* normal) const
+bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const rdVec3D* pos, float* height, rdVec3D* normal) const
 {
 	// Off-mesh connections do not have detail polys and getting height
 	// over them does not make sense.
@@ -1287,10 +1285,10 @@ bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const 
 	const unsigned int ip = (unsigned int)(poly - tile->polys);
 	const dtPolyDetail* pd = &tile->detailMeshes[ip];
 	
-	float verts[RD_VERTS_PER_POLYGON*3];	
+	rdVec3D verts[RD_VERTS_PER_POLYGON];
 	const int nv = poly->vertCount;
 	for (int i = 0; i < nv; ++i)
-		rdVcopy(&verts[i*3], &tile->verts[poly->verts[i]*3]);
+		rdVcopy(&verts[i], &tile->verts[poly->verts[i]]);
 	
 	if (!rdPointInPolygon(pos, verts, nv))
 		return false;
@@ -1302,13 +1300,13 @@ bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const 
 	for (int j = 0; j < pd->triCount; ++j)
 	{
 		const unsigned char* t = &tile->detailTris[(pd->triBase+j)*4];
-		const float* v[3];
+		const rdVec3D* v[3];
 		for (int k = 0; k < 3; ++k)
 		{
 			if (t[k] < poly->vertCount)
-				v[k] = &tile->verts[poly->verts[t[k]]*3];
+				v[k] = &tile->verts[poly->verts[t[k]]];
 			else
-				v[k] = &tile->detailVerts[(pd->vertBase+(t[k]-poly->vertCount))*3];
+				v[k] = &tile->detailVerts[(pd->vertBase+(t[k]-poly->vertCount))];
 		}
 		float h;
 		if (rdClosestHeightPointTriangle(pos, v[0], v[1], v[2], h))
@@ -1327,23 +1325,23 @@ bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const 
 	// or larger floating point values) the point is on an edge, so just select
 	// closest. This should almost never happen so the extra iteration here is
 	// ok.
-	float closest[3];
-	closestPointOnDetailEdges<false>(tile, poly, pos, closest, nullptr, normal);
+	rdVec3D closest;
+	closestPointOnDetailEdges<false>(tile, poly, pos, &closest, nullptr, normal);
 
 	if (height)
-		*height = closest[2];
+		*height = closest.z;
 
 	return true;
 }
 
-void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const float* pos, float* closest, bool* posOverPoly, float* dist, float* normal) const
+void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist, rdVec3D* normal) const
 {
 	const dtMeshTile* tile = 0;
 	const dtPoly* poly = 0;
 	getTileAndPolyByRefUnsafe(ref, &tile, &poly);
 
 	rdVcopy(closest, pos);
-	if (getPolyHeight(tile, poly, pos, &closest[2], normal))
+	if (getPolyHeight(tile, poly, pos, &closest->z, normal))
 	{
 		if (posOverPoly)
 			*posOverPoly = true;
@@ -1360,8 +1358,8 @@ void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const float* pos, float* close
 	// Off-mesh connections don't have detail polygons.
 	if (poly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
 	{
-		const float* v0 = &tile->verts[poly->verts[0]*3];
-		const float* v1 = &tile->verts[poly->verts[1]*3];
+		const rdVec3D* v0 = &tile->verts[poly->verts[0]];
+		const rdVec3D* v1 = &tile->verts[poly->verts[1]];
 		float t;
 		rdDistancePtSegSqr2D(pos, v0, v1, t);
 		rdVlerp(closest, v0, v1, t);
@@ -1377,16 +1375,16 @@ void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const float* pos, float* close
 }
 
 dtPolyRef dtNavMesh::findNearestPolyInTile(const dtMeshTile* tile,
-										   const float* center, const float* halfExtents,
-										   float* nearestPt) const
+										   const rdVec3D* center, const rdVec3D* halfExtents,
+										   rdVec3D* nearestPt) const
 {
-	float bmin[3], bmax[3];
-	rdVsub(bmin, center, halfExtents);
-	rdVadd(bmax, center, halfExtents);
+	rdVec3D bmin, bmax;
+	rdVsub(&bmin, center, halfExtents);
+	rdVadd(&bmax, center, halfExtents);
 	
 	// Get nearby polygons from proximity grid.
 	dtPolyRef polys[128];
-	int polyCount = queryPolygonsInTile(tile, bmin, bmax, polys, 128);
+	int polyCount = queryPolygonsInTile(tile, &bmin, &bmax, polys, 128);
 	
 	// Find nearest polygon amongst the nearby polygons.
 	dtPolyRef nearest = 0;
@@ -1394,28 +1392,28 @@ dtPolyRef dtNavMesh::findNearestPolyInTile(const dtMeshTile* tile,
 	for (int i = 0; i < polyCount; ++i)
 	{
 		dtPolyRef ref = polys[i];
-		float closestPtPoly[3];
-		float diff[3];
+		rdVec3D closestPtPoly;
+		rdVec3D diff;
 		bool posOverPoly = false;
 		float d;
-		closestPointOnPoly(ref, center, closestPtPoly, &posOverPoly);
+		closestPointOnPoly(ref, center, &closestPtPoly, &posOverPoly);
 
 		// If a point is directly over a polygon and closer than
 		// climb height, favor that instead of straight line nearest point.
-		rdVsub(diff, center, closestPtPoly);
+		rdVsub(&diff, center, &closestPtPoly);
 		if (posOverPoly)
 		{
-			d = rdAbs(diff[2]) - tile->header->walkableClimb;
+			d = rdAbs(diff.z) - tile->header->walkableClimb;
 			d = d > 0 ? d*d : 0;			
 		}
 		else
 		{
-			d = rdVlenSqr(diff);
+			d = rdVlenSqr(&diff);
 		}
 		
 		if (d < nearestDistanceSqr)
 		{
-			rdVcopy(nearestPt, closestPtPoly);
+			rdVcopy(nearestPt, &closestPtPoly);
 			nearestDistanceSqr = d;
 			nearest = ref;
 		}
@@ -1424,26 +1422,26 @@ dtPolyRef dtNavMesh::findNearestPolyInTile(const dtMeshTile* tile,
 	return nearest;
 }
 
-int dtNavMesh::queryPolygonsInTile(const dtMeshTile* tile, const float* qmin, const float* qmax,
+int dtNavMesh::queryPolygonsInTile(const dtMeshTile* tile, const rdVec3D* qmin, const rdVec3D* qmax,
 								   dtPolyRef* polys, const int maxPolys) const
 {
 	if (tile->bvTree)
 	{
 		const dtBVNode* node = &tile->bvTree[0];
 		const dtBVNode* end = &tile->bvTree[tile->header->bvNodeCount];
-		const float* tbmin = tile->header->bmin;
-		const float* tbmax = tile->header->bmax;
+		const rdVec3D* tbmin = &tile->header->bmin;
+		const rdVec3D* tbmax = &tile->header->bmax;
 		const float qfac = tile->header->bvQuantFactor;
 		
 		// Calculate quantized box
 		unsigned short bmin[3], bmax[3];
 		// dtClamp query box to world box.
-		float minx = -(rdClamp(qmax[0], tbmin[0], tbmax[0]) - tbmax[0]);
-		float miny = rdClamp(qmin[1], tbmin[1], tbmax[1]) - tbmin[1];
-		float minz = rdClamp(qmin[2], tbmin[2], tbmax[2]) - tbmin[2];
-		float maxx = -(rdClamp(qmin[0], tbmin[0], tbmax[0]) - tbmax[0]);
-		float maxy = rdClamp(qmax[1], tbmin[1], tbmax[1]) - tbmin[1];
-		float maxz = rdClamp(qmax[2], tbmin[2], tbmax[2]) - tbmin[2];
+		float minx = -(rdClamp(qmax->x, tbmin->x, tbmax->x) - tbmax->x);
+		float miny = rdClamp(qmin->y, tbmin->y, tbmax->y) - tbmin->y;
+		float minz = rdClamp(qmin->z, tbmin->z, tbmax->z) - tbmin->z;
+		float maxx = -(rdClamp(qmin->x, tbmin->x, tbmax->x) - tbmax->x);
+		float maxy = rdClamp(qmax->y, tbmin->y, tbmax->y) - tbmin->y;
+		float maxz = rdClamp(qmax->z, tbmin->z, tbmax->z) - tbmin->z;
 		// Quantize
 		bmin[0] = (unsigned short)(qfac * minx) & 0xfffe;
 		bmin[1] = (unsigned short)(qfac * miny) & 0xfffe;
@@ -1479,7 +1477,7 @@ int dtNavMesh::queryPolygonsInTile(const dtMeshTile* tile, const float* qmin, co
 	}
 	else
 	{
-		float bmin[3], bmax[3];
+		rdVec3D bmin, bmax;
 		int n = 0;
 		dtPolyRef base = getPolyRefBase(tile);
 		for (int i = 0; i < tile->header->polyCount; ++i)
@@ -1489,16 +1487,16 @@ int dtNavMesh::queryPolygonsInTile(const dtMeshTile* tile, const float* qmin, co
 			if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
 				continue;
 			// Calc polygon bounds.
-			const float* v = &tile->verts[p->verts[0]*3];
-			rdVcopy(bmin, v);
-			rdVcopy(bmax, v);
+			const rdVec3D* v = &tile->verts[p->verts[0]];
+			rdVcopy(&bmin, v);
+			rdVcopy(&bmax, v);
 			for (int j = 1; j < p->vertCount; ++j)
 			{
-				v = &tile->verts[p->verts[j]*3];
-				rdVmin(bmin, v);
-				rdVmax(bmax, v);
+				v = &tile->verts[p->verts[j]];
+				rdVmin(&bmin, v);
+				rdVmax(&bmax, v);
 			}
-			if (rdOverlapBounds(qmin,qmax, bmin,bmax))
+			if (rdOverlapBounds(qmin,qmax, &bmin,&bmax))
 			{
 				if (n < maxPolys)
 					polys[n++] = base | (dtPolyRef)i;
@@ -1600,12 +1598,12 @@ dtStatus dtNavMesh::addTile(unsigned char* data, int dataSize, int flags,
 	
 	// Patch header pointers.
 	const int headerSize = rdAlign4(sizeof(dtMeshHeader));
-	const int vertsSize = rdAlign4(sizeof(float)*3*header->vertCount);
+	const int vertsSize = rdAlign4(sizeof(rdVec3D)*header->vertCount);
 	const int polysSize = rdAlign4(sizeof(dtPoly)*header->polyCount);
 	const int polyMapSize = rdAlign4(sizeof(int)*(header->polyCount*header->polyMapCount));
 	const int linksSize = rdAlign4(sizeof(dtLink)*(header->maxLinkCount));
 	const int detailMeshesSize = rdAlign4(sizeof(dtPolyDetail)*header->detailMeshCount);
-	const int detailVertsSize = rdAlign4(sizeof(float)*3*header->detailVertCount);
+	const int detailVertsSize = rdAlign4(sizeof(rdVec3D)*header->detailVertCount);
 	const int detailTrisSize = rdAlign4(sizeof(unsigned char)*4*header->detailTriCount);
 	const int bvtreeSize = rdAlign4(sizeof(dtBVNode)*header->bvNodeCount);
 	const int offMeshLinksSize = rdAlign4(sizeof(dtOffMeshConnection)*header->offMeshConCount);
@@ -1614,12 +1612,12 @@ dtStatus dtNavMesh::addTile(unsigned char* data, int dataSize, int flags,
 #endif
 	
 	unsigned char* d = data + headerSize;
-	tile->verts = rdGetThenAdvanceBufferPointer<float>(d, vertsSize);
+	tile->verts = rdGetThenAdvanceBufferPointer<rdVec3D>(d, vertsSize);
 	tile->polys = rdGetThenAdvanceBufferPointer<dtPoly>(d, polysSize);
 	tile->polyMap = rdGetThenAdvanceBufferPointer<unsigned int>(d, polyMapSize);
 	tile->links = rdGetThenAdvanceBufferPointer<dtLink>(d, linksSize);
 	tile->detailMeshes = rdGetThenAdvanceBufferPointer<dtPolyDetail>(d, detailMeshesSize);
-	tile->detailVerts = rdGetThenAdvanceBufferPointer<float>(d, detailVertsSize);
+	tile->detailVerts = rdGetThenAdvanceBufferPointer<rdVec3D>(d, detailVertsSize);
 	tile->detailTris = rdGetThenAdvanceBufferPointer<unsigned char>(d, detailTrisSize);
 	tile->bvTree = rdGetThenAdvanceBufferPointer<dtBVNode>(d, bvtreeSize);
 	tile->offMeshCons = rdGetThenAdvanceBufferPointer<dtOffMeshConnection>(d, offMeshLinksSize);
@@ -1828,10 +1826,10 @@ const dtMeshTile* dtNavMesh::getTile(int i) const
 	return &m_tiles[i];
 }
 
-void dtNavMesh::calcTileLoc(const float* pos, int* tx, int* ty) const
+void dtNavMesh::calcTileLoc(const rdVec3D* pos, int* tx, int* ty) const
 {
-	*tx = (int)rdMathFloorf((m_orig[0]-pos[0]) / m_tileWidth);
-	*ty = (int)rdMathFloorf((pos[1]-m_orig[1]) / m_tileHeight);
+	*tx = (int)rdMathFloorf((m_orig.x-pos->x) / m_tileWidth);
+	*ty = (int)rdMathFloorf((pos->y-m_orig.y) / m_tileHeight);
 }
 
 dtStatus dtNavMesh::getTileAndPolyByRef(const dtPolyRef ref, const dtMeshTile** tile, const dtPoly** poly) const
@@ -2243,7 +2241,7 @@ dtStatus dtNavMesh::restoreTileState(dtMeshTile* tile, const unsigned char* data
 /// inside a normal polygon. So an off-mesh connection is "entered" from a 
 /// normal polygon at one of its endpoints. This is the polygon identified by 
 /// the prevRef parameter.
-dtStatus dtNavMesh::getOffMeshConnectionPolyEndPoints(dtPolyRef prevRef, dtPolyRef polyRef, float* startPos, float* endPos) const
+dtStatus dtNavMesh::getOffMeshConnectionPolyEndPoints(dtPolyRef prevRef, dtPolyRef polyRef, rdVec3D* startPos, rdVec3D* endPos) const
 {
 	unsigned int salt, it, ip;
 
@@ -2279,8 +2277,8 @@ dtStatus dtNavMesh::getOffMeshConnectionPolyEndPoints(dtPolyRef prevRef, dtPolyR
 		}
 	}
 	
-	rdVcopy(startPos, &tile->verts[poly->verts[idx0]*3]);
-	rdVcopy(endPos, &tile->verts[poly->verts[idx1]*3]);
+	rdVcopy(startPos, &tile->verts[poly->verts[idx0]]);
+	rdVcopy(endPos, &tile->verts[poly->verts[idx1]]);
 
 	return DT_SUCCESS;
 }
@@ -2427,7 +2425,7 @@ dtStatus dtNavMesh::getPolyArea(dtPolyRef ref, unsigned char* resultArea) const
 	return DT_SUCCESS;
 }
 
-float dtCalcLinkDistance(const float* spos, const float* epos)
+float dtCalcLinkDistance(const rdVec3D* spos, const rdVec3D* epos)
 {
 	return rdMathFabsf(rdVdist(spos, epos));
 }
@@ -2438,7 +2436,7 @@ unsigned char dtQuantLinkDistance(const float distance)
 	return (unsigned char)(rdMathRoundf(distance * DT_TRAVERSE_DIST_QUANT_FACTOR));
 }
 
-float dtCalcPolySurfaceArea(const dtPoly* poly, const float* verts)
+float dtCalcPolySurfaceArea(const dtPoly* poly, const rdVec3D* verts)
 {
 	float polyArea = 0.0f;
 
@@ -2446,34 +2444,34 @@ float dtCalcPolySurfaceArea(const dtPoly* poly, const float* verts)
 	// (off-mesh connections) don't have any surface area.
 	for (int i = 2; i < poly->vertCount; ++i)
 	{
-		const float* va = &verts[poly->verts[0]*3];
-		const float* vb = &verts[poly->verts[i]*3];
-		const float* vc = &verts[poly->verts[i-1]*3];
+		const rdVec3D* va = &verts[poly->verts[0]];
+		const rdVec3D* vb = &verts[poly->verts[i]];
+		const rdVec3D* vc = &verts[poly->verts[i-1]];
 		polyArea += rdTriArea2D(va,vb,vc);
 	}
 
 	return polyArea;
 }
 
-float dtCalcOffMeshRefYaw(const float* spos, const float* epos)
+float dtCalcOffMeshRefYaw(const rdVec2D* spos, const rdVec2D* epos)
 {
-	const float dx = epos[0]-spos[0];
-	const float dy = epos[1]-spos[1];
+	const float dx = epos->x - spos->x;
+	const float dy = epos->y - spos->y;
 
 	const float yawRad = rdMathAtan2f(dy, dx);
 	return rdRadToDeg(yawRad);
 }
 
-void dtCalcOffMeshRefPos(const float* spos, const float yawDeg, const float* offset, float* res)
+void dtCalcOffMeshRefPos(const rdVec3D* spos, const float yawDeg, const rdVec3D* offset, rdVec3D* res)
 {
 	const float yawRad = rdDegToRad(yawDeg);
 
-	const float dx = offset[0]*rdMathCosf(yawRad);
-	const float dy = offset[1]*rdMathSinf(yawRad);
+	const float dx = offset->x * rdMathCosf(yawRad);
+	const float dy = offset->y * rdMathSinf(yawRad);
 
-	res[0] = spos[0]+dx;
-	res[1] = spos[1]+dy;
-	res[2] = spos[2]+offset[2];
+	res->x = spos->x+dx;
+	res->y = spos->y+dy;
+	res->z = spos->z+offset->z;
 }
 
 int dtGetNavMeshVersionForSet(const int setVersion)

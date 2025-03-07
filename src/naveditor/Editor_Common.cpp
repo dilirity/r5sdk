@@ -35,31 +35,31 @@ static void EditorCommon_DrawInputGeometry(duDebugDraw* const dd, const InputGeo
 
 static void EditorCommon_DrawBoundingBox(duDebugDraw* const dd, const InputGeom* const geom)
 {
-	const float* const origBmin = geom->getMeshBoundsMin();
-	const float* const origBmax = geom->getMeshBoundsMax();
+	const rdVec3D* const origBmin = geom->getMeshBoundsMin();
+	const rdVec3D* const origBmax = geom->getMeshBoundsMax();
 
 	// Draw Mesh bounds
-	duDebugDrawBoxWire(dd, origBmin[0], origBmin[1], origBmin[2], origBmax[0], origBmax[1], origBmax[2], duRGBA(255, 255, 255, 170), 1.0f, nullptr);
+	duDebugDrawBoxWire(dd, origBmin->x, origBmin->y, origBmin->z, origBmax->x, origBmax->y, origBmax->z, duRGBA(255, 255, 255, 170), 1.0f, nullptr);
 
-	const float* const origNavBmin = geom->getOriginalNavMeshBoundsMin();
-	const float* const origNavBmax = geom->getOriginalNavMeshBoundsMax();
+	const rdVec3D* const origNavBmin = geom->getOriginalNavMeshBoundsMin();
+	const rdVec3D* const origNavBmax = geom->getOriginalNavMeshBoundsMax();
 
-	const float* const navBmin = geom->getNavMeshBoundsMin();
-	const float* const navBmax = geom->getNavMeshBoundsMax();
+	const rdVec3D* const navBmin = geom->getNavMeshBoundsMin();
+	const rdVec3D* const navBmax = geom->getNavMeshBoundsMax();
 
 	// Draw Original NavMesh bounds (e.g. when loading from a .gset with a predetermined NavMesh bound that differs from the mesh bound)
 	if ((!rdVequal(origBmin, origNavBmin) || !rdVequal(origBmax, origNavBmax)) && (!rdVequal(navBmin, origNavBmin) || !rdVequal(navBmax, origNavBmax)))
-		duDebugDrawBoxWire(dd, origNavBmin[0], origNavBmin[1], origNavBmin[2], origNavBmax[0], origNavBmax[1], origNavBmax[2], duRGBA(0, 80, 255, 215), 1.0f, nullptr);
+		duDebugDrawBoxWire(dd, origNavBmin->x, origNavBmin->y, origNavBmin->z, origNavBmax->x, origNavBmax->y, origNavBmax->z, duRGBA(0, 80, 255, 215), 1.0f, nullptr);
 
 	// Draw NavMesh bounds
 	if (!rdVequal(origBmin, navBmin) || !rdVequal(origBmax, navBmax))
-		duDebugDrawBoxWire(dd, navBmin[0], navBmin[1], navBmin[2], navBmax[0], navBmax[1], navBmax[2], duRGBA(0, 255, 0, 215), 1.0f, nullptr);
+		duDebugDrawBoxWire(dd, navBmin->x, navBmin->y, navBmin->z, navBmax->x, navBmax->y, navBmax->z, duRGBA(0, 255, 0, 215), 1.0f, nullptr);
 }
 
 static void EditorCommon_DrawTilingGrid(duDebugDraw* const dd, const InputGeom* const geom, const int tileSize, const float cellSize)
 {
-	const float* const bmin = geom->getNavMeshBoundsMin();
-	const float* const bmax = geom->getNavMeshBoundsMax();
+	const rdVec3D* const bmin = geom->getNavMeshBoundsMin();
+	const rdVec3D* const bmax = geom->getNavMeshBoundsMax();
 
 	int gw = 0, gh = 0;
 	rcCalcGridSize(bmin, bmax, cellSize, &gw, &gh);
@@ -68,7 +68,7 @@ static void EditorCommon_DrawTilingGrid(duDebugDraw* const dd, const InputGeom* 
 	const int th = (gh + tileSize - 1) / tileSize;
 	const float s = tileSize * cellSize;
 
-	duDebugDrawGridXY(dd, bmax[0], bmin[1], bmin[2], tw, th, s, duRGBA(0, 0, 0, 64), 1.0f, nullptr);
+	duDebugDrawGridXY(dd, bmax->x, bmin->y, bmin->z, tw, th, s, duRGBA(0, 0, 0, 64), 1.0f, nullptr);
 }
 
 int EditorCommon_SetAndRenderTileProperties(const InputGeom* const geom, 
@@ -80,8 +80,8 @@ int EditorCommon_SetAndRenderTileProperties(const InputGeom* const geom,
 	if (geom)
 	{
 		int gw = 0, gh = 0;
-		const float* bmin = geom->getNavMeshBoundsMin();
-		const float* bmax = geom->getNavMeshBoundsMax();
+		const rdVec3D* bmin = geom->getNavMeshBoundsMin();
+		const rdVec3D* bmax = geom->getNavMeshBoundsMax();
 		rcCalcGridSize(bmin, bmax, cellSize, &gw, &gh);
 		const int ts = tileSize;
 		const int tw = (gw + ts-1) / ts;
@@ -126,13 +126,8 @@ Editor_StaticTileMeshCommon::Editor_StaticTileMeshCommon()
 	, m_drawActiveTile(false)
 	, m_keepInterResults(false)
 {
-	m_lastBuiltTileBmin[0] = 0.0f;
-	m_lastBuiltTileBmin[1] = 0.0f;
-	m_lastBuiltTileBmin[2] = 0.0f;
-
-	m_lastBuiltTileBmax[0] = 0.0f;
-	m_lastBuiltTileBmax[1] = 0.0f;
-	m_lastBuiltTileBmax[2] = 0.0f;
+	m_lastBuiltTileBmin.init(0.0f,0.0f,0.0f);
+	m_lastBuiltTileBmax.init(0.0f,0.0f,0.0f);
 
 	memset(&m_cfg, 0, sizeof(rcConfig));
 }
@@ -294,8 +289,8 @@ void Editor_StaticTileMeshCommon::renderTileMeshData()
 	// Tiling grid.
 	EditorCommon_DrawTilingGrid(&m_dd, m_geom, m_tileSize, m_cellSize);
 
-	const float* recastDrawOffset = getRecastDrawOffset();
-	const float* detourDrawOffset = getDetourDrawOffset();
+	const rdVec3D* recastDrawOffset = getRecastDrawOffset();
+	const rdVec3D* detourDrawOffset = getDetourDrawOffset();
 
 	const unsigned int recastDrawFlags = getTileMeshDrawFlags();
 	const unsigned int detourDrawFlags = getNavMeshDrawFlags();
@@ -304,8 +299,8 @@ void Editor_StaticTileMeshCommon::renderTileMeshData()
 	{
 		// Draw active tile
 		// NOTE: only perform offset in x-y
-		duDebugDrawBoxWire(&m_dd, m_lastBuiltTileBmin[0]+detourDrawOffset[0], m_lastBuiltTileBmin[1]+detourDrawOffset[1], m_lastBuiltTileBmin[2],
-			m_lastBuiltTileBmax[0]+detourDrawOffset[0], m_lastBuiltTileBmax[1]+detourDrawOffset[1], m_lastBuiltTileBmax[2], m_tileCol, 1.0f, nullptr);
+		duDebugDrawBoxWire(&m_dd, m_lastBuiltTileBmin.x+detourDrawOffset->x, m_lastBuiltTileBmin.y+detourDrawOffset->y, m_lastBuiltTileBmin.z,
+			m_lastBuiltTileBmax.x+detourDrawOffset->x, m_lastBuiltTileBmax.y+detourDrawOffset->y, m_lastBuiltTileBmax.z, m_tileCol, 1.0f, nullptr);
 	}
 
 	if (m_navMesh && m_navQuery)
@@ -454,21 +449,21 @@ void Editor_StaticTileMeshCommon::renderIntermediateTileMeshOptions()
 		ImGui::Separator();
 }
 
-void drawTiles(duDebugDraw* dd, dtTileCache* tc, const float* offset)
+static void drawTiles(duDebugDraw* dd, dtTileCache* tc, const rdVec3D* offset)
 {
 	unsigned int fcol[6];
-	float bmin[3], bmax[3];
+	rdVec3D bmin, bmax;
 
 	for (int i = 0; i < tc->getTileCount(); ++i)
 	{
 		const dtCompressedTile* tile = tc->getTile(i);
 		if (!tile->header) continue;
 
-		tc->calcTightTileBounds(tile->header, bmin, bmax);
+		tc->calcTightTileBounds(tile->header, &bmin, &bmax);
 
 		const unsigned int col = duIntToCol(i, 64);
 		duCalcBoxColors(fcol, col, col);
-		duDebugDrawBox(dd, bmin[0], bmin[1], bmin[2], bmax[0], bmax[1], bmax[2], fcol, offset);
+		duDebugDrawBox(dd, bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, fcol, offset);
 	}
 
 	for (int i = 0; i < tc->getTileCount(); ++i)
@@ -476,24 +471,24 @@ void drawTiles(duDebugDraw* dd, dtTileCache* tc, const float* offset)
 		const dtCompressedTile* tile = tc->getTile(i);
 		if (!tile->header) continue;
 
-		tc->calcTightTileBounds(tile->header, bmin, bmax);
+		tc->calcTightTileBounds(tile->header, &bmin, &bmax);
 
 		const unsigned int col = duIntToCol(i, 255);
 		const float pad = tc->getParams()->cs * 0.1f;
-		duDebugDrawBoxWire(dd, bmin[0] - pad, bmin[1] - pad, bmin[2] - pad,
-			bmax[0] + pad, bmax[1] + pad, bmax[2] + pad, col, 2.0f, offset);
+		duDebugDrawBoxWire(dd, bmin.x - pad, bmin.y - pad, bmin.z - pad,
+			bmax.x + pad, bmax.y + pad, bmax.z + pad, col, 2.0f, offset);
 	}
 }
 
-void drawObstacles(duDebugDraw* dd, const dtTileCache* tc, const float* offset)
+static void drawObstacles(duDebugDraw* dd, const dtTileCache* tc, const rdVec3D* offset)
 {
 	// Draw obstacles
 	for (int i = 0; i < tc->getObstacleCount(); ++i)
 	{
 		const dtTileCacheObstacle* ob = tc->getObstacle(i);
 		if (ob->state == DT_OBSTACLE_EMPTY) continue;
-		float bmin[3], bmax[3];
-		tc->getObstacleBounds(ob, bmin, bmax);
+		rdVec3D bmin, bmax;
+		tc->getObstacleBounds(ob, &bmin, &bmax);
 
 		unsigned int col = 0;
 		if (ob->state == DT_OBSTACLE_PROCESSING)
@@ -503,8 +498,8 @@ void drawObstacles(duDebugDraw* dd, const dtTileCache* tc, const float* offset)
 		else if (ob->state == DT_OBSTACLE_REMOVING)
 			col = duRGBA(220, 0, 0, 128);
 
-		duDebugDrawCylinder(dd, bmin[0], bmin[1], bmin[2], bmax[0], bmax[1], bmax[2], col, offset);
-		duDebugDrawCylinderWire(dd, bmin[0], bmin[1], bmin[2], bmax[0], bmax[1], bmax[2], duDarkenCol(col), 2.0f, offset);
+		duDebugDrawCylinder(dd, bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, col, offset);
+		duDebugDrawCylinderWire(dd, bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, duDarkenCol(col), 2.0f, offset);
 	}
 }
 
@@ -567,8 +562,8 @@ void Editor_DynamicTileMeshCommon::renderTileMeshData()
 	const unsigned int recastDrawFlags = getTileMeshDrawFlags();
 	const unsigned int detourDrawFlags = getNavMeshDrawFlags();
 
-	const float* recastDrawOffset = getRecastDrawOffset();
-	const float* detourDrawOffset = getDetourDrawOffset();
+	const rdVec3D* recastDrawOffset = getRecastDrawOffset();
+	const rdVec3D* detourDrawOffset = getDetourDrawOffset();
 
 	// Draw input mesh
 	if (recastDrawFlags & DU_DRAW_RECASTMESH_INPUT_MESH)
