@@ -38,15 +38,13 @@ float rdCalcSlopeAngle(const rdVec3D* v1, const rdVec3D* v2)
 void rdClosestPtPointTriangle(rdVec3D* closest, const rdVec3D* p,
 							  const rdVec3D* a, const rdVec3D* b, const rdVec3D* c)
 {
-	// math_refactor(kawe): all dot products are eligible for const qualification.
-
 	// Check if P in vertex region outside A
 	rdVec3D ab, ac, ap;
 	rdVsub(&ab, b, a);
 	rdVsub(&ac, c, a);
 	rdVsub(&ap, p, a);
-	float d1 = rdVdot(&ab, &ap);
-	float d2 = rdVdot(&ac, &ap);
+	const float d1 = rdVdot(&ab, &ap);
+	const float d2 = rdVdot(&ac, &ap);
 	if (d1 <= 0.0f && d2 <= 0.0f)
 	{
 		// barycentric coordinates (1,0,0)
@@ -57,8 +55,8 @@ void rdClosestPtPointTriangle(rdVec3D* closest, const rdVec3D* p,
 	// Check if P in vertex region outside B
 	rdVec3D bp;
 	rdVsub(&bp, p, b);
-	float d3 = rdVdot(&ab, &bp);
-	float d4 = rdVdot(&ac, &bp);
+	const float d3 = rdVdot(&ab, &bp);
+	const float d4 = rdVdot(&ac, &bp);
 	if (d3 >= 0.0f && d4 <= d3)
 	{
 		// barycentric coordinates (0,1,0)
@@ -67,7 +65,7 @@ void rdClosestPtPointTriangle(rdVec3D* closest, const rdVec3D* p,
 	}
 	
 	// Check if P in edge region of AB, if so return projection of P onto AB
-	float vc = d1*d4 - d3*d2;
+	const float vc = d1*d4 - d3*d2;
 	if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
 	{
 		// barycentric coordinates (1-v,v,0)
@@ -81,8 +79,8 @@ void rdClosestPtPointTriangle(rdVec3D* closest, const rdVec3D* p,
 	// Check if P in vertex region outside C
 	rdVec3D cp;
 	rdVsub(&cp, p, c);
-	float d5 = rdVdot(&ab, &cp);
-	float d6 = rdVdot(&ac, &cp);
+	const float d5 = rdVdot(&ab, &cp);
+	const float d6 = rdVdot(&ac, &cp);
 	if (d6 >= 0.0f && d5 <= d6)
 	{
 		// barycentric coordinates (0,0,1)
@@ -91,7 +89,7 @@ void rdClosestPtPointTriangle(rdVec3D* closest, const rdVec3D* p,
 	}
 	
 	// Check if P in edge region of AC, if so return projection of P onto AC
-	float vb = d5*d2 - d1*d6;
+	const float vb = d5*d2 - d1*d6;
 	if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
 	{
 		// barycentric coordinates (1-w,0,w)
@@ -103,7 +101,7 @@ void rdClosestPtPointTriangle(rdVec3D* closest, const rdVec3D* p,
 	}
 	
 	// Check if P in edge region of BC, if so return projection of P onto BC
-	float va = d3*d6 - d5*d4;
+	const float va = d3*d6 - d5*d4;
 	if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
 	{
 		// barycentric coordinates (0,1-w,w)
@@ -115,9 +113,9 @@ void rdClosestPtPointTriangle(rdVec3D* closest, const rdVec3D* p,
 	}
 	
 	// P inside face region. Compute Q through its barycentric coordinates (u,v,w)
-	float denom = 1.0f / (va + vb + vc);
-	float v = vb * denom;
-	float w = vc * denom;
+	const float denom = 1.0f / (va + vb + vc);
+	const float v = vb * denom;
+	const float w = vc * denom;
 	closest->x = a->x + ab.x * v + ac.x * w;
 	closest->y = a->y + ab.y * v + ac.y * w;
 	closest->z = a->z + ab.z * v + ac.z * w;
@@ -283,7 +281,7 @@ bool rdIntersectSegmentCylinder(const rdVec3D* sp, const rdVec3D* sq, const rdVe
 
 	const float a = dx*dx + dy*dy;
 	const float b = 2.0f * (px*dx + py*dy);
-	const float c = px*px + py*py - radius*radius;
+	const float c = rdSqr(px) + rdSqr(py) - radius*radius;
 
 	if (a > 0.0f)
 	{
@@ -385,11 +383,11 @@ bool rdIntersectSegmentConvexHull(const rdVec3D* sp, const rdVec3D* sq,
 
 float rdDistancePtSegSqr2D(const rdVec3D* pt, const rdVec3D* p, const rdVec3D* q, float& t)
 {
-	float pqx = q->x - p->x; // math_refactor(kawe): can be const.
-	float pqy = q->y - p->y; // math_refactor(kawe): can be const.
+	const float pqx = q->x - p->x;
+	const float pqy = q->y - p->y;
 	float dx = pt->x - p->x;
 	float dy = pt->y - p->y;
-	float d = pqx*pqx + pqy*pqy; // math_refactor(kawe): use rdSqr.
+	const float d = rdSqr(pqx) + rdSqr(pqy);
 	t = pqx*dx + pqy*dy;
 	if (d > 0) t /= d;
 	if (t < 0) t = 0;
@@ -628,11 +626,11 @@ bool rdIntersectSegSeg2D(const rdVec2D* ap, const rdVec2D* aq,
 
 float rdDistancePtLine2D(const rdVec2D* pt, const rdVec2D* p, const rdVec2D* q)
 {
-	float pqx = q->x - p->x; // math_refactor(kawe): can be const.
-	float pqy = q->y - p->y; // math_refactor(kawe): can be const.
+	const float pqx = q->x - p->x;
+	const float pqy = q->y - p->y;
 	float dx = pt->x - p->x;
 	float dy = pt->y - p->y;
-	float d = pqx * pqx + pqy * pqy; // math_refactor(kawe): use rdSqr.
+	const float d = rdSqr(pqx) + rdSqr(pqy);
 	float t = pqx * dx + pqy * dy;
 	if (d != 0) t /= d;
 	dx = p->x + t * pqx - pt->x;

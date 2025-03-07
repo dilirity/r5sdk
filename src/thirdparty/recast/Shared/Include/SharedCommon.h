@@ -509,7 +509,7 @@ inline bool rdVequal(const rdVec3D* p0, const rdVec3D* p1)
 /// or any of the infinities.
 inline bool rdVisfinite(const rdVec3D* v)
 {
-	bool result = // math_refactor(kawe): can be const.
+	const bool result =
 		rdMathIsfinite(v->x) &&
 		rdMathIsfinite(v->y) &&
 		rdMathIsfinite(v->z);
@@ -521,7 +521,7 @@ inline bool rdVisfinite(const rdVec3D* v)
 ///  @param[in]		v	A point. [(x, y)]
 inline bool rdVisfinite2D(const rdVec2D* v)
 {
-	bool result = rdMathIsfinite(v->x) && rdMathIsfinite(v->y); // math_refactor(kawe): can be const.
+	const bool result = rdMathIsfinite(v->x) && rdMathIsfinite(v->y);
 	return result;
 }
 
