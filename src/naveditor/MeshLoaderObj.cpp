@@ -218,37 +218,16 @@ bool rcMeshLoaderObj::load(const std::string& filename)
 	}
 
 	delete [] buf;
+	m_normals = new rdVec3D[m_triCount];
 
 	// Calculate normals.
-	m_normals = new rdVec3D[m_triCount];
 	for (int i = 0; i < m_triCount; i++)
 	{
-		const rdVec3D& v0 = m_verts[m_tris[i * 3]];
-		const rdVec3D& v1 = m_verts[m_tris[i * 3 + 1]];
-		const rdVec3D& v2 = m_verts[m_tris[i * 3 + 2]];
+		const rdVec3D* v0 = &m_verts[m_tris[i*3]];
+		const rdVec3D* v1 = &m_verts[m_tris[i*3+1]];
+		const rdVec3D* v2 = &m_verts[m_tris[i*3+2]];
 
-		rdVec3D e0, e1;
-		e0.x = v1.x - v0.x;
-		e0.y = v1.y - v0.y;
-		e0.z = v1.z - v0.z;
-
-		e1.x = v2.x - v0.x;
-		e1.y = v2.y - v0.y;
-		e1.z = v2.z - v0.z;
-
-		rdVec3D& n = m_normals[i]; // math_refactor(kawe): use rdTriNormal here.
-		n.x = e0.y * e1.z - e0.z * e1.y;
-		n.y = e0.z * e1.x - e0.x * e1.z;
-		n.z = e0.x * e1.y - e0.y * e1.x;
-
-		float d = sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
-		if (d > 0)
-		{
-			float invD = 1.0f / d;
-			n.x *= invD;
-			n.y *= invD;
-			n.z *= invD;
-		}
+		rdTriNormal(v0, v1, v2, &m_normals[i]);
 	}
 
 	m_filename = filename;

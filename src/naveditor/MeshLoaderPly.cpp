@@ -102,24 +102,8 @@ end_header
 		const rdVec3D* v0 = &m_verts[m_tris[i*3]];
 		const rdVec3D* v1 = &m_verts[m_tris[i*3+1]];
 		const rdVec3D* v2 = &m_verts[m_tris[i*3+2]];
-		rdVec3D e0, e1;
-		for (int j = 0; j < 3; ++j)
-		{
-			e0[j] = (*v1)[j] - (*v0)[j];
-			e1[j] = (*v2)[j] - (*v0)[j];
-		}
-		rdVec3D* n = &m_normals[i]; // math_refractor(kawe): use rdTriNormal here?
-		n->x = e0.y*e1.z - e0.z*e1.y;
-		n->y = e0.z*e1.x - e0.x*e1.z;
-		n->z = e0.x*e1.y - e0.y*e1.x;
-		float d = sqrtf(n->x*n->x + n->y*n->y + n->z*n->z);
-		if (d > 0)
-		{
-			d = 1.0f/d;
-			n->x *= d;
-			n->y *= d;
-			n->z *= d;
-		}
+
+		rdTriNormal(v0, v1, v2, &m_normals[i]);
 	}
 	
 	m_filename = filename;
