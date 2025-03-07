@@ -918,7 +918,7 @@ public:
 
 	/// @{
 	/// @name State Management
-	/// These functions do not effect #dtTileRef or #dtPolyRef's. 
+	/// These functions do not affect #dtTileRef or #dtPolyRef's. 
 
 	/// Sets the user defined flags for the specified polygon.
 	///  @param[in]	ref		The polygon reference.

@@ -808,9 +808,9 @@ struct dtTraverseLinkConnectState
 	int landPolyIndex; ///< The index to the poly we are currently trying to connect to.
 
 	///< If these are set, the algorithm will check if we still have enough links available
-	///< on subsequent runs. This is a small optimization allowing the code to skip the checks
-	///< as the initial check is performed as soon as the function is called, so there's no
-	///< point in checking again as long as we haven't burned through available links yet.
+	///  on subsequent runs. This is a small optimization allowing the code to skip the checks
+	///  as the initial check is performed as soon as the function is called, so there's no
+	///  point in checking again as long as we haven't burned through available links yet.
 	bool firstBaseTileLinkUsed;
 	bool firstLandTileLinkUsed;
 };

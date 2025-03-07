@@ -3252,11 +3252,11 @@ dtStatus dtNavMeshQuery::raycast(dtPolyRef startRef, const rdVec3D* startPos, co
 /// 
 /// The value of the center point is used as the start position for cost 
 /// calculations. It is not projected onto the surface of the mesh, so its 
-/// z-value will effect the costs.
+/// z-value will affect the costs.
 ///
 /// Intersection tests occur in 2D. All polygons and the search circle are 
 /// projected onto the xy-plane. So the z-value of the center point does not 
-/// effect intersection tests.
+/// affect intersection tests.
 ///
 /// If the result arrays are to small to hold the entire result set, they will be 
 /// filled to capacity.
@@ -3443,7 +3443,7 @@ dtStatus dtNavMeshQuery::findPolysAroundCircle(dtPolyRef startRef, const rdVec3D
 /// calculations.
 /// 
 /// Intersection tests occur in 2D. All polygons are projected onto the 
-/// xy-plane. So the z-values of the vertices do not effect intersection tests.
+/// xy-plane. So the z-values of the vertices do not affect intersection tests.
 /// 
 /// If the result arrays are is too small to hold the entire result set, they will 
 /// be filled to capacity.
@@ -3648,12 +3648,12 @@ dtStatus dtNavMeshQuery::getPathFromDijkstraSearch(dtPolyRef endRef, dtPolyRef* 
 /// method applies to this method.
 ///
 /// The value of the center point is used as the start point for cost calculations. 
-/// It is not projected onto the surface of the mesh, so its z-value will effect 
+/// It is not projected onto the surface of the mesh, so its z-value will affect 
 /// the costs.
 /// 
 /// Intersection tests occur in 2D. All polygons and the search circle are 
 /// projected onto the xy-plane. So the z-value of the center point does not 
-/// effect intersection tests.
+/// affect intersection tests.
 /// 
 /// If the result arrays are is too small to hold the entire result set, they will 
 /// be filled to capacity.
