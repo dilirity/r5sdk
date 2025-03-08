@@ -39,8 +39,8 @@ inline dtNode*(*dtNodePool__getPool)(dtNodePool* pool, const dtPolyRef id, const
 constexpr const char* NAVMESH_PATH = "maps/navmesh/";
 constexpr const char* NAVMESH_EXT = ".nm";
 
-inline dtNavMesh** g_pNavMesh = nullptr;
-inline dtNavMeshQuery* g_pNavMeshQuery = nullptr;
+inline dtNavMesh** g_navMeshArray = nullptr; // size = NavMeshType_e::NAVMESH_COUNT.
+inline dtNavMeshQuery* g_navMeshQuery = nullptr;
 
 dtNavMesh* Detour_GetNavMeshByType(const NavMeshType_e navMeshType);
 
@@ -72,8 +72,8 @@ class VRecast : public IDetour
 
 		LogFunAdr("dtNodePool::getPool", dtNodePool__getPool);
 
-		LogVarAdr("g_pNavMesh[ NavMeshType_e::NAVMESH_COUNT ]", g_pNavMesh);
-		LogVarAdr("g_pNavMeshQuery", g_pNavMeshQuery);
+		LogVarAdr("g_navMeshArray[ NavMeshType_e::NAVMESH_COUNT ]", g_navMeshArray);
+		LogVarAdr("g_navMeshQuery", g_navMeshQuery);
 	}
 	virtual void GetFun(void) const
 	{
@@ -93,9 +93,9 @@ class VRecast : public IDetour
 	}
 	virtual void GetVar(void) const
 	{
-		g_pNavMesh = Module_FindPattern(g_GameDll, "48 89 54 24 ?? 48 89 4C 24 ?? 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ?? 48 81 EC ?? ?? ?? ?? 48 8B 02")
+		g_navMeshArray = Module_FindPattern(g_GameDll, "48 89 54 24 ?? 48 89 4C 24 ?? 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ?? 48 81 EC ?? ?? ?? ?? 48 8B 02")
 			.FindPatternSelf("48 8D 3D").ResolveRelativeAddressSelf(0x3, 0x7).RCast<dtNavMesh**>();
-		g_pNavMeshQuery = Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 56 57 41 56 48 81 EC ?? ?? ?? ?? 48 63 D9")
+		g_navMeshQuery = Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 56 57 41 56 48 81 EC ?? ?? ?? ?? 48 63 D9")
 			.FindPatternSelf("48 89 0D").ResolveRelativeAddressSelf(0x3, 0x7).RCast<dtNavMeshQuery*>();
 	}
 	virtual void GetCon(void) const { }

@@ -28,7 +28,7 @@ static ConVar navmesh_always_reachable("navmesh_always_reachable", "0", FCVAR_DE
 dtNavMesh* Detour_GetNavMeshByType(const NavMeshType_e navMeshType)
 {
     Assert(navMeshType >= NULL && navMeshType < NAVMESH_COUNT); // Programmer error.
-    return g_pNavMesh[navMeshType];
+    return g_navMeshArray[navMeshType];
 }
 
 //-----------------------------------------------------------------------------
@@ -38,14 +38,14 @@ dtNavMesh* Detour_GetNavMeshByType(const NavMeshType_e navMeshType)
 void Detour_FreeNavMeshByType(const NavMeshType_e navMeshType)
 {
     Assert(navMeshType >= NULL && navMeshType < NAVMESH_COUNT); // Programmer error.
-    dtNavMesh* const nav = g_pNavMesh[navMeshType];
+    dtNavMesh* const nav = g_navMeshArray[navMeshType];
 
     if (nav) // Only free if NavMesh for type is loaded.
     {
         // Frees tiles, polys, tris, anything dynamically
         // allocated for this navmesh, and the navmesh itself.
         delete nav;
-        g_pNavMesh[navMeshType] = nullptr;
+        g_navMeshArray[navMeshType] = nullptr;
     }
 }
 
@@ -307,7 +307,7 @@ void Detour_HotSwap()
     Assert(ThreadInMainOrServerFrameThread());
     g_pServerScript->ExecuteCodeCallback("CodeCallback_OnNavMeshHotSwapBegin");
 
-    const dtNavMesh* const queryNav = g_pNavMeshQuery->getAttachedNavMesh();
+    const dtNavMesh* const queryNav = g_navMeshQuery->getAttachedNavMesh();
     NavMeshType_e queryNavType = NAVMESH_INVALID;
 
     if (queryNav)
@@ -339,7 +339,7 @@ void Detour_HotSwap()
         const dtNavMesh* const newQueryNav = Detour_GetNavMeshByType(queryNavType);
 
         if (newQueryNav)
-            g_pNavMeshQuery->attachNavMeshUnsafe(newQueryNav);
+            g_navMeshQuery->attachNavMeshUnsafe(newQueryNav);
         else
             Error(eDLL_T::SERVER, NOERROR, "%s - Failed to hot swap NavMesh: %s\n", __FUNCTION__, 
                 "previously attached NavMesh type is no longer available for global Detour query");
