@@ -102,7 +102,7 @@ public:
 		bool Connect(const double queryTime, const ConnParams_s& params);
 		bool Process(const double queryTime);
 
-		void SetParams(const ConnParams_s& params);
+		void SetParams(const ConnParams_s& params) const;
 
 		void Disconnect();
 		void Reconnect();
