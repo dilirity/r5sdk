@@ -328,8 +328,8 @@ static bool rasterizeTri(const rdVec3D* v0, const rdVec3D* v1, const rdVec3D* v2
 	const float bz = hfBBMax->z - hfBBMin->z;
 
 	// Calculate the footprint of the triangle on the grid's y-axis
-	int y0 = (int)((triBBMin.y - hfBBMin->y) * inverseCellSize);
-	int y1 = (int)((triBBMax.y - hfBBMin->y) * inverseCellSize);
+	int y0 = (int)rdMathFloorf((triBBMin.y - hfBBMin->y) * inverseCellSize);
+	int y1 = (int)rdMathFloorf((triBBMax.y - hfBBMin->y) * inverseCellSize);
 
 	// use -1 rather than 0 to cut the polygon properly at the start of the tile
 	y0 = rdClamp(y0, -1, h - 1);
@@ -378,8 +378,8 @@ static bool rasterizeTri(const rdVec3D* v0, const rdVec3D* v1, const rdVec3D* v2
 				maxX = inRow[vert].x;
 			}
 		}
-		int x0 = (int)((minX - hfBBMin->x) * inverseCellSize);
-		int x1 = (int)((maxX - hfBBMin->x) * inverseCellSize);
+		int x0 = (int)rdMathFloorf((minX - hfBBMin->x) * inverseCellSize);
+		int x1 = (int)rdMathFloorf((maxX - hfBBMin->x) * inverseCellSize);
 		if (x1 < 0 || x0 >= w)
 		{
 			continue;
