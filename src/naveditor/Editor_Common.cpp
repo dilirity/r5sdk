@@ -422,7 +422,7 @@ void Editor_StaticTileMeshCommon::renderIntermediateTileMeshOptions()
 
 	if (ImGui::Button("Save", ImVec2(123, 0)))
 	{
-		Editor::saveAll(m_modelName.c_str(), m_navMesh);
+		Editor::saveAll(m_modelName, m_navMesh);
 	}
 
 	ImGui::Unindent();
