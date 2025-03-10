@@ -181,6 +181,18 @@ struct dtStraightPathResult
 	bool pathEndIsGoal;
 };
 
+/// Provides information about poly wall segments
+/// filled by dtNavMeshQuery::getPolyWallSegments
+/// @ingroup detour
+struct dtPolyWallSegment
+{
+	/// The first vertex describing the segment.
+	rdVec3D verta;
+
+	/// The second vertex describing the segment.
+	rdVec3D vertb;
+};
+
 /// Provides custom polygon query behavior.
 /// Used by dtNavMeshQuery::queryPolygons.
 /// @ingroup detour
@@ -522,14 +534,14 @@ public:
 	/// Returns the segments for the specified polygon, optionally including portals.
 	///  @param[in]		ref				The reference id of the polygon.
 	///  @param[in]		filter			The polygon filter to apply to the query.
-	///  @param[out]	segmentVerts	The segments. [(ax, ay, az, bx, by, bz) * segmentCount]
+	///  @param[out]	segments		The segments. [(polyWallSegment) * segmentCount]
 	///  @param[out]	segmentRefs		The reference ids of each segment's neighbor polygon. 
 	///  								Or zero if the segment is a wall. [opt] [(parentRef) * @p segmentCount] 
 	///  @param[out]	segmentCount	The number of segments returned.
 	///  @param[in]		maxSegments		The maximum number of segments the result arrays can hold.
 	/// @returns The status flags for the query.
 	dtStatus getPolyWallSegments(dtPolyRef ref, const dtQueryFilter* filter,
-								 rdVec3D* segmentVerts, dtPolyRef* segmentRefs, int* segmentCount,
+								 dtPolyWallSegment* segments, dtPolyRef* segmentRefs, int* segmentCount,
 								 const int maxSegments) const;
 
 	/// Returns random location on navmesh.

@@ -1374,7 +1374,7 @@ void NavMeshTesterTool::handleRender()
 			}
 
 			static const int MAX_SEGS = RD_VERTS_PER_POLYGON*4;
-			rdVec3D segs[MAX_SEGS*2];
+			dtPolyWallSegment segs[MAX_SEGS];
 			dtPolyRef refs[MAX_SEGS];
 			memset(refs, 0, sizeof(dtPolyRef)*MAX_SEGS); 
 			int nsegs = 0;
@@ -1382,17 +1382,17 @@ void NavMeshTesterTool::handleRender()
 			dd.begin(DU_DRAW_LINES, 2.0f, drawOffset);
 			for (int j = 0; j < nsegs; ++j)
 			{
-				const rdVec3D* s = &segs[j*2];
+				const dtPolyWallSegment* s = &segs[j];
 				
 				// Skip too distant segments.
 				float tseg;
-				float distSqr = rdDistancePtSegSqr2D(&m_spos, &s[0], &s[1], tseg);
+				float distSqr = rdDistancePtSegSqr2D(&m_spos, &s->verta, &s->vertb, tseg);
 				if (distSqr > rdSqr(m_neighbourhoodRadius))
 					continue;
 				
 				rdVec3D delta, norm, p0, p1;
-				rdVsub(&delta, &s[1], &s[0]);
-				rdVmad(&p0, s, &delta, 0.5f);
+				rdVsub(&delta, &s->vertb, &s->verta);
+				rdVmad(&p0, &s->verta, &delta, 0.5f);
 				norm.x = -delta.y;
 				norm.y = delta.x;
 				norm.z = 0;
@@ -1403,20 +1403,20 @@ void NavMeshTesterTool::handleRender()
 				if (refs[j])
 				{
 					unsigned int col = duRGBA(255,255,255,32);
-					dd.vertex(s[0].x,s[0].y,s[0].z+agentClimb,col);
-					dd.vertex(s[1].x,s[1].y,s[1].z+agentClimb,col);
+					dd.vertex(s->verta.x,s->verta.y,s->verta.z+agentClimb,col);
+					dd.vertex(s->vertb.x,s->vertb.y,s->vertb.z+agentClimb,col);
 				}
 				else
 				{
 					unsigned int col = duRGBA(192,32,16,192);
-					if (rdTriArea2D(&m_spos, &s[1], &s[0]) < 0.0f)
+					if (rdTriArea2D(&m_spos, &s->vertb, &s->verta) < 0.0f)
 						col = duRGBA(96,32,16,192);
 					
 					dd.vertex(p0.x,p0.y,p0.z+agentClimb,col);
 					dd.vertex(p1.x,p1.y,p1.z+agentClimb,col);
 
-					dd.vertex(s[0].x,s[0].y,s[0].z+agentClimb,col);
-					dd.vertex(s[1].x,s[1].y,s[1].z+agentClimb,col);
+					dd.vertex(s->verta.x,s->verta.y,s->verta.z+agentClimb,col);
+					dd.vertex(s->vertb.x,s->vertb.y,s->vertb.z+agentClimb,col);
 				}
 			}
 			dd.end();

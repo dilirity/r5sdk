@@ -101,20 +101,20 @@ void dtLocalBoundary::update(dtPolyRef ref, const rdVec3D* pos, const float coll
 	
 	// Secondly, store all polygon edges.
 	m_nsegs = 0;
-	rdVec3D segs[MAX_SEGS_PER_POLY*2];
+	dtPolyWallSegment segs[MAX_SEGS_PER_POLY];
 	int nsegs = 0;
 	for (int j = 0; j < m_npolys; ++j)
 	{
 		navquery->getPolyWallSegments(m_polys[j], filter, segs, 0, &nsegs, MAX_SEGS_PER_POLY);
 		for (int k = 0; k < nsegs; ++k)
 		{
-			const rdVec3D* s = &segs[k*2];
+			const dtPolyWallSegment* s = &segs[k];
 			// Skip too distant segments.
 			float tseg;
-			const float distSqr = rdDistancePtSegSqr2D(pos, &s[0], &s[1], tseg);
+			const float distSqr = rdDistancePtSegSqr2D(pos, &s->verta, &s->vertb, tseg);
 			if (distSqr > rdSqr(collisionQueryRange))
 				continue;
-			addSegment(distSqr, &s[0], &s[1]);
+			addSegment(distSqr, &s->verta, &s->vertb);
 		}
 	}
 }

@@ -3890,9 +3890,8 @@ static void insertInterval(dtSegInterval* ints, int& nints, const int maxInts,
 /// The @p segmentVerts and @p segmentRefs buffers should normally be sized for the 
 /// maximum segments per polygon of the source navigation mesh.
 /// 
-/// math_refactor(kawe): make 'segmentVerts' an actual struct.
 dtStatus dtNavMeshQuery::getPolyWallSegments(dtPolyRef ref, const dtQueryFilter* filter,
-											 rdVec3D* segmentVerts, dtPolyRef* segmentRefs, int* segmentCount,
+											 dtPolyWallSegment* segments, dtPolyRef* segmentRefs, int* segmentCount,
 											 const int maxSegments) const
 {
 	rdAssert(m_nav);
@@ -3907,7 +3906,7 @@ dtStatus dtNavMeshQuery::getPolyWallSegments(dtPolyRef ref, const dtQueryFilter*
 	if (dtStatusFailed(m_nav->getTileAndPolyByRef(ref, &tile, &poly)))
 		return DT_FAILURE | DT_INVALID_PARAM;
 
-	if (!filter || !segmentVerts || maxSegments < 0)
+	if (!filter || !segments || maxSegments < 0)
 		return DT_FAILURE | DT_INVALID_PARAM;
 	
 	int n = 0;
@@ -3965,9 +3964,9 @@ dtStatus dtNavMeshQuery::getPolyWallSegments(dtPolyRef ref, const dtQueryFilter*
 			{
 				const rdVec3D* vj = &tile->verts[poly->verts[j]];
 				const rdVec3D* vi = &tile->verts[poly->verts[i]];
-				rdVec3D* seg = &segmentVerts[n*2];
-				rdVcopy(&seg[0], vj);
-				rdVcopy(&seg[1], vi);
+				dtPolyWallSegment* seg = &segments[n];
+				rdVcopy(&seg->verta, vj);
+				rdVcopy(&seg->vertb, vi);
 				if (segmentRefs)
 					segmentRefs[n] = neiRef;
 				n++;
@@ -3996,9 +3995,9 @@ dtStatus dtNavMeshQuery::getPolyWallSegments(dtPolyRef ref, const dtQueryFilter*
 				const float tmax = ints[k].tmax/255.0f; 
 				if (n < maxSegments)
 				{
-					rdVec3D* seg = &segmentVerts[n*2];
-					rdVlerp(&seg[0], vj,vi, tmin);
-					rdVlerp(&seg[1], vj,vi, tmax);
+					dtPolyWallSegment* seg = &segments[n];
+					rdVlerp(&seg->verta, vj,vi, tmin);
+					rdVlerp(&seg->vertb, vj,vi, tmax);
 					if (segmentRefs)
 						segmentRefs[n] = ints[k].ref;
 					n++;
@@ -4018,9 +4017,9 @@ dtStatus dtNavMeshQuery::getPolyWallSegments(dtPolyRef ref, const dtQueryFilter*
 				const float tmax = imax/255.0f; 
 				if (n < maxSegments)
 				{
-					rdVec3D* seg = &segmentVerts[n*2];
-					rdVlerp(&seg[0], vj,vi, tmin);
-					rdVlerp(&seg[1], vj,vi, tmax);
+					dtPolyWallSegment* seg = &segments[n];
+					rdVlerp(&seg->verta, vj,vi, tmin);
+					rdVlerp(&seg->vertb, vj,vi, tmax);
 					if (segmentRefs)
 						segmentRefs[n] = 0;
 					n++;
