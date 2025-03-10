@@ -24,7 +24,7 @@
 #include "Detour/Include/DetourNode.h"
 
 
-inline bool overlapSlabs(const rdVec2D& amin, const rdVec2D& amax,
+static inline bool overlapSlabs(const rdVec2D& amin, const rdVec2D& amax,
 						 const rdVec2D& bmin, const rdVec2D& bmax,
 						 const float px, const float pz)
 {
@@ -151,7 +151,7 @@ static void alignPortalLimits(const rdVec3D* portal1Pos, const rdVec3D* portal1N
 	}
 }
 
-inline int computeTileHash(int x, int y, const int mask)
+static inline int computeTileHash(int x, int y, const int mask)
 {
 	const unsigned int h1 = 0x8da6b343; // Large multiplicative constants;
 	const unsigned int h2 = 0xd8163841; // here arbitrarily chosen primes
