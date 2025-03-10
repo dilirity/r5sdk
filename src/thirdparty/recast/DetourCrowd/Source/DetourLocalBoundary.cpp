@@ -119,7 +119,7 @@ void dtLocalBoundary::update(dtPolyRef ref, const rdVec3D* pos, const float coll
 	}
 }
 
-bool dtLocalBoundary::isValid(dtNavMeshQuery* navquery, const dtQueryFilter* filter)
+bool dtLocalBoundary::isValid(dtNavMeshQuery* navquery, const dtQueryFilter* filter) const
 {
 	if (!m_npolys)
 		return false;

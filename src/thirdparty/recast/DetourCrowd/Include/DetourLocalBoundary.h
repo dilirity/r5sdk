@@ -52,7 +52,7 @@ public:
 	void update(dtPolyRef ref, const rdVec3D* pos, const float collisionQueryRange,
 				dtNavMeshQuery* navquery, const dtQueryFilter* filter);
 	
-	bool isValid(dtNavMeshQuery* navquery, const dtQueryFilter* filter);
+	bool isValid(dtNavMeshQuery* navquery, const dtQueryFilter* filter) const;
 	
 	inline const rdVec3D* getCenter() const { return &m_center; }
 	inline int getSegmentCount() const { return m_nsegs; }
