@@ -773,15 +773,9 @@ public:
 /// return #DT_SUCCESS, but @p nearestRef will be zero. So if in doubt, check 
 /// @p nearestRef before using @p nearestPt.
 ///
-dtStatus dtNavMeshQuery::findNearestPoly(const rdVec3D* center, const rdVec3D* halfExtents,
-										 const dtQueryFilter* filter,
-										 dtPolyRef* nearestRef, rdVec3D* nearestPt) const
-{
-	return findNearestPoly(center, halfExtents, filter, nearestRef, nearestPt, NULL);
-}
-
-// If center and nearestPt point to an equal position, isOverPoly will be true;
-// however there's also a special case of climb height inside the polygon (see dtFindNearestPolyQuery)
+/// If center and nearestPt point to an equal position, isOverPoly will be true;
+/// however there's also a special case of climb height inside the polygon (see dtFindNearestPolyQuery)
+/// 
 dtStatus dtNavMeshQuery::findNearestPoly(const rdVec3D* center, const rdVec3D* halfExtents,
 										 const dtQueryFilter* filter, dtPolyRef* nearestRef,
 										 rdVec3D* nearestPt, bool* isOverPoly) const
@@ -811,6 +805,11 @@ dtStatus dtNavMeshQuery::findNearestPoly(const rdVec3D* center, const rdVec3D* h
 	return DT_SUCCESS;
 }
 
+/// @par 
+/// 
+/// @note The same as #findNearestPoly, but rejects anything that is not
+/// within the provided search box.
+/// 
 dtStatus dtNavMeshQuery::findNearestPolyInBounds(const rdVec3D* center, const rdVec3D* halfExtents,
 												 const dtQueryFilter* filter, dtPolyRef* nearestRef,
 												 rdVec3D* nearestPt, bool* isOverPoly) const
