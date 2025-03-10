@@ -152,7 +152,7 @@ inline void*(*v_RenderBox)(const matrix3x4_t& vTransforms, const Vector3D& vMins
 inline void*(*v_RenderWireframeSphere)(const Vector3D& vCenter, float flRadius, int nTheta, int nPhi, Color color, bool bZBuffer);
 
 inline OverlayBase_t** s_pOverlays = nullptr;
-inline LPCRITICAL_SECTION s_OverlayMutex = nullptr;
+inline CThreadMutex* s_OverlayMutex = nullptr;
 
 inline int* g_nRenderTickCount = nullptr;
 inline int* g_nOverlayTickCount = nullptr;
@@ -183,7 +183,7 @@ class VDebugOverlay : public IDetour
 	virtual void GetVar(void) const
 	{
 		s_pOverlays = CMemory(v_DrawAllOverlays).Offset(0x10).FindPatternSelf("48 8B 3D", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<OverlayBase_t**>();
-		s_OverlayMutex = CMemory(v_DrawAllOverlays).Offset(0x10).FindPatternSelf("48 8D 0D", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<LPCRITICAL_SECTION>();
+		s_OverlayMutex = CMemory(v_DrawAllOverlays).Offset(0x10).FindPatternSelf("48 8D 0D", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<CThreadMutex*>();
 
 		g_nRenderTickCount = CMemory(v_DrawAllOverlays).Offset(0x50).FindPatternSelf("3B 05", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x2, 0x6).RCast<int*>();
 		g_nOverlayTickCount = CMemory(v_DrawAllOverlays).Offset(0x70).FindPatternSelf("3B 05", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x2, 0x6).RCast<int*>();

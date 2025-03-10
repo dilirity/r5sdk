@@ -71,7 +71,7 @@ bool OverlayBase_t::IsDead() const
 //------------------------------------------------------------------------------
 void DestroyOverlay(OverlayBase_t* pOverlay)
 {
-    EnterCriticalSection(s_OverlayMutex);
+    AUTO_LOCK(*s_OverlayMutex);
     switch (pOverlay->m_Type)
     {
     case OverlayType_t::OVERLAY_BOX:
@@ -93,8 +93,6 @@ void DestroyOverlay(OverlayBase_t* pOverlay)
         Assert(0); // Code bug; invalid overlay type.
         break;
     }
-
-    LeaveCriticalSection(s_OverlayMutex);
 }
 
 //------------------------------------------------------------------------------
@@ -103,7 +101,7 @@ void DestroyOverlay(OverlayBase_t* pOverlay)
 //------------------------------------------------------------------------------
 void DrawOverlay(OverlayBase_t* pOverlay)
 {
-    EnterCriticalSection(s_OverlayMutex);
+    AUTO_LOCK(*s_OverlayMutex);
 
     switch (pOverlay->m_Type)
     {
@@ -118,7 +116,6 @@ void DrawOverlay(OverlayBase_t* pOverlay)
             }
             else
             {
-                LeaveCriticalSection(s_OverlayMutex);
                 return;
             }
         }
@@ -137,7 +134,6 @@ void DrawOverlay(OverlayBase_t* pOverlay)
             }
             else
             {
-                LeaveCriticalSection(s_OverlayMutex);
                 return;
             }
         }
@@ -164,7 +160,6 @@ void DrawOverlay(OverlayBase_t* pOverlay)
             }
             else
             {
-                LeaveCriticalSection(s_OverlayMutex);
                 return;
             }
         }
@@ -199,8 +194,7 @@ void DrawOverlay(OverlayBase_t* pOverlay)
             }
             else
             {
-                LeaveCriticalSection(s_OverlayMutex);
-                return;
+                break;
             }
         }
 
@@ -224,8 +218,6 @@ void DrawOverlay(OverlayBase_t* pOverlay)
         break;
     }
     }
-
-    LeaveCriticalSection(s_OverlayMutex);
 }
 
 //------------------------------------------------------------------------------
@@ -234,12 +226,12 @@ void DrawOverlay(OverlayBase_t* pOverlay)
 //------------------------------------------------------------------------------
 void DrawAllOverlays(bool bRender)
 {
-    EnterCriticalSection(s_OverlayMutex);
+    AUTO_LOCK(*s_OverlayMutex);
 
     const bool bOverlayEnabled = (bRender && enable_debug_overlays->GetBool());
-    OverlayBase_t* pCurrOverlay = *s_pOverlays; // rdi
-    OverlayBase_t* pPrevOverlay = nullptr;      // rsi
-    OverlayBase_t* pNextOverlay = nullptr;      // rbx
+    OverlayBase_t* pCurrOverlay = *s_pOverlays;
+    OverlayBase_t* pPrevOverlay = nullptr;
+    OverlayBase_t* pNextOverlay = nullptr;
 
     while (pCurrOverlay)
     {
@@ -268,12 +260,10 @@ void DrawAllOverlays(bool bRender)
             {
                 if (pCurrOverlay->m_nOverlayTick == *g_nOverlayTickCount)
                 {
-                    // Draw overlay if unk0 == *overlay_tickcount
                     bShouldDraw = true;
                 }
                 if (pCurrOverlay->m_nOverlayTick == -1)
                 {
-                    // Draw overlay if unk0 == -1
                     bShouldDraw = true;
                 }
             }
@@ -300,8 +290,6 @@ void DrawAllOverlays(bool bRender)
         g_AIUtility.RunRenderFrame();
     }
 #endif // !CLIENT_DLL
-
-    LeaveCriticalSection(s_OverlayMutex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
