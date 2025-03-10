@@ -2204,9 +2204,12 @@ dtStatus dtNavMeshQuery::findStraightPath(const rdVec3D* startPos, const rdVec3D
 		return DT_FAILURE | DT_INVALID_ACTION;
 
 	// Determine and mark whether the end vertex is our goal position.
-	const unsigned char endFlags = (distToClosest == 0.0f)
-		? DT_STRAIGHTPATH_END_GOAL
-		: DT_STRAIGHTPATH_END_PARTIAL;
+	const unsigned char endFlags =
+#if DT_NAVMESH_SET_VERSION >= 7
+		(distToClosest == 0.0f) ? DT_STRAIGHTPATH_END_GOAL : DT_STRAIGHTPATH_END_PARTIAL;
+#else // Titanfall 2 doesn't support partial path end flags.
+		DT_STRAIGHTPATH_END_GOAL;
+#endif
 	
 	// Add start point.
 	stat = appendVertex(&closestStartPos, DT_STRAIGHTPATH_START, path[0], jumpTypes[0],

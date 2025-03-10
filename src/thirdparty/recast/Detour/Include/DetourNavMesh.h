@@ -181,8 +181,15 @@ enum dtStraightPathFlags : unsigned char
 {
 	DT_STRAIGHTPATH_START = 1<<0,				///< The vertex is the start position in the path.
 	DT_STRAIGHTPATH_END_GOAL = 1<<1,			///< The vertex is the goal end position in the path.
+
+#if DT_NAVMESH_SET_VERSION >= 7
 	DT_STRAIGHTPATH_END_PARTIAL = 1<<2,			///< The vertex is the partial end position in the path.
-	DT_STRAIGHTPATH_OFFMESH_CONNECTION = 1<<3,	///< The vertex is the start of an off-mesh connection.
+	DT_STRAIGHTPATH_OFFMESH_CONNECTION = 1<<3	///< The vertex is the start of an off-mesh connection.
+#else
+	// 'DT_STRAIGHTPATH_END_PARTIAL' doesn't exist for Titanfall 2, therefore the enumerant
+	// 'DT_STRAIGHTPATH_OFFMESH_CONNECTION' must be shifted for backwards compatibility.
+	DT_STRAIGHTPATH_OFFMESH_CONNECTION = 1<<2	///< The vertex is the start of an off-mesh connection.
+#endif
 };
 
 /// Options for dtNavMeshQuery::findStraightPath.
