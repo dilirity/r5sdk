@@ -1832,7 +1832,7 @@ void dtNavMesh::calcTileLoc(const rdVec3D* pos, int* tx, int* ty) const
 	*ty = (int)rdMathFloorf((pos->y-m_orig.y) / m_tileHeight);
 }
 
-dtStatus dtNavMesh::getTileAndPolyByRef(const dtPolyRef ref, const dtMeshTile** tile, const dtPoly** poly) const
+dtStatus dtNavMesh::getTileAndPolyByRef(dtMeshTile** tile, dtPoly** poly, const dtPolyRef ref) const
 {
 	if (!ref) return DT_FAILURE;
 	unsigned int salt, it, ip;
@@ -1843,6 +1843,17 @@ dtStatus dtNavMesh::getTileAndPolyByRef(const dtPolyRef ref, const dtMeshTile** 
 	*tile = &m_tiles[it];
 	*poly = &m_tiles[it].polys[ip];
 	return DT_SUCCESS;
+}
+
+dtStatus dtNavMesh::getTileAndPolyByRef(const dtPolyRef ref, const dtMeshTile** tile, const dtPoly** poly) const
+{
+	dtMeshTile* tmpTile; dtPoly* tmpPoly;
+	const dtStatus status = getTileAndPolyByRef(&tmpTile, &tmpPoly, ref);
+
+	*tile = tmpTile;
+	*poly = tmpPoly;
+
+	return status;
 }
 
 /// @par
@@ -1957,13 +1968,8 @@ bool dtNavMesh::isGoalPolyReachable(const dtPolyRef fromRef, const dtPolyRef goa
 
 bool dtNavMesh::isValidPolyRef(dtPolyRef ref) const
 {
-	if (!ref) return false;
-	unsigned int salt, it, ip;
-	decodePolyId(ref, salt, it, ip);
-	if (it >= (unsigned int)m_maxTiles) return false;
-	if (m_tiles[it].salt != salt || m_tiles[it].header == 0) return false;
-	if (ip >= (unsigned int)m_tiles[it].header->polyCount) return false;
-	return true;
+	const dtMeshTile* tile; const dtPoly* poly;
+	return dtStatusSucceed(getTileAndPolyByRef(ref, &tile, &poly));
 }
 
 /// @par
@@ -2243,18 +2249,11 @@ dtStatus dtNavMesh::restoreTileState(dtMeshTile* tile, const unsigned char* data
 /// the prevRef parameter.
 dtStatus dtNavMesh::getOffMeshConnectionPolyEndPoints(dtPolyRef prevRef, dtPolyRef polyRef, rdVec3D* startPos, rdVec3D* endPos) const
 {
-	unsigned int salt, it, ip;
+	const dtMeshTile* tile; const dtPoly* poly;
 
-	if (!polyRef)
-		return DT_FAILURE;
-	
 	// Get current polygon
-	decodePolyId(polyRef, salt, it, ip);
-	if (it >= (unsigned int)m_maxTiles) return DT_FAILURE | DT_INVALID_PARAM;
-	if (m_tiles[it].salt != salt || m_tiles[it].header == 0) return DT_FAILURE | DT_INVALID_PARAM;
-	const dtMeshTile* tile = &m_tiles[it];
-	if (ip >= (unsigned int)tile->header->polyCount) return DT_FAILURE | DT_INVALID_PARAM;
-	const dtPoly* poly = &tile->polys[ip];
+	if (dtStatusFailed(getTileAndPolyByRef(polyRef, &tile, &poly)))
+		return DT_FAILURE | DT_INVALID_PARAM;
 
 	// Make sure that the current poly is indeed off-mesh link.
 	if (poly->getType() != DT_POLYTYPE_OFFMESH_CONNECTION)
@@ -2286,24 +2285,19 @@ dtStatus dtNavMesh::getOffMeshConnectionPolyEndPoints(dtPolyRef prevRef, dtPolyR
 
 const dtOffMeshConnection* dtNavMesh::getOffMeshConnectionByRef(dtPolyRef ref) const
 {
-	unsigned int salt, it, ip;
-	
-	if (!ref)
+	const dtMeshTile* tile; const dtPoly* poly;
+
+	// Get current polygon.
+	if (dtStatusFailed(getTileAndPolyByRef(ref, &tile, &poly)))
 		return 0;
-	
-	// Get current polygon
-	decodePolyId(ref, salt, it, ip);
-	if (it >= (unsigned int)m_maxTiles) return 0;
-	if (m_tiles[it].salt != salt || m_tiles[it].header == 0) return 0;
-	const dtMeshTile* tile = &m_tiles[it];
-	if (ip >= (unsigned int)tile->header->polyCount) return 0;
-	const dtPoly* poly = &tile->polys[ip];
 	
 	// Make sure that the current poly is indeed off-mesh link.
 	if (poly->getType() != DT_POLYTYPE_OFFMESH_CONNECTION)
 		return 0;
 
+	const unsigned int ip = (unsigned int)(poly - tile->polys);
 	const unsigned int idx =  ip - tile->header->offMeshBase;
+
 	rdAssert(idx < (unsigned int)tile->header->offMeshConCount);
 	return &tile->offMeshCons[idx];
 }
@@ -2362,14 +2356,10 @@ void dtNavMesh::freeHints()
 
 dtStatus dtNavMesh::setPolyFlags(dtPolyRef ref, unsigned short flags)
 {
-	if (!ref) return DT_FAILURE;
-	unsigned int salt, it, ip;
-	decodePolyId(ref, salt, it, ip);
-	if (it >= (unsigned int)m_maxTiles) return DT_FAILURE | DT_INVALID_PARAM;
-	if (m_tiles[it].salt != salt || m_tiles[it].header == 0) return DT_FAILURE | DT_INVALID_PARAM;
-	dtMeshTile* tile = &m_tiles[it];
-	if (ip >= (unsigned int)tile->header->polyCount) return DT_FAILURE | DT_INVALID_PARAM;
-	dtPoly* poly = &tile->polys[ip];
+	dtMeshTile* tile; dtPoly* poly;
+
+	if (dtStatusFailed(getTileAndPolyByRef(&tile, &poly, ref)))
+		return DT_FAILURE | DT_INVALID_PARAM;
 	
 	// Change flags.
 	poly->flags = flags;
@@ -2379,14 +2369,10 @@ dtStatus dtNavMesh::setPolyFlags(dtPolyRef ref, unsigned short flags)
 
 dtStatus dtNavMesh::getPolyFlags(dtPolyRef ref, unsigned short* resultFlags) const
 {
-	if (!ref) return DT_FAILURE;
-	unsigned int salt, it, ip;
-	decodePolyId(ref, salt, it, ip);
-	if (it >= (unsigned int)m_maxTiles) return DT_FAILURE | DT_INVALID_PARAM;
-	if (m_tiles[it].salt != salt || m_tiles[it].header == 0) return DT_FAILURE | DT_INVALID_PARAM;
-	const dtMeshTile* tile = &m_tiles[it];
-	if (ip >= (unsigned int)tile->header->polyCount) return DT_FAILURE | DT_INVALID_PARAM;
-	const dtPoly* poly = &tile->polys[ip];
+	const dtMeshTile* tile; const dtPoly* poly;
+
+	if (dtStatusFailed(getTileAndPolyByRef(ref, &tile, &poly)))
+		return DT_FAILURE | DT_INVALID_PARAM;
 
 	*resultFlags = poly->flags;
 	
@@ -2395,14 +2381,10 @@ dtStatus dtNavMesh::getPolyFlags(dtPolyRef ref, unsigned short* resultFlags) con
 
 dtStatus dtNavMesh::setPolyArea(dtPolyRef ref, unsigned char area)
 {
-	if (!ref) return DT_FAILURE;
-	unsigned int salt, it, ip;
-	decodePolyId(ref, salt, it, ip);
-	if (it >= (unsigned int)m_maxTiles) return DT_FAILURE | DT_INVALID_PARAM;
-	if (m_tiles[it].salt != salt || m_tiles[it].header == 0) return DT_FAILURE | DT_INVALID_PARAM;
-	dtMeshTile* tile = &m_tiles[it];
-	if (ip >= (unsigned int)tile->header->polyCount) return DT_FAILURE | DT_INVALID_PARAM;
-	dtPoly* poly = &tile->polys[ip];
+	dtMeshTile* tile; dtPoly* poly;
+
+	if (dtStatusFailed(getTileAndPolyByRef(&tile, &poly, ref)))
+		return DT_FAILURE | DT_INVALID_PARAM;
 	
 	poly->setArea(area);
 	
@@ -2411,14 +2393,10 @@ dtStatus dtNavMesh::setPolyArea(dtPolyRef ref, unsigned char area)
 
 dtStatus dtNavMesh::getPolyArea(dtPolyRef ref, unsigned char* resultArea) const
 {
-	if (!ref) return DT_FAILURE;
-	unsigned int salt, it, ip;
-	decodePolyId(ref, salt, it, ip);
-	if (it >= (unsigned int)m_maxTiles) return DT_FAILURE | DT_INVALID_PARAM;
-	if (m_tiles[it].salt != salt || m_tiles[it].header == 0) return DT_FAILURE | DT_INVALID_PARAM;
-	const dtMeshTile* tile = &m_tiles[it];
-	if (ip >= (unsigned int)tile->header->polyCount) return DT_FAILURE | DT_INVALID_PARAM;
-	const dtPoly* poly = &tile->polys[ip];
+	const dtMeshTile* tile; const dtPoly* poly;
+
+	if (dtStatusFailed(getTileAndPolyByRef(ref, &tile, &poly)))
+		return DT_FAILURE | DT_INVALID_PARAM;
 	
 	*resultArea = poly->getArea();
 	

@@ -1088,6 +1088,9 @@ public:
 	dtPolyRef clampOffMeshVertToPoly(dtOffMeshConnection* con, dtMeshTile* conTile, const dtMeshTile* lookupTile, const bool start);
 
 private:
+	/// Same as the public #getTileAndPolyByRef, but provides mutable handles.
+	dtStatus getTileAndPolyByRef(dtMeshTile** tile, dtPoly** poly, const dtPolyRef ref) const;
+
 	/// Returns all polygons in neighbour tile based on portal defined by the segment.
 	int findConnectingPolys(const rdVec3D* va, const rdVec3D* vb,
 		const dtMeshTile* tile, int side,
