@@ -1084,7 +1084,7 @@ void dtCrowd::update(const float dt, dtCrowdAgentDebugInfo* debug)
 			for (int j = 0; j < ag->boundary.getSegmentCount(); ++j)
 			{
 				const rdVec3D* s = ag->boundary.getSegmentStart(j);
-				const rdVec3D* e = ag->boundary.getSegmentStart(j);
+				const rdVec3D* e = ag->boundary.getSegmentEnd(j);
 				if (rdTriArea2D(&ag->npos, s, e) < 0.0f)
 					continue;
 				m_obstacleQuery->addSegment(s, e);
