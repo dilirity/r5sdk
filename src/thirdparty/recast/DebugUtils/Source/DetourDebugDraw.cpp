@@ -494,122 +494,6 @@ static void drawOffMeshConnections(duDebugDraw* dd, const dtNavMesh& mesh, const
 	dd->end();
 }
 
-void duDebugDrawMeshTile(duDebugDraw* dd, const dtNavMesh& mesh, const dtNavMeshQuery* query,
-						 const dtMeshTile* tile, const rdVec3D* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams)
-{
-	const bool depthTest = flags & DU_DRAW_DETOURMESH_DEPTH_MASK;
-
-	dd->depthMask(depthTest);
-
-	if (flags & DU_DRAW_DETOURMESH_POLY_FACES)
-		drawPolyMeshFaces(dd, mesh, query, tile, offset, flags);
-
-	if (flags & DU_DRAW_DETOURMESH_POLY_EDGES)
-		drawPolyMeshEdges(dd, tile, offset);
-
-	if (flags & DU_DRAW_DETOURMESH_POLY_VERTS)
-		drawPolyVerts(dd, tile, offset);
-
-	// Draw inner poly boundaries
-	if (flags & DU_DRAW_DETOURMESH_POLY_BOUNDS_INNER)
-		drawPolyBoundaries(dd, tile, 1.5f, offset, flags, true);
-	
-	// Draw outer poly boundaries
-	if (flags & DU_DRAW_DETOURMESH_POLY_BOUNDS_OUTER)
-		drawPolyBoundaries(dd, tile, 3.5f, offset, flags, false);
-
-	// Draw poly centers
-	if (flags & DU_DRAW_DETOURMESH_POLY_CENTERS)
-		drawPolyCenters(dd, tile, duRGBA(255, 255, 255, 100), 1.0f, offset);
-
-	if (query && (flags & DU_DRAW_DETOURMESH_TRAVERSE_LINKS))
-		drawTraverseLinks(dd, mesh, query, tile, offset, traverseLinkParams);
-
-	if (flags & DU_DRAW_DETOURMESH_TILE_CELLS)
-		drawTileCells(dd, tile, offset);
-
-	if (flags & DU_DRAW_DETOURMESH_TILE_BOUNDS)
-		drawTileBounds(dd, tile, offset);
-
-	if (flags & DU_DRAW_DETOURMESH_OFFMESHCONS)
-		drawOffMeshConnections(dd, mesh, query, tile, offset);
-
-	if (!depthTest)
-		dd->depthMask(true);
-}
-
-void duDebugDrawNavMesh(duDebugDraw* dd, const dtNavMesh& mesh, const rdVec3D* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams)
-{
-	if (!dd) return;
-	
-	for (int i = 0; i < mesh.getMaxTiles(); ++i)
-	{
-		const dtMeshTile* tile = mesh.getTile(i);
-		if (!tile->header) continue;
-		duDebugDrawMeshTile(dd, mesh, 0, tile, offset, flags, traverseLinkParams);
-	}
-}
-
-void duDebugDrawNavMeshWithClosedList(struct duDebugDraw* dd, const dtNavMesh& mesh, const dtNavMeshQuery& query, const rdVec3D* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams)
-{
-	if (!dd) return;
-
-	const dtNavMeshQuery* q = (flags & DU_DRAW_DETOURMESH_WITH_CLOSED_LIST) ? &query : 0;
-	
-	for (int i = 0; i < mesh.getMaxTiles(); ++i)
-	{
-		const dtMeshTile* tile = mesh.getTile(i);
-		if (!tile->header) continue;
-		duDebugDrawMeshTile(dd, mesh, q, tile, offset, flags, traverseLinkParams);
-	}
-
-	if (flags & DU_DRAW_DETOURMESH_BVTREE)
-		duDebugDrawNavMeshBVTree(dd, mesh, offset);
-	if (flags & DU_DRAW_DETOURMESH_PORTALS)
-		duDebugDrawNavMeshPortals(dd, mesh, offset);
-	if (flags & DU_DRAW_DETOURMESH_QUERY_NODES)
-		duDebugDrawNavMeshNodes(dd, query, offset);
-}
-
-void duDebugDrawNavMeshNodes(struct duDebugDraw* dd, const dtNavMeshQuery& query, const rdVec3D* offset)
-{
-	if (!dd) return;
-	
-	const dtNodePool* pool = query.getNodePool();
-	if (pool)
-	{
-		const float off = 0.5f;
-		dd->begin(DU_DRAW_POINTS, 4.0f, offset);
-		for (int i = 0; i < pool->getHashSize(); ++i)
-		{
-			for (dtNodeIndex j = pool->getFirst(i); j != DT_NULL_IDX; j = pool->getNext(j))
-			{
-				const dtNode* node = pool->getNodeAtIdx(j+1);
-				if (!node) continue;
-				dd->vertex(node->pos.x,node->pos.y,node->pos.z + off, duRGBA(255,192,0,255));
-			}
-		}
-		dd->end();
-		
-		dd->begin(DU_DRAW_LINES, 2.0f, offset);
-		for (int i = 0; i < pool->getHashSize(); ++i)
-		{
-			for (dtNodeIndex j = pool->getFirst(i); j != DT_NULL_IDX; j = pool->getNext(j))
-			{
-				const dtNode* node = pool->getNodeAtIdx(j+1);
-				if (!node) continue;
-				if (!node->pidx) continue;
-				const dtNode* parent = pool->getNodeAtIdx(node->pidx);
-				if (!parent) continue;
-				dd->vertex(node->pos.x,node->pos.y,node->pos.z + off, duRGBA(255,192,0,128));
-				dd->vertex(parent->pos.x,parent->pos.y,parent->pos.z + off, duRGBA(255,192,0,128));
-			}
-		}
-		dd->end();
-	}
-}
-
-
 static void drawMeshTileBVTree(duDebugDraw* dd, const dtMeshTile* tile, const rdVec3D* offset)
 {
 	// Draw BV nodes.
@@ -630,18 +514,6 @@ static void drawMeshTileBVTree(duDebugDraw* dd, const dtMeshTile* tile, const rd
 						duRGBA(255,255,255,128));
 	}
 	dd->end();
-}
-
-void duDebugDrawNavMeshBVTree(duDebugDraw* dd, const dtNavMesh& mesh, const rdVec3D* offset)
-{
-	if (!dd) return;
-	
-	for (int i = 0; i < mesh.getMaxTiles(); ++i)
-	{
-		const dtMeshTile* tile = mesh.getTile(i);
-		if (!tile->header) continue;
-		drawMeshTileBVTree(dd, tile, offset);
-	}
 }
 
 static void drawMeshTilePortal(duDebugDraw* dd, const dtMeshTile* tile, const rdVec3D* offset)
@@ -713,6 +585,135 @@ static void drawMeshTilePortal(duDebugDraw* dd, const dtMeshTile* tile, const rd
 	}
 	
 	dd->end();
+}
+
+void duDebugDrawMeshTile(duDebugDraw* dd, const dtNavMesh& mesh, const dtNavMeshQuery* query,
+						 const dtMeshTile* tile, const rdVec3D* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams)
+{
+	const bool depthTest = flags & DU_DRAW_DETOURMESH_DEPTH_MASK;
+
+	dd->depthMask(depthTest);
+
+	if (flags & DU_DRAW_DETOURMESH_POLY_FACES)
+		drawPolyMeshFaces(dd, mesh, query, tile, offset, flags);
+
+	if (flags & DU_DRAW_DETOURMESH_POLY_EDGES)
+		drawPolyMeshEdges(dd, tile, offset);
+
+	if (flags & DU_DRAW_DETOURMESH_POLY_VERTS)
+		drawPolyVerts(dd, tile, offset);
+
+	// Draw inner poly boundaries
+	if (flags & DU_DRAW_DETOURMESH_POLY_BOUNDS_INNER)
+		drawPolyBoundaries(dd, tile, 1.5f, offset, flags, true);
+	
+	// Draw outer poly boundaries
+	if (flags & DU_DRAW_DETOURMESH_POLY_BOUNDS_OUTER)
+		drawPolyBoundaries(dd, tile, 3.5f, offset, flags, false);
+
+	// Draw poly centers
+	if (flags & DU_DRAW_DETOURMESH_POLY_CENTERS)
+		drawPolyCenters(dd, tile, duRGBA(255, 255, 255, 100), 1.0f, offset);
+
+	if (query && (flags & DU_DRAW_DETOURMESH_TRAVERSE_LINKS))
+		drawTraverseLinks(dd, mesh, query, tile, offset, traverseLinkParams);
+
+	if (flags & DU_DRAW_DETOURMESH_TILE_CELLS)
+		drawTileCells(dd, tile, offset);
+
+	if (flags & DU_DRAW_DETOURMESH_TILE_BOUNDS)
+		drawTileBounds(dd, tile, offset);
+
+	if (flags & DU_DRAW_DETOURMESH_OFFMESHCONS)
+		drawOffMeshConnections(dd, mesh, query, tile, offset);
+
+	if (flags & DU_DRAW_DETOURMESH_BVTREE)
+		drawMeshTileBVTree(dd, tile, offset);
+
+	if (flags & DU_DRAW_DETOURMESH_PORTALS)
+		drawMeshTilePortal(dd, tile, offset);
+
+	if (!depthTest)
+		dd->depthMask(true);
+}
+
+void duDebugDrawNavMesh(duDebugDraw* dd, const dtNavMesh& mesh, const rdVec3D* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams)
+{
+	if (!dd) return;
+	
+	for (int i = 0; i < mesh.getMaxTiles(); ++i)
+	{
+		const dtMeshTile* tile = mesh.getTile(i);
+		if (!tile->header) continue;
+		duDebugDrawMeshTile(dd, mesh, 0, tile, offset, flags, traverseLinkParams);
+	}
+}
+
+void duDebugDrawNavMeshWithClosedList(struct duDebugDraw* dd, const dtNavMesh& mesh, const dtNavMeshQuery& query, const rdVec3D* offset, unsigned int flags, const duDrawTraverseLinkParams& traverseLinkParams)
+{
+	if (!dd) return;
+
+	const dtNavMeshQuery* q = (flags & DU_DRAW_DETOURMESH_WITH_CLOSED_LIST) ? &query : 0;
+	
+	for (int i = 0; i < mesh.getMaxTiles(); ++i)
+	{
+		const dtMeshTile* tile = mesh.getTile(i);
+		if (!tile->header) continue;
+		duDebugDrawMeshTile(dd, mesh, q, tile, offset, flags, traverseLinkParams);
+	}
+
+	if (flags & DU_DRAW_DETOURMESH_QUERY_NODES)
+		duDebugDrawNavMeshNodes(dd, query, offset);
+}
+
+void duDebugDrawNavMeshNodes(struct duDebugDraw* dd, const dtNavMeshQuery& query, const rdVec3D* offset)
+{
+	if (!dd) return;
+	
+	const dtNodePool* pool = query.getNodePool();
+	if (pool)
+	{
+		const float off = 0.5f;
+		dd->begin(DU_DRAW_POINTS, 4.0f, offset);
+		for (int i = 0; i < pool->getHashSize(); ++i)
+		{
+			for (dtNodeIndex j = pool->getFirst(i); j != DT_NULL_IDX; j = pool->getNext(j))
+			{
+				const dtNode* node = pool->getNodeAtIdx(j+1);
+				if (!node) continue;
+				dd->vertex(node->pos.x,node->pos.y,node->pos.z + off, duRGBA(255,192,0,255));
+			}
+		}
+		dd->end();
+		
+		dd->begin(DU_DRAW_LINES, 2.0f, offset);
+		for (int i = 0; i < pool->getHashSize(); ++i)
+		{
+			for (dtNodeIndex j = pool->getFirst(i); j != DT_NULL_IDX; j = pool->getNext(j))
+			{
+				const dtNode* node = pool->getNodeAtIdx(j+1);
+				if (!node) continue;
+				if (!node->pidx) continue;
+				const dtNode* parent = pool->getNodeAtIdx(node->pidx);
+				if (!parent) continue;
+				dd->vertex(node->pos.x,node->pos.y,node->pos.z + off, duRGBA(255,192,0,128));
+				dd->vertex(parent->pos.x,parent->pos.y,parent->pos.z + off, duRGBA(255,192,0,128));
+			}
+		}
+		dd->end();
+	}
+}
+
+void duDebugDrawNavMeshBVTree(duDebugDraw* dd, const dtNavMesh& mesh, const rdVec3D* offset)
+{
+	if (!dd) return;
+	
+	for (int i = 0; i < mesh.getMaxTiles(); ++i)
+	{
+		const dtMeshTile* tile = mesh.getTile(i);
+		if (!tile->header) continue;
+		drawMeshTileBVTree(dd, tile, offset);
+	}
 }
 
 void duDebugDrawNavMeshPortals(duDebugDraw* dd, const dtNavMesh& mesh, const rdVec3D* offset)
