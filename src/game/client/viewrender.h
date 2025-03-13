@@ -1,21 +1,27 @@
 #pragma once
+#include "iviewrender.h"
+#include "view_shared.h"
 
 //-------------------------------------------------------------------------------------
 // Forward declarations
 //-------------------------------------------------------------------------------------
-class VMatrix;
-
-class CViewRender
+class CViewRender : public IViewRender
 {
 public:
-	VMatrix* GetWorldMatrixForView(int8_t slot);
+	inline float GetZFar() const { return m_CurrentView.zFar; }
+	inline float GetZNear() const { return m_CurrentView.zNear; }
+
+	inline float GetFieldOfView() const { return m_CurrentView.fov; }
+	inline float GetAspectRatio() const { return ((float)m_CurrentView.width / (float)m_CurrentView.height); }
+
+private:
+	CViewSetup m_CurrentView;
+	bool m_bAllowViewAccess;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 const Vector3D& MainViewOrigin();
 const QAngle& MainViewAngles();
-
-inline VMatrix*(*CViewRender__GetWorldMatrixForView)(CViewRender*, int8_t);
 
 inline Vector3D* g_vecRenderOrigin = nullptr;
 inline QAngle* g_vecRenderAngles = nullptr;
@@ -29,15 +35,11 @@ class V_ViewRender : public IDetour
 	virtual void GetAdr(void) const
 	{
 		LogConAdr("CViewRender::`vftable'", g_pViewRender_VFTable);
-		LogFunAdr("CViewRender::GetWorldMatrixForView", CViewRender__GetWorldMatrixForView);
 		LogVarAdr("g_ViewRender", g_pViewRender);
 		LogVarAdr("g_vecRenderOrigin", g_vecRenderOrigin);
 		LogVarAdr("g_vecRenderAngles", g_vecRenderAngles);
 	}
-	virtual void GetFun(void) const
-	{
-		CMemory(g_pViewRender_VFTable).WalkVTable(16).Deref().GetPtr(CViewRender__GetWorldMatrixForView); // 16th vfunc.
-	}
+	virtual void GetFun(void) const { }
 	virtual void GetVar(void) const
 	{
 		CMemory base = Module_FindPattern(g_GameDll, "48 89 74 24 ?? 57 48 83 EC 30 F3 0F 10 05 ?? ?? ?? ?? ?? 8B ??");

@@ -239,6 +239,7 @@ add_sources( SOURCE_GROUP "Rendering"
     "client/spritemodel.cpp"
     "client/viewrender.cpp"
     "client/viewrender.h"
+    "client/iviewrender.h"
 )
 
 add_sources( SOURCE_GROUP "Animation"

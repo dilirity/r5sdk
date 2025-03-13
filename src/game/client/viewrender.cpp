@@ -8,11 +8,6 @@
 #include "mathlib/vector.h"
 #include "game/client/viewrender.h"
 
-VMatrix* CViewRender::GetWorldMatrixForView(int8_t slot)
-{
-	return CViewRender__GetWorldMatrixForView(this, slot);
-}
-
 const Vector3D& MainViewOrigin()
 {
 	return (*g_vecRenderOrigin);
