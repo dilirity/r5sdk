@@ -140,6 +140,24 @@ typedef enum tagSQObjectType
 
 typedef struct tagSQVector3D
 {
+	tagSQVector3D() = default;
+	tagSQVector3D(const SQFloat ix, const SQFloat iy, const SQFloat iz)
+	{
+		Init(ix, iy, iz);
+	}
+
+	inline void Init(const SQFloat ix, const SQFloat iy, const SQFloat iz)
+	{
+		x = ix;
+		y = iy;
+		z = iz;
+	}
+
+	inline SQFloat Dot() const
+	{
+		return (x * x) + (y * y) + (z * z);
+	}
+
 	SQFloat x;
 	SQFloat y;
 	SQFloat z;
