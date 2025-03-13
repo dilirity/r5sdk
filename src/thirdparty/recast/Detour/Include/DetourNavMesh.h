@@ -420,6 +420,7 @@ unsigned char dtQuantLinkDistance(const float distance);
 struct dtCell
 {
 	inline void setUnoccupied() { *(int*)((uintptr_t)&occupyState & ~0x3) = -1; }
+	inline bool isOccupied() const { return (*(int*)((uintptr_t)&occupyState & ~0x3)) != -1; }
 
 	rdVec3D pos;					///< The position of the cell.
 	unsigned int polyIndex;			///< The index of the poly this cell is on.
