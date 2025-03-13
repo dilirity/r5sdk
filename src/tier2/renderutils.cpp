@@ -13,6 +13,55 @@
 #include "mathlib/mathlib.h"
 #include "tier2/renderutils.h"
 #include "engine/debugoverlay.h" // TODO[ AMOS ]: must be a public interface!
+#include "rtech/pak/pakstate.h"
+#include "imaterial.h"
+
+//-----------------------------------------------------------------------------
+// Purpose: standard materials
+//-----------------------------------------------------------------------------
+static IMaterial* s_transIgnoreZWire;
+static IMaterial* s_transNormalZWire;
+static IMaterial* s_transIgnoreZFront;
+static IMaterial* s_transNormalZFront;
+static IMaterial* s_transIgnoreZBoth;
+static IMaterial* s_transNormalZBoth;
+
+static bool s_standardMaterialsInitialized = false;
+
+//-----------------------------------------------------------------------------
+// Purpose: initializes the standard materials; these must always be available
+//-----------------------------------------------------------------------------
+static void InitializeStandardMaterials()
+{
+    // Load engine materials first before proceeding with the SDK.
+    // The engine's impl handles LOCAL_THREAD_LOCK internally.
+    v_InitializeStandardMaterials();
+
+    LOCAL_THREAD_LOCK();
+
+    if (s_standardMaterialsInitialized)
+        return;
+
+    s_standardMaterialsInitialized = true;
+    Assert(g_pakLoadApi);
+
+    s_transIgnoreZWire = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_ignorez_wire_rgdu.rpak");
+    s_transNormalZWire = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_normalz_wire_rgdu.rpak");
+    s_transIgnoreZFront = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_ignorez_front_rgdu.rpak");
+    s_transNormalZFront = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_normalz_front_rgdu.rpak");
+    s_transIgnoreZBoth = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_ignorez_both_rgdu.rpak");
+    s_transNormalZBoth = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_normalz_both_rgdu.rpak");
+
+    // Make sure all standard materials have loaded, if this fails, then most
+    // likely the startup.rpak is corrupt or the materials have been renamed.
+    Assert(s_transIgnoreZWire);
+    Assert(s_transNormalZWire);
+    Assert(s_transIgnoreZFront);
+    Assert(s_transNormalZFront);
+    Assert(s_transIgnoreZBoth);
+    Assert(s_transNormalZBoth);
+}
+
 
 //-----------------------------------------------------------------------------
 // Purpose: render angled box:
@@ -356,4 +405,9 @@ void DebugDrawAxis(const Vector3D& vOrigin, const QAngle& vAngles, float flScale
     v_RenderLine(vOrigin, vOrigin + vForward * flScale, Color(0, 255, 0, 255), bZBuffer);
     v_RenderLine(vOrigin, vOrigin + vUp * flScale, Color(255, 0, 0, 255), bZBuffer);
     v_RenderLine(vOrigin, vOrigin + vRight * flScale, Color(0, 0, 255, 255), bZBuffer);
+}
+
+void V_RenderUtils::Detour(const bool bAttach) const
+{
+    DetourSetup(&v_InitializeStandardMaterials, &InitializeStandardMaterials, bAttach);
 }
