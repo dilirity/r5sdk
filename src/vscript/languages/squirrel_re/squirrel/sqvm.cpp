@@ -185,6 +185,7 @@ void SQVM::Pop(SQInteger n) {
 }
 
 void SQVM::Push(const SQObjectPtr& o) { _stack[_top++] = o; }
+void SQVM::PushNull() { Push(_null_); }
 SQObjectPtr& SQVM::Top() { return _stack[_top - 1]; }
 SQObjectPtr& SQVM::PopGet() { return _stack[--_top]; }
 SQObjectPtr& SQVM::GetUp(SQInteger n) { return _stack[_top + n]; }
