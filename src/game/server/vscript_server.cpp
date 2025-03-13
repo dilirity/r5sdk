@@ -24,6 +24,7 @@
 #include <engine/host_state.h>
 #include "player.h"
 #include <common/callback.h>
+#include "detour_impl.h"
 
 /*
 =====================
@@ -256,6 +257,140 @@ static SQRESULT ServerScript_ScriptSetClassVar(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: checks if the provided hull type is valid
+//-----------------------------------------------------------------------------
+static bool Internal_ServerScript_ValidateHull(const SQInteger hull)
+{
+    if (hull < 0 || hull >= Hull_e::NUM_HULLS)
+    {
+        v_SQVM_ScriptError("Hull type with value %d does not index the maximum number of hulls(%d)", hull, Hull_e::NUM_HULLS);
+        return false;
+    }
+
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: checks if the provided half-extents is valid
+//-----------------------------------------------------------------------------
+static bool Internal_ServerScript_NavMesh_GetExtents(HSQUIRRELVM v, const SQInteger stackIdx, rdVec3D* const out)
+{
+    const SQVector3D* extents;
+    sq_getvector(v, stackIdx, &extents);
+
+    const SQFloat maxMagnitudeSqr = 9000000.0f;
+    const SQFloat magnitudeSqr = extents->Dot();
+
+    if (magnitudeSqr > maxMagnitudeSqr)
+    {
+        v_SQVM_ScriptError("Extents magnitude (%f) is too big. Max magnitude is %f", sqrtf(magnitudeSqr), sqrtf(maxMagnitudeSqr));
+        return false;
+    }
+
+    if (extents->x <= 0.f || extents->y <= 0.f || extents->z <= 0.f)
+    {
+        v_SQVM_ScriptError("Extents elements (%f, %f, %f) must all be greater than zero", extents->x, extents->y, extents->z);
+        return false;
+    }
+
+    out->init(extents->x, extents->y, extents->z);
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: finds the nearest poly to given point, with an optional bounds filter.
+//-----------------------------------------------------------------------------
+static bool Internal_ServerScript_NavMesh_FindNearestPos(HSQUIRRELVM v, const bool useBounds)
+{
+    SQInteger hullType;
+    sq_getinteger(v, useBounds ? 4 : 3, &hullType);
+
+    if (!Internal_ServerScript_ValidateHull(hullType))
+        return false;
+
+    const Hull_s& hull = g_aiHullProperties[hullType];
+    const dtNavMesh* const nav = g_navMeshArray[hull.navMeshType];
+
+    if (!nav)
+    {
+        DevWarning(eDLL_T::SERVER, "NavMesh \"%s\" for hull \"%s\" hasn't been loaded!\n",
+            g_navMeshNames[hull.navMeshType], g_aiHullNames[hullType]);
+
+        v->PushNull();
+        return true;
+    }
+
+    rdVec3D halfExtents;
+
+    if (useBounds)
+    {
+        if (!Internal_ServerScript_NavMesh_GetExtents(v, 3, &halfExtents))
+            return false;
+    }
+    else
+    {
+        const Vector3D& maxs = hull.maxs;
+        halfExtents.init(maxs.x, maxs.y, maxs.z);
+    }
+
+    const SQVector3D* point;
+    sq_getvector(v, 2, &point);
+
+    const rdVec3D searchPoint(point->x, point->y, point->z);
+
+    dtNavMeshQuery query;
+    query.attachNavMeshUnsafe(g_navMeshArray[hull.navMeshType]);
+
+    dtQueryFilter filter;
+    filter.setIncludeFlags(DT_POLYFLAGS_ALL);
+    filter.setExcludeFlags(DT_POLYFLAGS_DISABLED);
+
+    dtPolyRef nearestRef;
+    rdVec3D nearestPt;
+
+    const dtStatus status = useBounds
+        ? query.findNearestPolyInBounds(&searchPoint, &halfExtents, &filter, &nearestRef, &nearestPt)
+        : query.findNearestPoly(&searchPoint, &halfExtents, &filter, &nearestRef, &nearestPt);
+
+    if (dtStatusFailed(status) || !nearestRef)
+    {
+        v->PushNull();
+        return true;
+    }
+
+    const SQVector3D result(nearestPt.x, nearestPt.y, nearestPt.z);
+    sq_pushvector(v, &result);
+
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: finds the nearest polygon to provided point
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_GetNearestPos(HSQUIRRELVM v)
+{
+    const bool ret = Internal_ServerScript_NavMesh_FindNearestPos(v, false);
+
+    if (!ret)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: finds the nearest polygon to provided point within extents
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_GetNearestPosInBounds(HSQUIRRELVM v)
+{
+    const bool ret = Internal_ServerScript_NavMesh_FindNearestPos(v, true);
+
+    if (!ret)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //---------------------------------------------------------------------------------
 // Purpose: registers script functions in SERVER context
 // Input  : *s - 
@@ -282,6 +417,9 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
 {
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SetAutoReloadState, "Set whether we can auto-reload the server", "void", "bool canAutoReload");
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, GetServerID, "Gets the current server ID", "string", "");
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPos, "Finds the nearest position to the provided point on the NavMesh for hull type", "vector ornull", "vector searchPoint, int hullType");
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPosInBounds, "Finds the nearest position to the provided point within the given bounds on the NavMesh for hull type", "vector ornull", "vector searchPoint, vector halfExtents, int hullType");
 }
 
 //---------------------------------------------------------------------------------
