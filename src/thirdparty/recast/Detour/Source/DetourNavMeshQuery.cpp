@@ -629,62 +629,6 @@ class dtFindNearestPolyQuery : public dtPolyQuery
 {
 	const dtNavMeshQuery* m_query;
 	const rdVec3D* m_center;
-	float m_nearestDistanceSqr;
-	dtPolyRef m_nearestRef;
-	rdVec3D m_nearestPoint;
-	bool m_overPoly;
-
-public:
-	dtFindNearestPolyQuery(const dtNavMeshQuery* query, const rdVec3D* center)
-		: m_query(query), m_center(center), m_nearestDistanceSqr(FLT_MAX), m_nearestRef(0), m_nearestPoint(), m_overPoly(false)
-	{
-	}
-
-	dtPolyRef nearestRef() const { return m_nearestRef; }
-	const rdVec3D* nearestPoint() const { return &m_nearestPoint; }
-	bool isOverPoly() const { return m_overPoly; }
-
-	void process(const dtMeshTile* tile, dtPoly** polys, dtPolyRef* refs, int count)
-	{
-		rdIgnoreUnused(polys);
-
-		for (int i = 0; i < count; ++i)
-		{
-			dtPolyRef ref = refs[i];
-			rdVec3D closestPtPoly;
-			rdVec3D diff;
-			bool posOverPoly = false;
-			float d;
-			m_query->closestPointOnPoly(ref, m_center, &closestPtPoly, &posOverPoly);
-
-			// If a point is directly over a polygon and closer than
-			// climb height, favor that instead of straight line nearest point.
-			rdVsub(&diff, m_center, &closestPtPoly);
-			if (posOverPoly)
-			{
-				d = rdAbs(diff.z) - tile->header->walkableClimb;
-				d = d > 0 ? d*d : 0;			
-			}
-			else
-			{
-				d = rdVlenSqr(&diff);
-			}
-			
-			if (d < m_nearestDistanceSqr)
-			{
-				m_nearestPoint = closestPtPoly;
-				m_nearestDistanceSqr = d;
-				m_nearestRef = ref;
-				m_overPoly = posOverPoly;
-			}
-		}
-	}
-};
-
-class dtFindNearestPolyInBoundsQuery : public dtPolyQuery
-{
-	const dtNavMeshQuery* m_query;
-	const rdVec3D* m_center;
 	const rdVec3D* m_halfExtents;
 	float m_nearestDistanceSqr;
 	dtPolyRef m_nearestRef;
@@ -692,7 +636,7 @@ class dtFindNearestPolyInBoundsQuery : public dtPolyQuery
 	bool m_overPoly;
 
 public:
-	dtFindNearestPolyInBoundsQuery(const dtNavMeshQuery* query, const rdVec3D* center, const rdVec3D* halfExtents)
+	dtFindNearestPolyQuery(const dtNavMeshQuery* query, const rdVec3D* center, const rdVec3D* halfExtents)
 		: m_query(query), m_center(center), m_halfExtents(halfExtents), m_nearestDistanceSqr(FLT_MAX), m_nearestRef(0), m_nearestPoint(), m_overPoly(false)
 	{
 	}
@@ -786,41 +730,7 @@ dtStatus dtNavMeshQuery::findNearestPoly(const rdVec3D* center, const rdVec3D* h
 		return DT_FAILURE | DT_INVALID_PARAM;
 
 	// queryPolygons below will check rest of params
-	dtFindNearestPolyQuery query(this, center);
-	const dtStatus status = queryPolygonsInArea(center, halfExtents, filter, &query);
-
-	if (dtStatusFailed(status))
-		return status;
-
-	*nearestRef = query.nearestRef();
-	// Only override nearestPt if we actually found a poly so the nearest point
-	// is valid.
-	if (nearestPt && *nearestRef)
-	{
-		rdVcopy(nearestPt, query.nearestPoint());
-		if (isOverPoly)
-			*isOverPoly = query.isOverPoly();
-	}
-	
-	return DT_SUCCESS;
-}
-
-/// @par 
-/// 
-/// @note The same as #findNearestPoly, but rejects anything that is not
-/// within the provided search box.
-/// 
-dtStatus dtNavMeshQuery::findNearestPolyInBounds(const rdVec3D* center, const rdVec3D* halfExtents,
-												 const dtQueryFilter* filter, dtPolyRef* nearestRef,
-												 rdVec3D* nearestPt, bool* isOverPoly) const
-{
-	rdAssert(m_nav);
-
-	if (!nearestRef)
-		return DT_FAILURE | DT_INVALID_PARAM;
-
-	// queryPolygons below will check rest of params
-	dtFindNearestPolyInBoundsQuery query(this, center, halfExtents);
+	dtFindNearestPolyQuery query(this, halfExtents, center);
 	const dtStatus status = queryPolygonsInArea(center, halfExtents, filter, &query);
 
 	if (dtStatusFailed(status))

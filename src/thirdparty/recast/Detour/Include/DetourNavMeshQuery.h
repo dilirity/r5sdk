@@ -402,20 +402,6 @@ public:
 							 const dtQueryFilter* filter,
 							 dtPolyRef* nearestRef, rdVec3D* nearestPt, bool* isOverPoly = nullptr) const;
 
-	/// Finds the polygon nearest to the specified center point within bounds defined by @p halfExtents.
-	/// [opt] means the specified parameter can be a null pointer, in that case the output parameter will not be set.
-	/// 
-	///  @param[in]		center		The center of the search box. [(x, y, z)]
-	///  @param[in]		halfExtents	The search distance along each axis. [(x, y, z)]
-	///  @param[in]		filter		The polygon filter to apply to the query.
-	///  @param[out]	nearestRef	The reference id of the nearest polygon. Will be set to 0 if no polygon is found.
-	///  @param[out]	nearestPt	The nearest point on the polygon. Unchanged if no polygon is found. [opt] [(x, y, z)]
-	///  @param[out]	isOverPoly 	Set to true if the point's X/Z coordinate lies inside the polygon, false otherwise. Unchanged if no polygon is found. [opt]
-	/// @returns The status flags for the query.
-	dtStatus findNearestPolyInBounds(const rdVec3D* center, const rdVec3D* halfExtents,
-									 const dtQueryFilter* filter,
-									 dtPolyRef* nearestRef, rdVec3D* nearestPt, bool* isOverPoly = nullptr) const;
-
 	/// Finds polygons that overlap the search box.
 	///  @param[in]		center		The center of the search box. [(x, y, z)]
 	///  @param[in]		halfExtents		The search distance along each axis. [(x, y, z)]

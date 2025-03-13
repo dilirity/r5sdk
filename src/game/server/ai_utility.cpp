@@ -96,7 +96,7 @@ static dtStatus Detour_FindNearestPolyInBounds(dtNavMeshQuery* const query, cons
     // 
     // Its also more accurate and robust compared to the old one, as the new
     // one favors climb height over straight list distances to nearest poly.
-    return query->findNearestPolyInBounds(center, halfExtents, filter, nearestRef, nearestPt, nullptr);
+    return query->findNearestPoly(center, halfExtents, filter, nearestRef, nearestPt, nullptr);
 }
 
 //-----------------------------------------------------------------------------
