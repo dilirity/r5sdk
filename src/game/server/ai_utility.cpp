@@ -305,7 +305,9 @@ bool Detour_IsLoaded()
 void Detour_HotSwap()
 {
     Assert(ThreadInMainOrServerFrameThread());
-    g_pServerScript->ExecuteCodeCallback("CodeCallback_OnNavMeshHotSwapBegin");
+
+    if (g_pServerScript)
+        g_pServerScript->ExecuteCodeCallback("CodeCallback_OnNavMeshHotSwapBegin");
 
     const dtNavMesh* const queryNav = g_navMeshQuery->getAttachedNavMesh();
     NavMeshType_e queryNavType = NAVMESH_INVALID;
@@ -361,7 +363,8 @@ void Detour_HotSwap()
             Error(eDLL_T::SERVER, NOERROR, "%s - Failed to initialize Detour NavMesh query for %s\n", __FUNCTION__, UTIL_GetEntityScriptInfo(npc));
     }
 
-    g_pServerScript->ExecuteCodeCallback("CodeCallback_OnNavMeshHotSwapEnd");
+    if (g_pServerScript)
+        g_pServerScript->ExecuteCodeCallback("CodeCallback_OnNavMeshHotSwapEnd");
 }
 
 /*
