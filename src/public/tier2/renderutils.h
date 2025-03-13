@@ -14,6 +14,10 @@ void DebugDrawMark(const Vector3D& vOrigin, float flRadius, const vector<int>& v
 void DrawStar(const Vector3D& vRrigin, float flRadius, bool bZBuffer = true);
 void DebugDrawArrow(const Vector3D& vOrigin, const Vector3D& vEnd, float flArraySize, Color color, bool bZBuffer = true);
 void DebugDrawAxis(const Vector3D& vOrigin, const QAngle& vAngles = { 0, 0, 0 }, float flScale = 50.f, bool bZBuffer = true);
+
+///////////////////////////////////////////////////////////////////////////////
+void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, const bool bZBuffer);
+
 ///////////////////////////////////////////////////////////////////////////////
 inline void(*v_InitializeStandardMaterials)();
 

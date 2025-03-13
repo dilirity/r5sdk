@@ -15,6 +15,15 @@
 #include "engine/debugoverlay.h" // TODO[ AMOS ]: must be a public interface!
 #include "rtech/pak/pakstate.h"
 #include "imaterial.h"
+#include "materialsystem/cmaterialsystem.h"
+#include "materialsystem/cmatrendercontext.h"
+#include "materialsystem/cmatqueuedrendercontext.h"
+
+//-----------------------------------------------------------------------------
+// Purpose: console variables
+//-----------------------------------------------------------------------------
+static ConVar r_debugDrawForceWireFrame("r_debugDrawForceWireFrame", "0");
+static ConVar r_debugDrawCullBackFaces("r_debugDrawCullBackFaces", "0");
 
 //-----------------------------------------------------------------------------
 // Purpose: standard materials
@@ -62,6 +71,135 @@ static void InitializeStandardMaterials()
     Assert(s_transNormalZBoth);
 }
 
+struct RenderTriangleQueue_s
+{
+    void (*function)(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, IMaterial* const pMaterial);
+    Vector3D p1;
+    Vector3D p2;
+    Vector3D p3;
+    Color color;
+    IMaterial* material;
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: process and advance triangle render queue
+//-----------------------------------------------------------------------------
+static void TriangleRenderQueueFunctor(CallQueue_s* const queue)
+{
+    RenderTriangleQueue_s* const item = (RenderTriangleQueue_s*)queue->GetCurrentCallItem();
+    item->function(item->p1, item->p2, item->p3, item->color, item->material);
+
+    // Advance the queue.
+    queue->currentCallIndex += sizeof(RenderTriangleQueue_s);
+}
+
+struct RenderTriangleVert_s
+{
+    Vector3D position;
+    Vector3D normal;
+    Color color;
+    Vector2D texCoord;
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: process and advance triangle render queue
+//-----------------------------------------------------------------------------
+static void RenderTriangleInternal(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, IMaterial* const pMaterial)
+{
+    v_InitializeStandardMaterials();
+
+    // Queue it off if this is called outside the render thread.
+    if ((*g_fnHasRenderCallQueue)())
+    {
+        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(TriangleRenderQueueFunctor, sizeof(RenderTriangleQueue_s), 7);
+        RenderTriangleQueue_s* const item = (RenderTriangleQueue_s*)queue->GetCurrentAllocatedItem();
+
+        item->function = RenderTriangleInternal;
+        item->p1 = p1;
+        item->p2 = p2;
+        item->p3 = p3;
+        item->color = c;
+        item->material = pMaterial;
+
+        (*g_fnAdvanceRenderCallQueue)(sizeof(RenderTriangleQueue_s));
+        return;
+    }
+
+    CMatRenderContext* const ctx = g_pMaterialSystem->GetRenderContext();
+    ctx->Bind(pMaterial);
+
+    DirectDrawParams_s drawParams;
+
+    drawParams.vertexFormat.position3d = 1;
+    drawParams.vertexFormat.color = 1;
+    drawParams.vertexFormat.normal = 1;
+    drawParams.vertexFormat.texCoordFlags = 1;
+
+    drawParams.vertexStructSize = sizeof(RenderTriangleVert_s);
+    drawParams.vertexBlockIndex = 0;
+    drawParams.vertexBufferOffset = 0;
+    drawParams.vertexCount = 0;
+
+    // Allocate 3 instances of RenderTriangleVert_s.
+    RenderTriangleVert_s* const dynamicMesh = (RenderTriangleVert_s*)ctx->GetDynamicMesh(3, &drawParams, 13);
+
+    if (dynamicMesh)
+    {
+        Vector3D vecNormal;
+        Vector3D vecDelta1, vecDelta2;
+        VectorSubtract(p2, p1, vecDelta1);
+        VectorSubtract(p3, p1, vecDelta2);
+        CrossProduct(vecDelta1, vecDelta2, vecNormal);
+        VectorNormalize(vecNormal);
+
+        dynamicMesh[0].position = p1;
+        dynamicMesh[0].normal = vecNormal;
+        dynamicMesh[0].color = c;
+        dynamicMesh[0].texCoord.Init(0.0f, 0.0f);
+        dynamicMesh[1].position = p2;
+        dynamicMesh[1].normal = vecNormal;
+        dynamicMesh[1].color = c;
+        dynamicMesh[1].texCoord.Init(0.0f, 1.0f);
+        dynamicMesh[2].position = p3;
+        dynamicMesh[2].normal = vecNormal;
+        dynamicMesh[2].color = c;
+        dynamicMesh[2].texCoord.Init(1.0f, 0.0f);
+
+        ctx->EndDynamicMesh(drawParams.vertexCount);
+        ctx->DrawTriangleList(&drawParams, nullptr, 0);
+    }
+
+    // Need to call this to decrement context ref counter.
+    ctx->EndRenderer();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: determines and returns the material to use for given parameters
+//-----------------------------------------------------------------------------
+static IMaterial* SelectDebugMaterialForBind(const Color c, const bool bZBuffer)
+{
+    if (c.a() < 1 || r_debugDrawForceWireFrame.GetBool())
+        return bZBuffer ? s_transNormalZWire : s_transIgnoreZWire;
+    else
+    {
+        if (r_debugDrawCullBackFaces.GetBool())
+            return bZBuffer ? s_transNormalZFront : s_transIgnoreZFront;
+        else
+            return bZBuffer ? s_transNormalZBoth : s_transIgnoreZBoth;
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: returns the material to use for given parameters
+//-----------------------------------------------------------------------------
+void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, const bool bZBuffer)
+{
+    RenderTriangleInternal(p1, p2, p3, c, SelectDebugMaterialForBind(c, bZBuffer));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Below a set of helper functions for shapes utilizing the render code above
+///////////////////////////////////////////////////////////////////////////////
 
 //-----------------------------------------------------------------------------
 // Purpose: render angled box:
