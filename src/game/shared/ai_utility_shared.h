@@ -1,6 +1,11 @@
 #ifndef AI_UTILITY_SHARED_H
 #define AI_UTILITY_SHARED_H
 
+#include "navmesh_debug_draw.h"
+#include "mathlib/vector.h"
+#include "mathlib/vplane.h"
+#include "mathlib/fltx4.h"
+
 //------------------------------------------------------------------------------
 // Forward declarations
 //------------------------------------------------------------------------------
@@ -17,7 +22,9 @@ class CAI_Utility
 {
 public:
 	CAI_Utility(void);
+
 	void RunRenderFrame(void);
+	void DrawNavMesh(const dtNavMesh& mesh, const u32 flags);
 
 	void DrawAIScriptNetwork(const CAI_Network* pNetwork,
 		const Vector3D& vCameraPos,
@@ -25,39 +32,15 @@ public:
 		const float flCameraRange,
 		const bool bDepthBuffer) const;
 
-	void DrawNavMeshBVTree(const dtNavMesh* mesh,
-		const Vector3D& vCameraPos,
-		const VPlane* vCullPlane,
-		const int iBVTreeIndex,
-		const float flCameraRange,
-		const int nTileRange,
-		const bool bDepthBuffer) const;
-
-	void DrawNavMeshPortals(const dtNavMesh* mesh,
-		const Vector3D& vCameraPos,
-		const VPlane* vCullPlane,
-		const int iPortalIndex,
-		const float flCameraRange,
-		const int nTileRange,
-		const bool bDepthBuffer) const;
-
-	void DrawNavMeshPolyBoundaries(const dtNavMesh* mesh,
-		const Vector3D& vCameraPos,
-		const VPlane* vCullPlane,
-		const int iBoundaryIndex,
-		const float flCameraRange,
-		const int nTileRange,
-		const bool bDrawInner,
-		const bool bDrawDetail,
-		const bool bDepthBuffer) const;
-
-	shortx8 PackNodeLink(int32_t a, int32_t b, int32_t c = 0, int32_t d = 0) const;
+	static shortx8 PackNodeLink(i32 a, i32 b, i32 c = 0, i32 d = 0);
 	int GetNearestNodeToPos(const CAI_Network* pAINetwork, const Vector3D* vec) const;
 	bool IsTileWithinRange(const dtMeshTile* pTile, const VPlane* vPlane, const Vector3D& vCamera, const float flCameraRadius) const;
 
 private:
-	Color m_BoxColor;
-	Color m_LinkColor;
+	rdNavMeshDebugDraw m_navMeshDebugDraw;
+	dtNavMeshQuery m_navMeshQuery;
+
+	VPlane m_cullPlane;
 };
 
 extern CAI_Utility g_AIUtility;
