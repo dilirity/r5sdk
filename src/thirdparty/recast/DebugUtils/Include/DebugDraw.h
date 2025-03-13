@@ -22,10 +22,11 @@
 
 enum duDebugDrawPrimitives
 {
+	DU_DRAW_UNDEFINED,
 	DU_DRAW_POINTS,
 	DU_DRAW_LINES,
 	DU_DRAW_TRIS,
-	DU_DRAW_QUADS,	
+	DU_DRAW_QUADS,
 };
 
 /// Abstract debug draw interface.

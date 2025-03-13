@@ -213,6 +213,10 @@ void DebugDrawGL::begin(const duDebugDrawPrimitives prim, const float size, cons
 		case DU_DRAW_QUADS:
 			glBegin(GL_QUADS);
 			break;
+
+		default:
+			rdAssert(0);
+			break;
 	};
 
 	if (offset)

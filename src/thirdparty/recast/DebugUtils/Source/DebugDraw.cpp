@@ -531,7 +531,7 @@ void duAppendCross(struct duDebugDraw* dd, const float x, const float y, const f
 }
 
 duDisplayList::duDisplayList(int cap) :
-	m_prim(DU_DRAW_LINES),
+	m_prim(DU_DRAW_UNDEFINED),
 	m_primSize(1.0f),
 	m_pos(0),
 	m_color(0),
@@ -580,6 +580,8 @@ void duDisplayList::depthMask(bool state)
 
 void duDisplayList::begin(const duDebugDrawPrimitives prim, const float size, const rdVec3D* offset)
 {
+	rdAssert(prim != DU_DRAW_UNDEFINED);
+
 	clear();
 	m_prim = prim;
 	m_primSize = size;
