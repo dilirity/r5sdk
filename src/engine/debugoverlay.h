@@ -12,12 +12,15 @@ enum class OverlayType_t
 	OVERLAY_BOX = 0,
 	OVERLAY_SPHERE,
 	OVERLAY_LINE,
+	OVERLAY_CUSTOM_MESH,
+	OVERLAY_SPLINE,
 	OVERLAY_TRIANGLE,
-	OVERLAY_LASER_LINE,
-	OVERLAY_BOX2,
+	OVERLAY_SWEPT_BOX,
+	OVERLAY_UNKNOWN, // see 0x140209440, possibly a tetrahedron or quadrilateral?
+	OVERLAY_DESTROYED, // see 0x140208230, DestroyOverlay sets all destroyed overlays to this.
+
+	// Custom SDK overlays start from here.
 	OVERLAY_CAPSULE,
-	OVERLAY_UNK0,
-	OVERLAY_UNK1
 };
 
 struct OverlayBase_t
@@ -99,6 +102,18 @@ struct OverlayLine_t : public OverlayBase_t
 	bool            noDepthTest;
 };
 
+struct OverlayCustomMesh_t : public OverlayBase_t
+{
+	OverlayCustomMesh_t(void) { m_Type = OverlayType_t::OVERLAY_CUSTOM_MESH; }
+
+	matrix3x4_t     matrices[128];
+	int             r;
+	int             g;
+	int             b;
+	int             a;
+	bool            noDepthTest;
+};
+
 struct OverlayTriangle_t : public OverlayBase_t
 {
 	OverlayTriangle_t() { m_Type = OverlayType_t::OVERLAY_TRIANGLE; }
@@ -113,17 +128,19 @@ struct OverlayTriangle_t : public OverlayBase_t
 	bool			noDepthTest;
 };
 
-struct OverlayLaserLine_t : public OverlayBase_t
+struct OverlaySweptBox_t : public OverlayBase_t
 {
-	OverlayLaserLine_t() { m_Type = OverlayType_t::OVERLAY_LASER_LINE; }
+	OverlaySweptBox_t() { m_Type = OverlayType_t::OVERLAY_SWEPT_BOX; }
 
-	Vector3D		start;
-	Vector3D		end;
-	int				r;
-	int				g;
-	int				b;
-	int				a;
-	bool			noDepthTest;
+	Vector3D start;
+	Vector3D end;
+	Vector3D mins;
+	Vector3D maxs;
+	QAngle angles;
+	int r;
+	int g;
+	int b;
+	int a;
 };
 
 struct OverlayCapsule_t : public OverlayBase_t

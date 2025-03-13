@@ -77,17 +77,21 @@ void DestroyOverlay(OverlayBase_t* pOverlay)
     case OverlayType_t::OVERLAY_BOX:
     case OverlayType_t::OVERLAY_SPHERE:
     case OverlayType_t::OVERLAY_LINE:
+    case OverlayType_t::OVERLAY_CUSTOM_MESH:
     case OverlayType_t::OVERLAY_TRIANGLE:
-    case OverlayType_t::OVERLAY_BOX2:
+    case OverlayType_t::OVERLAY_SWEPT_BOX:
+    case OverlayType_t::OVERLAY_UNKNOWN:
     case OverlayType_t::OVERLAY_CAPSULE:
-    case OverlayType_t::OVERLAY_UNK0:
+        pOverlay->m_Type = OverlayType_t::OVERLAY_DESTROYED;
         delete pOverlay;
+
         break;
         // The laser line overlay, used for the smart pistol's guidance
         // line, appears to be not deleted in this particular function.
         // Its unclear whether or not something else takes care of this,
         // research needed!!!
-    case OverlayType_t::OVERLAY_LASER_LINE:
+    case OverlayType_t::OVERLAY_SPLINE:
+        pOverlay->m_Type = OverlayType_t::OVERLAY_DESTROYED;
         break;
     default:
         Assert(0); // Code bug; invalid overlay type.
@@ -167,20 +171,24 @@ void DrawOverlay(OverlayBase_t* pOverlay)
         v_RenderLine(pLine->origin, pLine->dest, Color(pLine->r, pLine->g, pLine->b, pLine->a), !pLine->noDepthTest);
         break;
     }
+    case OverlayType_t::OVERLAY_CUSTOM_MESH:
+    {
+        // TODO: 128 * matrix3x4_t, figure out how to render this...
+        // Nothing in the game is currently calling this overlay, so
+        // implementing this isn't necessary.
+        break;
+    }
+    case OverlayType_t::OVERLAY_SPLINE:
+    {
+        // This is used for the Smart Pistol laser.
+        OverlayLine_t* pLaser = reinterpret_cast<OverlayLine_t*>(pOverlay);
+        v_RenderLine(pLaser->origin, pLaser->dest, Color(pLaser->r, pLaser->g, pLaser->b, pLaser->a), !pLaser->noDepthTest);
+        break;
+    }
     case OverlayType_t::OVERLAY_TRIANGLE:
     {
-        //printf("TRIANGLE %p\n", pOverlay);
-        break;
-    }
-    case OverlayType_t::OVERLAY_LASER_LINE:
-    {
-        OverlayLaserLine_t* pLaser = static_cast<OverlayLaserLine_t*>(pOverlay);
-        v_RenderLine(pLaser->start, pLaser->end, Color(pLaser->r, pLaser->g, pLaser->b, pLaser->a), !pLaser->noDepthTest);
-        break;
-    }
-    case OverlayType_t::OVERLAY_BOX2:
-    {
-        //printf("BOX2 %p\n", pOverlay);
+        OverlayTriangle_t* pTriangle = reinterpret_cast<OverlayTriangle_t*>(pOverlay);
+        RenderTriangle(pTriangle->p1, pTriangle->p2, pTriangle->p3, Color(pTriangle->r, pTriangle->g, pTriangle->b, pTriangle->a), !pTriangle->noDepthTest);
         break;
     }
     case OverlayType_t::OVERLAY_CAPSULE:
@@ -203,18 +211,13 @@ void DrawOverlay(OverlayBase_t* pOverlay)
         VectorAngles(pCapsule->end, pCapsule->start, angles);
         AngleInverse(angles, angles);
 
-        DebugDrawCapsule(pCapsule->start, angles, pCapsule->radius, pCapsule->start.DistTo(pCapsule->end), 
+        DebugDrawCapsule(pCapsule->start, angles, pCapsule->radius, pCapsule->start.DistTo(pCapsule->end),
             Color(pCapsule->r, pCapsule->g, pCapsule->b, pCapsule->a), r_debug_draw_depth_test.GetBool());
         break;
     }
-    case OverlayType_t::OVERLAY_UNK0:
+    case OverlayType_t::OVERLAY_UNKNOWN:
     {
         //printf("UNK0 %p\n", pOverlay);
-        break;
-    }
-    case OverlayType_t::OVERLAY_UNK1:
-    {
-        //printf("UNK1 %p\n", pOverlay);
         break;
     }
     }
@@ -258,11 +261,8 @@ void DrawAllOverlays(bool bRender)
 
             if (pCurrOverlay->m_nCreationTick == -1)
             {
-                if (pCurrOverlay->m_nOverlayTick == *g_nOverlayTickCount)
-                {
-                    bShouldDraw = true;
-                }
-                if (pCurrOverlay->m_nOverlayTick == -1)
+                if (pCurrOverlay->m_nOverlayTick == *g_nOverlayTickCount ||
+                    pCurrOverlay->m_nOverlayTick == -1)
                 {
                     bShouldDraw = true;
                 }
@@ -273,10 +273,7 @@ void DrawAllOverlays(bool bRender)
             }
             if (bOverlayEnabled && bShouldDraw)
             {
-                if (bShouldDraw)
-                {
-                    DrawOverlay(pCurrOverlay);
-                }
+                DrawOverlay(pCurrOverlay);
             }
 
             pPrevOverlay = pCurrOverlay;
