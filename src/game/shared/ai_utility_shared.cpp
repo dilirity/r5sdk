@@ -13,7 +13,6 @@
 #include "mathlib/color.h"
 #include "mathlib/vector.h"
 #include "mathlib/ssemath.h"
-#include "engine/debugoverlay.h"
 #include "game/shared/ai_utility_shared.h"
 #include "game/server/ai_utility.h"
 #include "game/server/ai_networkmanager.h"

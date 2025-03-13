@@ -124,7 +124,7 @@ void DrawOverlay(OverlayBase_t* pOverlay)
             }
         }
 
-        v_RenderBox(pBox->transforms.mat, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, pBox->a), !pBox->noDepthTest);
+        v_RenderWireFrameBox(pBox->transforms.mat, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, pBox->a), !pBox->noDepthTest);
         break;
     }
     case OverlayType_t::OVERLAY_SPHERE:

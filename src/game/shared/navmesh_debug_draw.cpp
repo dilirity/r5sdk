@@ -4,7 +4,6 @@
 // 
 //============================================================================//
 #include "tier2/renderutils.h"
-#include "engine/debugoverlay.h" // todo(kawe): remove once everything is in tier2.
 #include "navmesh_debug_draw.h"
 
 //------------------------------------------------------------------------------

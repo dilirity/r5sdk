@@ -164,9 +164,6 @@ void DrawOverlay(OverlayBase_t* pOverlay);
 
 inline void(*v_DrawAllOverlays)(bool bDraw);
 inline void(*v_DestroyOverlay)(OverlayBase_t* pOverlay);
-inline void*(*v_RenderLine)(const Vector3D& vOrigin, const Vector3D& vDest, Color color, bool bZBuffer);
-inline void*(*v_RenderBox)(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, bool bZBuffer);
-inline void*(*v_RenderWireframeSphere)(const Vector3D& vCenter, float flRadius, int nTheta, int nPhi, Color color, bool bZBuffer);
 
 inline OverlayBase_t** s_pOverlays = nullptr;
 inline CThreadMutex* s_OverlayMutex = nullptr;
@@ -181,9 +178,6 @@ class VDebugOverlay : public IDetour
 	{
 		LogFunAdr("DrawAllOverlays", v_DrawAllOverlays);
 		LogFunAdr("DestroyOverlay", v_DestroyOverlay);
-		LogFunAdr("RenderLine", v_RenderLine);
-		LogFunAdr("RenderBox", v_RenderBox);
-		LogFunAdr("RenderWireframeSphere", v_RenderWireframeSphere);
 		LogVarAdr("s_Overlays", s_pOverlays);
 		LogVarAdr("s_OverlayMutex", s_OverlayMutex);
 		LogVarAdr("g_nOverlayTickCount", g_nOverlayTickCount);
@@ -192,10 +186,7 @@ class VDebugOverlay : public IDetour
 	virtual void GetFun(void) const
 	{
 		Module_FindPattern(g_GameDll, "40 55 48 83 EC 30 48 8B 05 ?? ?? ?? ?? 0F B6 E9").GetPtr(v_DrawAllOverlays);
-		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 44 89 4C 24 ??").GetPtr(v_RenderBox);
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC 20 48 8B D9 48 8D 0D ?? ?? ?? ?? FF 15 ?? ?? ?? ?? 48 63 03").GetPtr(v_DestroyOverlay);
-		Module_FindPattern(g_GameDll, "40 56 41 54 41 55 48 81 EC ?? ?? ?? ??").GetPtr(v_RenderWireframeSphere);
-		Module_FindPattern(g_GameDll, "48 89 74 24 ?? 44 89 44 24 ?? 57 41 56").GetPtr(v_RenderLine);
 	}
 	virtual void GetVar(void) const
 	{

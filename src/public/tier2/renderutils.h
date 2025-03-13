@@ -21,13 +21,25 @@ void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, 
 ///////////////////////////////////////////////////////////////////////////////
 inline void(*v_InitializeStandardMaterials)();
 
+inline void* (*v_RenderWireFrameBox)(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, bool bZBuffer);
+inline void* (*v_RenderWireframeSphere)(const Vector3D& vCenter, float flRadius, int nTheta, int nPhi, Color color, bool bZBuffer);
+inline void* (*v_RenderLine)(const Vector3D& vOrigin, const Vector3D& vDest, Color color, bool bZBuffer);
+
 ///////////////////////////////////////////////////////////////////////////////
 class V_RenderUtils : public IDetour
 {
-	virtual void GetAdr(void) const { }
+	virtual void GetAdr(void) const
+	{
+		LogFunAdr("RenderWireFrameBox", v_RenderWireFrameBox);
+		LogFunAdr("RenderWireframeSphere", v_RenderWireframeSphere);
+		LogFunAdr("RenderLine", v_RenderLine);
+	}
 	virtual void GetFun(void) const
 	{
 		Module_FindPattern(g_GameDll, "48 83 EC ? 65 48 8B 04 25 ? ? ? ? BA ? ? ? ? 48 8B 08 8B 04 0A 39 05 ? ? ? ? 0F 8F ? ? ? ? 48 8D 0D").GetPtr(v_InitializeStandardMaterials);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 44 89 4C 24 ??").GetPtr(v_RenderWireFrameBox);
+		Module_FindPattern(g_GameDll, "40 56 41 54 41 55 48 81 EC ?? ?? ?? ??").GetPtr(v_RenderWireframeSphere);
+		Module_FindPattern(g_GameDll, "48 89 74 24 ?? 44 89 44 24 ?? 57 41 56").GetPtr(v_RenderLine);
 	}
 	virtual void GetVar(void) const { }
 	virtual void GetCon(void) const { }
