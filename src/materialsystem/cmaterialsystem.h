@@ -1,6 +1,7 @@
 #ifndef MATERIALSYSTEM_H
 #define MATERIALSYSTEM_H
 #include "cmaterialglue.h"
+#include "cmatrendercontext.h"
 #include "public/imaterialsystem.h"
 
 class CMaterialSystem
@@ -25,6 +26,12 @@ public:
 	{
 		const static int index = 74;
 		return CallVFunc<int>(index, this);
+	}
+
+	inline CMatRenderContext* GetRenderContext()
+	{
+		const static int index = 126;
+		return CallVFunc<CMatRenderContext*>(index, this);
 	}
 };
 
