@@ -10,6 +10,8 @@ if( ${PROJECT_NAME} STREQUAL "game_shared_static" )
 add_sources( SOURCE_GROUP "AI"
     "shared/ai_utility_shared.cpp"
     "shared/ai_utility_shared.h"
+    "shared/navmesh_debug_draw.cpp"
+    "shared/navmesh_debug_draw.h"
 )
 
 add_sources( SOURCE_GROUP "Entity"
