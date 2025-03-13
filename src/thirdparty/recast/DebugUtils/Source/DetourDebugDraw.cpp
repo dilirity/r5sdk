@@ -390,7 +390,9 @@ static void drawTileCells(duDebugDraw* dd, const dtMeshTile* tile, const rdVec3D
 	for (int i = 0; i < tile->header->maxCellCount; i++)
 	{
 		const dtCell& cell = tile->cells[i];
-		duDebugDrawCross(dd, cell.pos.x, cell.pos.y, cell.pos.z, 25.f, duRGBA(255,0,0,255), 2, offset);
+		const unsigned int col = cell.isOccupied() ? duRGBA(255,0,0,255) : duRGBA(255,255,0,255);
+
+		duDebugDrawCross(dd, cell.pos.x, cell.pos.y, cell.pos.z, 25.f, col, 2, offset);
 	}
 #else
 	rdIgnoreUnused(dd);
