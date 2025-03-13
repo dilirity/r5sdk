@@ -196,7 +196,7 @@ void CAI_Utility::DrawAIScriptNetwork(
     const bool bDrawNearest = ai_script_nodes_draw_nearest.GetBool();
     const int  nNodeRange = ai_script_nodes_draw_range.GetInt();
 
-    OverlayBox_t::Transforms vTransforms;
+    matrix3x4_t vTransforms;
     std::unordered_set<int64_t> uLinkSet;
 
     for (int i = iNodeIndex, ns = pNetwork->NumScriptNodes(); i < ns; i++)
@@ -219,7 +219,7 @@ void CAI_Utility::DrawAIScriptNetwork(
         }
 
         // Construct box matrix transforms.
-        vTransforms.mat.Init(
+        vTransforms.Init(
             { 1.0f, 0.0f, 0.0f },
             { 0.0f, 1.0f, 0.0f },
             { 0.0f, 0.0f, 1.0f },
@@ -228,7 +228,7 @@ void CAI_Utility::DrawAIScriptNetwork(
         static const Color boxColor(0, 255, 0, 255);
         static const Color linkColor(255, 0, 0, 255);
 
-        v_RenderBox(vTransforms.mat, *reinterpret_cast<const Vector3D*>(&s_xMins),
+        v_RenderWireFrameBox(vTransforms, *reinterpret_cast<const Vector3D*>(&s_xMins),
             *reinterpret_cast<const Vector3D*>(&s_xMaxs), boxColor, bUseDepthBuffer);
 
         if (bDrawNearest) // Render links to the nearest node.
