@@ -303,22 +303,23 @@ static bool Internal_ServerScript_NavMesh_GetExtents(HSQUIRRELVM v, const SQInte
 //-----------------------------------------------------------------------------
 static bool Internal_ServerScript_NavMesh_FindNearestPos(HSQUIRRELVM v, const bool useBounds)
 {
-    SQInteger hullType;
-    sq_getinteger(v, useBounds ? 4 : 3, &hullType);
+    SQInteger hullIdx;
+    sq_getinteger(v, useBounds ? 4 : 3, &hullIdx);
 
-    if (!Internal_ServerScript_ValidateHull(hullType))
+    if (!Internal_ServerScript_ValidateHull(hullIdx))
         return false;
 
-    const Hull_s& hull = g_aiHullProperties[hullType];
-    const dtNavMesh* const nav = g_navMeshArray[hull.navMeshType];
+    const Hull_e hullType = Hull_e(hullIdx);
+
+    const NavMeshType_e navType = NAI_Hull::NavMeshType(hullType);
+    const dtNavMesh* const nav = Detour_GetNavMeshByType(navType);
 
     if (!nav)
     {
-        DevWarning(eDLL_T::SERVER, "NavMesh \"%s\" for hull \"%s\" hasn't been loaded!\n",
-            g_navMeshNames[hull.navMeshType], g_aiHullNames[hullType]);
+        v_SQVM_ScriptError("NavMesh \"%s\" for hull \"%s\" hasn't been loaded!",
+            NavMesh_GetNameForType(navType), g_aiHullNames[hullType]);
 
-        v->PushNull();
-        return true;
+        return false;
     }
 
     rdVec3D halfExtents;
@@ -330,7 +331,7 @@ static bool Internal_ServerScript_NavMesh_FindNearestPos(HSQUIRRELVM v, const bo
     }
     else
     {
-        const Vector3D& maxs = hull.maxs;
+        const Vector3D& maxs = NAI_Hull::Maxs(hullType);
         halfExtents.init(maxs.x, maxs.y, maxs.z);
     }
 
@@ -340,7 +341,7 @@ static bool Internal_ServerScript_NavMesh_FindNearestPos(HSQUIRRELVM v, const bo
     const rdVec3D searchPoint(point->x, point->y, point->z);
 
     dtNavMeshQuery query;
-    query.attachNavMeshUnsafe(g_navMeshArray[hull.navMeshType]);
+    query.attachNavMeshUnsafe(nav);
 
     dtQueryFilter filter;
     filter.setIncludeFlags(DT_POLYFLAGS_ALL);
@@ -349,9 +350,7 @@ static bool Internal_ServerScript_NavMesh_FindNearestPos(HSQUIRRELVM v, const bo
     dtPolyRef nearestRef;
     rdVec3D nearestPt;
 
-    const dtStatus status = useBounds
-        ? query.findNearestPolyInBounds(&searchPoint, &halfExtents, &filter, &nearestRef, &nearestPt)
-        : query.findNearestPoly(&searchPoint, &halfExtents, &filter, &nearestRef, &nearestPt);
+    const dtStatus status = query.findNearestPoly(&searchPoint, &halfExtents, &filter, &nearestRef, &nearestPt);
 
     if (dtStatusFailed(status) || !nearestRef)
     {
@@ -418,8 +417,8 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SetAutoReloadState, "Set whether we can auto-reload the server", "void", "bool canAutoReload");
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, GetServerID, "Gets the current server ID", "string", "");
 
-    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPos, "Finds the nearest position to the provided point on the NavMesh for hull type", "vector ornull", "vector searchPoint, int hullType");
-    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPosInBounds, "Finds the nearest position to the provided point within the given bounds on the NavMesh for hull type", "vector ornull", "vector searchPoint, vector halfExtents, int hullType");
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPos, "Finds the nearest position to the provided point on the hull's NavMesh using the hull's bounds as extents", "vector ornull", "vector searchPoint, int hullType");
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPosInBounds, "Finds the nearest position to the provided point on the hull's NavMesh using provided bounds as extents", "vector ornull", "vector searchPoint, vector halfExtents, int hullType");
 }
 
 //---------------------------------------------------------------------------------
