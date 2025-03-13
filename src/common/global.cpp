@@ -359,6 +359,7 @@ static ConCommand bhit("bhit", BHit_f, "Bullet-hit trajectory debug", FCVAR_DEVE
 
 #ifndef DEDICATED
 static ConCommand line("line", Line_f, "Draw a debug line", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT);
+static ConCommand triangle("triangle", Triangle_f, "Draw a debug triangle", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT);
 static ConCommand sphere("sphere", Sphere_f, "Draw a debug sphere", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT);
 static ConCommand capsule("capsule", Capsule_f, "Draw a debug capsule", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT);
 #endif //!DEDICATED

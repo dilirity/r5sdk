@@ -370,6 +370,32 @@ void Line_f(const CCommand& args)
 
 /*
 =====================
+Triangle_f
+
+  Draws a triangle at p1<x1 y1 z1>
+  p2<x2 y2 z2> p3 <x3 y3 z3>.
+=====================
+*/
+void Triangle_f(const CCommand& args)
+{
+	if (args.ArgC() != 10)
+	{
+		Msg(eDLL_T::CLIENT, "Usage 'triangle': p1(vector) p2(vector) p3(vector)\n");
+		return;
+	}
+
+	Vector3D p1, p2, p3;
+	for (int i = 0; i < 3; ++i)
+	{
+		p1[i] = float(atof(args[i + 1]));
+		p2[i] = float(atof(args[i + 4]));
+		p3[i] = float(atof(args[i + 7]));
+	}
+	g_pDebugOverlay->AddTriangleOverlay(p1, p2, p3, 230, 40, 20, 200, !r_debug_draw_depth_test.GetBool(), 100);
+}
+
+/*
+=====================
 Sphere_f
 
   Draws a sphere at origin(x1 y1 z1) 

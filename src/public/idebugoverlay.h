@@ -27,6 +27,11 @@ public:
 		const static int index = 3;
 		CallVFunc<void>(index, this, vOrigin, flRadius, nTheta, nPhi, r, g, b, a, flDuration);
 	}
+	void AddTriangleOverlay(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, int r, int g, int b, int a, bool bZBuffer, float flDuration)
+	{
+		const static int index = 4;
+		CallVFunc<void>(index, this, p1, p2, p3, r, g, b, a, bZBuffer, flDuration);
+	}
 	void AddLineOverlay(const Vector3D& vStart, const Vector3D& vEnd, int r, int g, int b, char noDepthTest, float flDuration)
 	{
 		const static int index = 5;

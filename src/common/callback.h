@@ -35,6 +35,7 @@ void LanguageChanged_f(IConVar* pConVar, const char* pOldString, float flOldValu
 void Set_f(const CCommand& args);
 void Mat_CrossHair_f(const CCommand& args);
 void Line_f(const CCommand& args);
+void Triangle_f(const CCommand& args);
 void Sphere_f(const CCommand& args);
 void Capsule_f(const CCommand& args);
 #endif // !DEDICATED
