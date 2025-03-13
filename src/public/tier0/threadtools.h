@@ -627,6 +627,14 @@ template <> struct CAutoLockTypeDeducer<sizeof(CThreadFastMutex)> { typedef CThr
 	AUTO_LOCK_(CAutoLockTypeDeducer<sizeof(mutex)>::Type_t, mutex)
 #endif
 
+#define LOCAL_THREAD_LOCK_( tag ) \
+	; \
+	static CThreadMutex autoMutex_##tag; \
+	AUTO_LOCK( autoMutex_##tag )
+
+#define LOCAL_THREAD_LOCK() \
+	LOCAL_THREAD_LOCK_(_)
+
 //-----------------------------------------------------------------------------
 //
 // CThreadSpinRWLock inline functions
