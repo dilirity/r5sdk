@@ -19,6 +19,7 @@
 #include "tier1/cmd.h"
 #include "tier1/cvar.h"
 #include "tier1/keyvalues_iface.h"
+#include "tier2/renderutils.h"
 #include "vpc/IAppSystem.h"
 #include "vpc/interfaces.h"
 #include "common/callback.h"
@@ -512,6 +513,9 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	// Tier1
 	REGISTER(VCommandLine);
 	REGISTER(VCVar);
+
+	// Tier2
+	REGISTER(V_RenderUtils);
 
 	// VPC
 	REGISTER(VAppSystem);
