@@ -174,7 +174,7 @@ public:
 		}
 	}
 };
-GLCheckerTexture g_tex;
+GLCheckerTexture g_checkerTexture;
 
 
 void DebugDrawGL::depthMask(bool state)
@@ -187,7 +187,7 @@ void DebugDrawGL::texture(bool state)
 	if (state)
 	{
 		glEnable(GL_TEXTURE_2D);
-		g_tex.bind();
+		g_checkerTexture.bind();
 	}
 	else
 	{
