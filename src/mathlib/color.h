@@ -28,6 +28,7 @@ typedef struct color32_s
 class Color
 {
 public:
+	Color() = default;
 	Color(int r, int g, int b, int a)
 	{
 		_color[0] = (unsigned char)r;
@@ -40,6 +41,20 @@ public:
 		_color[0] = (unsigned char)_r;
 		_color[1] = (unsigned char)_g;
 		_color[2] = (unsigned char)_b;
+		_color[3] = (unsigned char)_a;
+	}
+	void SetColor(unsigned int all)
+	{
+		_color[0] = (unsigned char)(all & UINT8_MAX);
+		_color[1] = (unsigned char)((all >> 8) & UINT8_MAX);
+		_color[2] = (unsigned char)((all >> 16) & UINT8_MAX);
+		_color[3] = (unsigned char)((all >> 24) & UINT8_MAX);
+	}
+	void SetColor(unsigned int rgb, int _a)
+	{
+		_color[0] = (unsigned char)(rgb & UINT8_MAX);
+		_color[1] = (unsigned char)((rgb >> 8) & UINT8_MAX);
+		_color[2] = (unsigned char)((rgb >> 16) & UINT8_MAX);
 		_color[3] = (unsigned char)_a;
 	}
 	void GetColor(int& _r, int& _g, int& _b, int& _a) const
