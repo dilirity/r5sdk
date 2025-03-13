@@ -2423,12 +2423,12 @@ float dtCalcPolySurfaceArea(const dtPoly* poly, const rdVec3D* verts)
 	for (int i = 2; i < poly->vertCount; ++i)
 	{
 		const rdVec3D* va = &verts[poly->verts[0]];
-		const rdVec3D* vb = &verts[poly->verts[i]];
-		const rdVec3D* vc = &verts[poly->verts[i-1]];
+		const rdVec3D* vb = &verts[poly->verts[i-1]];
+		const rdVec3D* vc = &verts[poly->verts[i]];
 		polyArea += rdTriArea2D(va,vb,vc);
 	}
 
-	return polyArea;
+	return rdMathFabsf(polyArea);
 }
 
 float dtCalcOffMeshRefYaw(const rdVec2D* spos, const rdVec2D* epos)
