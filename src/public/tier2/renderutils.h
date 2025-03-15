@@ -16,6 +16,9 @@ void DebugDrawArrow(const Vector3D& vOrigin, const Vector3D& vEnd, float flArray
 void DebugDrawAxis(const Vector3D& vOrigin, const QAngle& vAngles = { 0, 0, 0 }, float flScale = 50.f, bool bZBuffer = true);
 
 ///////////////////////////////////////////////////////////////////////////////
+void RenderBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, bool bZBuffer);
+void RenderWireframeSweptBox(const Vector3D& vStart, const Vector3D& vEnd, const QAngle& angles,
+	const Vector3D& vMins, const Vector3D& vMaxs, const Color c, const bool bZBuffer);
 void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, const bool bZBuffer);
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -66,6 +66,295 @@ static void InitializeStandardMaterials()
     Assert(s_transNormalZBoth);
 }
 
+//-----------------------------------------------------------------------------
+// purpose: box indices
+//-----------------------------------------------------------------------------
+static const int s_boxFaceIndices[6][4] =
+{
+    { 0, 4, 6, 2 }, // -x
+    { 5, 1, 3, 7 }, // +x
+    { 0, 1, 5, 4 }, // -y
+    { 2, 6, 7, 3 }, // +y
+    { 0, 2, 3, 1 },	// -z
+    { 4, 5, 7, 6 }	// +z
+};
+static const int s_boxFaceIndicesInsideOut[6][4] =
+{
+    { 0, 2, 6, 4 }, // -x
+    { 5, 7, 3, 1 }, // +x
+    { 0, 4, 5, 1 }, // -y
+    { 2, 3, 7, 6 }, // +y
+    { 0, 1, 3, 2 },	// -z
+    { 4, 6, 7, 5 }	// +z
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: generates the box vertices from the rotation matrix
+//-----------------------------------------------------------------------------
+static void GenerateBoxVertices(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Vector3D pVerts[8])
+{
+    Vector3D vecPos;
+    for (int i = 0; i < 8; ++i)
+    {
+        vecPos[0] = (i & 0x1) ? vMaxs[0] : vMins[0];
+        vecPos[1] = (i & 0x2) ? vMaxs[1] : vMins[1];
+        vecPos[2] = (i & 0x4) ? vMaxs[2] : vMins[2];
+
+        VectorRotate(vecPos, fRotateMatrix, pVerts[i]);
+    }
+}
+
+struct RenderBoxQueue_s
+{
+    void (*function)(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial, bool bInsideOut);
+    matrix3x4_t fRotateMatrix;
+    Vector3D vMins;
+    Vector3D vMaxs;
+    Color color;
+    IMaterial* material;
+    bool bInsideOut;
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: process and advance box render queue
+//-----------------------------------------------------------------------------
+static void RenderBoxQueueFunctor(CallQueue_s* const queue)
+{
+    RenderBoxQueue_s* const item = (RenderBoxQueue_s*)queue->GetCurrentCallItem();
+    item->function(item->fRotateMatrix, item->vMins, item->vMaxs, item->color, item->material, item->bInsideOut);
+
+    // Advance the queue.
+    queue->currentCallIndex += sizeof(RenderBoxQueue_s);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: renders a solid box
+//-----------------------------------------------------------------------------
+static void RenderBoxInternal(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial, bool bInsideOut)
+{
+    InitializeStandardMaterials();
+
+    if ((*g_fnHasRenderCallQueue)())
+    {
+        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(RenderBoxQueueFunctor, sizeof(RenderBoxQueue_s), 7);
+        RenderBoxQueue_s* const item = (RenderBoxQueue_s*)queue->GetCurrentAllocatedItem();
+
+        item->function = RenderBoxInternal;
+        item->fRotateMatrix = fRotateMatrix;
+        item->vMins = vMins;
+        item->vMaxs = vMaxs;
+        item->color = c;
+        item->material = pMaterial;
+        item->bInsideOut = bInsideOut;
+
+        (*g_fnAdvanceRenderCallQueue)(sizeof(RenderBoxQueue_s));
+        return;
+    }
+
+    CMatRenderContext* const ctx = g_pMaterialSystem->GetRenderContext();
+    CMeshVertexBuilder vertexBuilder;
+
+    if (vertexBuilder.Begin(ctx, 36))
+    {
+        ctx->Bind(pMaterial);
+
+        Vector3D p[8];
+        GenerateBoxVertices(fRotateMatrix, vMins, vMaxs, p);
+
+        // Draw the box
+        for (int i = 0; i < 6; i++)
+        {
+            const int* const ppFaceIndices = bInsideOut ? s_boxFaceIndicesInsideOut[i] : s_boxFaceIndices[i];
+            for (int j = 1; j < 3; ++j)
+            {
+                const int i0 = ppFaceIndices[0];
+                const int i1 = ppFaceIndices[j];
+                const int i2 = ppFaceIndices[j + 1];
+
+                vertexBuilder.AppendVertex(p[i0], c);
+                vertexBuilder.AppendVertex(p[i2], c);
+                vertexBuilder.AppendVertex(p[i1], c);
+            }
+        }
+
+        vertexBuilder.End(ctx);
+        ctx->DrawTriangleList(vertexBuilder.GetParams(), nullptr, 0);
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: appends axes to the provided mesh
+//-----------------------------------------------------------------------------
+static void AppendAxes(const Vector3D& origin, Vector3D* const pts, const int idx, const Color c, CMeshVertexBuilder& vertexBuilder)
+{
+    Vector3D start, temp;
+    VectorAdd(pts[idx], origin, start);
+
+    vertexBuilder.AppendVertex(start, c);
+
+    int endidx = (idx & 0x1) ? idx - 1 : idx + 1;
+    VectorAdd(pts[endidx], origin, temp);
+
+    vertexBuilder.AppendVertex(temp, c);
+    vertexBuilder.AppendVertex(start, c);
+
+    endidx = (idx & 0x2) ? idx - 2 : idx + 2;
+    VectorAdd(pts[endidx], origin, temp);
+    vertexBuilder.AppendVertex(temp, c);
+    vertexBuilder.AppendVertex(start, c);
+
+    endidx = (idx & 0x4) ? idx - 4 : idx + 4;
+    VectorAdd(pts[endidx], origin, temp);
+
+    vertexBuilder.AppendVertex(temp, c);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: appends extrusion faces to the provided mesh
+//-----------------------------------------------------------------------------
+static void AppendExtrusionFace(const Vector3D& start, const Vector3D& end,
+    Vector3D* const pts, const int idx1, const int idx2, const Color c, CMeshVertexBuilder& vertexBuilder)
+{
+    Vector3D temp;
+    VectorAdd(pts[idx1], start, temp);
+    vertexBuilder.AppendVertex(temp, c);
+
+    VectorAdd(pts[idx2], start, temp);
+
+    vertexBuilder.AppendVertex(temp, c);
+    vertexBuilder.AppendVertex(temp, c);
+
+    VectorAdd(pts[idx2], end, temp);
+
+    vertexBuilder.AppendVertex(temp, c);
+    vertexBuilder.AppendVertex(temp, c);
+
+    VectorAdd(pts[idx1], end, temp);
+
+    vertexBuilder.AppendVertex(temp, c);
+    vertexBuilder.AppendVertex(temp, c);
+
+    VectorAdd(pts[idx1], start, temp);
+    vertexBuilder.AppendVertex(temp, c);
+}
+
+struct RenderSweptBoxQueue_s
+{
+    void (*function)(const Vector3D& vStart, const Vector3D& vEnd, const QAngle& angles,
+        const Vector3D& vMins, const Vector3D& vMaxs, const Color c, IMaterial* const pMaterial);
+    Vector3D vStart;
+    Vector3D vEnd;
+    QAngle angles;
+    Vector3D vMins;
+    Vector3D vMaxs;
+    Color color;
+    IMaterial* pMaterial;
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: process and advance swept box render queue
+//-----------------------------------------------------------------------------
+static void RenderSweptBoxQueueFunctor(CallQueue_s* const queue)
+{
+    RenderSweptBoxQueue_s* const item = (RenderSweptBoxQueue_s*)queue->GetCurrentCallItem();
+    item->function(item->vStart, item->vEnd, item->angles, item->vMins, item->vMaxs, item->color, item->pMaterial);
+
+    // Advance the queue.
+    queue->currentCallIndex += sizeof(RenderSweptBoxQueue_s);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: renders an extruded box
+//-----------------------------------------------------------------------------
+static void RenderWireframeSweptBoxInternal(const Vector3D& vStart, const Vector3D& vEnd,
+    const QAngle& angles, const Vector3D& vMins, const Vector3D& vMaxs, const Color c, IMaterial* const pMaterial)
+{
+    InitializeStandardMaterials();
+
+    // Queue it off if this is called outside the render thread.
+    if ((*g_fnHasRenderCallQueue)())
+    {
+        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(RenderSweptBoxQueueFunctor, sizeof(RenderTriangleQueue_s), 7);
+        RenderSweptBoxQueue_s* const item = (RenderSweptBoxQueue_s*)queue->GetCurrentAllocatedItem();
+
+        item->function = RenderWireframeSweptBoxInternal;
+        item->vStart = vStart;
+        item->vEnd = vEnd;
+        item->angles = angles;
+        item->vMins = vMins;
+        item->vMaxs = vMaxs;
+        item->color = c;
+        item->pMaterial = pMaterial;
+
+        (*g_fnAdvanceRenderCallQueue)(sizeof(RenderSweptBoxQueue_s));
+        return;
+    }
+
+    CMatRenderContext* const ctx = g_pMaterialSystem->GetRenderContext();
+    CMeshVertexBuilder vertexBuilder;
+
+    if (vertexBuilder.Begin(ctx, 60))
+    {
+        ctx->Bind(pMaterial);
+
+        // Build a rotation matrix from angles
+        matrix3x4_t fRotateMatrix;
+        AngleMatrix(angles, fRotateMatrix);
+
+        Vector3D vDelta;
+        VectorSubtract(vEnd, vStart, vDelta);
+
+        // Compute the box points, rotated but without the origin added
+        Vector3D temp;
+        Vector3D pts[8];
+        float dot[8];
+        int minidx = 0;
+        for (int i = 0; i < 8; ++i)
+        {
+            temp.x = (i & 0x1) ? vMaxs[0] : vMins[0];
+            temp.y = (i & 0x2) ? vMaxs[1] : vMins[1];
+            temp.z = (i & 0x4) ? vMaxs[2] : vMins[2];
+
+            // Rotate the corner point
+            VectorRotate(temp, fRotateMatrix, pts[i]);
+
+            // Find the dot product with dir
+            dot[i] = DotProduct(pts[i], vDelta);
+            if (dot[i] < dot[minidx])
+            {
+                minidx = i;
+            }
+        }
+
+        // Choose opposite corner
+        const int maxidx = minidx ^ 0x7;
+
+        // Draw the start + end axes...
+        AppendAxes(vStart, pts, minidx, c, vertexBuilder);
+        AppendAxes(vEnd, pts, maxidx, c, vertexBuilder);
+
+        // Draw the extrusion faces
+        for (int j = 0; j < 3; ++j)
+        {
+            const int dirflag1 = (1 << ((j + 1) % 3));
+            const int dirflag2 = (1 << ((j + 2) % 3));
+
+            const int idx1 = (minidx & dirflag1) ? minidx - dirflag1 : minidx + dirflag1;
+            const int idx2 = (minidx & dirflag2) ? minidx - dirflag2 : minidx + dirflag2;
+            const int idx3 = (minidx & dirflag2) ? idx1 - dirflag2 : idx1 + dirflag2;
+
+            AppendExtrusionFace(vStart, vEnd, pts, idx1, idx3, c, vertexBuilder);
+            AppendExtrusionFace(vStart, vEnd, pts, idx2, idx3, c, vertexBuilder);
+        }
+
+        vertexBuilder.End(ctx);
+        ctx->DrawLineList(vertexBuilder.GetParams(), nullptr, 0);
+    }
+
+    // Need to call this to decrement context ref counter.
+    ctx->EndRenderer();
+}
+
 struct RenderTriangleQueue_s
 {
     void (*function)(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, IMaterial* const pMaterial);
@@ -132,7 +421,26 @@ static void RenderTriangleInternal(const Vector3D& p1, const Vector3D& p2, const
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
+// Purpose: public proxy for RenderBoxInternal
+//-----------------------------------------------------------------------------
+void RenderBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, bool bZBuffer)
+{
+    IMaterial* const mat = bZBuffer ? s_transNormalZFront : s_transIgnoreZFront;
+    RenderBoxInternal(vTransforms, vMins, vMaxs, color, mat, false);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: public proxy for RenderWireframeSweptBoxInternal
+//-----------------------------------------------------------------------------
+void RenderWireframeSweptBox(const Vector3D& vStart, const Vector3D& vEnd, const QAngle& angles,
+    const Vector3D& vMins, const Vector3D& vMaxs, const Color c, const bool bZBuffer)
+{
+    IMaterial* const pMaterial = bZBuffer ? s_transNormalZWire : s_transIgnoreZWire;
+    RenderWireframeSweptBoxInternal(vStart, vEnd, angles, vMins, vMaxs, c, pMaterial);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: public proxy for RenderTriangleInternal
 //-----------------------------------------------------------------------------
 void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, const bool bZBuffer)
 {
