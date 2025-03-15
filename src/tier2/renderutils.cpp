@@ -603,18 +603,20 @@ void DebugDrawSphere(const Vector3D& vOrigin, float flRadius, Color color, int n
 //-----------------------------------------------------------------------------
 void DebugDrawHemiSphere(const Vector3D& vOrigin, const QAngle& vAngles, const Vector3D& vRadius, Color color, int nSegments, bool bZBuffer)
 {
+    const float flDegrees = 360.0f / float(nSegments * 2);
     bool bFirstLoop = true;
-    float flDegrees = 360.0f / float(nSegments * 2);
 
     Vector3D vStart[4], vEnd[4], vForward[4];
     QAngle vComposed[4];
 
     for (int i = 0; i < (nSegments + 1); i++)
     {
-        AngleCompose(vAngles, { flDegrees * i - 180, 0, 0 }, vComposed[0]);
-        AngleCompose(vAngles, { 0, flDegrees * i - 90, 0 }, vComposed[1]);
-        AngleCompose(vAngles, { flDegrees * i + 180, 90, 0 }, vComposed[2]);
-        AngleCompose(vAngles, { 0, flDegrees * i + 90, 0 }, vComposed[3]);
+        const float angleOffset = flDegrees * i;
+
+        AngleCompose(vAngles, { angleOffset - 180, 0, 0 }, vComposed[0]);
+        AngleCompose(vAngles, { 0, angleOffset - 90, 0 }, vComposed[1]);
+        AngleCompose(vAngles, { angleOffset + 180, 90, 0 }, vComposed[2]);
+        AngleCompose(vAngles, { 0, angleOffset + 90, 0 }, vComposed[3]);
 
         AngleVectors(vComposed[0], &vForward[0]);
         AngleVectors(vComposed[1], &vForward[1]);
@@ -634,12 +636,12 @@ void DebugDrawHemiSphere(const Vector3D& vOrigin, const QAngle& vAngles, const V
             v_RenderLine(vStart[3], vEnd[3], color, bZBuffer);
         }
 
+        bFirstLoop = false;
+
         vStart[0] = vEnd[0];
         vStart[1] = vEnd[1];
         vStart[2] = vEnd[2];
         vStart[3] = vEnd[3];
-
-        bFirstLoop = false;
     }
 }
 
