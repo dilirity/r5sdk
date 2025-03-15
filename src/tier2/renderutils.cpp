@@ -274,7 +274,7 @@ static void RenderWireframeSweptBoxInternal(const Vector3D& vStart, const Vector
     // Queue it off if this is called outside the render thread.
     if ((*g_fnHasRenderCallQueue)())
     {
-        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(RenderSweptBoxQueueFunctor, sizeof(RenderTriangleQueue_s), 7);
+        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(RenderSweptBoxQueueFunctor, sizeof(RenderSweptBoxQueue_s), 7);
         RenderSweptBoxQueue_s* const item = (RenderSweptBoxQueue_s*)queue->GetCurrentAllocatedItem();
 
         item->function = RenderWireframeSweptBoxInternal;
