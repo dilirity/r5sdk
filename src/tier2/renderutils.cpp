@@ -106,7 +106,7 @@ struct RenderTriangleVert_s
 //-----------------------------------------------------------------------------
 static void RenderTriangleInternal(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, IMaterial* const pMaterial)
 {
-    v_InitializeStandardMaterials();
+    InitializeStandardMaterials();
 
     // Queue it off if this is called outside the render thread.
     if ((*g_fnHasRenderCallQueue)())
