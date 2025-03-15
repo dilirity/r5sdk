@@ -21,10 +21,7 @@
 #endif // !CLIENT_DLL
 
 ConVar r_debug_draw_depth_test("r_debug_draw_depth_test", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Toggle depth test for other debug draw functionality");
-
 static ConVar r_debug_overlay_nodecay("r_debug_overlay_nodecay", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Keeps all debug overlays alive regardless of their lifetime. Use command 'clear_debug_overlays' to clear everything");
-static ConVar r_debug_overlay_invisible("r_debug_overlay_invisible", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Show invisible debug overlays (alpha < 1 = 255)");
-static ConVar r_debug_overlay_wireframe("r_debug_overlay_wireframe", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Use wireframe in debug overlay");
 
 //------------------------------------------------------------------------------
 // Purpose: checks if overlay should be decayed
@@ -112,63 +109,31 @@ void DrawOverlay(OverlayBase_t* pOverlay)
     case OverlayType_t::OVERLAY_BOX:
     {
         OverlayBox_t* pBox = static_cast<OverlayBox_t*>(pOverlay);
-        if (pBox->a < 1)
+
+        if (pBox->a > 0)
         {
-            if (r_debug_overlay_invisible.GetBool())
-            {
-                pBox->a = 255;
-            }
-            else
-            {
-                return;
-            }
+            RenderBox(pBox->transforms.mat, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, pBox->a), !pBox->noDepthTest);
+        }
+        if (pBox->a < 255)
+        {
+            v_RenderWireFrameBox(pBox->transforms.mat, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, 255), !pBox->noDepthTest);
         }
 
-        v_RenderWireFrameBox(pBox->transforms.mat, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, pBox->a), !pBox->noDepthTest);
         break;
     }
     case OverlayType_t::OVERLAY_SPHERE:
     {
         OverlaySphere_t* pSphere = static_cast<OverlaySphere_t*>(pOverlay);
-        if (pSphere->a < 1)
-        {
-            if (r_debug_overlay_invisible.GetBool())
-            {
-                pSphere->a = 255;
-            }
-            else
-            {
-                return;
-            }
-        }
+        v_RenderWireframeSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi,
+            Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), r_debug_draw_depth_test.GetBool());
 
-        if (r_debug_overlay_wireframe.GetBool())
-        {
-            v_RenderWireframeSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi, 
-                Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), r_debug_draw_depth_test.GetBool());
-        }
-        else
-        {
-            DebugDrawSphere(pSphere->vOrigin, pSphere->flRadius, Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), 16, r_debug_draw_depth_test.GetBool());
-        }
         break;
     }
     case OverlayType_t::OVERLAY_LINE:
     {
         OverlayLine_t* pLine = static_cast<OverlayLine_t*>(pOverlay);
-        if (pLine->a < 1)
-        {
-            if (r_debug_overlay_invisible.GetBool())
-            {
-                pLine->a = 255;
-            }
-            else
-            {
-                return;
-            }
-        }
-
         v_RenderLine(pLine->origin, pLine->dest, Color(pLine->r, pLine->g, pLine->b, pLine->a), !pLine->noDepthTest);
+
         break;
     }
     case OverlayType_t::OVERLAY_CUSTOM_MESH:
@@ -183,29 +148,26 @@ void DrawOverlay(OverlayBase_t* pOverlay)
         // This is used for the Smart Pistol laser.
         OverlayLine_t* pLaser = reinterpret_cast<OverlayLine_t*>(pOverlay);
         v_RenderLine(pLaser->origin, pLaser->dest, Color(pLaser->r, pLaser->g, pLaser->b, pLaser->a), !pLaser->noDepthTest);
+
         break;
     }
     case OverlayType_t::OVERLAY_TRIANGLE:
     {
         OverlayTriangle_t* pTriangle = reinterpret_cast<OverlayTriangle_t*>(pOverlay);
         RenderTriangle(pTriangle->p1, pTriangle->p2, pTriangle->p3, Color(pTriangle->r, pTriangle->g, pTriangle->b, pTriangle->a), !pTriangle->noDepthTest);
+
+        break;
+    }
+    case OverlayType_t::OVERLAY_SWEPT_BOX:
+    {
+        OverlaySweptBox_t* pSweptBox = reinterpret_cast<OverlaySweptBox_t*>(pOverlay);
+        RenderWireframeSweptBox(pSweptBox->start, pSweptBox->end, pSweptBox->angles, pSweptBox->mins, pSweptBox->maxs, 
+            Color(pSweptBox->r, pSweptBox->g, pSweptBox->b, pSweptBox->a), r_debug_draw_depth_test.GetBool());
         break;
     }
     case OverlayType_t::OVERLAY_CAPSULE:
     {
         OverlayCapsule_t* pCapsule = static_cast<OverlayCapsule_t*>(pOverlay);
-        if (pCapsule->a < 1)
-        {
-            if (r_debug_overlay_invisible.GetBool())
-            {
-                pCapsule->a = 255;
-            }
-            else
-            {
-                break;
-            }
-        }
-
         QAngle angles;
 
         VectorAngles(pCapsule->end, pCapsule->start, angles);
@@ -213,6 +175,7 @@ void DrawOverlay(OverlayBase_t* pOverlay)
 
         DebugDrawCapsule(pCapsule->start, angles, pCapsule->radius, pCapsule->start.DistTo(pCapsule->end),
             Color(pCapsule->r, pCapsule->g, pCapsule->b, pCapsule->a), r_debug_draw_depth_test.GetBool());
+
         break;
     }
     case OverlayType_t::OVERLAY_UNKNOWN:
