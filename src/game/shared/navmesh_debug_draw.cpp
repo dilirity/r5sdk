@@ -125,16 +125,17 @@ void rdNavMeshDebugDraw::handleAppend(const float x, const float y, const float 
 	{
 	case duDebugDrawPrimitives::DU_DRAW_POINTS:
 		// Unhandled for now.
+		rdAssert(0); // If you hit this, implement it.
 		break;
 	case duDebugDrawPrimitives::DU_DRAW_LINES:
-		v_RenderLine(m_primitiveVertices[1], m_primitiveVertices[0], m_primitiveColor, true);
+		v_RenderLine(m_primitiveVertices[0], m_primitiveVertices[1], m_primitiveColor, true);
 		break;
 	case duDebugDrawPrimitives::DU_DRAW_TRIS:
-		RenderTriangle(m_primitiveVertices[2], m_primitiveVertices[1], m_primitiveVertices[0], m_primitiveColor, true);
+		RenderTriangle(m_primitiveVertices[0], m_primitiveVertices[1], m_primitiveVertices[2], m_primitiveColor, true);
 		break;
 	case duDebugDrawPrimitives::DU_DRAW_QUADS:
-		RenderTriangle(m_primitiveVertices[2], m_primitiveVertices[1], m_primitiveVertices[0], m_primitiveColor, true);
-		RenderTriangle(m_primitiveVertices[1], m_primitiveVertices[2], m_primitiveVertices[0], m_primitiveColor, true);
+		// Unhandled for now.
+		rdAssert(0); // If you hit this, implement it.
 		break;
 	}
 
