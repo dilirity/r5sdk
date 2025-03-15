@@ -18,12 +18,7 @@
 #include "materialsystem/cmaterialsystem.h"
 #include "materialsystem/cmatrendercontext.h"
 #include "materialsystem/cmatqueuedrendercontext.h"
-
-//-----------------------------------------------------------------------------
-// Purpose: console variables
-//-----------------------------------------------------------------------------
-static ConVar r_debugDrawForceWireFrame("r_debugDrawForceWireFrame", "0");
-static ConVar r_debugDrawCullBackFaces("r_debugDrawCullBackFaces", "0");
+#include "materialsystem/meshbuilder.h"
 
 //-----------------------------------------------------------------------------
 // Purpose: standard materials
@@ -84,7 +79,7 @@ struct RenderTriangleQueue_s
 //-----------------------------------------------------------------------------
 // Purpose: process and advance triangle render queue
 //-----------------------------------------------------------------------------
-static void TriangleRenderQueueFunctor(CallQueue_s* const queue)
+static void RenderTriangleQueueFunctor(CallQueue_s* const queue)
 {
     RenderTriangleQueue_s* const item = (RenderTriangleQueue_s*)queue->GetCurrentCallItem();
     item->function(item->p1, item->p2, item->p3, item->color, item->material);
@@ -92,14 +87,6 @@ static void TriangleRenderQueueFunctor(CallQueue_s* const queue)
     // Advance the queue.
     queue->currentCallIndex += sizeof(RenderTriangleQueue_s);
 }
-
-struct RenderTriangleVert_s
-{
-    Vector3D position;
-    Vector3D normal;
-    Color color;
-    Vector2D texCoord;
-};
 
 //-----------------------------------------------------------------------------
 // Purpose: process and advance triangle render queue
@@ -111,7 +98,7 @@ static void RenderTriangleInternal(const Vector3D& p1, const Vector3D& p2, const
     // Queue it off if this is called outside the render thread.
     if ((*g_fnHasRenderCallQueue)())
     {
-        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(TriangleRenderQueueFunctor, sizeof(RenderTriangleQueue_s), 7);
+        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(RenderTriangleQueueFunctor, sizeof(RenderTriangleQueue_s), 7);
         RenderTriangleQueue_s* const item = (RenderTriangleQueue_s*)queue->GetCurrentAllocatedItem();
 
         item->function = RenderTriangleInternal;
@@ -126,47 +113,18 @@ static void RenderTriangleInternal(const Vector3D& p1, const Vector3D& p2, const
     }
 
     CMatRenderContext* const ctx = g_pMaterialSystem->GetRenderContext();
-    ctx->Bind(pMaterial);
+    CMeshVertexBuilder vertexBuilder;
 
-    DirectDrawParams_s drawParams;
-
-    drawParams.vertexFormat.position3d = 1;
-    drawParams.vertexFormat.color = 1;
-    drawParams.vertexFormat.normal = 1;
-    drawParams.vertexFormat.texCoordFlags = 1;
-
-    drawParams.vertexStructSize = sizeof(RenderTriangleVert_s);
-    drawParams.vertexBlockIndex = 0;
-    drawParams.vertexBufferOffset = 0;
-    drawParams.vertexCount = 0;
-
-    // Allocate 3 instances of RenderTriangleVert_s.
-    RenderTriangleVert_s* const dynamicMesh = (RenderTriangleVert_s*)ctx->GetDynamicMesh(3, &drawParams, 13);
-
-    if (dynamicMesh)
+    if (vertexBuilder.Begin(ctx, 3))
     {
-        Vector3D vecNormal;
-        Vector3D vecDelta1, vecDelta2;
-        VectorSubtract(p2, p1, vecDelta1);
-        VectorSubtract(p3, p1, vecDelta2);
-        CrossProduct(vecDelta1, vecDelta2, vecNormal);
-        VectorNormalize(vecNormal);
+        ctx->Bind(pMaterial);
 
-        dynamicMesh[0].position = p1;
-        dynamicMesh[0].normal = vecNormal;
-        dynamicMesh[0].color = c;
-        dynamicMesh[0].texCoord.Init(0.0f, 0.0f);
-        dynamicMesh[1].position = p2;
-        dynamicMesh[1].normal = vecNormal;
-        dynamicMesh[1].color = c;
-        dynamicMesh[1].texCoord.Init(0.0f, 1.0f);
-        dynamicMesh[2].position = p3;
-        dynamicMesh[2].normal = vecNormal;
-        dynamicMesh[2].color = c;
-        dynamicMesh[2].texCoord.Init(1.0f, 0.0f);
+        vertexBuilder.AppendVertex(p3, c);
+        vertexBuilder.AppendVertex(p2, c);
+        vertexBuilder.AppendVertex(p1, c);
 
-        ctx->EndDynamicMesh(drawParams.vertexCount);
-        ctx->DrawTriangleList(&drawParams, nullptr, 0);
+        vertexBuilder.End(ctx);
+        ctx->DrawTriangleList(vertexBuilder.GetParams(), nullptr, 0);
     }
 
     // Need to call this to decrement context ref counter.
@@ -174,27 +132,17 @@ static void RenderTriangleInternal(const Vector3D& p1, const Vector3D& p2, const
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: determines and returns the material to use for given parameters
-//-----------------------------------------------------------------------------
-static IMaterial* SelectDebugMaterialForBind(const Color c, const bool bZBuffer)
-{
-    if (c.a() < 1 || r_debugDrawForceWireFrame.GetBool())
-        return bZBuffer ? s_transNormalZWire : s_transIgnoreZWire;
-    else
-    {
-        if (r_debugDrawCullBackFaces.GetBool())
-            return bZBuffer ? s_transNormalZFront : s_transIgnoreZFront;
-        else
-            return bZBuffer ? s_transNormalZBoth : s_transIgnoreZBoth;
-    }
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: returns the material to use for given parameters
+// Purpose: 
 //-----------------------------------------------------------------------------
 void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, const bool bZBuffer)
 {
-    RenderTriangleInternal(p1, p2, p3, c, SelectDebugMaterialForBind(c, bZBuffer));
+    IMaterial* pMaterial;
+    if (c.a() < 1)
+        pMaterial = bZBuffer ? s_transNormalZWire : s_transIgnoreZWire;
+    else
+        pMaterial = bZBuffer ? s_transNormalZBoth : s_transIgnoreZBoth;
+
+    RenderTriangleInternal(p1, p2, p3, c, pMaterial);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

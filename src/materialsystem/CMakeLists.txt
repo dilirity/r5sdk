@@ -14,6 +14,7 @@ add_sources( SOURCE_GROUP "Private"
     "cmatqueuedrendercontext.h"
     "cshaderglue.cpp"
     "cshaderglue.h"
+    "meshbuilder.cpp"
     "texturestreaming.cpp"
     "texturestreaming.h"
 )
@@ -37,6 +38,8 @@ add_sources( SOURCE_GROUP "Private"
 
 add_sources( SOURCE_GROUP "Public"
     "${ENGINE_SOURCE_DIR}/public/imaterialsystem.h"
+    "${ENGINE_SOURCE_DIR}/public/materialsystem/imatrendercontext.h"
+    "${ENGINE_SOURCE_DIR}/public/materialsystem/meshbuilder.h"
 )
 
 end_sources()
