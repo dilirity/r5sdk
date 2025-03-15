@@ -87,7 +87,7 @@ static dtStatus Detour_AddTile(dtNavMesh* nav, void* unused, unsigned char* data
 // Purpose: finds the nearest polygon to specified center point.
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
-static dtStatus Detour_FindNearestPolyInBounds(dtNavMeshQuery* const query, const rdVec3D* const center,
+static dtStatus Detour_FindNearestPoly(dtNavMeshQuery* const query, const rdVec3D* const center,
     const rdVec3D* const halfExtents, const dtQueryFilter* const filter,
     dtPolyRef* const nearestRef, rdVec3D* const nearestPt)
 {
@@ -400,7 +400,7 @@ void VRecast::Detour(const bool bAttach) const
 	DetourSetup(&v_Detour_IsGoalPolyReachable, &Detour_IsGoalPolyReachable, bAttach);
 	DetourSetup(&v_Detour_LevelInit, &Detour_LevelInit, bAttach);
 	DetourSetup(&dtNavMesh__addTile, &Detour_AddTile, bAttach);
-	DetourSetup(&dtNavMeshQuery__findNearestPolyInBounds, &Detour_FindNearestPolyInBounds, bAttach);
+	DetourSetup(&dtNavMeshQuery__findNearestPoly, &Detour_FindNearestPoly, bAttach);
 	DetourSetup(&dtNavMeshQuery__findPath, &Detour_FindPath, bAttach);
 	DetourSetup(&dtNavMeshQuery__findStraightPath, &Detour_FindStraightPath, bAttach);
 	DetourSetup(&dtNavMeshQuery__moveAlongSurface, &Detour_MoveAlongSurface, bAttach);

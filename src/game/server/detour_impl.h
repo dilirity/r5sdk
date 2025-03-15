@@ -13,7 +13,7 @@ inline bool(*v_Detour_IsGoalPolyReachable)(dtNavMesh* const nav, const dtPolyRef
 inline dtStatus(*dtNavMesh__Init)(dtNavMesh* thisptr, unsigned char* data, int flags);
 inline dtStatus(*dtNavMesh__addTile)(dtNavMesh* thisptr, void* unused, unsigned char* data, int dataSize, int flags, dtTileRef lastRef);
 
-inline dtStatus(*dtNavMeshQuery__findNearestPolyInBounds)(dtNavMeshQuery* query, const rdVec3D* center, const rdVec3D* halfExtents,
+inline dtStatus(*dtNavMeshQuery__findNearestPoly)(dtNavMeshQuery* query, const rdVec3D* center, const rdVec3D* halfExtents,
 	const dtQueryFilter* filter, dtPolyRef* nearestRef, rdVec3D* nearestPt);
 
 inline dtStatus(*dtNavMeshQuery__findPath)(dtNavMeshQuery* query, dtPolyRef startRef, dtPolyRef endRef,
@@ -59,7 +59,7 @@ class VRecast : public IDetour
 		LogFunAdr("dtNavMesh::Init", dtNavMesh__Init);
 		LogFunAdr("dtNavMesh::addTile", dtNavMesh__addTile);
 
-		LogFunAdr("dtNavMeshQuery::findNearestPolyInBounds", dtNavMeshQuery__findNearestPolyInBounds);
+		LogFunAdr("dtNavMeshQuery::findNearestPolyInBounds", dtNavMeshQuery__findNearestPoly);
 		LogFunAdr("dtNavMeshQuery::findPath", dtNavMeshQuery__findPath);
 		LogFunAdr("dtNavMeshQuery::findStraightPath", dtNavMeshQuery__findStraightPath);
 
@@ -81,7 +81,7 @@ class VRecast : public IDetour
 		Module_FindPattern(g_GameDll, "48 89 6C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 41 56 49 63 F1").GetPtr(v_Detour_IsGoalPolyReachable);
 		Module_FindPattern(g_GameDll, "4C 89 44 24 ?? 53 41 56 48 81 EC ?? ?? ?? ?? 0F 10 11").GetPtr(dtNavMesh__Init);
 		Module_FindPattern(g_GameDll, "44 89 4C 24 ?? 41 55").GetPtr(dtNavMesh__addTile);
-		Module_FindPattern(g_GameDll, "4C 8B DC 49 89 4B ?? 41 54 41 57").GetPtr(dtNavMeshQuery__findNearestPolyInBounds);
+		Module_FindPattern(g_GameDll, "4C 8B DC 49 89 4B ?? 41 54 41 57").GetPtr(dtNavMeshQuery__findNearestPoly);
 		Module_FindPattern(g_GameDll, "44 89 44 24 ?? 56 57 41 56 41 57").GetPtr(dtNavMeshQuery__findPath);
 		Module_FindPattern(g_GameDll, "4C 89 44 24 ?? 48 89 4C 24 ?? 55 53 56 57 41 54 41 55 41 57 48 8D AC 24 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 4C 8B BD").GetPtr(dtNavMeshQuery__findStraightPath);
 		Module_FindPattern(g_GameDll, "4C 89 4C 24 ?? 48 89 4C 24 ?? 55 53 56 57").GetPtr(dtNavMeshQuery__moveAlongSurface);
