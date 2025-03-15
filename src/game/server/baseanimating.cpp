@@ -54,7 +54,7 @@ void CBaseAnimating::DrawServerHitboxes(float duration /*= 0.0f*/)
 		b = static_cast<int>(255.0f * s_HullColor[j][2]);
 
         HitboxToWorldTransforms(pBox->bone, &transforms);
-        g_pDebugOverlay->AddBoxOverlay(transforms, pBox->bbmin, pBox->bbmax, r, g, b, 0, bDepthTest, duration);
+        g_pDebugOverlay->AddBoxOverlay(transforms, pBox->bbmin, pBox->bbmax, r, g, b, 16, bDepthTest, duration);
     }
 }
 
