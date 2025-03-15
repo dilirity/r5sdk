@@ -96,11 +96,11 @@ static void GenerateBoxVertices(const matrix3x4_t& fRotateMatrix, const Vector3D
     Vector3D vecPos;
     for (int i = 0; i < 8; ++i)
     {
-        vecPos[0] = (i & 0x1) ? vMaxs[0] : vMins[0];
-        vecPos[1] = (i & 0x2) ? vMaxs[1] : vMins[1];
-        vecPos[2] = (i & 0x4) ? vMaxs[2] : vMins[2];
+        vecPos.x = (i & 0x1) ? vMaxs.x : vMins.x;
+        vecPos.y = (i & 0x2) ? vMaxs.y : vMins.y;
+        vecPos.z = (i & 0x4) ? vMaxs.z : vMins.z;
 
-        VectorRotate(vecPos, fRotateMatrix, pVerts[i]);
+        VectorTransform(vecPos, fRotateMatrix, pVerts[i]);
     }
 }
 
