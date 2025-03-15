@@ -730,7 +730,7 @@ dtStatus dtNavMeshQuery::findNearestPoly(const rdVec3D* center, const rdVec3D* h
 		return DT_FAILURE | DT_INVALID_PARAM;
 
 	// queryPolygons below will check rest of params
-	dtFindNearestPolyQuery query(this, halfExtents, center);
+	dtFindNearestPolyQuery query(this, center, halfExtents);
 	const dtStatus status = queryPolygonsInArea(center, halfExtents, filter, &query);
 
 	if (dtStatusFailed(status))
