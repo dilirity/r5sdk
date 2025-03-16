@@ -54,6 +54,18 @@ struct TimedOverlay_t
 
 class CBaseEntity : public IServerEntity
 {
+public:
+	void DrawDebugGeometryOverlays(void)
+	{
+		const int index = 34;
+		CallVFunc<void>(index, this);
+	}
+	void DrawDebugTextOverlays(void)
+	{
+		const int index = 35;
+		CallVFunc<void>(index, this);
+	}
+
 	// non-virtual methods. Don't override these!
 public:
 	CCollisionProperty* CollisionProp();
