@@ -122,10 +122,10 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 	CServerGameDLL__OnReceivedSayTextMessage(thisptr, senderId, text, false);
 }
 
-void DrawServerHitbox(int iEntity)
+static void DrawServerHitbox(int iEntity)
 {
-	const CEntInfo* pInfo = g_serverEntityList->GetEntInfoPtrByIndex(iEntity);
-	CBaseAnimating* pAnimating = dynamic_cast<CBaseAnimating*>(pInfo->m_pEntity);
+	const CEntInfo* const pInfo = g_serverEntityList->GetEntInfoPtrByIndex(iEntity);
+	CBaseAnimating* const pAnimating = dynamic_cast<CBaseAnimating*>(pInfo->m_pEntity);
 
 	if (pAnimating)
 	{
@@ -133,9 +133,9 @@ void DrawServerHitbox(int iEntity)
 	}
 }
 
-void DrawServerHitboxes(bool bRunOverlays)
+static void DrawServerHitboxes()
 {
-	int nVal = sv_showhitboxes->GetInt();
+	const int nVal = sv_showhitboxes->GetInt();
 	Assert(nVal < NUM_ENT_ENTRIES);
 
 	if (nVal == -1)
@@ -152,6 +152,30 @@ void DrawServerHitboxes(bool bRunOverlays)
 	{
 		DrawServerHitbox(nVal);
 	}
+}
+
+static void DrawGeometryOverlays()
+{
+	const CEntInfo* pInfo = g_serverEntityList->FirstEntInfo();
+
+	for (; pInfo; pInfo = pInfo->m_pNext)
+	{
+		CBaseEntity* const ent = (CBaseEntity*)pInfo->m_pEntity;
+
+		if (ent->GetDebugOverlays() || ent->GetTimedOverlay())
+		{
+			ent->DrawDebugGeometryOverlays();
+		}
+	}
+}
+
+static void DrawAllDebugOverlays()
+{
+	if (!developer->GetBool())
+		return;
+
+	DrawServerHitboxes();
+	DrawGeometryOverlays();
 }
 
 void CServerGameClients::_ProcessUserCmds(CServerGameClients* thisp, edict_t edict,
@@ -199,10 +223,10 @@ void CServerGameClients::_ProcessUserCmds(CServerGameClients* thisp, edict_t edi
 	pPlayer->ProcessUserCmds(cmds, numCmds, totalCmds, droppedPackets, paused);
 }
 
-void RunFrameServer(double flFrameTime, bool bRunOverlays, bool bUniformUpdate)
+static void RunFrameServer(double flFrameTime, bool bRunOverlays, bool bUniformUpdate)
 {
-	DrawServerHitboxes(bRunOverlays);
 	v_RunFrameServer(flFrameTime, bRunOverlays, bUniformUpdate);
+	DrawAllDebugOverlays();
 }
 
 void VServerGameDLL::Detour(const bool bAttach) const
