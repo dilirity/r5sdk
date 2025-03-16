@@ -23,6 +23,7 @@ add_sources( SOURCE_GROUP "Public"
     "${ENGINE_SOURCE_DIR}/public/imaterial.h"
     "${ENGINE_SOURCE_DIR}/public/imaterialinternal.h"
     "${ENGINE_SOURCE_DIR}/public/imaterialsystem.h"
+    "${ENGINE_SOURCE_DIR}/public/materialsystem/meshbuilder.h"
 )
 
 end_sources()
@@ -34,6 +35,7 @@ start_sources()
 add_sources( SOURCE_GROUP "Private"
     "cmaterialsystem.cpp"
     "cmaterialsystem.h"
+    "meshbuilder.cpp"
 )
 
 add_sources( SOURCE_GROUP "Public"
