@@ -8,8 +8,8 @@ class CViewSetup
 public:
 	int unk1;
 	int unk2;
-	int unk3;
-	int unk4;
+	int x;
+	int y;
 	int width;
 	int height;
 	int unk5[44];
