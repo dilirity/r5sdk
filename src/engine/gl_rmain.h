@@ -1,21 +1,12 @@
 #pragma once
 #include "mathlib/vector.h"
 #include "mathlib/vmatrix.h"
+#include "view_shared.h"
 
 #ifndef DEDICATED
 
-// Remove after CViewSetup impl
-// For main view calc width / 2 = posX same for posY with height. 
-struct TransformInfo_t
-{
-	int posX;
-	int posY;
-	int width;
-	int height;
-};
-
-bool ClipTransform(const VMatrix& w2sMatrix, const Vector3D& point, Vector3D* pClip);
-bool ScreenTransform(const TransformInfo_t& transformInfo, const VMatrix& w2sMatrix, const Vector3D& point, Vector3D* pClip);
+bool ClipTransform(const VMatrix& w2sMatrix, const Vector3D& point, Vector3D* const pClip);
+bool ScreenTransform(const CViewSetup& view, const VMatrix& w2sMatrix, const Vector3D& point, Vector3D* const pClip);
 
 ///////////////////////////////////////////////////////////////////////////////
 class VGL_RMain : public IDetour
