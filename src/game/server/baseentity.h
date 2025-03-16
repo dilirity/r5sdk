@@ -72,6 +72,7 @@ public:
 
 	const HSCRIPT GetScriptInstance();
 
+	inline int GetDebugOverlays() const { return m_debugOverlays; }
 	inline const TimedOverlay_t* GetTimedOverlay() const { return m_pTimedOverlay; }
 
 protected:
