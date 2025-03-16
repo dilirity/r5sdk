@@ -18,7 +18,7 @@
 class CBaseAnimating : public CBaseEntity
 {
 public:
-	void DrawServerHitboxes(float duration = 0.0f);
+	void DrawServerHitboxes(const float duration = 0.0f);
 
 	void LockStudioHdr(void);
 	void HitboxToWorldTransforms(uint32_t iBone, matrix3x4_t* transforms);

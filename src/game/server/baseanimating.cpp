@@ -26,34 +26,31 @@ static const Vector3D s_HullColor[8] =
 //  r_drawentities 3 client side boxes ).
 // WARNING:  This uses a ton of bandwidth, only use on a listen server
 //-----------------------------------------------------------------------------
-void CBaseAnimating::DrawServerHitboxes(float duration /*= 0.0f*/)
+void CBaseAnimating::DrawServerHitboxes(const float duration /*= 0.0f*/)
 {
-	CStudioHdr* pStudioHdr = GetModelPtr();
+	const CStudioHdr* const pStudioHdr = GetModelPtr();
 	if (!GetModelPtr())
 		return;
 
-    mstudiohitboxset_t* pSet = pStudioHdr->GetHitboxSet(m_nHitboxSet);
+    const mstudiohitboxset_t* const pSet = pStudioHdr->GetHitboxSet(m_nHitboxSet);
     if (!pSet)
         return;
 
-    matrix3x4_t transforms;
-
-	int r = 0;
-	int g = 0;
-	int b = 255;
-	bool bDepthTest = !debug_draw_box_depth_test->GetBool();
+	const bool bDepthTest = !debug_draw_box_depth_test->GetBool();
 
     for (int i = 0; i < pSet->numhitboxes; i++)
     {
-        mstudiobbox_t* pBox = pSet->pHitbox(i);
+        const mstudiobbox_t* const pBox = pSet->pHitbox(i);
 
-		int j = (pBox->group % 8);
+		const int j = (pBox->group % 8);
 
-		r = static_cast<int>(255.0f * s_HullColor[j][0]);
-		g = static_cast<int>(255.0f * s_HullColor[j][1]);
-		b = static_cast<int>(255.0f * s_HullColor[j][2]);
+		const int r = static_cast<int>(255.0f * s_HullColor[j][0]);
+		const int g = static_cast<int>(255.0f * s_HullColor[j][1]);
+		const int b = static_cast<int>(255.0f * s_HullColor[j][2]);
 
+		matrix3x4_t transforms;
         HitboxToWorldTransforms(pBox->bone, &transforms);
+
         g_pDebugOverlay->AddBoxOverlay(transforms, pBox->bbmin, pBox->bbmax, r, g, b, 16, bDepthTest, duration);
     }
 }
