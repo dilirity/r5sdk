@@ -41,6 +41,17 @@ struct thinkfunc_t
 	int			m_nLastThinkTick;
 };
 
+//-----------------------------------------------------------------------------
+// Purpose: timed overlays
+//-----------------------------------------------------------------------------
+struct TimedOverlay_t
+{
+	char* msg;
+	int				msgEndTime;
+	int				msgStartTime;
+	TimedOverlay_t* pNextTimedOverlay;
+};
+
 class CBaseEntity : public IServerEntity
 {
 	// non-virtual methods. Don't override these!
@@ -60,6 +71,8 @@ public:
 	inline int		GetFlags(void) const { return m_fFlags; }
 
 	const HSCRIPT GetScriptInstance();
+
+	inline const TimedOverlay_t* GetTimedOverlay() const { return m_pTimedOverlay; }
 
 protected:
 	void* m_collideable;
@@ -242,7 +255,7 @@ protected:
 	char gap_5df[1];
 	int m_debugOverlays;
 	char gap_5e4[4];
-	void* m_pTimedOverlay;
+	TimedOverlay_t* m_pTimedOverlay;
 	char m_ScriptScope[32];
 	char m_hScriptInstance[8];
 	string_t m_iszScriptId;
