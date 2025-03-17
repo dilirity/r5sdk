@@ -420,7 +420,7 @@ void Sphere_f(const CCommand& args)
 	int theta = atoi(args[5]);
 	int phi = atoi(args[6]);
 
-	g_pDebugOverlay->AddSphereOverlay(start, radius, theta, phi, 20, 210, 255, 0, 100);
+	g_pDebugOverlay->AddSphereOverlay(start, radius, theta, phi, 20, 210, 255, 200, 100);
 }
 
 /*
@@ -504,7 +504,7 @@ void BHit_f(const CCommand& args)
 		if (const IClientEntity* pEntity = g_pClientEntityList->GetClientEntity(iEnt))
 		{
 			g_pDebugOverlay->AddSphereOverlay( // Render a debug sphere at the client's predicted entity origin.
-				pEntity->GetAbsOrigin(), 10.f, 8, 6, 20, 60, 255, 0, r_visualizetraces_duration->GetFloat());
+				pEntity->GetAbsOrigin(), 10.f, 8, 6, 20, 60, 255, 255, r_visualizetraces_duration->GetFloat());
 		}
 	}
 #endif // !DEDICATED
