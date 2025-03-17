@@ -68,6 +68,8 @@ public:
 
 	void RegisterNetMsgs(CNetChan* chan);
 
+	inline int GetServerCount() const { return m_nServerCount; }
+
 protected:
 	FORCEINLINE CClientState* GetShiftedBasePointer(void)
 	{
