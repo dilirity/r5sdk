@@ -30,7 +30,9 @@ struct user_creds_s
 class CServer : public IConnectionlessPacketHandler
 {
 public:
-	int	GetTick(void) const { return m_nTickCount; }
+	inline int GetTick(void) const { return m_nTickCount; }
+	inline bool CanApplyOverlays(void) const { return m_bApplyOverlays; }
+
 #ifndef CLIENT_DLL // Only the connectionless packet handler is implemented on the client via the IServer base class.
 	int GetNumHumanPlayers(void) const;
 	int GetNumFakeClients(void) const;
