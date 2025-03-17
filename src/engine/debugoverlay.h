@@ -33,9 +33,8 @@ struct OverlayBase_t
 		m_nCreationTick = -1;
 		m_flEndTime     = 0.0f;
 		m_nServerCount  = -1;
-		m_pNextOverlay  = NULL;
-		m_nOverlayTick  = NULL;
-		m_nFlags        = NULL;
+		m_pNextOverlay  = nullptr;
+		m_nOverlayTick  = -1;
 	}
 	bool IsDead(void) const;
 
