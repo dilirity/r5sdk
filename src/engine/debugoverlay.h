@@ -37,6 +37,7 @@ struct OverlayBase_t
 		m_nOverlayTick  = -1;
 	}
 	bool IsDead(void) const;
+	void SetEndTime(const float duration);
 
 	OverlayType_t   m_Type;          // What type of overlay is it?
 	int             m_nCreationTick; // Duration -1 means go away after this frame #
@@ -161,6 +162,8 @@ struct OverlayCapsule_t : public OverlayBase_t
 class CIVDebugOverlay : public IVDebugOverlay, public IVPhysicsDebugOverlay
 {
 public:
+	void AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration);
+
 private:
 	char m_text[1024];
 	va_list m_argptr;

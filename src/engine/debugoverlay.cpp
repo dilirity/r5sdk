@@ -13,6 +13,9 @@
 #include "engine/client/clientstate.h"
 #include "engine/host_cmd.h"
 #include "engine/debugoverlay.h"
+#ifndef CLIENT_DLL
+#include "engine/server/server.h"
+#endif // !CLIENT_DLL
 #include "materialsystem/cmaterialsystem.h"
 #include "mathlib/mathlib.h"
 #ifndef CLIENT_DLL
@@ -22,6 +25,53 @@
 
 ConVar r_debug_draw_depth_test("r_debug_draw_depth_test", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Toggle depth test for other debug draw functionality");
 static ConVar r_debug_overlay_nodecay("r_debug_overlay_nodecay", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Keeps all debug overlays alive regardless of their lifetime. Use command 'clear_debug_overlays' to clear everything");
+
+//------------------------------------------------------------------------------
+// Purpose: returns whether the overlay can be added at this moment
+//------------------------------------------------------------------------------
+static bool CanAddOverlay()
+{
+#ifndef DEDICATED
+    if (!g_pClientState->IsPaused())
+        return true;
+#endif // !DEDICATED
+
+#ifndef CLIENT_DLL
+    if (g_pServer->CanApplyOverlays())
+        return true;
+#endif // !CLIENT_DLL
+
+    return false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: add new overlay capsule
+//------------------------------------------------------------------------------
+void CIVDebugOverlay::AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration)
+{
+    if (!CanAddOverlay())
+        return;
+
+    AUTO_LOCK(*s_OverlayMutex);
+    OverlayCapsule_t* const newOverlay = new OverlayCapsule_t;
+
+    if (!newOverlay)
+        return;
+
+    newOverlay->start = vStart;
+    newOverlay->end = vEnd;
+    newOverlay->radius = flRadius;
+    newOverlay->r = r;
+    newOverlay->g = g;
+    newOverlay->b = b;
+    newOverlay->a = a;
+    newOverlay->noDepthTest = noDepthTest;
+
+    newOverlay->SetEndTime(flDuration);
+
+    newOverlay->m_pNextOverlay = *s_pOverlays;
+    *s_pOverlays = newOverlay;
+}
 
 //------------------------------------------------------------------------------
 // Purpose: checks if overlay should be decayed
@@ -59,6 +109,33 @@ bool OverlayBase_t::IsDead() const
     else
     {
         return m_nCreationTick < *g_nRenderTickCount;
+    }
+}
+
+//------------------------------------------------------------------------------
+// Purpose: sets the overlay end time
+// Input  : duration
+//------------------------------------------------------------------------------
+void OverlayBase_t::SetEndTime(const float duration)
+{
+    // todo: obtain pointer to g_nNewOtherOverlays and increment here!!!.
+    m_nServerCount = g_pClientState->GetServerCount();
+
+    if (duration == 0.0f)
+    {
+        m_nCreationTick = *g_nRenderTickCount;	// stay alive for only one frame
+    }
+    else if (duration == (NDEBUG_PERSIST_TILL_NEXT_SERVER * 2))
+    {
+        m_flEndTime = (NDEBUG_PERSIST_TILL_NEXT_SERVER * 2);
+    }
+    else if (duration == NDEBUG_PERSIST_TILL_NEXT_SERVER)
+    {
+        m_flEndTime = NDEBUG_PERSIST_TILL_NEXT_SERVER;
+    }
+    else
+    {
+        m_flEndTime = g_pClientState->GetClientTime() + duration;
     }
 }
 
@@ -165,22 +242,16 @@ void DrawOverlay(OverlayBase_t* pOverlay)
             Color(pSweptBox->r, pSweptBox->g, pSweptBox->b, pSweptBox->a), r_debug_draw_depth_test.GetBool());
         break;
     }
-    case OverlayType_t::OVERLAY_CAPSULE:
-    {
-        OverlayCapsule_t* pCapsule = static_cast<OverlayCapsule_t*>(pOverlay);
-        QAngle angles;
-
-        VectorAngles(pCapsule->end, pCapsule->start, angles);
-        AngleInverse(angles, angles);
-
-        DebugDrawCapsule(pCapsule->start, angles, pCapsule->radius, pCapsule->start.DistTo(pCapsule->end),
-            Color(pCapsule->r, pCapsule->g, pCapsule->b, pCapsule->a), r_debug_draw_depth_test.GetBool());
-
-        break;
-    }
     case OverlayType_t::OVERLAY_UNKNOWN:
     {
         //printf("UNK0 %p\n", pOverlay);
+        break;
+    }
+    case OverlayType_t::OVERLAY_CAPSULE:
+    {
+        OverlayCapsule_t* pCapsule = static_cast<OverlayCapsule_t*>(pOverlay);
+        RenderCapsule(pCapsule->start, pCapsule->end, pCapsule->radius, Color(pCapsule->r, pCapsule->g, pCapsule->b, pCapsule->a), !pCapsule->noDepthTest);
+
         break;
     }
     }
@@ -190,7 +261,7 @@ void DrawOverlay(OverlayBase_t* pOverlay)
 // Purpose : overlay drawing entrypoint
 // Input  : bRender - won't render anything if false
 //------------------------------------------------------------------------------
-void DrawAllOverlays(bool bRender)
+static void DrawAllOverlays(const bool bRender)
 {
     AUTO_LOCK(*s_OverlayMutex);
 

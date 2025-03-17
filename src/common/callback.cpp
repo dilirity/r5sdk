@@ -431,23 +431,23 @@ Capsule_f
   end<x2 y2 z2> radius <x3 y3 z3>.
 =====================
 */
-void Capsule_f(const CCommand& /*args*/)
+void Capsule_f(const CCommand& args)
 {
-	//if (args.ArgC() != 8) // TODO: temporarily commented, AddCapsuleOverlay needs to be reimplemented.
-	//{
-	//	Msg(eDLL_T::CLIENT, "Usage 'capsule': start(vector) end(vector) radius(float)\n");
-	//	return;
-	//}
+	if (args.ArgC() != 8)
+	{
+		Msg(eDLL_T::CLIENT, "Usage 'capsule': start(vector) end(vector) radius(float)\n");
+		return;
+	}
 
-	//Vector3D start, end;
-	//for (int i = 0; i < 3; ++i)
-	//{
-	//	start[i] = float(atof(args[i + 1]));
-	//	end[i] = float(atof(args[i + 4]));
-	//}
+	Vector3D start, end;
+	for (int i = 0; i < 3; ++i)
+	{
+		start[i] = float(atof(args[i + 1]));
+		end[i] = float(atof(args[i + 4]));
+	}
 
-	//const float radius = float(atof(args[7]));
-	//g_pDebugOverlay->AddCapsuleOverlay(start, end, radius, 141, 233, 135, 200, !r_debug_draw_depth_test.GetBool(), 100);
+	const float radius = float(atof(args[7]));
+	g_pDebugOverlay->AddCapsuleOverlay(start, end, radius, 141, 233, 135, 200, !r_debug_draw_depth_test.GetBool(), 100);
 }
 #endif // !DEDICATED
 
