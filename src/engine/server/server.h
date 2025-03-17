@@ -79,7 +79,7 @@ private:
 	CNetworkStringTable*          m_pLightStyleTable;            // lightstyles
 	CNetworkStringTable*          m_pUserInfoTable;              // userinfo
 	CNetworkStringTable*          m_pServerQueryTable;           // server_query_inf
-	bool                          m_bReplay;                     // MAYBE
+	bool                          m_bApplyOverlays;              // add and run overlays
 	bool                          m_bUpdateFrame;                // perform snapshot update
 	bool                          m_bUseReputation;              // use of player reputation on the server
 	bool                          m_bSimulating;                 // are we simulating or not
