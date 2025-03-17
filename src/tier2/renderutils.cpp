@@ -420,6 +420,180 @@ static void RenderTriangleInternal(const Vector3D& p1, const Vector3D& p2, const
 }
 
 //-----------------------------------------------------------------------------
+// purpose: capsule vertices
+//-----------------------------------------------------------------------------
+#define CAPSULE_VERTS 74
+#define CAPSULE_LINES 69 // note(kawe): make this 117 and uncomment the indices
+                         // below if you want more detailed hemi-spheres on the
+                         // capsule ends. The single-divided hemi-sphere turned
+                         // out to look good enough while dropping 84 vertices.
+static const Vector3D g_capsuleVertPositions[CAPSULE_VERTS] = {
+    { -0.01f, -0.01f, 1.0f },	{ 0.51f, 0.0f, 0.86f },		{ 0.44f, 0.25f, 0.86f },	{ 0.25f, 0.44f, 0.86f },	{ -0.01f, 0.51f, 0.86f },	{ -0.26f, 0.44f, 0.86f },	{ -0.45f, 0.25f, 0.86f },	{ -0.51f, 0.0f, 0.86f },	{ -0.45f, -0.26f, 0.86f },
+    { -0.26f, -0.45f, 0.86f },	{ -0.01f, -0.51f, 0.86f },	{ 0.25f, -0.45f, 0.86f },	{ 0.44f, -0.26f, 0.86f },	{ 0.86f, 0.0f, 0.51f },		{ 0.75f, 0.43f, 0.51f },	{ 0.43f, 0.75f, 0.51f },	{ -0.01f, 0.86f, 0.51f },	{ -0.44f, 0.75f, 0.51f },
+    { -0.76f, 0.43f, 0.51f },	{ -0.87f, 0.0f, 0.51f },	{ -0.76f, -0.44f, 0.51f },	{ -0.44f, -0.76f, 0.51f },	{ -0.01f, -0.87f, 0.51f },	{ 0.43f, -0.76f, 0.51f },	{ 0.75f, -0.44f, 0.51f },	{ 1.0f, 0.0f, 0.01f },		{ 0.86f, 0.5f, 0.01f },
+    { 0.49f, 0.86f, 0.01f },	{ -0.01f, 1.0f, 0.01f },	{ -0.51f, 0.86f, 0.01f },	{ -0.87f, 0.5f, 0.01f },	{ -1.0f, 0.0f, 0.01f },		{ -0.87f, -0.5f, 0.01f },	{ -0.51f, -0.87f, 0.01f },	{ -0.01f, -1.0f, 0.01f },	{ 0.49f, -0.87f, 0.01f },
+    { 0.86f, -0.51f, 0.01f },	{ 1.0f, 0.0f, -0.02f },		{ 0.86f, 0.5f, -0.02f },	{ 0.49f, 0.86f, -0.02f },	{ -0.01f, 1.0f, -0.02f },	{ -0.51f, 0.86f, -0.02f },	{ -0.87f, 0.5f, -0.02f },	{ -1.0f, 0.0f, -0.02f },	{ -0.87f, -0.5f, -0.02f },
+    { -0.51f, -0.87f, -0.02f },	{ -0.01f, -1.0f, -0.02f },	{ 0.49f, -0.87f, -0.02f },	{ 0.86f, -0.51f, -0.02f },	{ 0.86f, 0.0f, -0.51f },	{ 0.75f, 0.43f, -0.51f },	{ 0.43f, 0.75f, -0.51f },	{ -0.01f, 0.86f, -0.51f },	{ -0.44f, 0.75f, -0.51f },
+    { -0.76f, 0.43f, -0.51f },	{ -0.87f, 0.0f, -0.51f },	{ -0.76f, -0.44f, -0.51f },	{ -0.44f, -0.76f, -0.51f },	{ -0.01f, -0.87f, -0.51f },	{ 0.43f, -0.76f, -0.51f },	{ 0.75f, -0.44f, -0.51f },	{ 0.51f, 0.0f, -0.87f },	{ 0.44f, 0.25f, -0.87f },
+    { 0.25f, 0.44f, -0.87f },	{ -0.01f, 0.51f, -0.87f },	{ -0.26f, 0.44f, -0.87f },	{ -0.45f, 0.25f, -0.87f },	{ -0.51f, 0.0f, -0.87f },	{ -0.45f, -0.26f, -0.87f },	{ -0.26f, -0.45f, -0.87f },	{ -0.01f, -0.51f, -0.87f },	{ 0.25f, -0.45f, -0.87f },
+    { 0.44f, -0.26f, -0.87f },	{ 0.0f, 0.0f, -1.0f },
+};
+static const int g_capsuleLineIndices[CAPSULE_LINES] = { -1,
+    14,		0,	1,	13,	25,	37,	49,	61,	73,	67,	55,	43,	31,	19,	7,		-1,
+    14,		0,	4,	16,	28,	40,	52,	64,	73,	70,	58,	46,	34,	22,	10,		-1,
+    12,		25,	26,	27,	28,	29,	30,	31,	32,	33,	34,	35,	36,				-1,
+    12,		37,	38,	39,	40,	41,	42,	43,	44,	45,	46,	47,	48,				-1,
+//    12,		13,	14,	15,	16,	17,	18,	19,	20,	21,	22,	23,	24,				-1,
+//    12,		49,	50,	51,	52,	53,	54,	55,	56,	57,	58,	59,	60,				-1,
+//    12,		1,	2,	3,	4,	5,	6,	7,	8,	9,	10,	11,	12,				-1,
+//    12,		61,	62,	63,	64,	65,	66,	67,	68,	69,	70,	71,	72,				-1,
+};
+
+struct RenderCapsuleQueue_s
+{
+    void (*function)(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const Color c, IMaterial* const pMaterial);
+    Vector3D vStart;
+    Vector3D vEnd;
+    float flRadius;
+    Color color;
+    IMaterial* material;
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: process and advance capsule render queue
+//-----------------------------------------------------------------------------
+static void RenderCapsuleQueueFunctor(CallQueue_s* const queue)
+{
+    RenderCapsuleQueue_s* const item = (RenderCapsuleQueue_s*)queue->GetCurrentCallItem();
+    item->function(item->vStart, item->vEnd, item->flRadius, item->color, item->material);
+
+    // Advance the queue.
+    queue->currentCallIndex += sizeof(RenderCapsuleQueue_s);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: render capsule:
+// +z           _+y
+// ^            /|
+// |           /
+// |.-'"|"'-. /
+// |----|----|
+// |    |    |
+// |    |    |
+// | <--+--> |--> +r
+// |    |    |
+// |    |    |
+// |----|----|
+//  "-..|..-" --> +x
+//-----------------------------------------------------------------------------
+static void RenderCapsuleInternal(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const Color c, IMaterial* const pMaterial)
+{
+    InitializeStandardMaterials();
+
+    // Queue it off if this is called outside the render thread.
+    if ((*g_fnHasRenderCallQueue)())
+    {
+        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(RenderCapsuleQueueFunctor, sizeof(RenderCapsuleQueue_s), 7);
+        RenderCapsuleQueue_s* const item = (RenderCapsuleQueue_s*)queue->GetCurrentAllocatedItem();
+
+        item->function = RenderCapsuleInternal;
+        item->vStart = vStart;
+        item->vEnd = vEnd;
+        item->flRadius = flRadius;
+        item->color = c;
+        item->material = pMaterial;
+
+        (*g_fnAdvanceRenderCallQueue)(sizeof(RenderCapsuleQueue_s));
+        return;
+    }
+
+    const Vector3D vecCapsuleCoreNormal = (vStart - vEnd).Normalized();
+
+    matrix3x4_t matCapsuleRotationSpace;
+    VectorMatrix(Vector3D(0, 0, 1), matCapsuleRotationSpace);
+
+    matrix3x4_t matCapsuleSpace;
+    VectorMatrix(vecCapsuleCoreNormal, matCapsuleSpace);
+
+    const Vector3D vecLen = (vEnd - vStart);
+    Vector3D v[CAPSULE_VERTS];
+
+    for (int i = 0; i < CAPSULE_VERTS; i++)
+    {
+        Vector3D vecCapsuleVert = g_capsuleVertPositions[i];
+
+        VectorRotate(vecCapsuleVert, matCapsuleRotationSpace, vecCapsuleVert);
+        VectorRotate(vecCapsuleVert, matCapsuleSpace, vecCapsuleVert);
+
+        vecCapsuleVert *= flRadius;
+
+        if (g_capsuleVertPositions[i].z > 0)
+        {
+            vecCapsuleVert += vecLen;
+        }
+
+        v[i] = vecCapsuleVert + vStart;
+    }
+
+    CMatRenderContext* const ctx = g_pMaterialSystem->GetRenderContext();
+    CMeshVertexBuilder vertexBuilder;
+
+    // note(kawe): see comment at the 'CAPSULE_LINES' define,
+    // if you wish to have more detailed hemi-spheres on the
+    // capsule ends, allocate 200 vertices here instead of
+    // 116 after increasing 'CAPSULE_LINES'.
+    if (vertexBuilder.Begin(ctx, 116))
+    {
+        ctx->Bind(pMaterial);
+        int loopStartIndex = -1; // Track where each loop starts.
+
+        for (int i = 0; i < CAPSULE_LINES; i++)
+        {
+            if (g_capsuleLineIndices[i] == -1)
+            {
+                if (loopStartIndex != -1)
+                {
+                    // Close the loop properly.
+                    const int lastIndex = g_capsuleLineIndices[i - 1];
+                    const int firstIndex = g_capsuleLineIndices[loopStartIndex];
+
+                    if (lastIndex >= 0 && firstIndex >= 0)
+                    {
+                        vertexBuilder.AppendVertex(v[lastIndex], c);
+                        vertexBuilder.AppendVertex(v[firstIndex], c);
+                    }
+                }
+
+                // Prepare for the next loop.
+                if (++i >= CAPSULE_LINES)
+                    break;
+
+                loopStartIndex = i + 1;
+                continue;
+            }
+
+            if (i + 1 < CAPSULE_LINES && g_capsuleLineIndices[i + 1] != -1)
+            {
+                const int idx1 = g_capsuleLineIndices[i];
+                const int idx2 = g_capsuleLineIndices[i + 1];
+
+                if (idx1 >= 0 && idx2 >= 0)
+                {
+                    vertexBuilder.AppendVertex(v[idx1], c);
+                    vertexBuilder.AppendVertex(v[idx2], c);
+                }
+            }
+        }
+
+        vertexBuilder.End(ctx);
+        ctx->DrawLineList(vertexBuilder.GetParams(), nullptr, 0);
+    }
+
+    // Need to call this to decrement context ref counter.
+    ctx->EndRenderer();
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: public proxy for RenderBoxInternal
 //-----------------------------------------------------------------------------
 void RenderBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, bool bZBuffer)
@@ -450,6 +624,15 @@ void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, 
         pMaterial = bZBuffer ? s_transNormalZBoth : s_transIgnoreZBoth;
 
     RenderTriangleInternal(p1, p2, p3, c, pMaterial);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: public proxy for RenderCapsuleInternal
+//-----------------------------------------------------------------------------
+void RenderCapsule(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const Color c, const bool bZBuffer)
+{
+    IMaterial* const pMaterial = bZBuffer ? s_transNormalZWire : s_transIgnoreZWire;
+    RenderCapsuleInternal(vStart, vEnd, flRadius, c, pMaterial);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
