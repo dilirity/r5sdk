@@ -33,6 +33,7 @@ class V_RenderUtils : public IDetour
 {
 	virtual void GetAdr(void) const
 	{
+		LogFunAdr("InitializeStandardMaterials", v_InitializeStandardMaterials);
 		LogFunAdr("RenderWireFrameBox", v_RenderWireFrameBox);
 		LogFunAdr("RenderWireframeSphere", v_RenderWireframeSphere);
 		LogFunAdr("RenderLine", v_RenderLine);
