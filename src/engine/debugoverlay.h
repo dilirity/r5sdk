@@ -44,7 +44,7 @@ struct OverlayBase_t
 	int             m_nServerCount;  // Latch server count, too
 	OverlayBase_t*  m_pNextOverlay;  // 16
 	int             m_nOverlayTick;  // 24
-	int             m_nFlags;        // Maybe
+	// There is 4 bytes padding here.
 };
 
 struct OverlayBox_t : public OverlayBase_t
