@@ -458,7 +458,7 @@ void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, 
 
 //-----------------------------------------------------------------------------
 // Purpose: render angled box:
-// +y              _+z
+// +z              _+y
 // ^               /|
 // |              /
 // |  +----------+
@@ -493,7 +493,7 @@ void DebugDrawBox(const Vector3D& vOrigin, const QAngle& vAngles, const Vector3D
 
 //-----------------------------------------------------------------------------
 // Purpose: render cylinder:
-// +y           _+z
+// +z           _+y
 // ^            /|
 // |           /
 // |.-'"|"'-. /
@@ -572,7 +572,7 @@ void DebugDrawCapsule(const Vector3D& vStart, const QAngle& vAngles, const Vecto
 
 //-----------------------------------------------------------------------------
 // Purpose: render sphere:
-// +y                _+z
+// +z                _+y
 // ^                 /|
 // |                /
 // |   .--"|"--.   /
@@ -592,7 +592,7 @@ void DebugDrawSphere(const Vector3D& vOrigin, float flRadius, Color color, int n
 
 //-----------------------------------------------------------------------------
 // Purpose: render hemisphere:
-// +y                _+z
+// +z                _+y
 // ^                 /|
 // |                /
 // |   .--"|"--.   /
@@ -646,7 +646,7 @@ void DebugDrawHemiSphere(const Vector3D& vOrigin, const QAngle& vAngles, const V
 
 //-----------------------------------------------------------------------------
 // Purpose: render circle:
-// +y                _+z
+// +z                _+y
 // ^                 /|
 // |                /
 // |   .--"""--.   /
@@ -687,7 +687,7 @@ void DebugDrawCircle(const Vector3D& vOrigin, const QAngle& vAngles, float flRad
 
 //-----------------------------------------------------------------------------
 // Purpose: render square:
-// +y              _+z
+// +z              _+y
 // |               /|
 // .--------------.
 // |              |
@@ -705,7 +705,7 @@ void DebugDrawSquare(const Vector3D& vOrigin, const QAngle& vAngles, float flSqu
 
 //-----------------------------------------------------------------------------
 // Purpose: render triangle:
-// +y              _+z
+// +z              _+y
 // |               /|
 // |      /\      /
 // |     /  \    /
@@ -723,7 +723,7 @@ void DebugDrawTriangle(const Vector3D& vOrigin, const QAngle& vAngles, float flT
 
 //-----------------------------------------------------------------------------
 // Purpose: render mark:
-// +y     _+z
+// +z     _+y
 // |      /|
 // |     /
 //   \  /--> +r
@@ -741,7 +741,7 @@ void DebugDrawMark(const Vector3D& vOrigin, float flRadius, const vector<int>& v
 
 //-----------------------------------------------------------------------------
 // Purpose: render star:
-// +y     _+z
+// +z     _+y
 // |      /|
 // |     /
 //   \  /--> +r
@@ -762,7 +762,7 @@ void DrawStar(const Vector3D& vOrigin, float flRadius, bool bZBuffer)
 
 //-----------------------------------------------------------------------------
 // Purpose: render arrow:
-// +y     _+z
+// +z     _+y
 // |      /|
 // |  .  /
 // | / \
@@ -783,9 +783,9 @@ void DebugDrawArrow(const Vector3D& vOrigin, const Vector3D& vEnd, float flArray
 
 //-----------------------------------------------------------------------------
 // Purpose: render 3d axis:
-// +y
+// +z
 // ^
-// |   _+z
+// |   _+y
 // |   /|
 // |  /
 // | /
