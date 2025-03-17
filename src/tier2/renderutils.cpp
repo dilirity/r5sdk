@@ -12,7 +12,6 @@
 #include "mathlib/vector4d.h"
 #include "mathlib/mathlib.h"
 #include "tier2/renderutils.h"
-#include "engine/debugoverlay.h" // TODO[ AMOS ]: must be a public interface!
 #include "rtech/pak/pakstate.h"
 #include "imaterial.h"
 #include "materialsystem/cmaterialsystem.h"

@@ -7,7 +7,7 @@
 #include "tier1/cvar.h"
 #include "baseanimating.h"
 #include "engine/modelinfo.h"
-#include "public/idebugoverlay.h"
+#include "engine/debugoverlay.h"
 
 static const Vector3D s_HullColor[8] =
 {

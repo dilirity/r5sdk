@@ -6,7 +6,6 @@
 #include "public/isnapshotmgr.h"
 #include "engine/net_chan.h"
 #include "engine/networkstringtable.h"
-#include "engine/debugoverlay.h"
 #include "engine/clockdriftmgr.h"
 #include "engine/framesnapshot.h"
 #include "engine/packed_entity.h"

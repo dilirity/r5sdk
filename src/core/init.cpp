@@ -101,6 +101,7 @@
 #include "engine/net.h"
 #include "engine/net_chan.h"
 #include "engine/networkstringtable.h"
+#include "engine/debugoverlay.h"
 #ifndef CLIENT_DLL
 #include "engine/server/sv_main.h"
 #include "engine/server/sv_rcon.h"
@@ -119,7 +120,6 @@
 #include "engine/gl_drawlights.h"
 #include "engine/gl_screen.h"
 #include "engine/gl_rsurf.h"
-#include "engine/debugoverlay.h"
 #include "engine/keys.h"
 #endif // !DEDICATED
 #include "vscript/languages/squirrel_re/include/squirrel.h"
@@ -160,7 +160,6 @@
 #endif // !DEDICATED
 #include "public/edict.h"
 #ifndef DEDICATED
-#include "public/idebugoverlay.h"
 #include "inputsystem/inputsystem.h"
 #include "inputsystem/inputstacksystem.h"
 #include "windows/id3dx.h"

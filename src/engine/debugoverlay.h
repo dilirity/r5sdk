@@ -3,6 +3,8 @@
 #include "mathlib/vector4d.h"
 #include "mathlib/color.h"
 #include "mathlib/ssemath.h"
+#include "public/idebugoverlay.h"
+#include "public/vphysics/vphysics_interface.h"
 
 constexpr auto NDEBUG_PERSIST_TILL_NEXT_SERVER = (0.01023f);
 extern ConVar r_debug_draw_depth_test;
@@ -157,7 +159,16 @@ struct OverlayCapsule_t : public OverlayBase_t
 	int b;
 	int a;
 	bool m_bWireframe;
+
+class CIVDebugOverlay : public IVDebugOverlay, public IVPhysicsDebugOverlay
+{
+public:
+private:
+	char m_text[1024];
+	va_list m_argptr;
 };
+
+inline CIVDebugOverlay* g_pDebugOverlay = nullptr;
 
 void DestroyOverlay(OverlayBase_t* pOverlay);
 void DrawOverlay(OverlayBase_t* pOverlay);

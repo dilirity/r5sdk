@@ -27,6 +27,7 @@
 #include "engine/host_cmd.h"
 #include "engine/host_state.h"
 #include "engine/enginetrace.h"
+#include "engine/debugoverlay.h"
 
 #include "rtech/pak/pakencode.h"
 #include "rtech/pak/pakdecode.h"
@@ -61,7 +62,6 @@
 #endif // !DEDICATED
 #include "public/bspflags.h"
 #include "public/cmodel.h"
-#include "public/idebugoverlay.h"
 #include "public/localize/ilocalize.h"
 #ifndef CLIENT_DLL
 #include "game/server/detour_impl.h"
@@ -431,22 +431,23 @@ Capsule_f
   end<x2 y2 z2> radius <x3 y3 z3>.
 =====================
 */
-void Capsule_f(const CCommand& args)
+void Capsule_f(const CCommand& /*args*/)
 {
-	if (args.ArgC() != 10)
-	{
-		Msg(eDLL_T::CLIENT, "Usage 'capsule': start(vector) end(vector) radius(vector)\n");
-		return;
-	}
+	//if (args.ArgC() != 8) // TODO: temporarily commented, AddCapsuleOverlay needs to be reimplemented.
+	//{
+	//	Msg(eDLL_T::CLIENT, "Usage 'capsule': start(vector) end(vector) radius(float)\n");
+	//	return;
+	//}
 
-	Vector3D start, end, radius;
-	for (int i = 0; i < 3; ++i)
-	{
-		start[i] = float(atof(args[i + 1]));
-		end[i] = float(atof(args[i + 4]));
-		radius[i] = float(atof(args[i + 7]));
-	}
-	g_pDebugOverlay->AddCapsuleOverlay(start, end, radius, { 0,0,0 }, { 0,0,0 }, 141, 233, 135, 0, 100);
+	//Vector3D start, end;
+	//for (int i = 0; i < 3; ++i)
+	//{
+	//	start[i] = float(atof(args[i + 1]));
+	//	end[i] = float(atof(args[i + 4]));
+	//}
+
+	//const float radius = float(atof(args[7]));
+	//g_pDebugOverlay->AddCapsuleOverlay(start, end, radius, 141, 233, 135, 200, !r_debug_draw_depth_test.GetBool(), 100);
 }
 #endif // !DEDICATED
 

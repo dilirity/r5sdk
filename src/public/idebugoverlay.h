@@ -9,40 +9,53 @@
 #define IDEBUGOVERLAY_H
 
 #include "mathlib/vector.h"
+
+class OverlayText_t;
+
 class IVDebugOverlay
 {
-	void* __vftable /*VFT*/;
-};
-
-class CIVDebugOverlay : public IVDebugOverlay
-{
 public:
-	void AddBoxOverlay(matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, int r, int g, int b, int a, bool bZBuffer, float flDuration)
-	{
-		const static int index = 1;
-		CallVFunc<void>(index, this, vTransforms, vMins, vMaxs, r, g, b, a, bZBuffer, flDuration);
-	}
-	void AddSphereOverlay(const Vector3D& vOrigin, float flRadius, int nTheta, int nPhi, int r, int g, int b, int a, float flDuration)
-	{
-		const static int index = 3;
-		CallVFunc<void>(index, this, vOrigin, flRadius, nTheta, nPhi, r, g, b, a, flDuration);
-	}
-	void AddTriangleOverlay(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, int r, int g, int b, int a, bool bZBuffer, float flDuration)
-	{
-		const static int index = 4;
-		CallVFunc<void>(index, this, p1, p2, p3, r, g, b, a, bZBuffer, flDuration);
-	}
-	void AddLineOverlay(const Vector3D& vStart, const Vector3D& vEnd, int r, int g, int b, char noDepthTest, float flDuration)
-	{
-		const static int index = 5;
-		CallVFunc<void>(index, this, vStart, vEnd, r, g, b, noDepthTest, flDuration);
-	}
-	void AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const Vector3D& vRadius, const Vector3D& vTop, const Vector3D& vBottom, int r, int g, int b, int a, float flDuration)
-	{
-		const static int index = 12;
-		CallVFunc<void>(index, this, vStart, vEnd, vRadius, vTop, vBottom, r, g, b, a, flDuration);
-	}
+	virtual void AddEntityTextOverlay(const int entIndex, const int lineOffset, const float duration, const int r, const int g, const int b, const int a, PRINTF_FORMAT_STRING const char* const format, ...) = 0;
+	virtual void AddBoxOverlay(matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
+	virtual void AddBoxOverlay(Vector3D& VOrigin, const Vector3D& vMins, const Vector3D& vMaxs, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
+	virtual void AddSphereOverlay(const Vector3D& vOrigin, const float flRadius, const int nTheta, const int nPhi, const int r, const int g, const int b, const int a, const float flDuration) = 0;
+	virtual void AddTriangleOverlay(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
+	virtual void AddLineOverlay(const Vector3D& vStart, const Vector3D& vEnd, const int r, const int g, const int b, const bool noDepthTest, const float flDuration) = 0;
+	virtual void AddSplineOverlay(const Vector3D& vStart, const Vector3D& vEnd, const int r, const int g, const int b, const bool noDepthTest, const float flDuration) = 0;
+
+	virtual void stub_0() = 0; // Appears to adds a 128 * matrix3x4_t overlay, but this is never used anywhere in the game code and the renderer doesn't exist. Stubbed for now.
+
+	virtual void AddTextOverlay(const Vector3D& origin, const float duration, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(4, 5) = 0;
+	virtual void AddTextOverlay(const Vector3D& origin, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(3, 4) = 0;
+
+	// Also a AddScreenTextOverlay function, but never used in the engine and gutted so its impossible to know the parameters.
+	// Since this isn't used, it will be replaced with a new implementation in the future.
+	virtual void stub_1() = 0;
+	virtual void AddScreenTextOverlay(IVDebugOverlay* const unused1, const char* const text, const void* unused2, const int unk1, const int unk2) = 0;
+
+	virtual void AddSweptBoxOverlay(const Vector3D& start, const Vector3D& end, const Vector3D& mins, const Vector3D& max, const QAngle& angles, const int r, const int g, const int b, const int a, const float flDuration) = 0;
+	virtual void AddGridOverlay(const Vector3D& origin) = 0;
+	virtual void AddCoordFrameOverlay(const matrix3x4_t& frame, float flScale, int vColorTable[3][3] = NULL) = 0;
+
+	virtual OverlayText_t* GetFirstText(void) = 0;
+	virtual OverlayText_t* GetNextText(OverlayText_t* const current) = 0;
+
+	virtual void stub_2() = 0; // Something with text overlays, checks creation and overlay ticks, reverse this.
+
+	virtual void ClearDeadOverlays(void) = 0;
+	virtual void ClearAllOverlays(void) = 0;
+
+	virtual void stub_3() = 0; // This is DebugDebugOverlays(), parameters need reversing but that can only be done once this entire interface is mapped out.
+	virtual void stub_4() = 0; // Increments 'g_nOverlayStage' if not paused and when a2 > 0.
+	virtual void stub_5() = 0; // Sets 'g_nRenderTickCount' to 'g_ClientGlobalVariables.frameCount' if not paused.
+
+	virtual bool DebugDebugOverlaysEnabled(void) const = 0;
+
+	virtual void AddTextOverlayRGB(const Vector3D& origin, const int lineOffset, const float duration, const float r, const float g, const float b, const float alpha, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(9, 10) = 0;
+	virtual void AddTextOverlayRGB(const Vector3D& origin, const int lineOffset, const float duration, const int r, const int g, const int b, const int a, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(9, 10) = 0;
+
+	virtual void AddLineOverlayWithAlpha(const Vector3D& vStart, const Vector3D& vEnd, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
+	virtual void AddUnknownOverlay(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const float& unk1, const float& unk2, const float flDuration) = 0; // Unknown shape, renderer also not available.
 };
 
-inline CIVDebugOverlay* g_pDebugOverlay = nullptr;
 #endif // IDEBUGOVERLAY_H
