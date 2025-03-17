@@ -416,9 +416,9 @@ void Sphere_f(const CCommand& args)
 		start[i] = float(atof(args[i + 1]));
 	}
 
-	float radius = float(atof(args[4]));
-	int theta = atoi(args[5]);
-	int phi = atoi(args[6]);
+	const float radius = float(atof(args[4]));
+	const int theta = atoi(args[5]);
+	const int phi = atoi(args[6]);
 
 	g_pDebugOverlay->AddSphereOverlay(start, radius, theta, phi, 20, 210, 255, 200, 100);
 }
@@ -452,7 +452,7 @@ void Capsule_f(const CCommand& args)
 
 // TODO: move to other file?
 static ConVar bhit_depth_test("bhit_depth_test", "0", FCVAR_DEVELOPMENTONLY | FCVAR_REPLICATED, "Use depth test for bullet ray trace overlay");
-static ConVar bhit_abs_origin("bhit_abs_origin", "1", FCVAR_DEVELOPMENTONLY | FCVAR_REPLICATED, "Draw entity's predicted abs origin upon bullet impact for trajectory debugging (requires 'r_visualizetraces' to be set!)");
+static ConVar bhit_abs_origin("bhit_abs_origin", "1", FCVAR_DEVELOPMENTONLY | FCVAR_REPLICATED, "Draw entity's predicted absolute origin upon bullet impact for trajectory debugging (requires 'r_visualizetraces' to be set!)");
 /*
 =====================
 BHit_f
@@ -501,7 +501,9 @@ void BHit_f(const CCommand& args)
 	if (bhit_abs_origin.GetBool() && r_visualizetraces->GetBool())
 	{
 		const int iEnt = atoi(args[2]);
-		if (const IClientEntity* pEntity = g_pClientEntityList->GetClientEntity(iEnt))
+		const IClientEntity* const pEntity = g_pClientEntityList->GetClientEntity(iEnt);
+
+		if (pEntity)
 		{
 			g_pDebugOverlay->AddSphereOverlay( // Render a debug sphere at the client's predicted entity origin.
 				pEntity->GetAbsOrigin(), 10.f, 8, 6, 20, 60, 255, 255, r_visualizetraces_duration->GetFloat());
