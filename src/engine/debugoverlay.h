@@ -119,45 +119,44 @@ struct OverlayTriangle_t : public OverlayBase_t
 {
 	OverlayTriangle_t() { m_Type = OverlayType_t::OVERLAY_TRIANGLE; }
 
-	Vector3D		p1;
-	Vector3D		p2;
-	Vector3D		p3;
-	int				r;
-	int				g;
-	int				b;
-	int				a;
-	bool			noDepthTest;
+	Vector3D        p1;
+	Vector3D        p2;
+	Vector3D        p3;
+	int             r;
+	int             g;
+	int             b;
+	int             a;
+	bool            noDepthTest;
 };
 
 struct OverlaySweptBox_t : public OverlayBase_t
 {
 	OverlaySweptBox_t() { m_Type = OverlayType_t::OVERLAY_SWEPT_BOX; }
 
-	Vector3D start;
-	Vector3D end;
-	Vector3D mins;
-	Vector3D maxs;
-	QAngle angles;
-	int r;
-	int g;
-	int b;
-	int a;
+	Vector3D        start;
+	Vector3D        end;
+	Vector3D        mins;
+	Vector3D        maxs;
+	QAngle          angles;
+	int             r;
+	int             g;
+	int             b;
+	int             a;
 };
 
 struct OverlayCapsule_t : public OverlayBase_t
 {
 	OverlayCapsule_t() { m_Type = OverlayType_t::OVERLAY_CAPSULE; }
 
-	Vector3D start;
-	Vector3D end;
-	Vector3D radius;
-	Vector3D top;
-	Vector3D bottom;
-	int r;
-	int g;
-	int b;
-	int a;
-	bool m_bWireframe;
+	Vector3D        start;
+	Vector3D        end;
+	float           radius;
+	int             r;
+	int             g;
+	int             b;
+	int             a;
+	bool            noDepthTest;
+};
 
 class CIVDebugOverlay : public IVDebugOverlay, public IVPhysicsDebugOverlay
 {
