@@ -719,41 +719,6 @@ void DebugDrawCylinder(const Vector3D& vOrigin, const QAngle& vAngles, float flR
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: render capsule:
-// +y           _+z
-// ^            /|
-// |           /
-// |.-'"|"'-. /
-// |----|----|
-// |    |    |
-// |    |    |
-// | <--+--> |--> +r
-// |    |    |
-// |    |    |
-// |----|----|
-//  "-..|..-" --> +x
-//-----------------------------------------------------------------------------
-void DebugDrawCapsule(const Vector3D& vStart, const QAngle& vAngles, const Vector3D& vRadius, float flHeight, Color color, bool bZBuffer)
-{
-    Vector3D vForward, vUp;
-    QAngle vHemi, vComposed;
-
-    AngleVectors(vAngles, nullptr, nullptr, &vUp);
-
-    for (int i = 0; i < 4; i++)
-    {
-        AngleCompose(vAngles, { 0.f, 90.f * i, 0.f }, vComposed);
-        AngleVectors(vComposed, &vForward);
-        v_RenderLine(vStart + (vForward * vRadius), vStart + (vForward * vRadius) + (vUp * flHeight), color, bZBuffer);
-    }
-
-    AngleCompose(vAngles, { 180.f, 180.f, 0.f }, vHemi);
-
-    DebugDrawHemiSphere(vStart + (vUp * flHeight), vAngles, vRadius, color, 8, bZBuffer);
-    DebugDrawHemiSphere(vStart, vHemi, vRadius, color, 8, bZBuffer);
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: render sphere:
 // +z                _+y
 // ^                 /|
