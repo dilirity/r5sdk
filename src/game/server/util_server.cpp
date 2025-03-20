@@ -11,7 +11,7 @@
 //-----------------------------------------------------------------------------
 // Purpose: returns the player instance by edict
 //-----------------------------------------------------------------------------
-CPlayer* UTIL_PlayerByIndex(int nIndex)
+CPlayer* UTIL_PlayerByIndex(const int nIndex)
 {
 	if (nIndex < 1 || nIndex >gpGlobals->maxClients || nIndex == FL_EDICT_INVALID)
 	{
@@ -20,6 +20,6 @@ CPlayer* UTIL_PlayerByIndex(int nIndex)
 	}
 
 	// !TODO: Improve this!!!
-	CPlayer* pPlayer = reinterpret_cast<CPlayer*>(gpGlobals->m_pEdicts[nIndex + 0x7808]);
+	CPlayer* const pPlayer = reinterpret_cast<CPlayer*>(gpGlobals->m_pEdicts[nIndex + 0x7808]);
 	return pPlayer;
 }

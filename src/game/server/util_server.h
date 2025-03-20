@@ -7,6 +7,6 @@
 #define UTIL_SERVER_H
 #include "game/server/player.h"
 
-CPlayer* UTIL_PlayerByIndex(int nIndex);
+CPlayer* UTIL_PlayerByIndex(const int nIndex);
 
 #endif // UTIL_SERVER_H
