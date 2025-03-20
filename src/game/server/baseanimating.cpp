@@ -51,7 +51,7 @@ void CBaseAnimating::DrawServerHitboxes(const float duration /*= 0.0f*/)
 		matrix3x4_t transforms;
         HitboxToWorldTransforms(pBox->bone, &transforms);
 
-        g_pDebugOverlay->AddBoxOverlay(transforms, pBox->bbmin, pBox->bbmax, r, g, b, 16, bDepthTest, duration);
+        g_pDebugOverlay->AddTransformedBoxOverlay(transforms, pBox->bbmin, pBox->bbmax, r, g, b, 16, bDepthTest, duration);
     }
 }
 

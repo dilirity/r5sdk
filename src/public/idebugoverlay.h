@@ -16,8 +16,8 @@ class IVDebugOverlay
 {
 public:
 	virtual void AddEntityTextOverlay(const int entIndex, const int lineOffset, const float duration, const int r, const int g, const int b, const int a, PRINTF_FORMAT_STRING const char* const format, ...) = 0;
-	virtual void AddBoxOverlay(matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
-	virtual void AddBoxOverlay(Vector3D& VOrigin, const Vector3D& vMins, const Vector3D& vMaxs, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
+	virtual void AddTransformedBoxOverlay(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
+	virtual void AddBoxOverlay(const Vector3D& VOrigin, const Vector3D& vMins, const Vector3D& vMaxs, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
 	virtual void AddSphereOverlay(const Vector3D& vOrigin, const float flRadius, const int nTheta, const int nPhi, const int r, const int g, const int b, const int a, const float flDuration) = 0;
 	virtual void AddTriangleOverlay(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
 	virtual void AddLineOverlay(const Vector3D& vStart, const Vector3D& vEnd, const int r, const int g, const int b, const bool noDepthTest, const float flDuration) = 0;
