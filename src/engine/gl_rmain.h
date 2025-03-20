@@ -5,8 +5,8 @@
 
 #ifndef DEDICATED
 
-bool ClipTransform(const VMatrix& w2sMatrix, const Vector3D& point, Vector3D* const pClip);
-bool ScreenTransform(const CViewSetup& view, const VMatrix& w2sMatrix, const Vector3D& point, Vector3D* const pClip);
+bool ClipTransform(const VMatrix& w2sMatrix, const Vector3D& point, Vector2D* const pClip);
+bool ScreenTransform(const CViewSetup& view, const VMatrix& w2sMatrix, const Vector3D& point, Vector2D* const pClip);
 
 ///////////////////////////////////////////////////////////////////////////////
 class VGL_RMain : public IDetour

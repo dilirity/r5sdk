@@ -18,11 +18,10 @@
 //          *pClip -
 // Output : false if the position if off-screen
 //-----------------------------------------------------------------------------
-bool ClipTransform(const VMatrix& w2sMatrix, const Vector3D& point, Vector3D* const pClip)
+bool ClipTransform(const VMatrix& w2sMatrix, const Vector3D& point, Vector2D* const pClip)
 {
 	pClip->x = w2sMatrix[0][0] * point.x + w2sMatrix[0][1] * point.y + w2sMatrix[0][2] * point.z + w2sMatrix[0][3];
 	pClip->y = w2sMatrix[1][0] * point.x + w2sMatrix[1][1] * point.y + w2sMatrix[1][2] * point.z + w2sMatrix[1][3];
-	pClip->z = 0.0f;
 
 	const float w = w2sMatrix[3][0] * point.x + w2sMatrix[3][1] * point.y + w2sMatrix[3][2] * point.z + w2sMatrix[3][3];
 
@@ -49,7 +48,7 @@ bool ClipTransform(const VMatrix& w2sMatrix, const Vector3D& point, Vector3D* co
 //          *pClip -
 // Output : false if the position if off-screen
 //-----------------------------------------------------------------------------
-bool ScreenTransform(const CViewSetup& view, const VMatrix& w2sMatrix, const Vector3D& point, Vector3D* const pClip)
+bool ScreenTransform(const CViewSetup& view, const VMatrix& w2sMatrix, const Vector3D& point, Vector2D* const pClip)
 {
 	const bool bIsOffscreen = ClipTransform(w2sMatrix, point, pClip);
 
