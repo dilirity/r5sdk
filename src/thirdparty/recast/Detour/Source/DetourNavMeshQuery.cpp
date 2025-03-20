@@ -2269,7 +2269,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const rdVec3D* startPos, const rdVec3D
 				else
 				{
 					// note(kawe): we must delay 'right' after 'left' since we
-					// flipped the coordinate system (XZY -> XYZ, Z is up now),
+					// changed the coordinate system (XZY -> XYZ, Z is up now),
 					// 'left' however must know its poly, jump and index in
 					// case its vertex lies outside the current funnel.
 					addSegments[SP_SEGMENT_ADD_RIGHT] = true;
