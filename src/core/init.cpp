@@ -133,6 +133,7 @@
 #include "game/shared/animation.h"
 #include "game/shared/vscript_shared.h"
 #ifndef CLIENT_DLL
+#include "game/server/util_server.h"
 #include "game/server/ai_node.h"
 #include "game/server/ai_network.h"
 #include "game/server/ai_networkmanager.h"
@@ -707,6 +708,8 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	REGISTER(VPlayerMove);
 	REGISTER(VServerEntityList);
 	REGISTER(VCBaseEntity);
+
+	REGISTER(V_UTIL_Server);
 
 #endif // !CLIENT_DLL
 
