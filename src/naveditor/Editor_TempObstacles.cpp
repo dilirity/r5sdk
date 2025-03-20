@@ -525,7 +525,7 @@ static void drawDetail(duDebugDraw* dd, dtTileCache* tc, const int tx, const int
 }
 
 
-static void drawDetailOverlay(const dtTileCache* tc, const int tx, const int ty, double* proj, double* model, int* view)
+static void drawDetailOverlay(const dtTileCache* tc, const int tx, const int ty, double* model, double* proj, int* view)
 {
 	dtCompressedTileRef tiles[MAX_LAYERS];
 	const int ntiles = tc->getTilesAt(tx,ty,tiles,MAX_LAYERS);
@@ -676,7 +676,7 @@ public:
 		}
 	}
 	
-	virtual void handleRenderOverlay(double* proj, double* model, int* view)
+	virtual void handleRenderOverlay(double* model, double* proj, int* view)
 	{
 		if (m_hitPosSet)
 		{
@@ -684,7 +684,7 @@ public:
 			{
 				int tx=0, ty=0;
 				m_editor->getTilePos(&m_hitPos, tx, ty);
-				m_editor->renderCachedTileOverlay(tx,ty,proj,model,view);
+				m_editor->renderCachedTileOverlay(tx,ty,model,proj,view);
 			}
 		}		
 	}
@@ -742,7 +742,7 @@ public:
 	virtual void handleStep() {}
 	virtual void handleUpdate(const float /*dt*/) {}
 	virtual void handleRender() {}
-	virtual void handleRenderOverlay(double* /*proj*/, double* /*model*/, int* /*view*/) { }
+	virtual void handleRenderOverlay(double* /*model*/, double* /*proj*/, int* /*view*/) { }
 };
 
 
@@ -897,17 +897,17 @@ void Editor_TempObstacles::renderCachedTile(const int tx, const int ty, const in
 		drawDetail(&m_dd,m_tileCache,tx,ty,type, getDetourDrawOffset());
 }
 
-void Editor_TempObstacles::renderCachedTileOverlay(const int tx, const int ty, double* proj, double* model, int* view)
+void Editor_TempObstacles::renderCachedTileOverlay(const int tx, const int ty, double* model, double* proj, int* view)
 {
 	if (m_tileCache)
 		drawDetailOverlay(m_tileCache, tx, ty, proj, model, view);
 }
 
-void Editor_TempObstacles::handleRenderOverlay(double* proj, double* model, int* view)
+void Editor_TempObstacles::handleRenderOverlay(double* model, double* proj, int* view)
 {	
 	if (m_tool)
-		m_tool->handleRenderOverlay(proj, model, view);
-	renderOverlayToolStates(proj, model, view);
+		m_tool->handleRenderOverlay(model, proj, view);
+	renderOverlayToolStates(model, proj, view);
 
 	// Stats
 /*	imguiDrawRect(280,10,300,100,imguiRGBA(0,0,0,64));

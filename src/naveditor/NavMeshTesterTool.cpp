@@ -1450,7 +1450,7 @@ void NavMeshTesterTool::handleRender()
 	}
 }
 
-void NavMeshTesterTool::handleRenderOverlay(double* proj, double* model, int* view)
+void NavMeshTesterTool::handleRenderOverlay(double* model, double* proj, int* view)
 {
 	const int h = view[3];
 	const rdVec3D* drawOffset = m_editor->getDetourDrawOffset();

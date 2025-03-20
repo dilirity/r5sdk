@@ -343,7 +343,7 @@ void NavMeshPruneTool::handleRender()
 	}
 }
 
-void NavMeshPruneTool::handleRenderOverlay(double* proj, double* model, int* view)
+void NavMeshPruneTool::handleRenderOverlay(double* model, double* proj, int* view)
 {
 	rdIgnoreUnused(model);
 	rdIgnoreUnused(proj);

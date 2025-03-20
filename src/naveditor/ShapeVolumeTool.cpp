@@ -495,7 +495,7 @@ void ShapeVolumeTool::handleRender()
 	}
 }
 
-void ShapeVolumeTool::handleRenderOverlay(double* /*proj*/, double* /*model*/, int* /*view*/)
+void ShapeVolumeTool::handleRenderOverlay(double* /*model*/, double* /*proj*/, int* /*view*/)
 {
 	// Tool help
 	if (!m_npts)

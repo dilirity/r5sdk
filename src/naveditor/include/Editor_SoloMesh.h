@@ -38,7 +38,7 @@ public:
 	virtual void handleDebugMode();
 	
 	virtual void handleRender();
-	virtual void handleRenderOverlay(double* proj, double* model, int* view);
+	virtual void handleRenderOverlay(double* model, double* proj, int* view);
 	virtual void handleMeshChanged(class InputGeom* geom);
 	virtual bool handleBuild();
 

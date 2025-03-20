@@ -94,7 +94,7 @@ public:
 	virtual void init(class Editor* editor);
 	virtual void reset();
 	virtual void handleRender();
-	virtual void handleRenderOverlay(double* proj, double* model, int* view);
+	virtual void handleRenderOverlay(double* model, double* proj, int* view);
 	virtual void handleUpdate(const float dt);
 
 	inline bool isRunning() const { return m_run; }
@@ -143,7 +143,7 @@ public:
 	virtual void handleStep();
 	virtual void handleUpdate(const float dt);
 	virtual void handleRender();
-	virtual void handleRenderOverlay(double* proj, double* model, int* view);
+	virtual void handleRenderOverlay(double* model, double* proj, int* view);
 };
 
 #endif // CROWDTOOL_H

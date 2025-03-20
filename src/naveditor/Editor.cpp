@@ -213,7 +213,7 @@ void Editor::handleRender()
 	duDebugDrawBoxWire(&m_dd, bmin->x,bmin->y,bmin->z, bmax->x,bmax->y,bmax->z, duRGBA(255,255,255,128), 1.0f, nullptr);
 }
 
-void Editor::handleRenderOverlay(double* /*proj*/, double* /*model*/, int* /*view*/)
+void Editor::handleRenderOverlay(double* /*model*/, double* /*proj*/, int* /*view*/)
 {
 }
 
@@ -1067,12 +1067,12 @@ void Editor::renderToolStates()
 	}
 }
 
-void Editor::renderOverlayToolStates(double* proj, double* model, int* view)
+void Editor::renderOverlayToolStates(double* model, double* proj, int* view)
 {
 	for (int i = 0; i < MAX_TOOLS; i++)
 	{
 		if (m_toolStates[i])
-			m_toolStates[i]->handleRenderOverlay(proj, model, view);
+			m_toolStates[i]->handleRenderOverlay(model, proj, view);
 	}
 }
 

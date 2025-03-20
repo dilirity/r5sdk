@@ -958,12 +958,13 @@ int not_main(int argc, char** argv)
 		
 		if (editor)
 		{
-			editor->handleRenderOverlay(reinterpret_cast<double*>(projectionMatrix), 
-				reinterpret_cast<double*>(modelviewMatrix), reinterpret_cast<int*>(viewport));
+			editor->handleRenderOverlay(reinterpret_cast<double*>(modelviewMatrix),
+				reinterpret_cast<double*>(projectionMatrix), reinterpret_cast<int*>(viewport));
 		}
 		if (test)
 		{
-			test->handleRenderOverlay(reinterpret_cast<double*>(projectionMatrix), reinterpret_cast<double*>(modelviewMatrix), reinterpret_cast<int*>(viewport));
+			test->handleRenderOverlay(reinterpret_cast<double*>(modelviewMatrix),
+				reinterpret_cast<double*>(projectionMatrix), reinterpret_cast<int*>(viewport));
 		}
 
 		// Help text.

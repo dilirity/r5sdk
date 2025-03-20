@@ -102,7 +102,7 @@ public:
 	void doTests(class dtNavMesh* navmesh, class dtNavMeshQuery* navquery);
 	
 	void handleRender();
-	bool handleRenderOverlay(double* proj, double* model, int* view);
+	bool handleRenderOverlay(double* model, double* proj, int* view);
 
 private:
 	// Explicitly disabled copy constructor and copy assignment operator.

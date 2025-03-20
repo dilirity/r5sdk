@@ -374,7 +374,7 @@ void TestCase::handleRender()
 	glLineWidth(1.0f);
 }
 
-bool TestCase::handleRenderOverlay(double* proj, double* model, int* view)
+bool TestCase::handleRenderOverlay(double* model, double* proj, int* view)
 {
 	const int h = view[3];
 	char text[256];

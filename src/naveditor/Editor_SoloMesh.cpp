@@ -129,11 +129,11 @@ void Editor_SoloMesh::handleRender()
 	Editor_StaticTileMeshCommon::renderTileMeshData();
 }
 
-void Editor_SoloMesh::handleRenderOverlay(double* proj, double* model, int* view)
+void Editor_SoloMesh::handleRenderOverlay(double* model, double* proj, int* view)
 {
 	if (m_tool)
-		m_tool->handleRenderOverlay(proj, model, view);
-	renderOverlayToolStates(proj, model, view);
+		m_tool->handleRenderOverlay(model, proj, view);
+	renderOverlayToolStates(model, proj, view);
 }
 
 void Editor_SoloMesh::handleMeshChanged(class InputGeom* geom)

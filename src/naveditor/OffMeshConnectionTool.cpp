@@ -312,7 +312,7 @@ void OffMeshConnectionTool::handleRender()
 		geom->drawOffMeshConnections(&dd, m_editor->getRecastDrawOffset(), m_selectedOffMeshIndex);
 }
 
-void OffMeshConnectionTool::handleRenderOverlay(double* proj, double* model, int* view)
+void OffMeshConnectionTool::handleRenderOverlay(double* model, double* proj, int* view)
 {
 	const int h = view[3];
 	rdVec2D screenPos;

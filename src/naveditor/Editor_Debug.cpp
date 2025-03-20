@@ -308,7 +308,7 @@ void Editor_Debug::handleRender()
 	m_dd.depthMask(true);*/
 }
 
-void Editor_Debug::handleRenderOverlay(double* /*proj*/, double* /*model*/, int* /*view*/)
+void Editor_Debug::handleRenderOverlay(double* /*model*/, double* /*proj*/, int* /*view*/)
 {
 }
 

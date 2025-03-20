@@ -485,7 +485,7 @@ namespace ImPlot
 	extern void Demo_ShadedPlots();
 };
 
-void CrowdToolState::handleRenderOverlay(double* proj, double* model, int* view)
+void CrowdToolState::handleRenderOverlay(double* model, double* proj, int* view)
 {
 	rdVec2D screenPos;
 	const int windowHeight = view[3];
@@ -1102,7 +1102,7 @@ void CrowdTool::handleRender()
 {
 }
 
-void CrowdTool::handleRenderOverlay(double* proj, double* model, int* view)
+void CrowdTool::handleRenderOverlay(double* model, double* proj, int* view)
 {
 	rdIgnoreUnused(model);
 	rdIgnoreUnused(proj);

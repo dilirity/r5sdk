@@ -71,7 +71,7 @@ public:
 	virtual void handleStep();
 	virtual void handleUpdate(const float dt);
 	virtual void handleRender();
-	virtual void handleRenderOverlay(double* proj, double* model, int* view);
+	virtual void handleRenderOverlay(double* model, double* proj, int* view);
 };
 
 #endif // OFFMESHCONNECTIONTOOL_H

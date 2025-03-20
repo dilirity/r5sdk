@@ -217,7 +217,7 @@ struct EditorTool
 	virtual void handleMenu() = 0;
 	virtual void handleClick(const rdVec3D* s, const rdVec3D* p, const int v, bool shift) = 0;
 	virtual void handleRender() = 0;
-	virtual void handleRenderOverlay(double* proj, double* model, int* view) = 0;
+	virtual void handleRenderOverlay(double* model, double* proj, int* view) = 0;
 	virtual void handleToggle() = 0;
 	virtual void handleStep() = 0;
 	virtual void handleUpdate(const float dt) = 0;
@@ -228,7 +228,7 @@ struct EditorToolState {
 	virtual void init(class Editor* editor) = 0;
 	virtual void reset() = 0;
 	virtual void handleRender() = 0;
-	virtual void handleRenderOverlay(double* proj, double* model, int* view) = 0;
+	virtual void handleRenderOverlay(double* model, double* proj, int* view) = 0;
 	virtual void handleUpdate(const float dt) = 0;
 };
 
@@ -321,7 +321,7 @@ public:
 	virtual void handleToggle();
 	virtual void handleStep();
 	virtual void handleRender();
-	virtual void handleRenderOverlay(double* proj, double* model, int* view);
+	virtual void handleRenderOverlay(double* model, double* proj, int* view);
 	virtual void handleMeshChanged(class InputGeom* geom);
 	virtual bool handleBuild();
 	virtual void handleUpdate(const float dt);
@@ -359,7 +359,7 @@ public:
 	void initToolStates(Editor* editor);
 	void resetToolStates();
 	void renderToolStates();
-	void renderOverlayToolStates(double* proj, double* model, int* view);
+	void renderOverlayToolStates(double* model, double* proj, int* view);
 
 	void renderMeshOffsetOptions();
 	void renderDetourDebugMenu();

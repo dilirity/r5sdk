@@ -367,7 +367,7 @@ public:
 			duDebugDrawCross(&m_editor->getDebugDraw(), m_nearestPos[0], m_nearestPos[1], m_nearestPos[2], 20.f, duRGBA(0, 0, 255, 255), 2, debugDrawOffset);
 	}
 	
-	virtual void handleRenderOverlay(double* proj, double* model, int* view)
+	virtual void handleRenderOverlay(double* model, double* proj, int* view)
 	{
 		rdVec2D screenPos;
 		const int h = view[3];
@@ -573,7 +573,7 @@ void Editor_TileMesh::handleRender()
 	Editor_StaticTileMeshCommon::renderTileMeshData();
 }
 
-void Editor_TileMesh::handleRenderOverlay(double* proj, double* model, int* view)
+void Editor_TileMesh::handleRenderOverlay(double* model, double* proj, int* view)
 {
 	const int h = view[3];
 	const rdVec3D* drawOffset = getDetourDrawOffset();
@@ -593,8 +593,8 @@ void Editor_TileMesh::handleRenderOverlay(double* proj, double* model, int* view
 	}
 	
 	if (m_tool)
-		m_tool->handleRenderOverlay(proj, model, view);
-	renderOverlayToolStates(proj, model, view);
+		m_tool->handleRenderOverlay(model, proj, view);
+	renderOverlayToolStates(model, proj, view);
 }
 
 void Editor_TileMesh::handleMeshChanged(InputGeom* geom)
