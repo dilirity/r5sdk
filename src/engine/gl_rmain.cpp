@@ -61,4 +61,22 @@ bool ScreenTransform(const CViewSetup& view, const VMatrix& w2sMatrix, const Vec
 	return true;
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Given an xy screen pos (0-1), return the screen position 
+// Input  : view - 
+//          &pos - 
+//          *pScreen - 
+// Output : false if the position if off-screen
+//-----------------------------------------------------------------------------
+bool ScreenPosition(const CViewSetup& view, const Vector2D& pos, Vector2D* const pScreen)
+{
+	if (pos.x > 1.0 || pos.y > 1.0 || pos.x < 0.0 || pos.y < 0.0)
+		return false; // Fail.
+
+	pScreen->x = pos.x * view.width;
+	pScreen->y = pos.y * view.height;
+
+	return true;
+}
+
 #endif
