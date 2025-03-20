@@ -39,6 +39,7 @@ extern ConVar* mp_gamemode;
 #ifndef DEDICATED
 extern ConVar* r_visualizetraces;
 extern ConVar* r_visualizetraces_duration;
+extern ConVar* r_drawvgui;
 
 extern ConVar* stream_overlay;
 extern ConVar* stream_overlay_mode;

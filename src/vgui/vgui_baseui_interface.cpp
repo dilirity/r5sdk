@@ -17,11 +17,12 @@
 //-----------------------------------------------------------------------------
 int CEngineVGui::VPaint(CEngineVGui* const thisptr, const PaintMode_t mode)
 {
-	int result = CEngineVGui__Paint(thisptr, mode);
+	const int result = CEngineVGui__Paint(thisptr, mode);
 
 	if (/*mode == PaintMode_t::PAINT_UIPANELS ||*/ mode == PaintMode_t::PAINT_INGAMEPANELS) // Render in-main menu and in-game.
 	{
-		g_TextOverlay.Update();
+		if (r_drawvgui->GetBool())
+			g_TextOverlay.Update();
 	}
 
 	return result;
