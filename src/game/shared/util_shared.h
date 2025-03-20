@@ -39,7 +39,7 @@ private:
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-class VUtil_Shared : public IDetour
+class V_UTIL_Shared : public IDetour
 {
 	virtual void GetAdr(void) const
 	{

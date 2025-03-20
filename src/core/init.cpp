@@ -687,7 +687,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	// Game/shared
 	REGISTER(VUserCmd);
 	REGISTER(VAnimation);
-	REGISTER(VUtil_Shared);
+	REGISTER(V_UTIL_Shared);
 
 #ifndef CLIENT_DLL
 
