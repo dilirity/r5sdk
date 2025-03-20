@@ -66,6 +66,8 @@ add_sources( SOURCE_GROUP "Network"
 )
 
 add_sources( SOURCE_GROUP "Model"
+    "cmodel.cpp"
+    "cmodel.h"
     "cmodel_bsp.cpp"
     "cmodel_bsp.h"
     "modelinfo.cpp"
