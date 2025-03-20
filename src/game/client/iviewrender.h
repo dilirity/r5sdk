@@ -3,6 +3,15 @@
 
 class VMatrix;
 
+enum ViewRenderMatrixType_e : unsigned char
+{
+	VMATRIX_TYPE_VIEW,
+	VMATRIX_TYPE_PROJECTION,
+
+	// !NOT A VALID TYPE! - represents the total number of matrix types.
+	VMATRIX_TYPE_COUNT
+};
+
 abstract_class IViewRender
 {
 public:
@@ -32,8 +41,8 @@ public:
 	virtual void		SubUnk11(void) = 0;
 
 	// Retrieve details about the world matrices
-	virtual VMatrix*	GetViewProjectionMatrix(const unsigned char slot) = 0;
-	virtual VMatrix*	IsViewProjectionMatrixAvailable(const unsigned char slot) = 0;
+	virtual VMatrix*	GetViewProjectionMatrix(const ViewRenderMatrixType_e type) = 0;
+	virtual VMatrix*	IsViewProjectionMatrixAvailable(const ViewRenderMatrixType_e type) = 0;
 
 	// TODO: reverse engineer the rest.
 };
