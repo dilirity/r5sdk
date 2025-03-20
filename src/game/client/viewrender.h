@@ -14,6 +14,8 @@ public:
 	inline float GetFieldOfView() const { return m_CurrentView.fov; }
 	inline float GetAspectRatio() const { return ((float)m_CurrentView.width / (float)m_CurrentView.height); }
 
+	const CViewSetup* GetMainView() const { return &m_CurrentView; }
+
 private:
 	CViewSetup m_CurrentView;
 	bool m_bAllowViewAccess;
