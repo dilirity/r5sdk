@@ -32,6 +32,7 @@
 #include "NavEditor/Include/InputGeom.h"
 #include "NavEditor/Include/Editor.h"
 #include "NavEditor/Include/Editor_TileMesh.h"
+#include "NavEditor/Include/CameraUtils.h"
 
 #include "game/server/ai_navmesh.h"
 #include "game/server/ai_hull.h"
@@ -368,7 +369,7 @@ public:
 	
 	virtual void handleRenderOverlay(double* proj, double* model, int* view)
 	{
-		GLdouble x, y, z;
+		rdVec2D screenPos;
 		const int h = view[3];
 		const rdVec3D* drawOffset = m_editor->getDetourDrawOffset();
 
@@ -377,13 +378,12 @@ public:
 		// see which tile we build as this will be drawn on the hit position, while we can enumerate all
 		// the tiles using the debug options in the NavMeshTileTool which will always be aligned with the
 		// navmesh.
-		if (m_hitPosSet && gluProject((GLdouble)m_hitPos[0], (GLdouble)m_hitPos[1], (GLdouble)m_hitPos[2],
-									  model, proj, view, &x, &y, &z))
+		if (m_hitPosSet && worldToScreen(model, proj, view, m_hitPos, screenPos))
 		{
 			int tx=0, ty=0;
 			m_editor->getTilePos(&m_hitPos, tx, ty);
 
-			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2((float)x, h-((float)y-25)), ImVec4(0,0,0,0.8f), "(%d,%d)", tx,ty);
+			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2(screenPos.x, h-(screenPos.y-25)), ImVec4(0,0,0,0.8f), "(%d,%d)", tx,ty);
 		}
 
 		if (m_navMesh && m_textOverlayDrawMode != TO_DRAW_MODE_DISABLED)
@@ -429,15 +429,14 @@ public:
 						rdAssert(0);
 					}
 
-					if (gluProject((GLdouble)pos->x+drawOffset->x, (GLdouble)pos->y+drawOffset->y, (GLdouble)pos->z+drawOffset->z+30,
-						model, proj, view, &x, &y, &z))
+					if (worldToScreen(model, proj, view, pos->x+drawOffset->x, pos->y+drawOffset->y, pos->z+drawOffset->z+30, screenPos))
 					{
 						const char* format = (m_textOverlayDrawFlags & TO_DRAW_FLAGS_INDICES)
 							? "%hu (%d,%d)"
 							: "%hu";
 
 						ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter,
-							ImVec2((float)x, h - (float)y), ImVec4(0, 0, 0, 0.8f), format, value, i, j);
+							ImVec2(screenPos.x, h - screenPos.y), ImVec4(0, 0, 0, 0.8f), format, value, i, j);
 					}
 				}
 
@@ -445,11 +444,10 @@ public:
 				//{
 				//	const dtCell* cell = &tile->cells[j];
 
-				//	if (gluProject((GLdouble)cell->pos[0]+drawOffset[0], (GLdouble)cell->pos[1]+drawOffset[1], (GLdouble)cell->pos[2]+drawOffset[2]+30,
-				//		model, proj, view, &x, &y, &z))
+				//	if (worldToScreen(model, proj, view, cell->pos.x+drawOffset->x, cell->pos.y+drawOffset->y, cell->pos.z+drawOffset->z+30, screenPos))
 				//	{
 				//		ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter,
-				//			ImVec2((float)x, h - (float)y), ImVec4(0, 0.4, 0, 0.8f), "(%d,%d)", j, cell->flags);
+				//			ImVec2(screenPos.x, h - screenPos.y), ImVec4(0, 0.4, 0, 0.8f), "(%d,%d)", j, cell->flags);
 				//	}
 				//}
 			}
@@ -577,7 +575,6 @@ void Editor_TileMesh::handleRender()
 
 void Editor_TileMesh::handleRenderOverlay(double* proj, double* model, int* view)
 {
-	GLdouble x, y, z;
 	const int h = view[3];
 	const rdVec3D* drawOffset = getDetourDrawOffset();
 
@@ -586,11 +583,12 @@ void Editor_TileMesh::handleRenderOverlay(double* proj, double* model, int* view
 		((m_lastBuiltTileBmin.y + m_lastBuiltTileBmax.y)/2)+drawOffset->y,
 		((m_lastBuiltTileBmin.z + m_lastBuiltTileBmax.z)/2)+drawOffset->z);
 	
+	rdVec2D screenPos;
+
 	// Draw start and end point labels
-	if (m_tileBuildTime > 0.0f && gluProject((GLdouble)projectPos[0], (GLdouble)projectPos[1], (GLdouble)projectPos[2],
-											 model, proj, view, &x, &y, &z))
+	if (m_tileBuildTime > 0.0f && worldToScreen(model, proj, view, projectPos, screenPos))
 	{
-		ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2((float)x, h-(float)(y-25)),
+		ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2(screenPos.x, h-(float)(screenPos.y-25)),
 			ImVec4(0,0,0,0.8f), "%.3fms / %dTris / %.1fkB", m_tileBuildTime, m_tileTriCount, m_tileMemUsage);
 	}
 	

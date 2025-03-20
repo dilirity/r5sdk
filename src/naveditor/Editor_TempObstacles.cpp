@@ -32,6 +32,7 @@
 #include "NavEditor/Include/InputGeom.h"
 #include "NavEditor/Include/Editor.h"
 #include "NavEditor/Include/Editor_TempObstacles.h"
+#include "NavEditor/Include/CameraUtils.h"
 
 
 // This value specifies how many layers (or "floors") each navmesh tile is expected to have.
@@ -543,17 +544,16 @@ static void drawDetailOverlay(const dtTileCache* tc, const int tx, const int ty,
 		pos.y = (tile->header->bmin.y+tile->header->bmax.y)/2.0f;
 		pos.z = (tile->header->bmin.z);
 		
-		GLdouble x, y, z;
-		if (gluProject((GLdouble)pos.x, (GLdouble)pos.y, (GLdouble)pos.z,
-					   model, proj, view, &x, &y, &z))
+		rdVec2D screenPos;
+		if (worldToScreen(model, proj, view, pos.x, pos.y, pos.z, screenPos))
 		{
-			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2((float)x, h-((float)y-25.f)), ImVec4(0.0f, 0.0f, 0.0f, 0.8f),
+			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2(screenPos.x, h-(screenPos.y-25.f)), ImVec4(0.0f, 0.0f, 0.0f, 0.8f),
 				"(%d,%d)/%d", tile->header->tx, tile->header->ty, tile->header->tlayer);
 
-			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2((float)x, h-((float)y-45.f)), ImVec4(0.0f, 0.0f, 0.0f, 0.8f),
+			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2(screenPos.x, h-(screenPos.y-45.f)), ImVec4(0.0f, 0.0f, 0.0f, 0.8f),
 				"Compressed: %.1f kB", tile->dataSize/1024.0f);
 
-			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2((float)x, h-((float)y-65.f)), ImVec4(0.0f, 0.0f, 0.0f, 0.8f),
+			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2(screenPos.x, h-(screenPos.y-65.f)), ImVec4(0.0f, 0.0f, 0.0f, 0.8f),
 				"Raw: %.1fkB", rawSize/1024.0f);
 		}
 	}

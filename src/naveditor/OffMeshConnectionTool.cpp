@@ -22,6 +22,7 @@
 #include "NavEditor/Include/OffMeshConnectionTool.h"
 #include "NavEditor/Include/InputGeom.h"
 #include "NavEditor/Include/Editor.h"
+#include "NavEditor/Include/CameraUtils.h"
 
 #ifdef WIN32
 #	define snprintf _snprintf
@@ -313,14 +314,13 @@ void OffMeshConnectionTool::handleRender()
 
 void OffMeshConnectionTool::handleRenderOverlay(double* proj, double* model, int* view)
 {
-	GLdouble x, y, z;
 	const int h = view[3];
+	rdVec2D screenPos;
 	
 	// Draw start and end point labels
-	if (m_hitPosSet && gluProject((GLdouble)m_hitPos[0], (GLdouble)m_hitPos[1], (GLdouble)m_hitPos[2],
-								model, proj, view, &x, &y, &z))
+	if (m_hitPosSet && worldToScreen(model, proj, view, m_hitPos.x, m_hitPos.y, m_hitPos.z, screenPos))
 	{
-		ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2((float)x, h-((float)y-25)), ImVec4(0,0,0,0.8f), "Start");
+		ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2(screenPos.x, h-(screenPos.y-25)), ImVec4(0,0,0,0.8f), "Start");
 	}
 	
 	// Tool help

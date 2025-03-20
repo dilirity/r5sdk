@@ -26,8 +26,9 @@
 #include "NavEditor/Include/Editor_SoloMesh.h"
 #include "NavEditor/Include/Editor_TileMesh.h"
 #include "NavEditor/Include/Editor_Debug.h"
-#include "NavEditor/include/DroidSans.h"
-#include "NavEditor/include/Icon.h"
+#include "NavEditor/Include/DroidSans.h"
+#include "NavEditor/Include/Icon.h"
+#include "NavEditor/Include/CameraUtils.h"
 
 using std::string;
 using std::vector;
@@ -1324,10 +1325,9 @@ int not_main(int argc, char** argv)
 			ImGui::End();
 		}
 		
-		// Marker
-		if (markerPositionSet && gluProject(static_cast<GLdouble>(markerPosition[0]), 
-			static_cast<GLdouble>(markerPosition[1]), static_cast<GLdouble>(markerPosition[2]),
-								  modelviewMatrix, projectionMatrix, viewport, &x, &y, &z))
+
+		rdVec2D screenPos; // Marker
+		if (markerPositionSet && worldToScreen(modelviewMatrix, projectionMatrix, viewport, markerPosition.x, markerPosition.y, markerPosition.z, screenPos))
 		{
 			// Draw marker circle
 			glLineWidth(5.0f);
@@ -1337,8 +1337,8 @@ int not_main(int argc, char** argv)
 			for (int i = 0; i < 20; ++i)
 			{
 				const float a = (float)i / 20.0f * RD_PI*2;
-				const float fx = (float)x + cosf(a)*r;
-				const float fy = (float)y + sinf(a)*r;
+				const float fx = screenPos.x + cosf(a)*r;
+				const float fy = screenPos.y + sinf(a)*r;
 				glVertex2f(fx,fy);
 			}
 			glEnd();

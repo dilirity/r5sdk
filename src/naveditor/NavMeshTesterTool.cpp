@@ -25,6 +25,7 @@
 #include "DebugUtils/Include/RecastDebugDraw.h"
 #include "NavEditor/Include/NavMeshTesterTool.h"
 #include "NavEditor/Include/Editor.h"
+#include "NavEditor/Include/CameraUtils.h"
 
 // Uncomment this to dump all the requests in stdout.
 #define DUMP_REQS
@@ -1451,22 +1452,20 @@ void NavMeshTesterTool::handleRender()
 
 void NavMeshTesterTool::handleRenderOverlay(double* proj, double* model, int* view)
 {
-	GLdouble x, y, z;
 	const int h = view[3];
 	const rdVec3D* drawOffset = m_editor->getDetourDrawOffset();
 
 	// Draw start and end point labels
-	if (m_sposSet && gluProject((GLdouble)m_spos.x+drawOffset->x, (GLdouble)m_spos.y+drawOffset->y, (GLdouble)m_spos.z+drawOffset->z,
-								model, proj, view, &x, &y, &z))
+	rdVec2D screenPos;
+	if (m_sposSet && worldToScreen(model, proj, view, m_spos.x+drawOffset->x, m_spos.y+drawOffset->y, m_spos.z+drawOffset->z, screenPos))
 	{
 		ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter,
-			ImVec2((float)x, h-((float)y-25)), ImVec4(0,0,0,0.8f), "Start");
+			ImVec2(screenPos.x, h-(screenPos.y-25)), ImVec4(0,0,0,0.8f), "Start");
 	}
-	if (m_eposSet && gluProject((GLdouble)m_epos.x+drawOffset->x, (GLdouble)m_epos.y+drawOffset->y, (GLdouble)m_epos.z+drawOffset->z,
-								model, proj, view, &x, &y, &z))
+	if (m_eposSet && worldToScreen(model, proj, view, m_epos.x+drawOffset->x, m_epos.y+drawOffset->y, m_epos.z+drawOffset->z, screenPos))
 	{
 		ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter,
-			ImVec2((float)x, h-((float)y-25)), ImVec4(0,0,0,0.8f), "End");
+			ImVec2(screenPos.x, h-(screenPos.y-25)), ImVec4(0,0,0,0.8f), "End");
 	}
 	
 	// Tool help

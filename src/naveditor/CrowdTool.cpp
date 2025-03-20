@@ -25,6 +25,7 @@
 #include "NavEditor/Include/InputGeom.h"
 #include "NavEditor/Include/Editor.h"
 #include "NavEditor/Include/EditorInterfaces.h"
+#include "NavEditor/Include/CameraUtils.h"
 #include "DetourCrowd/Include/DetourCrowdInternal.h"
 
 static void getAgentBounds(const dtCrowdAgent* ag, rdVec3D* bmin, rdVec3D* bmax)
@@ -486,16 +487,15 @@ namespace ImPlot
 
 void CrowdToolState::handleRenderOverlay(double* proj, double* model, int* view)
 {
-	GLdouble x, y, z;
+	rdVec2D screenPos;
 	const int windowHeight = view[3];
 	const rdVec3D* drawOffset = m_editor->getDetourDrawOffset();
-	
+
 	// Draw start and end point labels
-	if (m_targetRef && gluProject((GLdouble)m_targetPos.x+drawOffset->x, (GLdouble)m_targetPos.y+drawOffset->y, (GLdouble)m_targetPos.z+drawOffset->z,
-								  model, proj, view, &x, &y, &z))
+	if (m_targetRef && worldToScreen(model, proj, view, m_targetPos.x+drawOffset->x, m_targetPos.y+drawOffset->y, m_targetPos.z+drawOffset->z, screenPos))
 	{
 		ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter,
-			ImVec2((float)x, windowHeight-((float)y+25)), ImVec4(0,0,0,0.8f), "TARGET");
+			ImVec2(screenPos.x, windowHeight-(screenPos.y+25)), ImVec4(0,0,0,0.8f), "TARGET");
 	}
 	
 
@@ -516,12 +516,11 @@ void CrowdToolState::handleRenderOverlay(double* proj, double* model, int* view)
 						const dtNode* node = pool->getNodeAtIdx(j+1);
 						if (!node) continue;
 
-						if (gluProject((GLdouble)node->pos.x+drawOffset->x,(GLdouble)node->pos.y+drawOffset->y,(GLdouble)node->pos.z+drawOffset->z+off,
-									   model, proj, view, &x, &y, &z))
+						if (worldToScreen(model, proj, view, node->pos.x+drawOffset->x,node->pos.y+drawOffset->y,node->pos.z+drawOffset->z+off, screenPos))
 						{
 							const float heuristic = node->total;// - node->cost;
 							ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter,
-								ImVec2((float)x, windowHeight-((float)y+25)), ImVec4(0,0,0,0.8f), "%.2f", heuristic);
+								ImVec2(screenPos.x, windowHeight-(screenPos.y+25)), ImVec4(0,0,0,0.8f), "%.2f", heuristic);
 						}
 					}
 				}
@@ -540,8 +539,8 @@ void CrowdToolState::handleRenderOverlay(double* proj, double* model, int* view)
 				if (!ag->active) continue;
 				const rdVec3D* pos = &ag->npos;
 				const float h = ag->params.height;
-				if (gluProject((GLdouble)pos->x+drawOffset->x, (GLdouble)pos->y+drawOffset->y, (GLdouble)pos->z+drawOffset->z+h,
-							   model, proj, view, &x, &y, &z))
+
+				if (worldToScreen(model, proj, view, pos->x+drawOffset->x, pos->y+drawOffset->y, pos->z+drawOffset->z+h, screenPos))
 				{
 					const TraverseAnimType_e animType = ag->params.traverseAnimType;
 					const char* animTypeName = animType == ANIMTYPE_NONE
@@ -549,7 +548,7 @@ void CrowdToolState::handleRenderOverlay(double* proj, double* model, int* view)
 						: g_traverseAnimTypeNames[animType];
 
 					ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter,
-						ImVec2((float)x, windowHeight-((float)y+15)), ImVec4(0,0,0,0.8f), "%s (%d)", animTypeName, i);
+						ImVec2(screenPos.x, windowHeight-(screenPos.y+15)), ImVec4(0,0,0,0.8f), "%s (%d)", animTypeName, i);
 				}
 			}
 		}
@@ -573,12 +572,11 @@ void CrowdToolState::handleRenderOverlay(double* proj, double* model, int* view)
 					{
 						const dtCrowdAgent* nei = crowd->getAgent(ag->neis[j].idx);
 						if (!nei->active) continue;
-						
-						if (gluProject((GLdouble)nei->npos.x+drawOffset->x, (GLdouble)nei->npos.y+drawOffset->y, (GLdouble)nei->npos.z+drawOffset->z+radius,
-									   model, proj, view, &x, &y, &z))
+
+						if (worldToScreen(model, proj, view, nei->npos.x+drawOffset->x, nei->npos.y+drawOffset->y, nei->npos.z+drawOffset->z+radius, screenPos))
 						{
 							ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, 
-								ImVec2((float)x, windowHeight-((float)y+15)), ImVec4(1.0f,1.0f,1.0f,0.8f), "%.3f", ag->neis[j].dist);
+								ImVec2(screenPos.x, windowHeight-(screenPos.y+15)), ImVec4(1.0f,1.0f,1.0f,0.8f), "%.3f", ag->neis[j].dist);
 						}
 					}
 				}

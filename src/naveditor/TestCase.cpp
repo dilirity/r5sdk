@@ -21,6 +21,7 @@
 #include "Detour/Include/DetourNavMeshQuery.h"
 #include "NavEditor/Include/TestCase.h"
 #include "NavEditor/Include/PerfTimer.h"
+#include "NavEditor/Include/CameraUtils.h"
 
 #ifdef WIN32
 #define snprintf _snprintf
@@ -375,7 +376,6 @@ void TestCase::handleRender()
 
 bool TestCase::handleRenderOverlay(double* proj, double* model, int* view)
 {
-	GLdouble x, y, z;
 	const int h = view[3];
 	char text[256];
 	int n = 0;
@@ -404,14 +404,14 @@ bool TestCase::handleRenderOverlay(double* proj, double* model, int* view)
 			pt.z+=0.5f;
 		}
 		
-		if (gluProject((GLdouble)pt[0], (GLdouble)pt[1], (GLdouble)pt[2],
-					   model, proj, view, &x, &y, &z))
+		rdVec2D screenPos;
+		if (worldToScreen(model, proj, view, pt.x, pt.y, pt.z, screenPos))
 		{
 			ImVec4 col = ImVec4(0.0f,0.0f,0.0f,0.5f);
 			if (iter->expand)
 				col = ImVec4(1.0f,0.75f,0.0f,0.85f);
 
-			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2((float)x, h-((float)y-25)), col, "Path %d\n", n);
+			ImGui_RenderText(ImGuiTextAlign_e::kAlignCenter, ImVec2(screenPos.x, h-(screenPos.y-25)), col, "Path %d\n", n);
 		}
 		n++;
 	}
