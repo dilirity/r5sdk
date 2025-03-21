@@ -168,7 +168,7 @@ void CTextOverlay::DrawNotify(void)
 		{
 			c[3] = 255;
 		}
-		CMatSystemSurface__DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(),
+		MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(),
 			m_nFontHeight, x, y, c.r(), c.g(), c.b(), c.a(), "%s", notify.m_Text.String());
 
 		if (IsX360())
@@ -203,7 +203,7 @@ void CTextOverlay::DrawFormat(const int x, const int y, const Color c, const cha
 		va_end(args);
 	}/////////////////////////////
 
-	CMatSystemSurface__DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, x, y, c.r(), c.g(), c.b(), c.a(), "%s", szLogbuf);
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, x, y, c.r(), c.g(), c.b(), c.a(), "%s", szLogbuf);
 }
 
 //-----------------------------------------------------------------------------
@@ -252,7 +252,7 @@ void CTextOverlay::Con_NPrintf(void)
 	const int nHeight = cl_notify_invert_y.GetBool() ? h - cl_notify_offset_y.GetInt() : cl_notify_offset_y.GetInt();
 
 	static const Color c = { 255, 255, 255, 255 };
-	CMatSystemSurface__DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, nWidth, nHeight, c.r(), c.g(), c.b(), c.a(), "%s", m_szCon_NPrintf_Buf);
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, nWidth, nHeight, c.r(), c.g(), c.b(), c.a(), "%s", m_szCon_NPrintf_Buf);
 
 	m_nCon_NPrintf_Idx = 0;
 	m_szCon_NPrintf_Buf[0] = '\0';
