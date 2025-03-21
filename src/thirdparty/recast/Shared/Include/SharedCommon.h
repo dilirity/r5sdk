@@ -800,8 +800,8 @@ inline void rdSwapEndian(float* v)
 
 inline void rdSwapEndian(rdVec3D* v)
 {
-	unsigned char* x = (unsigned char*)v;
-	rdSwapByte(x+0, x+3); rdSwapByte(x+1, x+2);
+	for (int i = 0; i < 3; i++)
+		rdSwapEndian(&v[i]);
 }
 
 void rdRandomPointInConvexPoly(const rdVec3D* pts, const int npts, float* areas,

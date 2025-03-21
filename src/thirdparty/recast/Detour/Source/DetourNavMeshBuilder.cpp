@@ -1278,6 +1278,7 @@ bool dtNavMeshHeaderSwapEndian(unsigned char* data, const int /*dataSize*/)
 	rdSwapEndian(&header->layer);
 	rdSwapEndian(&header->userId);
 	rdSwapEndian(&header->polyCount);
+	rdSwapEndian(&header->polyMapCount);
 	rdSwapEndian(&header->vertCount);
 	rdSwapEndian(&header->maxLinkCount);
 	rdSwapEndian(&header->detailMeshCount);
@@ -1292,12 +1293,8 @@ bool dtNavMeshHeaderSwapEndian(unsigned char* data, const int /*dataSize*/)
 	rdSwapEndian(&header->walkableHeight);
 	rdSwapEndian(&header->walkableRadius);
 	rdSwapEndian(&header->walkableClimb);
-	rdSwapEndian(&header->bmin[0]);
-	rdSwapEndian(&header->bmin[1]);
-	rdSwapEndian(&header->bmin[2]);
-	rdSwapEndian(&header->bmax[0]);
-	rdSwapEndian(&header->bmax[1]);
-	rdSwapEndian(&header->bmax[2]);
+	rdSwapEndian(&header->bmin);
+	rdSwapEndian(&header->bmax);
 	rdSwapEndian(&header->bvQuantFactor);
 
 	// Freelist index and pointers are updated when tile is added, no need to swap.
@@ -1943,31 +1940,36 @@ bool dtNavMeshDataSwapEndian(unsigned char* data, const int /*dataSize*/)
 	
 	// Patch header pointers.
 	const int headerSize = rdAlign4(sizeof(dtMeshHeader));
-	const int vertsSize = rdAlign4(sizeof(float)*3*header->vertCount); // math_refactor(kawe): rework.
+	const int vertsSize = rdAlign4(sizeof(rdVec3D)*header->vertCount);
 	const int polysSize = rdAlign4(sizeof(dtPoly)*header->polyCount);
+	const int polyMapSize = rdAlign4(sizeof(int)*(header->polyMapCount*header->polyCount));
 	const int linksSize = rdAlign4(sizeof(dtLink)*(header->maxLinkCount));
 	const int detailMeshesSize = rdAlign4(sizeof(dtPolyDetail)*header->detailMeshCount);
-	const int detailVertsSize = rdAlign4(sizeof(float)*3*header->detailVertCount); // math_refactor(kawe): rework.
+	const int detailVertsSize = rdAlign4(sizeof(rdVec3D)*header->detailVertCount);
 	const int detailTrisSize = rdAlign4(sizeof(unsigned char)*4*header->detailTriCount);
 	const int bvtreeSize = rdAlign4(sizeof(dtBVNode)*header->bvNodeCount);
 	const int offMeshLinksSize = rdAlign4(sizeof(dtOffMeshConnection)*header->offMeshConCount);
-	
-	// todo(kawe): finish this for the new structures and field members !!!
+#if DT_NAVMESH_SET_VERSION >= 8
+	const int cellsSize = rdAlign4(sizeof(dtCell)*header->maxCellCount);
+#endif
 
 	unsigned char* d = data + headerSize;
 	rdVec3D* verts = rdGetThenAdvanceBufferPointer<rdVec3D>(d, vertsSize);
 	dtPoly* polys = rdGetThenAdvanceBufferPointer<dtPoly>(d, polysSize);
-	d += linksSize; // Ignore links; they technically should be endian-swapped but all their data is overwritten on load anyway.
-	//dtLink* links = rdGetThenAdvanceBufferPointer<dtLink>(d, linksSize);
+	unsigned int* polyMap = rdGetThenAdvanceBufferPointer<unsigned int>(d, polyMapSize);
+	dtLink* links = rdGetThenAdvanceBufferPointer<dtLink>(d, linksSize);
 	dtPolyDetail* detailMeshes = rdGetThenAdvanceBufferPointer<dtPolyDetail>(d, detailMeshesSize);
 	rdVec3D* detailVerts = rdGetThenAdvanceBufferPointer<rdVec3D>(d, detailVertsSize);
 	d += detailTrisSize; // Ignore detail tris; single bytes can't be endian-swapped.
 	//unsigned char* detailTris = rdGetThenAdvanceBufferPointer<unsigned char>(d, detailTrisSize);
 	dtBVNode* bvTree = rdGetThenAdvanceBufferPointer<dtBVNode>(d, bvtreeSize);
 	dtOffMeshConnection* offMeshCons = rdGetThenAdvanceBufferPointer<dtOffMeshConnection>(d, offMeshLinksSize);
+#if DT_NAVMESH_SET_VERSION >= 8
+	dtCell* cells = rdGetThenAdvanceBufferPointer<dtCell>(d, cellsSize);
+#endif
 	
 	// Vertices
-	for (int i = 0; i < header->vertCount*3; ++i) // math_refactor(kawe): rework.
+	for (int i = 0; i < header->vertCount; ++i)
 	{
 		rdSwapEndian(&verts[i]);
 	}
@@ -1976,16 +1978,41 @@ bool dtNavMeshDataSwapEndian(unsigned char* data, const int /*dataSize*/)
 	for (int i = 0; i < header->polyCount; ++i)
 	{
 		dtPoly* p = &polys[i];
-		// poly->firstLink is update when tile is added, no need to swap.
+		rdSwapEndian(&p->firstLink);
+
 		for (int j = 0; j < RD_VERTS_PER_POLYGON; ++j)
 		{
 			rdSwapEndian(&p->verts[j]);
 			rdSwapEndian(&p->neis[j]);
 		}
+
 		rdSwapEndian(&p->flags);
+		rdSwapEndian(&p->groupId);
+		rdSwapEndian(&p->surfaceArea);
+
+#if DT_NAVMESH_SET_VERSION >= 8
+		rdSwapEndian(&p->unk1);
+		rdSwapEndian(&p->unk2);
+#endif
+		rdSwapEndian(&p->center);
 	}
 
-	// Links are rebuild when tile is added, no need to swap.
+	// Poly maps
+	for (int i = 0; i < header->polyMapCount * header->polyCount; ++i)
+	{
+		rdSwapEndian(&polyMap[i]);
+	}
+
+	// Links
+	for (int i = 0; i < header->maxLinkCount; ++i)
+	{
+		dtLink* l = &links[i];
+		rdSwapEndian(&l->ref);
+		rdSwapEndian(&l->next);
+		rdSwapEndian(&l->reverseLink);
+
+		// All the other members are single byte, no need to swap.
+	}
 
 	// Detail meshes
 	for (int i = 0; i < header->detailMeshCount; ++i)
@@ -1996,9 +2023,9 @@ bool dtNavMeshDataSwapEndian(unsigned char* data, const int /*dataSize*/)
 	}
 	
 	// Detail verts
-	for (int i = 0; i < header->detailVertCount*3; ++i)
+	for (int i = 0; i < header->detailVertCount; ++i)
 	{
-		rdSwapEndian(&detailVerts[i]); // math_refactor(kawe): rework.
+		rdSwapEndian(&detailVerts[i]);
 	}
 
 	// BV-tree
@@ -2017,13 +2044,37 @@ bool dtNavMeshDataSwapEndian(unsigned char* data, const int /*dataSize*/)
 	for (int i = 0; i < header->offMeshConCount; ++i)
 	{
 		dtOffMeshConnection* con = &offMeshCons[i];
-		for (int j = 0; j < 3; ++j)
-			rdSwapEndian(&con->posa[j]);
-		for (int j = 0; j < 3; ++j)
-			rdSwapEndian(&con->posb[j]);
+		rdSwapEndian(&con->posa);
+		rdSwapEndian(&con->posb);
 		rdSwapEndian(&con->rad);
 		rdSwapEndian(&con->poly);
+		rdSwapEndian(&con->userId);
+
+#if DT_NAVMESH_SET_VERSION >= 7
+		rdSwapEndian(&con->hintIndex);
+#else
+		rdSwapEndian(&con->traverseContext);
+#endif
+		rdSwapEndian(&con->refPos);
+		rdSwapEndian(&con->refYaw);
+
+#if DT_NAVMESH_SET_VERSION >= 9
+		rdSwapEndian(&con->secPosa);
+		rdSwapEndian(&con->secPosb);
+#endif
 	}
-	
+
+#if DT_NAVMESH_SET_VERSION >= 8
+	// Cells
+	for (int i = 0; i < header->maxCellCount; ++i)
+	{
+		dtCell* cell = &cells[i];
+
+		rdSwapEndian(&cell->pos);
+		rdSwapEndian(&cell->polyIndex);
+		rdSwapEndian((int*)((uintptr_t)&cell->occupyState & ~0x3));
+		// The other data is runtime always 0 here.
+	}
+#endif
 	return true;
 }
