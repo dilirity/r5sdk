@@ -263,7 +263,6 @@ void ConVar_InitShipped(void)
 
 	sv_single_core_dedi->RemoveFlags(FCVAR_DEVELOPMENTONLY);
 
-	ai_script_nodes_draw->SetValue(-1);
 	bhit_enable->SetValue(0);
 #endif // !CLIENT_DLL
 #ifndef DEDICATED
