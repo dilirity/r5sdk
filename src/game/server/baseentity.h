@@ -42,6 +42,49 @@ struct thinkfunc_t
 };
 
 //-----------------------------------------------------------------------------
+// Purpose: debug overlay bits
+//-----------------------------------------------------------------------------
+enum DebugOverlayBits_e
+{
+	OVERLAY_TEXT_BIT			=	1<<0,		// show text debug overlay for this entity
+	OVERLAY_NAME_BIT			=	1<<1,		// show name debug overlay for this entity
+	OVERLAY_BBOX_BIT			=	1<<2,		// show bounding box overlay for this entity
+	OVERLAY_PIVOT_BIT			=	1<<3,		// show pivot for this entity
+	OVERLAY_MESSAGE_BIT			=	1<<4,		// show messages for this entity
+	OVERLAY_ABSBOX_BIT			=	1<<5,		// show abs bounding box overlay
+	OVERLAY_RBOX_BIT			=   1<<6,		// show the rbox overlay
+	OVERLAY_SHOW_BLOCKSLOS		=	1<<7,		// show entities that block NPC LOS
+	OVERLAY_ATTACHMENTS_BIT		=	1<<8,		// show attachment points
+	OVERLAY_AUTOAIM_BIT			=	1<<9,		// Display autoaim radius
+	OVERLAY_NPC_ASSAULT_VOLUME	=	1<<11,		// show the npc's assault volume
+	OVERLAY_NPC_SELECTED_BIT	=	1<<12,		// the npc is current selected
+	OVERLAY_NPC_NODE_BIT		=	1<<13,		// show the nearest and squad assigned node of this npc
+	OVERLAY_NPC_ROUTE_BIT		=	1<<14,		// draw the route for this npc
+	OVERLAY_NPC_TRIANGULATE_BIT =	1<<15,		// draw the triangulation for this npc
+	OVERLAY_NPC_ZAP_BIT			=	1<<16,		// destroy the NPC
+	OVERLAY_NPC_ENEMIES_BIT		=	1<<17,		// show npc's enemies
+	OVERLAY_NPC_CONDITIONS_BIT	=	1<<18,		// show NPC's current conditions
+	OVERLAY_NPC_SQUAD_BIT		=	1<<19,		// show npc squads
+	OVERLAY_NPC_TASK_BIT		=	1<<20,		// show npc task details
+	OVERLAY_NPC_FOCUS_BIT		=	1<<21,		// show line to npc's enemy and target
+	OVERLAY_NPC_SIGHT_BIT		=	1<<22,		// show npc's sight volume
+	OVERLAY_NPC_KILL_BIT		=	1<<23,		// kill the NPC, running all appropriate AI.
+
+	OVERLAY_WC_CHANGE_ENTITY	=	1<<24,		// object changed during WC edit
+	OVERLAY_BUDDHA_MODE			=	1<<25,		// take damage but don't die
+
+	OVERLAY_NPC_STEERING_REGULATIONS	=	1<<26,	// Show the steering regulations associated with the NPC
+
+	OVERLAY_TASK_TEXT_BIT		=	1<<27,		// show task and schedule names when they start
+
+	OVERLAY_PROP_DEBUG			=	1<<28,
+
+	OVERLAY_NPC_RELATION_BIT	=	1<<29,		// show relationships between target and all children
+
+	OVERLAY_VIEWOFFSET			=	1<<30,		// show view offset
+};
+
+//-----------------------------------------------------------------------------
 // Purpose: timed overlays
 //-----------------------------------------------------------------------------
 struct TimedOverlay_t
