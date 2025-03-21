@@ -20,9 +20,10 @@
 #endif // !CLIENT_DLL
 #include <engine/sys_engine.h>
 #include <engine/sys_mainwind.h>
+#include <engine/gl_rmain.h>
 #include <engine/debugoverlay.h>
 #include <engine/client/clientstate.h>
-#include <materialsystem/cmaterialglue.h>
+#include <game/client/viewrender.h>
 
 static ConVar con_drawnotify("con_drawnotify", "0", FCVAR_RELEASE | FCVAR_MATERIAL_SYSTEM_THREAD, "Draws the RUI console to the hud");
 
@@ -106,6 +107,10 @@ void CTextOverlay::Update(void)
 	{
 		DrawCrosshairMaterial();
 	}
+	if (enable_debug_text_overlays.GetBool())
+	{
+		DrawDebugOverlay();
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -179,6 +184,45 @@ void CTextOverlay::DrawNotify(void)
 		else
 		{
 			y += m_nFontHeight;
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: draws debug text overlay
+//-----------------------------------------------------------------------------
+void CTextOverlay::DrawDebugOverlay(void) const
+{
+	const OverlayText_t* pCurrText = g_pDebugOverlay->GetFirstText();
+
+	for (; pCurrText; pCurrText = g_pDebugOverlay->GetNextText(pCurrText))
+	{
+		// If this gets fired, an empty overlay was added.
+		Assert(pCurrText->textBuf);
+		Assert(pCurrText->textLen > 0);
+
+		const CViewSetup* const viewSetup = g_pViewRender->GetMainView();
+
+		Vector2D screenPos;
+		bool onScreen = false;
+
+		if (pCurrText->bUseOrigin)
+		{
+			const VMatrix* const viewMatrix = g_pViewRender->GetViewProjectionMatrix(VMATRIX_TYPE_VIEW);
+
+			if (viewMatrix)
+				onScreen = ScreenTransform(*viewSetup, *viewMatrix, pCurrText->origin, &screenPos);
+		}
+		else
+			onScreen = ScreenPosition(*viewSetup, pCurrText->screenPos, &screenPos);
+
+		if (onScreen)
+		{
+			screenPos.y += (pCurrText->lineOffset * m_nLineSpacing);
+
+			MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight,
+				(int)screenPos.x, (int)screenPos.y, pCurrText->r, pCurrText->g, pCurrText->b, pCurrText->a,
+				"%s", pCurrText->textBuf);
 		}
 	}
 }

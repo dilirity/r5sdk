@@ -23,6 +23,7 @@ public:
 	CTextOverlay()
 	{
 		m_nFontHeight = 16;
+		m_nLineSpacing = 15;
 		m_nCon_NPrintf_Idx = 0;
 		memset(m_szCon_NPrintf_Buf, '\0', sizeof(m_szCon_NPrintf_Buf));
 	}
@@ -30,6 +31,7 @@ public:
 	void Update(void);
 	void AddLog(const eDLL_T context, const char* pszText, const ssize_t textLen);
 	void DrawNotify(void);
+	void DrawDebugOverlay(void) const;
 	void DrawFormat(const int x, const int y, const Color c, const char* pszFormat, ...) const;
 	void ShouldDraw(const float flFrameTime);
 	void DrawSimStats(void) const;
@@ -42,6 +44,7 @@ private:
 	Color GetLogColorForType(const eDLL_T type) const;
 	CUtlVector<TextNotify_s> m_NotifyLines;
 	int m_nFontHeight; // Hardcoded to 16 in this engine.
+	int m_nLineSpacing;
 
 	mutable CThreadFastMutex m_Mutex;
 
