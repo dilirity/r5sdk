@@ -90,8 +90,7 @@ static void ImGui_ImplDX11_SetupRenderState(ImDrawData* draw_data, ID3D11DeviceC
     ImGui_ImplDX11_Data* bd = ImGui_ImplDX11_GetBackendData();
 
     // Setup viewport
-    D3D11_VIEWPORT vp;
-    memset(&vp, 0, sizeof(D3D11_VIEWPORT));
+    D3D11_VIEWPORT vp = {};
     vp.Width = draw_data->DisplaySize.x;
     vp.Height = draw_data->DisplaySize.y;
     vp.MinDepth = 0.0f;
@@ -158,8 +157,7 @@ void ImGui_ImplDX11_RenderDrawData(ImDrawData* draw_data)
     {
         if (bd->pVB) { bd->pVB->Release(); bd->pVB = nullptr; }
         bd->VertexBufferSize = draw_data->TotalVtxCount + 5000;
-        D3D11_BUFFER_DESC desc;
-        memset(&desc, 0, sizeof(D3D11_BUFFER_DESC));
+        D3D11_BUFFER_DESC desc = {};
         desc.Usage = D3D11_USAGE_DYNAMIC;
         desc.ByteWidth = bd->VertexBufferSize * sizeof(ImDrawVert);
         desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
@@ -172,8 +170,7 @@ void ImGui_ImplDX11_RenderDrawData(ImDrawData* draw_data)
     {
         if (bd->pIB) { bd->pIB->Release(); bd->pIB = nullptr; }
         bd->IndexBufferSize = draw_data->TotalIdxCount + 10000;
-        D3D11_BUFFER_DESC desc;
-        memset(&desc, 0, sizeof(D3D11_BUFFER_DESC));
+        D3D11_BUFFER_DESC desc = {};
         desc.Usage = D3D11_USAGE_DYNAMIC;
         desc.ByteWidth = bd->IndexBufferSize * sizeof(ImDrawIdx);
         desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
@@ -393,34 +390,33 @@ bool    ImGui_ImplDX11_CreateDeviceObjects()
     // See https://github.com/ocornut/imgui/pull/638 for sources and details.
 
     // Create the vertex shader
-    // Shader taken from https://github.com/ocornut/imgui/issues/1724
     {
         static const char vertexShader[] =
             "cbuffer vertexBuffer : register(b0)\n"
             "{\n"
-            "  float4x4 ProjectionMatrix;\n"
+            "\tfloat4x4 ProjectionMatrix;\n"
             "};\n"
             "struct VS_INPUT\n"
             "{\n"
-            "  float2 pos : POSITION;\n"
-            "  float4 col : COLOR0;\n"
-            "  float2 uv : TEXCOORD0;\n"
+            "\tfloat2 pos : POSITION;\n"
+            "\tfloat4 col : COLOR0;\n"
+            "\tfloat2 uv : TEXCOORD0;\n"
             "};\n"
             "struct PS_INPUT\n"
             "{\n"
-            "  float4 pos : SV_POSITION;\n"
-            "  float4 col : COLOR0;\n"
-            "  float2 uv : TEXCOORD0;\n"
+            "\tfloat4 pos : SV_POSITION;\n"
+            "\tfloat4 col : COLOR0;\n"
+            "\tfloat2 uv : TEXCOORD0;\n"
             "};\n"
             "PS_INPUT main(VS_INPUT input)\n"
             "{\n"
-            "  PS_INPUT output;\n"
-            "  output.pos = mul(ProjectionMatrix, float4(input.pos.xy, 0.0f, 1.0f));\n"
-            "  output.col.xyz = pow(abs(input.col.xyz), 2.2f);\n"
-            "  output.col.w = input.col.w;\n"
-            "  output.uv = input.uv;\n"
-            "  return output;\n"
-            "}\n";
+            "\tPS_INPUT output;\n"
+            "\toutput.pos = mul(ProjectionMatrix, float4(input.pos.xy, 0.0f, 1.0f));\n"
+            "\toutput.col.xyz = pow(abs(input.col.xyz), 2.2f);\n"
+            "\toutput.col.w = input.col.w;\n"
+            "\toutput.uv = input.uv;\n"
+            "\treturn output;\n"
+            "};\n";
 
         ID3DBlob* vertexShaderBlob;
         if (FAILED(D3DCompile(vertexShader, sizeof(vertexShader)-1, nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, &vertexShaderBlob, nullptr)))
@@ -447,7 +443,7 @@ bool    ImGui_ImplDX11_CreateDeviceObjects()
 
         // Create the constant buffer
         {
-            D3D11_BUFFER_DESC desc;
+            D3D11_BUFFER_DESC desc = {};
             desc.ByteWidth = sizeof(VERTEX_CONSTANT_BUFFER_DX11);
             desc.Usage = D3D11_USAGE_DYNAMIC;
             desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -462,17 +458,17 @@ bool    ImGui_ImplDX11_CreateDeviceObjects()
         static const char pixelShader[] =
             "struct PS_INPUT\n"
             "{\n"
-            "  float4 pos : SV_POSITION;\n"
-            "  float4 col : COLOR0;\n"
-            "  float2 uv : TEXCOORD0;\n"
+            "\tfloat4 pos : SV_POSITION;\n"
+            "\tfloat4 col : COLOR0;\n"
+            "\tfloat2 uv : TEXCOORD0;\n"
             "};\n"
             "sampler sampler0;\n"
             "Texture2D texture0;\n"
             "float4 main(PS_INPUT input) : SV_Target\n"
             "{\n"
-            "  float4 output = input.col * texture0.Sample(sampler0, input.uv);\n"
-            "  return output;\n"
-            "}\n";
+            "\tfloat4 output = input.col * texture0.Sample(sampler0, input.uv);\n"
+            "\treturn output;\n"
+            "};\n";
 
         ID3DBlob* pixelShaderBlob;
         if (FAILED(D3DCompile(pixelShader, sizeof(pixelShader)-1, nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0, &pixelShaderBlob, nullptr)))
