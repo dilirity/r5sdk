@@ -425,13 +425,14 @@ dtStatus dtNavMesh::init(unsigned char* data, const int dataSize, const int tabl
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-int dtNavMesh::findConnectingPolys(const rdVec3D* va, const rdVec3D* vb,
+void dtNavMesh::findConnectingPolys(const rdVec3D* va, const rdVec3D* vb,
 								   const dtMeshTile* tile, int side,
-								   dtPolyRef* con, rdVec2D* conarea, int maxcon) const
+								   rdTempVector<dtFindConnectingPolysResult>& out) const
 {
 	const float near_thresh = 0.01f;
 
-	if (!tile) return 0;
+	if (!tile)
+		return;
 	
 	rdVec2D amin, amax;
 	calcSlabEndPoints(va, vb, &amin, &amax, side);
@@ -440,7 +441,6 @@ int dtNavMesh::findConnectingPolys(const rdVec3D* va, const rdVec3D* vb,
 	// Remove links pointing to 'side' and compact the links array. 
 	rdVec2D bmin, bmax;
 	unsigned short m = DT_EXT_LINK | (unsigned short)side;
-	int n = 0;
 	
 	dtPolyRef base = getPolyRefBase(tile);
 	
@@ -464,20 +464,20 @@ int dtNavMesh::findConnectingPolys(const rdVec3D* va, const rdVec3D* vb,
 			// Check if the segments touch.
 			calcSlabEndPoints(vc,vd, &bmin,&bmax, side);
 			
-			if (!overlapSlabs(amin,amax, bmin,bmax, near_thresh, tile->header->walkableClimb)) continue;
-			
+			if (!overlapSlabs(amin,amax, bmin,bmax, near_thresh, tile->header->walkableClimb))
+				continue;
+
 			// Add return value.
-			if (n < maxcon)
-			{
-				conarea[n].x = rdMax(amin.x, bmin.x);
-				conarea[n].y = rdMin(amax.x, bmax.x);
-				con[n] = base | (dtPolyRef)i;
-				n++;
-			}
+			dtFindConnectingPolysResult result;
+
+			result.ref = base | (dtPolyRef)i;
+			result.min = rdMax(amin.x, bmin.x);
+			result.max = rdMin(amax.x, bmax.x);
+
+			out.push_back(result);
 			break;
 		}
 	}
-	return n;
 }
 
 void dtNavMesh::unconnectLinks(dtMeshTile* tile, dtMeshTile* target)
@@ -514,10 +514,14 @@ void dtNavMesh::unconnectLinks(dtMeshTile* tile, dtMeshTile* target)
 	}
 }
 
-void dtNavMesh::connectExtLinks(dtMeshTile* tile, dtMeshTile* target, int side)
+dtStatus dtNavMesh::connectExtLinks(dtMeshTile* tile, dtMeshTile* target, const int side)
 {
-	if (!tile) return;
+	if (!tile)
+		return DT_FAILURE | DT_INVALID_PARAM;
 	
+	rdTempVector<dtFindConnectingPolysResult> neiCons;
+	neiCons.reserve(16);
+
 	// Connect border links.
 	for (int i = 0; i < tile->header->polyCount; ++i)
 	{
@@ -540,9 +544,11 @@ void dtNavMesh::connectExtLinks(dtMeshTile* tile, dtMeshTile* target, int side)
 			// Create new links
 			const rdVec3D* va = &tile->verts[poly->verts[j]];
 			const rdVec3D* vb = &tile->verts[poly->verts[(j+1) % nv]];
-			dtPolyRef nei[4];
-			rdVec2D neia[4];
-			const int nnei = findConnectingPolys(va,vb, target, rdOppositeTile(dir), nei,neia,4);
+
+			neiCons.clear(); // Clear the array before reusing it.
+			findConnectingPolys(va,vb, target, rdOppositeTile(dir), neiCons);
+
+			const rdSizeType nnei = neiCons.size();
 
 			// If the portal edge has no neighbor, mark the edge as a boundary edge.
 			if (!nnei)
@@ -551,46 +557,51 @@ void dtNavMesh::connectExtLinks(dtMeshTile* tile, dtMeshTile* target, int side)
 				continue;
 			}
 
-			for (int k = 0; k < nnei; ++k)
+			for (rdSizeType k = 0; k < nnei; ++k)
 			{
 				unsigned int idx = tile->allocLink();
-				if (idx != DT_NULL_LINK)
+				if (idx == DT_NULL_LINK)
 				{
-					dtLink* link = &tile->links[idx];
-					link->ref = nei[k];
-					link->edge = (unsigned char)j;
-					link->side = (unsigned char)dir;
-					
-					link->next = poly->firstLink;
-					poly->firstLink = idx;
+					// No room for more connections.
+					return DT_FAILURE | DT_OUT_OF_MEMORY;
+				}
 
-					link->traverseType = DT_NULL_TRAVERSE_TYPE;
-					link->traverseDist = 0;
-					link->reverseLink = DT_NULL_TRAVERSE_REVERSE_LINK;
+				dtLink* link = &tile->links[idx];
+				link->ref = neiCons[k].ref;
+				link->edge = (unsigned char)j;
+				link->side = (unsigned char)dir;
+				
+				link->next = poly->firstLink;
+				poly->firstLink = idx;
 
-					// Compress portal limits to a byte value.
-					if (dir == 0 || dir == 4)
-					{
-						float tmin = (neia[k].x-va->y) / (vb->y-va->y);
-						float tmax = (neia[k].y-va->y) / (vb->y-va->y);
-						if (tmin > tmax)
-							rdSwap(tmin,tmax);
-						link->bmin = (unsigned char)rdMathRoundf(rdClamp(tmin, 0.0f, 1.0f)*255.0f);
-						link->bmax = (unsigned char)rdMathRoundf(rdClamp(tmax, 0.0f, 1.0f)*255.0f);
-					}
-					else if (dir == 2 || dir == 6)
-					{
-						float tmin = (neia[k].x-va->x) / (vb->x-va->x);
-						float tmax = (neia[k].y-va->x) / (vb->x-va->x);
-						if (tmin > tmax)
-							rdSwap(tmin,tmax);
-						link->bmin = (unsigned char)rdMathRoundf(rdClamp(tmin, 0.0f, 1.0f)*255.0f);
-						link->bmax = (unsigned char)rdMathRoundf(rdClamp(tmax, 0.0f, 1.0f)*255.0f);
-					}
+				link->traverseType = DT_NULL_TRAVERSE_TYPE;
+				link->traverseDist = 0;
+				link->reverseLink = DT_NULL_TRAVERSE_REVERSE_LINK;
+
+				// Compress portal limits to a byte value.
+				if (dir == 0 || dir == 4)
+				{
+					float tmin = (neiCons[k].min-va->y) / (vb->y-va->y);
+					float tmax = (neiCons[k].max-va->y) / (vb->y-va->y);
+					if (tmin > tmax)
+						rdSwap(tmin,tmax);
+					link->bmin = (unsigned char)rdMathRoundf(rdClamp(tmin, 0.0f, 1.0f)*255.0f);
+					link->bmax = (unsigned char)rdMathRoundf(rdClamp(tmax, 0.0f, 1.0f)*255.0f);
+				}
+				else if (dir == 2 || dir == 6)
+				{
+					float tmin = (neiCons[k].min-va->x) / (vb->x-va->x);
+					float tmax = (neiCons[k].max-va->x) / (vb->x-va->x);
+					if (tmin > tmax)
+						rdSwap(tmin,tmax);
+					link->bmin = (unsigned char)rdMathRoundf(rdClamp(tmin, 0.0f, 1.0f)*255.0f);
+					link->bmax = (unsigned char)rdMathRoundf(rdClamp(tmax, 0.0f, 1.0f)*255.0f);
 				}
 			}
 		}
 	}
+
+	return DT_SUCCESS;
 }
 
 dtPolyRef dtNavMesh::clampOffMeshVertToPoly(dtOffMeshConnection* con, dtMeshTile* conTile, 
@@ -753,9 +764,10 @@ dtStatus dtNavMesh::connectOffMeshLinks(const dtTileRef tileRef)
 	return DT_SUCCESS;
 }
 
-void dtNavMesh::connectIntLinks(dtMeshTile* tile)
+dtStatus dtNavMesh::connectIntLinks(dtMeshTile* tile)
 {
-	if (!tile) return;
+	if (!tile)
+		return DT_FAILURE | DT_INVALID_PARAM;
 
 	dtPolyRef base = getPolyRefBase(tile);
 
@@ -775,22 +787,27 @@ void dtNavMesh::connectIntLinks(dtMeshTile* tile)
 			if (poly->neis[j] == 0 || (poly->neis[j] & DT_EXT_LINK)) continue;
 
 			unsigned int idx = tile->allocLink();
-			if (idx != DT_NULL_LINK)
+			if (idx == DT_NULL_LINK)
 			{
-				dtLink* link = &tile->links[idx];
-				link->ref = base | (dtPolyRef)(poly->neis[j]-1);
-				link->edge = (unsigned char)j;
-				link->side = 0xff;
-				link->bmin = link->bmax = 0;
-				// Add to linked list.
-				link->next = poly->firstLink;
-				poly->firstLink = idx;
-				link->traverseType = DT_NULL_TRAVERSE_TYPE;
-				link->traverseDist = 0;
-				link->reverseLink = DT_NULL_TRAVERSE_REVERSE_LINK;
+				// No room for more connections.
+				return DT_FAILURE | DT_OUT_OF_MEMORY;
 			}
+
+			dtLink* link = &tile->links[idx];
+			link->ref = base | (dtPolyRef)(poly->neis[j]-1);
+			link->edge = (unsigned char)j;
+			link->side = 0xff;
+			link->bmin = link->bmax = 0;
+			// Add to linked list.
+			link->next = poly->firstLink;
+			poly->firstLink = idx;
+			link->traverseType = DT_NULL_TRAVERSE_TYPE;
+			link->traverseDist = 0;
+			link->reverseLink = DT_NULL_TRAVERSE_REVERSE_LINK;
 		}
 	}
+
+	return DT_SUCCESS;
 }
 
 /// The internal state of #dtNavMesh::connectTraverseLinks.
@@ -1658,7 +1675,10 @@ dtStatus dtNavMesh::connectTile(const dtTileRef tileRef)
 	for (int i = 0; i < header->maxLinkCount - 1; ++i)
 		tile->links[i].next = i + 1;
 
-	connectIntLinks(tile);
+	dtStatus status = connectIntLinks(tile);
+
+	if (dtStatusFailed(status))
+		return status;
 
 	// Create connections with neighbour tiles.
 	static const int MAX_NEIS = 32;
@@ -1672,8 +1692,15 @@ dtStatus dtNavMesh::connectTile(const dtTileRef tileRef)
 		if (neis[j] == tile)
 			continue;
 	
-		connectExtLinks(tile, neis[j], -1);
-		connectExtLinks(neis[j], tile, -1);
+		status = connectExtLinks(tile, neis[j], -1);
+
+		if (dtStatusFailed(status))
+			return status;
+
+		status = connectExtLinks(neis[j], tile, -1);
+
+		if (dtStatusFailed(status))
+			return status;
 	}
 	
 	// Connect with neighbour tiles.
@@ -1682,8 +1709,15 @@ dtStatus dtNavMesh::connectTile(const dtTileRef tileRef)
 		nneis = getNeighbourTilesAt(header->x, header->y, i, neis, MAX_NEIS);
 		for (int j = 0; j < nneis; ++j)
 		{
-			connectExtLinks(tile, neis[j], i);
-			connectExtLinks(neis[j], tile, rdOppositeTile(i));
+			status = connectExtLinks(tile, neis[j], i);
+
+			if (dtStatusFailed(status))
+				return status;
+
+			status = connectExtLinks(neis[j], tile, rdOppositeTile(i));
+
+			if (dtStatusFailed(status))
+				return status;
 		}
 	}
 

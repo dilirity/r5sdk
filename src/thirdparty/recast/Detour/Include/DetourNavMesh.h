@@ -1099,16 +1099,24 @@ private:
 	/// Same as the public #getTileAndPolyByRef, but provides mutable handles.
 	dtStatus getTileAndPolyByRef(dtMeshTile** tile, dtPoly** poly, const dtPolyRef ref) const;
 
+	/// Internal result structure for #findConnectingPolys.
+	struct dtFindConnectingPolysResult
+	{
+		dtPolyRef ref;	///< The connecting polygon ref.
+		float min;		///< The min of the segment overlap.
+		float max;		///< The max of the segment overlap.
+	};
+
 	/// Returns all polygons in neighbour tile based on portal defined by the segment.
-	int findConnectingPolys(const rdVec3D* va, const rdVec3D* vb,
+	void findConnectingPolys(const rdVec3D* va, const rdVec3D* vb,
 		const dtMeshTile* tile, int side,
-		dtPolyRef* con, rdVec2D* conarea, int maxcon) const;
+		rdTempVector<dtFindConnectingPolysResult>& result) const;
 
 	/// Builds internal polygons links for a tile.
-	void connectIntLinks(dtMeshTile* tile);
+	dtStatus connectIntLinks(dtMeshTile* tile);
 
 	/// Builds external polygon links for a tile.
-	void connectExtLinks(dtMeshTile* tile, dtMeshTile* target, int side);
+	dtStatus connectExtLinks(dtMeshTile* tile, dtMeshTile* target, const int side);
 
 	/// Removes external links at specified side.
 	void unconnectLinks(dtMeshTile* tile, dtMeshTile* target);
