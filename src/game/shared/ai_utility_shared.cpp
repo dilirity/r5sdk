@@ -13,6 +13,7 @@
 #include "mathlib/color.h"
 #include "mathlib/vector.h"
 #include "mathlib/ssemath.h"
+#include "engine/debugoverlay.h"
 #include "game/shared/ai_utility_shared.h"
 #include "game/server/ai_utility.h"
 #include "game/server/ai_networkmanager.h"
@@ -53,7 +54,7 @@ static ConVar navmesh_draw_force_opaque("navmesh_draw_force_opaque", "0", FCVAR_
 static ConVar navmesh_draw_flag_show_tile_id("navmesh_draw_show_tile_ids", "0", FCVAR_DEVELOPMENTONLY, "Color NavMesh tiles by their lookup ID");
 static ConVar navmesh_draw_flag_show_poly_groups("navmesh_draw_show_poly_groups", "0", FCVAR_DEVELOPMENTONLY, "Color NavMesh polygons by their group ID");
 
-static ConVar ai_script_nodes_draw_range("ai_script_nodes_draw_range", "0", FCVAR_DEVELOPMENTONLY, "Debug draw AIN script nodes ranging from shift index to the value of this ConVar");
+static ConVar ai_script_nodes_draw_range("ai_script_nodes_draw_range", "1000", FCVAR_DEVELOPMENTONLY, "Only draw AIN script nodes within this distance from our camera");
 static ConVar ai_script_nodes_draw_nearest("ai_script_nodes_draw_nearest", "1", FCVAR_DEVELOPMENTONLY, "Debug draw AIN script node links to nearest node (build order is used if null)");
 
 //------------------------------------------------------------------------------
@@ -116,10 +117,8 @@ void CAI_Utility::RunRenderFrame(void)
         }
     }
 
-    const int scriptNodeIndex = ai_script_nodes_draw->GetInt();
-
-    if (scriptNodeIndex > -1)
-        DrawAIScriptNetwork(*g_pAINetwork, MainViewOrigin(), scriptNodeIndex, navmesh_draw_range.GetFloat(), true);
+    if (ai_script_nodes_draw->GetBool())
+        DrawAIScriptNetwork(*g_pAINetwork, MainViewOrigin(), ai_script_nodes_draw_range.GetFloat(), true);
 }
 
 //------------------------------------------------------------------------------
@@ -178,14 +177,12 @@ static const fltx4 s_xSubMask = LoadAlignedSIMD(s_vSubMask);
 // Purpose: draw AI script network
 // Input  : *pNetwork       - 
 //          &vCameraPos     - 
-//          iNodeIndex      - 
 //          flCameraRange   - 
 //          bUseDepthBuffer - 
 //------------------------------------------------------------------------------
 void CAI_Utility::DrawAIScriptNetwork(
     const CAI_Network* pNetwork,
     const Vector3D& vCameraPos,
-    const int iNodeIndex,
     const float flCameraRange,
     const bool bUseDepthBuffer) const
 {
@@ -193,16 +190,12 @@ void CAI_Utility::DrawAIScriptNetwork(
         return; // AI Network not build or loaded.
 
     const bool bDrawNearest = ai_script_nodes_draw_nearest.GetBool();
-    const int  nNodeRange = ai_script_nodes_draw_range.GetInt();
 
     matrix3x4_t vTransforms;
     std::unordered_set<int64_t> uLinkSet;
 
-    for (int i = iNodeIndex, ns = pNetwork->NumScriptNodes(); i < ns; i++)
+    for (int i = 0, ns = pNetwork->NumScriptNodes(); i < ns; i++)
     {
-        if (nNodeRange && i > nNodeRange)
-            break;
-
         const CAI_ScriptNode* pScriptNode = &pNetwork->m_ScriptNode[i];
         const fltx4 xOrigin = SubSIMD(// Subtract 25.f from our scalars to align box with node.
             LoadUnaligned3SIMD(&pScriptNode->m_vOrigin), s_xSubMask);
@@ -224,11 +217,11 @@ void CAI_Utility::DrawAIScriptNetwork(
             { 0.0f, 0.0f, 1.0f },
             *reinterpret_cast<const Vector3D*>(&xOrigin));
 
-        static const Color boxColor(0, 255, 0, 255);
+        static const Color boxColor(0, 255, 0, 30);
         static const Color linkColor(255, 0, 0, 255);
 
-        v_RenderWireFrameBox(vTransforms, *reinterpret_cast<const Vector3D*>(&s_xMins),
-            *reinterpret_cast<const Vector3D*>(&s_xMaxs), boxColor, bUseDepthBuffer);
+        g_pDebugOverlay->AddTransformedBoxOverlay(vTransforms, *reinterpret_cast<const Vector3D*>(&s_xMins),
+            *reinterpret_cast<const Vector3D*>(&s_xMaxs), boxColor.r(), boxColor.g(), boxColor.b(), boxColor.a(), !bUseDepthBuffer, 0.0f);
 
         if (bDrawNearest) // Render links to the nearest node.
         {
@@ -242,12 +235,12 @@ void CAI_Utility::DrawAIScriptNetwork(
                 if (p.second) // Only render if link hasn't already been rendered.
                 {
                     const CAI_ScriptNode* pNearestNode = &pNetwork->m_ScriptNode[nNearest];
-                    v_RenderLine(pScriptNode->m_vOrigin, pNearestNode->m_vOrigin, linkColor, bUseDepthBuffer);
+                    g_pDebugOverlay->AddLineOverlay(pScriptNode->m_vOrigin, pNearestNode->m_vOrigin, linkColor.r(), linkColor.g(), linkColor.b(), !bUseDepthBuffer, 0.0f);
                 }
             }
         }
         else if (i > 0) // Render links in the order the AI Network was build.
-            v_RenderLine((pScriptNode - 1)->m_vOrigin, pScriptNode->m_vOrigin, linkColor, bUseDepthBuffer);
+            g_pDebugOverlay->AddLineOverlay((pScriptNode - 1)->m_vOrigin, pScriptNode->m_vOrigin, linkColor.r(), linkColor.g(), linkColor.b(), !bUseDepthBuffer, 0.0f);
     }
 }
 

@@ -28,7 +28,6 @@ public:
 
 	void DrawAIScriptNetwork(const CAI_Network* pNetwork,
 		const Vector3D& vCameraPos,
-		const int iNodeIndex,
 		const float flCameraRange,
 		const bool bDepthBuffer) const;
 
