@@ -435,7 +435,9 @@ void NavMeshTesterTool::handleMenu()
 		if (ImGui::Checkbox(animtypeName, &isEnabled))
 		{
 			m_traverseAnimType = animTypeIndex;
+
 			updateTraverseCosts();
+			recalc();
 		}
 	}
 
