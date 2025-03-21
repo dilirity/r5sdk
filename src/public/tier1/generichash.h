@@ -101,16 +101,4 @@ template<> inline unsigned HashItem<char*>(char* const& pszKey)
 
 //-----------------------------------------------------------------------------
 
-
-//-----------------------------------------------------------------------------
-// Murmur hash
-//-----------------------------------------------------------------------------
-uint32 MurmurHash2(const void* key, int len, uint32 seed);
-
-// return murmurhash2 of a downcased string
-uint32 MurmurHash2LowerCase(char const* pString, uint32 nSeed);
-
-uint64 MurmurHash64(const void* key, size_t len, uint32 seed);
-
-
 #endif /* !GENERICHASH_H */
