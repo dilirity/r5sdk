@@ -11,6 +11,7 @@
 #include "public/eiface.h"
 #include "public/const.h"
 #include "common/protocol.h"
+#include "common/callback.h"
 #include "engine/server/sv_main.h"
 #include "gameinterface.h"
 #include "entitylist.h"
@@ -19,6 +20,40 @@
 #include "game/shared/usercmd.h"
 #include "game/server/util_server.h"
 #include "pluginsystem/pluginsystem.h"
+
+//-----------------------------------------------------------------------------
+// Purpose: retrieves the index of the client that issued the last command
+// Output : int
+//-----------------------------------------------------------------------------
+int UTIL_GetCommandClientIndex(void)
+{
+	// -1 == unknown,dedicated server console
+	// 0  == player 1
+
+	// Convert to 1 based offset
+	return (*g_nCommandClientIndex)+1;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: retrieves the player of the client that issued the last command
+// Output : CPlayer*
+//-----------------------------------------------------------------------------
+CPlayer* UTIL_GetCommandClient(void)
+{
+	const int idx = UTIL_GetCommandClientIndex();
+	if (idx > 0)
+	{
+		CPlayer* const player = UTIL_PlayerByIndex(idx);
+
+		if (!player || !player->IsConnected())
+			return NULL;
+
+		return player;
+	}
+
+	// HLDS console issued command
+	return NULL;
+}
 
 bool CServerGameDLL::DLLInit(CServerGameDLL* thisptr, CreateInterfaceFn appSystemFactory, CreateInterfaceFn physicsFactory,
 	CreateInterfaceFn fileSystemFactory, CGlobalVars* pGlobals)
