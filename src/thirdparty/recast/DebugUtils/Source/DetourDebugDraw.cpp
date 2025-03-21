@@ -30,7 +30,7 @@ static void drawPolyVerts(duDebugDraw* dd, const dtMeshTile* tile, const rdVec3D
 	dd->begin(DU_DRAW_POINTS, 4.0f, offset);
 	for (int i = 0; i < header->vertCount; ++i)
 	{
-		const rdVec3D* v = &tile->verts[i * 3];
+		const rdVec3D* v = &tile->verts[i];
 		dd->vertex(v->x, v->y, v->z, vcol);
 	}
 	dd->end();
