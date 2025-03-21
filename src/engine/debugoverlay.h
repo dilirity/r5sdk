@@ -7,6 +7,9 @@
 #include "public/vphysics/vphysics_interface.h"
 
 constexpr auto NDEBUG_PERSIST_TILL_NEXT_SERVER = (0.01023f);
+constexpr auto NDEBUG_PERSIST_TILL_SECOND_NEXT_SERVER = (NDEBUG_PERSIST_TILL_NEXT_SERVER * 2);
+
+extern ConVar enable_debug_text_overlays;
 extern ConVar r_debug_draw_depth_test;
 
 enum class OverlayType_t
@@ -159,8 +162,71 @@ struct OverlayCapsule_t : public OverlayBase_t
 	bool            noDepthTest;
 };
 
+class OverlayText_t
+{
+public:
+	OverlayText_t()
+	{
+		origin.Init();
+		bUseOrigin = false;
+		lineOffset = 0;
+		screenPos.Init();
+		m_nServerCount = -1;
+		textLen = 0;
+		textBuf = nullptr;
+		m_flEndTime = 0.0f;
+		m_nCreationTick = -1;
+		m_nOverlayTick = -1;
+		r = g = b = a = 255;
+		nextOverlayText = 0;
+	}
+
+	~OverlayText_t()
+	{
+		if (textBuf)
+		{
+			delete[] textBuf;
+			textBuf = nullptr;
+		}
+	}
+
+	void SetEndTime(const float duration);
+
+	Vector3D origin;
+	bool bUseOrigin;
+	int lineOffset;
+	Vector2D screenPos;
+	int m_nServerCount;
+	char unk[24];
+	ssize_t textLen;
+	char* textBuf;
+	float m_flEndTime;
+	int m_nCreationTick;
+	int m_nOverlayTick;
+	int r;
+	int g;
+	int b;
+	int a;
+	OverlayText_t* nextOverlayText;
+};
+
 class CIVDebugOverlay : public IVDebugOverlay, public IVPhysicsDebugOverlay
 {
+public: // Hook statics:
+	static void AddEntityTextOverlay(CIVDebugOverlay* const thisptr, const int entIndex, const int lineOffset, const float duration, const int r, const int g, const int b, const int a, const char* const format, ...);
+
+	static void AddTextOverlay(CIVDebugOverlay* const thisptr, const Vector3D& origin, const float duration, const char* const format, ...);
+	static void AddTextOverlayAtOffset(CIVDebugOverlay* const thisptr, const Vector3D& origin, const int lineOffset, const float duration, const char* const format, ...);
+
+	static void AddScreenTextOverlayAtOffset(CIVDebugOverlay* const thisptr, const Vector2D& screenPos, const int lineOffset, const float flDuration, const int r, const int g, const int b, const int a, const char* const text);
+	static void AddScreenTextOverlayAtCenter(CIVDebugOverlay* const thisptr, IVDebugOverlay* const unused1, const char* const text, const void* unused2, const int unk1, const int unk2);
+
+	static void AddTextOverlayRGBu32(CIVDebugOverlay* const thisptr, const Vector3D& origin, const int lineOffset, const float duration,
+		const int r, const int g, const int b, const int a, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(9, 10);
+
+	static void AddTextOverlayRGBf32(CIVDebugOverlay* const thisptr, const Vector3D& origin, const int lineOffset, const float duration,
+		const float r, const float g, const float b, const float a, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(9, 10);
+
 public:
 	void AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration);
 
@@ -171,42 +237,71 @@ private:
 
 inline CIVDebugOverlay* g_pDebugOverlay = nullptr;
 
-void DestroyOverlay(OverlayBase_t* pOverlay);
-void DrawOverlay(OverlayBase_t* pOverlay);
+inline void(*v_DebugOverlay_DrawAllOverlays)(bool bDraw);
+inline void(*v_DebugOverlay_ClearAllOverlays)(void);
+inline void(*v_DebugOverlay_DebugDebugOverlays)(void* unk1, unsigned short unk2, unsigned int unk3, float unk4);
 
-inline void(*v_DrawAllOverlays)(bool bDraw);
-inline void(*v_DestroyOverlay)(OverlayBase_t* pOverlay);
+inline void (*v_AddEntityTextOverlay)(CIVDebugOverlay* const thisptr, const int entIndex, const int lineOffset, const float duration,
+	const int r, const int g, const int b, const int a, const char* const format, ...);
 
 inline OverlayBase_t** s_pOverlays = nullptr;
+inline OverlayText_t** s_pOverlayText = nullptr;
 inline CThreadMutex* s_OverlayMutex = nullptr;
+inline bool* s_bDrawGrid = nullptr;
 
 inline int* g_nRenderTickCount = nullptr;
 inline int* g_nOverlayTickCount = nullptr;
+
+inline int* g_nOverlayStage = nullptr;
+
+inline int* g_nNewOtherOverlays = nullptr;
+inline int* g_nNewTextOverlays = nullptr;
+
+inline void* g_pIVPhysicsDebugOverlay_VFTable = nullptr;
+inline void* g_pIVDebugOverlay_VFTable = nullptr;
 
 ///////////////////////////////////////////////////////////////////////////////
 class VDebugOverlay : public IDetour
 {
 	virtual void GetAdr(void) const
 	{
-		LogFunAdr("DrawAllOverlays", v_DrawAllOverlays);
-		LogFunAdr("DestroyOverlay", v_DestroyOverlay);
-		LogVarAdr("s_Overlays", s_pOverlays);
+		LogFunAdr("DebugOverlay_DrawAllOverlays", v_DebugOverlay_DrawAllOverlays);
+		LogFunAdr("DebugOverlay_ClearAllOverlays", v_DebugOverlay_ClearAllOverlays);
+		LogFunAdr("DebugOverlay_DebugDebugOverlays", v_DebugOverlay_DebugDebugOverlays);
+		LogVarAdr("s_pOverlays", s_pOverlays);
+		LogVarAdr("s_pOverlayText", s_pOverlayText);
 		LogVarAdr("s_OverlayMutex", s_OverlayMutex);
+		LogVarAdr("s_bDrawGrid", s_bDrawGrid);
 		LogVarAdr("g_nOverlayTickCount", g_nOverlayTickCount);
 		LogVarAdr("g_nRenderTickCount", g_nRenderTickCount);
+		LogVarAdr("g_nNewOtherOverlays", g_nNewOtherOverlays);
+		LogVarAdr("g_nNewTextOverlays", g_nNewTextOverlays);
 	}
 	virtual void GetFun(void) const
 	{
-		Module_FindPattern(g_GameDll, "40 55 48 83 EC 30 48 8B 05 ?? ?? ?? ?? 0F B6 E9").GetPtr(v_DrawAllOverlays);
-		Module_FindPattern(g_GameDll, "40 53 48 83 EC 20 48 8B D9 48 8D 0D ?? ?? ?? ?? FF 15 ?? ?? ?? ?? 48 63 03").GetPtr(v_DestroyOverlay);
+		Module_FindPattern(g_GameDll, "40 55 48 83 EC 30 48 8B 05 ?? ?? ?? ?? 0F B6 E9").GetPtr(v_DebugOverlay_DrawAllOverlays);
+		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 48 8D 0D ?? ?? ?? ?? FF 15 ?? ?? ?? ?? 48 8B 0D").GetPtr(v_DebugOverlay_ClearAllOverlays);
+		Module_FindPattern(g_GameDll, "4C 8B DC 45 89 43 ?? 66 89 54 24").GetPtr(v_DebugOverlay_DebugDebugOverlays);
+
+		Module_FindPattern(g_GameDll, "40 53 56 57 48 83 EC ?? 48 8D B4 24").GetPtr(v_AddEntityTextOverlay);
 	}
 	virtual void GetVar(void) const
 	{
-		s_pOverlays = CMemory(v_DrawAllOverlays).Offset(0x10).FindPatternSelf("48 8B 3D", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<OverlayBase_t**>();
-		s_OverlayMutex = CMemory(v_DrawAllOverlays).Offset(0x10).FindPatternSelf("48 8D 0D", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<CThreadMutex*>();
+		s_pOverlays = CMemory(v_DebugOverlay_DrawAllOverlays).Offset(0x10).FindPatternSelf("48 8B 3D", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<OverlayBase_t**>();
+		s_pOverlayText = CMemory(v_DebugOverlay_ClearAllOverlays).Offset(0x3A).FindPatternSelf("48 8B 1D", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<OverlayText_t**>();
+		s_OverlayMutex = CMemory(v_DebugOverlay_DrawAllOverlays).Offset(0x10).FindPatternSelf("48 8D 0D", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<CThreadMutex*>();
+		s_bDrawGrid = CMemory(v_DebugOverlay_ClearAllOverlays).Offset(0xC0).FindPatternSelf("C6 05", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x2, 0x7).RCast<bool*>();
 
-		g_nRenderTickCount = CMemory(v_DrawAllOverlays).Offset(0x50).FindPatternSelf("3B 05", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x2, 0x6).RCast<int*>();
-		g_nOverlayTickCount = CMemory(v_DrawAllOverlays).Offset(0x70).FindPatternSelf("3B 05", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x2, 0x6).RCast<int*>();
+		g_nRenderTickCount = CMemory(v_DebugOverlay_DrawAllOverlays).Offset(0x50).FindPatternSelf("3B 05", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x2, 0x6).RCast<int*>();
+		g_nOverlayTickCount = CMemory(v_DebugOverlay_DrawAllOverlays).Offset(0x70).FindPatternSelf("3B 05", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x2, 0x6).RCast<int*>();
+
+		g_nOverlayStage = CMemory(v_DebugOverlay_DebugDebugOverlays).Offset(0x70).FindPatternSelf("8B 05", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x2, 0x6).RCast<int*>();
+
+		g_nNewOtherOverlays = CMemory(v_DebugOverlay_DebugDebugOverlays).Offset(0x1100).FindPatternSelf("44 89", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<int*>();
+		g_nNewTextOverlays = CMemory(v_DebugOverlay_DebugDebugOverlays).Offset(0x1104).FindPatternSelf("44 89", CMemory::Direction::DOWN, 150).ResolveRelativeAddressSelf(0x3, 0x7).RCast<int*>();
+
+		g_GameDll.GetVirtualMethodTable(".?AVCIVDebugOverlay@@", 1).GetPtr(g_pIVPhysicsDebugOverlay_VFTable);
+		g_GameDll.GetVirtualMethodTable(".?AVCIVDebugOverlay@@", 2).GetPtr(g_pIVDebugOverlay_VFTable);
 	}
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const;

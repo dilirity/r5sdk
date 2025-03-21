@@ -8,6 +8,7 @@
 #include <core/stdafx.h>
 #include <tier1/cvar.h>
 #include <engine/sys_utils.h>
+#include <engine/debugoverlay.h>
 #include <vgui/vgui_debugpanel.h>
 #include <vgui/vgui_baseui_interface.h>
 #include <vguimatsurface/MatSystemSurface.h>
@@ -25,6 +26,10 @@ int CEngineVGui::VPaint(CEngineVGui* const thisptr, const PaintMode_t mode)
 			g_TextOverlay.Update();
 	}
 
+	// This must always be called, even when VGui is disabled because
+	// we still need to decay old text overlays. Else they will stack
+	// up forever and burn CPU.
+	g_pDebugOverlay->ClearDeadTextOverlays();
 	return result;
 }
 
