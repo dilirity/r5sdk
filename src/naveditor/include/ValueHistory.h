@@ -3,7 +3,7 @@
 
 class ValueHistory
 {
-	static const int MAX_HISTORY = 256;
+	static const int MAX_HISTORY = 512;
 	ImVec2 m_samples[MAX_HISTORY];
 	int m_hsamples;
 public:
