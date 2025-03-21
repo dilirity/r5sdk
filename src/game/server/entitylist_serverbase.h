@@ -182,11 +182,13 @@ inline const CEntInfo* CBaseEntityList::GetEntInfoPtr(const CBaseHandle& hEnt) c
 
 inline const CEntInfo* CBaseEntityList::GetEntInfoPtrByIndex(const int index) const
 {
+	Assert(index >= 0 && index < NUM_ENT_ENTRIES);
 	return &m_EntPtrArray[index];
 }
 
 inline void CBaseEntityList::ForceEntSerialNumber(const int iEntIndex, const int iSerialNumber)
 {
+	Assert(iEntIndex >= 0 && iEntIndex < NUM_ENT_ENTRIES);
 	m_EntPtrArray[iEntIndex].m_SerialNumber = iSerialNumber;
 }
 
