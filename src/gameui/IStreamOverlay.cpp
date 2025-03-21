@@ -129,7 +129,7 @@ bool CStreamOverlay::DrawSurface(void)
 		return false;
 	}
 
-	if (ImGui::BeginChild("##StreamReport", ImVec2(-1, -1), ImGuiChildFlags_Border, ImGuiWindowFlags_None))
+	if (ImGui::BeginChild("##StreamReport", ImVec2(-1, -1), ImGuiChildFlags_Border, ImGuiWindowFlags_HorizontalScrollbar))
 	{
 		const bool resized = ResizeScratchBuffer(stream_overlay_memory.GetInt());
 
