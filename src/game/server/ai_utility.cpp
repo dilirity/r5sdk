@@ -409,4 +409,7 @@ void VRecast::Detour(const bool bAttach) const
 	DetourSetup(&dtNavMeshQuery__closestPointOnPolyBoundary, &Detour_ClosestPointOnPolyBoundary, bAttach);
 	DetourSetup(&dtNavMeshQuery__getPolyHeight, &Detour_GetPolyHeight, bAttach);
 	DetourSetup(&dtNodePool__getPool, &Detour_GetNode, bAttach);
+
+    extern void AICommands_Dummy();
+    AICommands_Dummy();
 }
