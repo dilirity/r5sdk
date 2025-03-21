@@ -123,6 +123,10 @@ ConVar* discord_updatePresence = nullptr;
 ConVar* gamepad_custom_enabled             = nullptr;
 ConVar* gamepad_custom_assist_on           = nullptr;
 ConVar* gamepad_look_curve                 = nullptr;
+
+ConVar* particle_overlay                   = nullptr;
+ConVar* particle_overlay_old               = nullptr;
+ConVar* particle_overlay_list_tally        = nullptr;
 #endif // !DEDICATED
 //-----------------------------------------------------------------------------
 // FILESYSTEM                                                                 |
@@ -207,6 +211,10 @@ void ConVar_InitShipped(void)
 	gamepad_custom_enabled           = g_pCVar->FindVar("gamepad_custom_enabled");
 	gamepad_custom_assist_on         = g_pCVar->FindVar("gamepad_custom_assist_on");
 	gamepad_look_curve               = g_pCVar->FindVar("gamepad_look_curve");
+
+	particle_overlay                 = g_pCVar->FindVar("particle_overlay");
+	particle_overlay_old             = g_pCVar->FindVar("particle_overlay_old");
+	particle_overlay_list_tally      = g_pCVar->FindVar("particle_overlay_list_tally");
 #endif // !DEDICATED
 	mp_gamemode                      = g_pCVar->FindVar("mp_gamemode");
 	ip_cvar                          = g_pCVar->FindVar("ip");

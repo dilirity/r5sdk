@@ -164,6 +164,8 @@ add_sources( SOURCE_GROUP "GameUI"
     "${ENGINE_SOURCE_DIR}/gameui/IBrowser.h"
     "${ENGINE_SOURCE_DIR}/gameui/IConsole.cpp"
     "${ENGINE_SOURCE_DIR}/gameui/IConsole.h"
+    "${ENGINE_SOURCE_DIR}/gameui/IParticleOverlay.cpp"
+    "${ENGINE_SOURCE_DIR}/gameui/IParticleOverlay.h"
     "${ENGINE_SOURCE_DIR}/gameui/IStreamOverlay.cpp"
     "${ENGINE_SOURCE_DIR}/gameui/IStreamOverlay.h"
 

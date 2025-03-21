@@ -108,6 +108,10 @@ extern ConVar* discord_updatePresence;
 extern ConVar* gamepad_custom_enabled;
 extern ConVar* gamepad_custom_assist_on;
 extern ConVar* gamepad_look_curve;
+
+extern ConVar* particle_overlay;
+extern ConVar* particle_overlay_old;
+extern ConVar* particle_overlay_list_tally;
 #endif // !DEDICATED
 //-------------------------------------------------------------------------
 // FILESYSTEM                                                             |

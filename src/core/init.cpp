@@ -53,6 +53,7 @@
 #include "vgui/vgui_controls/RichText.h"
 #include "vguimatsurface/MatSystemSurface.h"
 #include "particles/particles.h"
+#include "particles/particle_overlay.h"
 #include "engine/client/vengineclient_impl.h"
 #include "engine/client/cdll_engine_int.h"
 #include "engine/client/datablock_receiver.h"
@@ -584,6 +585,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 
 	// Particles
 	REGISTER(VParticles);
+	REGISTER(VParticleOverlay);
 
 	// Client
 	REGISTER(HVEngineClient);
