@@ -35,7 +35,7 @@ dtNavMesh* Detour_GetNavMeshByType(const NavMeshType_e navMeshType)
 // Purpose: free's the navmesh by type from global array [small, med_short, medium, large, extra_large]
 // Input  : navMeshType - 
 //-----------------------------------------------------------------------------
-void Detour_FreeNavMeshByType(const NavMeshType_e navMeshType)
+static void Detour_FreeNavMeshByType(const NavMeshType_e navMeshType)
 {
     Assert(navMeshType >= NULL && navMeshType < NAVMESH_COUNT); // Programmer error.
     dtNavMesh* const nav = g_navMeshArray[navMeshType];
@@ -58,7 +58,7 @@ void Detour_FreeNavMeshByType(const NavMeshType_e navMeshType)
 //			animType - 
 // Output : value if reachable, false otherwise
 //-----------------------------------------------------------------------------
-bool Detour_IsGoalPolyReachable(dtNavMesh* const nav, const dtPolyRef fromRef, 
+static bool Detour_IsGoalPolyReachable(dtNavMesh* const nav, const dtPolyRef fromRef, 
     const dtPolyRef goalRef, const TraverseAnimType_e animType)
 {
     if (navmesh_always_reachable.GetBool())
