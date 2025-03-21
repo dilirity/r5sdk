@@ -17,6 +17,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 #include "tier0/sigcache.h"
+#include "mathlib/MurmurHash.h"
 
 //-----------------------------------------------------------------------------
 // Purpose: whether or not to disable the caching of signatures
@@ -53,7 +54,7 @@ void CSigCache::AddEntry(const void* pPattern, const size_t nPatternLen, const u
 		return;
 	}
 
-	const u64 hash = MurmurHash64(pPattern, nPatternLen, SIGDB_MURMUR_SEED);
+	const u64 hash = MurmurHash64A(pPattern, nPatternLen, SIGDB_MURMUR_SEED);
 	(*m_Cache.mutable_smap())[hash] = nRVA;
 }
 
@@ -68,7 +69,7 @@ bool CSigCache::FindEntry(const void* pPattern, const size_t nPatternLen, u64& n
 {
 	if (!m_bDisabled && m_bInitialized)
 	{
-		const u64 hash = MurmurHash64(pPattern, nPatternLen, SIGDB_MURMUR_SEED);
+		const u64 hash = MurmurHash64A(pPattern, nPatternLen, SIGDB_MURMUR_SEED);
 		google::protobuf::Map< u64, u64 >* const sMap = m_Cache.mutable_smap();
 
 		const auto p = sMap->find(hash);
