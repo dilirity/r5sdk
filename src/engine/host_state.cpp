@@ -513,7 +513,7 @@ void CHostState::State_NewGame(void)
 void CHostState::State_ChangeLevelSP(void)
 {
 	Msg(eDLL_T::ENGINE, "%s: Changing singleplayer level to: '%s'\n", __FUNCTION__, m_levelName);
-	m_flShortFrameTime = 1.5; // Set frame time.
+	m_flShortFrameTime = 1.5f; // Set frame time.
 
 	if (CModelLoader__Map_IsValid(g_pModelLoader, m_levelName)) // Check if map is valid and if we can start a new game.
 	{
@@ -534,7 +534,7 @@ void CHostState::State_ChangeLevelSP(void)
 void CHostState::State_ChangeLevelMP(void)
 {
 	Msg(eDLL_T::ENGINE, "%s: Changing multiplayer level to: '%s'\n", __FUNCTION__, m_levelName);
-	m_flShortFrameTime = 0.5; // Set frame time.
+	m_flShortFrameTime = 0.5f; // Set frame time.
 
 #ifndef CLIENT_DLL
 	g_pServerGameDLL->LevelShutdown();
