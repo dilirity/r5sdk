@@ -12,6 +12,8 @@ add_sources( SOURCE_GROUP "Hash"
     "IceKey.H"
     "sha1.cpp"
     "sha1.h"
+    "MurmurHash.cpp"
+    "MurmurHash.h"
 )
 
 add_sources( SOURCE_GROUP "RNG"
