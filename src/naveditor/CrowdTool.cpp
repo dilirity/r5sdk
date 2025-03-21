@@ -480,11 +480,6 @@ void CrowdToolState::handleRender()
 	dd.depthMask(true);
 }
 
-namespace ImPlot
-{
-	extern void Demo_ShadedPlots();
-};
-
 void CrowdToolState::handleRenderOverlay(double* model, double* proj, int* view)
 {
 	rdVec2D screenPos;
@@ -586,7 +581,7 @@ void CrowdToolState::handleRenderOverlay(double* model, double* proj, int* view)
 	
 	if (m_toolParams.m_showPerfGraph)
 	{
-		static const ImPlotAxisFlags flags = ImPlotFlags_None;
+		static const ImPlotAxisFlags flags = ImPlotAxisFlags_None;
 		ImVec2* totalSample = m_crowdTotalTime.getSampleBuffer();
 		ImVec2* crowdSample = m_crowdSampleCount.getSampleBuffer();
 
@@ -624,8 +619,6 @@ void CrowdToolState::handleRenderOverlay(double* model, double* proj, int* view)
 
 				snprintf(labelBuffer, sizeof(labelBuffer), "Sample Count (avg %.2f).", m_crowdSampleCount.getAverage());
 				ImGui::Text(labelBuffer);
-
-				ImGui::SameLine();
 			}
 		}
 
