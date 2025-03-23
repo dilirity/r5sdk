@@ -13,7 +13,6 @@ extern ConVar* developer;
 extern ConVar* fps_max;
 extern ConVar* fps_max_vsync;
 
-extern ConVar* script_server_fps;
 #ifndef DEDICATED
 extern ConVar* in_syncRT;
 #endif // !DEDICATED
@@ -93,6 +92,7 @@ extern ConVar* playerframetimekick_decayrate;
 extern ConVar* player_userCmdsQueueWarning;
 extern ConVar* player_disallow_negative_frametime;
 
+extern ConVar* script_server_fps;
 #endif // CLIENT_DLL
 extern ConVar* sv_cheats;
 extern ConVar* sv_visualizetraces;

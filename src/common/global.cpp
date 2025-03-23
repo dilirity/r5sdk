@@ -27,7 +27,6 @@ ConVar* developer                          = nullptr;
 ConVar* fps_max                            = nullptr;
 ConVar* fps_max_vsync                      = nullptr;
 
-ConVar* script_server_fps                  = nullptr;
 #ifndef DEDICATED
 ConVar* in_syncRT                          = nullptr;
 #endif // !DEDICATED
@@ -106,6 +105,7 @@ ConVar* playerframetimekick_decayrate      = nullptr;
 ConVar* player_userCmdsQueueWarning        = nullptr;
 ConVar* player_disallow_negative_frametime = nullptr;
 
+ConVar* script_server_fps                  = nullptr;
 #endif // !CLIENT_DLL
 ConVar* sv_cheats                          = nullptr;
 ConVar* sv_visualizetraces                 = nullptr;
@@ -166,7 +166,6 @@ void ConVar_InitShipped(void)
 	developer                        = g_pCVar->FindVar("developer");
 	fps_max                          = g_pCVar->FindVar("fps_max");
 	fps_max_vsync                    = g_pCVar->FindVar("fps_max_vsync");
-	script_server_fps                = g_pCVar->FindVar("script_server_fps");
 	base_tickinterval_sp             = g_pCVar->FindVar("base_tickinterval_sp");
 	base_tickinterval_mp             = g_pCVar->FindVar("base_tickinterval_mp");
 	fs_showAllReads                  = g_pCVar->FindVar("fs_showAllReads");
@@ -262,6 +261,8 @@ void ConVar_InitShipped(void)
 	player_userCmdsQueueWarning = g_pCVar->FindVar("player_userCmdsQueueWarning");
 	player_disallow_negative_frametime = g_pCVar->FindVar("player_disallow_negative_frametime");
 
+	script_server_fps = g_pCVar->FindVar("script_server_fps");
+
 	sv_updaterate_sp->RemoveFlags(FCVAR_DEVELOPMENTONLY);
 	sv_updaterate_mp->RemoveFlags(FCVAR_DEVELOPMENTONLY);
 
@@ -272,6 +273,11 @@ void ConVar_InitShipped(void)
 	sv_forceChatToTeamOnly->AddFlags(FCVAR_REPLICATED);
 
 	sv_single_core_dedi->RemoveFlags(FCVAR_DEVELOPMENTONLY);
+
+	// This gets used for division in code, make sure its never zero
+	// to prevent division by zero since this cvar doesn't have a min
+	// and code doesn't check for it either.
+	script_server_fps->SetMin(0.0001f);
 
 	bhit_enable->SetValue(0);
 #endif // !CLIENT_DLL
@@ -285,11 +291,6 @@ void ConVar_InitShipped(void)
 #endif // !DEDICATED
 	fps_max->AddFlags(FCVAR_ARCHIVE);
 	fps_max_vsync->RemoveFlags(FCVAR_DEVELOPMENTONLY);
-
-	// This gets used for division in code, make sure its never zero
-	// to prevent division by zero since this cvar doesn't have a min
-	// and code doesn't check for it either.
-	script_server_fps->SetMin(0.0001f);
 
 	base_tickinterval_sp->RemoveFlags(FCVAR_DEVELOPMENTONLY);
 	base_tickinterval_mp->RemoveFlags(FCVAR_DEVELOPMENTONLY);
