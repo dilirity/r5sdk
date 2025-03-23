@@ -137,7 +137,7 @@ void CConsole::RunFrame(void)
     else
     {
         minBaseWindowRect = m_surfaceStyle == ImGuiStyle_t::LEGACY
-            ? ImVec2(619.f, 526.f)
+            ? ImVec2(619.f, 530.f)
             : ImVec2(618.f, 524.f);
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 6.f, 6.f });  baseWindowStyleVars++;
