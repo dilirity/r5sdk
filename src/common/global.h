@@ -13,6 +13,7 @@ extern ConVar* developer;
 extern ConVar* fps_max;
 extern ConVar* fps_max_vsync;
 
+extern ConVar* script_server_fps;
 #ifndef DEDICATED
 extern ConVar* in_syncRT;
 #endif // !DEDICATED
