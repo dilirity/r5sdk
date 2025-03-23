@@ -120,7 +120,7 @@ public:
 	CTextLogger();
 	~CTextLogger();
 
-	void Render();
+	void Render(const float alpha);
 	void Copy(bool aCopyAll = false);
 
 	//void SetText(const ConLog_t& aText);

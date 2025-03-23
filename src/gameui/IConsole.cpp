@@ -265,7 +265,7 @@ bool CConsole::DrawSurface(void)
     // during the drawing of the base panel.
     {
         AUTO_LOCK(m_colorTextLoggerMutex);
-        m_colorTextLogger.Render();
+        m_colorTextLogger.Render(m_fadeAlpha);
     }
 
     m_lastFrameScrollPos = ImVec2(ImGui::GetScrollX(), ImGui::GetScrollY());

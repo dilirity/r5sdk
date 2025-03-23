@@ -720,8 +720,9 @@ void CTextLogger::HandleMouseInputs(bool bHoveredScrollbar, bool bActiveScrollba
 	}
 }
 
-void CTextLogger::Render()
+void CTextLogger::Render(const float alpha)
 {
+	IM_ASSERT(alpha > 0.0f);
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
 
 	ImGuiWindow* const pWindow = ImGui::GetCurrentWindow();
@@ -810,7 +811,7 @@ void CTextLogger::Render()
 					const ImVec2 cstart(textScreenPos.x + cx, lineStartScreenPos.y);
 					const ImVec2 cend(textScreenPos.x + cx + width, lineStartScreenPos.y + m_CharAdvance.y);
 
-					drawList->AddRectFilled(cstart, cend, 0xffe0e0e0);
+					drawList->AddRectFilled(cstart, cend, ImGui::ColorConvertFloat4ToU32(ImVec4(0.87f, 0.87f, 0.87f, alpha)));
 
 					if (elapsed > 0.8)
 						m_flCursorBlinkerStartTime = currTime;
@@ -822,13 +823,28 @@ void CTextLogger::Render()
 				const char* const text = line.buffer.c_str();
 				const char* const textEnd = &text[line.buffer.length()];
 
-				ImU32 color = line.color;
+				ImU32 color;
+				bool filteredOut = false;
 
 				if (m_itFilter.IsActive())
 				{
 					// Make line dark if it isn't found by the filter
 					if (!m_itFilter.PassFilter(text, textEnd))
-						color = 0xff605040;
+					{
+						color = ImGui::ColorConvertFloat4ToU32(ImVec4(0.25f, 0.31f, 0.37f, alpha));
+						filteredOut = true;
+					}
+				}
+
+				if (!filteredOut)
+				{
+					const ImU32 lineAlpha = (line.color & IM_COL32_A_MASK) >> IM_COL32_A_SHIFT;
+					const ImU32 overrideAlpha = static_cast<ImU32>(IM_F32_TO_INT8_SAT(alpha));
+
+					if (overrideAlpha < lineAlpha)
+						color = (line.color & ~IM_COL32_A_MASK) | (overrideAlpha << IM_COL32_A_SHIFT);
+					else
+						color = line.color;
 				}
 
 				const ImVec2 newOffset(textScreenPos.x, textScreenPos.y);
