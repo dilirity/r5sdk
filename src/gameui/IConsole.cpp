@@ -34,8 +34,11 @@ static ConVar con_suggest_limit("con_suggest_limit", "128", FCVAR_DEVELOPMENTONL
 static ConVar con_suggest_helptext("con_suggest_helptext", "1", FCVAR_RELEASE, "Show CommandBase help text in autocomplete window");
 
 static ConVar con_autocomplete_window_textures("con_autocomplete_window_textures", "1", FCVAR_RELEASE, "Show help textures in autocomplete window");
-static ConVar con_autocomplete_window_width("con_autocomplete_window_width", "0", FCVAR_RELEASE, "The maximum width of the console's autocomplete window", true, 0.f, false, 0.f);
-static ConVar con_autocomplete_window_height("con_autocomplete_window_height", "217.5", FCVAR_RELEASE, "The maximum height of the console's autocomplete window", true, 0.f, false, 0.f);
+static ConVar con_autocomplete_window_width("con_autocomplete_window_width", "0.0f", FCVAR_RELEASE, "The maximum width of the console's autocomplete window", true, 0.f, false, 0.f);
+static ConVar con_autocomplete_window_height("con_autocomplete_window_height", "220.0f", FCVAR_RELEASE, "The maximum height of the console's autocomplete window", true, 0.f, false, 0.f);
+
+static ConVar con_autocomplete_scroll_snap_adjust_min("con_autocomplete_scroll_snap_adjust_min", "2.0f", FCVAR_RELEASE, "The adjustment value subtracted from the item's min bounds to correct scroll snapping in the autocomplete window");
+static ConVar con_autocomplete_scroll_snap_adjust_max("con_autocomplete_scroll_snap_adjust_max", "1.0f", FCVAR_RELEASE, "The adjustment value subtracted from the item's max bounds to correct scroll snapping in the autocomplete window");
 
 //-----------------------------------------------------------------------------
 // Console commands
@@ -166,11 +169,6 @@ void CConsole::RunFrame(void)
 
         int autoCompleteStyleVars = 0;
 
-        // NOTE: 68 is the minimum width of the autocomplete window as this
-        // leaves enough space to show the flag and the first 4 characters
-        // of the suggestion. 37 is the minimum height as anything lower
-        // will truncate the first element in the autocomplete window.
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(68, 37));  autoCompleteStyleVars++;
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);         autoCompleteStyleVars++;
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, m_fadeAlpha);             autoCompleteStyleVars++;
 
@@ -321,7 +319,7 @@ bool CConsole::DrawSurface(void)
         m_reclaimFocus = false;
     }
 
-    DetermineAutoCompleteWindowRect();
+    DetermineAutoCompleteWindowPosAndWidth();
 
     ImGui::SameLine();
     if (ImGui::Button("Submit"))
@@ -536,6 +534,12 @@ void CConsole::DrawAutoCompletePanel(void)
     // suggest window.
     ImGui::BringWindowToDisplayBehind(autocompleteWindow, m_mainWindow);
 
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const ImVec2 startCursorPos = ImGui::GetCursorScreenPos();
+
+    const float startY = startCursorPos.y; // Initial Y position in screen space.
+    ImGui::SetCursorScreenPos({ startCursorPos.x, startY + style.FramePadding.y });
+
     for (size_t i = 0, ns = m_vecSuggest.size(); i < ns; i++)
     {
         const ConAutoCompleteSuggest_s& suggest = m_vecSuggest[i];
@@ -606,9 +610,9 @@ void CConsole::DrawAutoCompletePanel(void)
                 imRect.Min.x = autocompleteWindow->InnerRect.Min.x;
                 imRect.Max.x = autocompleteWindow->InnerRect.Max.x;
 
-                // Eliminate jiggle when going up/down in the menu.
-                imRect.Min.y += 1;
-                imRect.Max.y -= 1;
+                // Eliminate misalignment during item snap when going up/down in the menu.
+                imRect.Min.y -= con_autocomplete_scroll_snap_adjust_min.GetFloat();
+                imRect.Max.y -= con_autocomplete_scroll_snap_adjust_max.GetFloat();
 
                 ImGui::ScrollToRect(autocompleteWindow, imRect);
                 m_autoCompletePosMoved = false;
@@ -623,6 +627,8 @@ void CConsole::DrawAutoCompletePanel(void)
             }
         }
     }
+
+    DetermineAutoCompleteWindowHeight(startY);
 
     ImGui::PopAllowKeyboardFocus();
     ImGui::End();
@@ -879,18 +885,14 @@ void CConsole::DetermineInputTextFromSelectedSuggestion(const ConAutoCompleteSug
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: determines the autocomplete window rect
+// Purpose: determines the autocomplete window position and width
 //-----------------------------------------------------------------------------
-void CConsole::DetermineAutoCompleteWindowRect(void)
+void CConsole::DetermineAutoCompleteWindowPosAndWidth(void)
 {
-    float flSinglePadding = 0.f;
-    const float flItemHeight = ImGui::GetTextLineHeightWithSpacing() + 1.0f;
+    const size_t itemCount = m_vecSuggest.size();
 
-    if (m_vecSuggest.size() > 1)
-    {
-        // Pad with 18 to keep all items in view.
-        flSinglePadding = flItemHeight;
-    }
+    if (itemCount == 0)
+        return; // No items, no rect bounds to calculate.
 
     // NOTE: last item rect = the input text box, the idea here is to set the
     // pos to that of the input text bar, whilst also clamping the width to it.
@@ -906,16 +908,26 @@ void CConsole::DetermineAutoCompleteWindowRect(void)
         ? ImMin(maxWindowWidth, lastItemRectSize.x)
         : lastItemRectSize.x;
 
-    // NOTE: minimum vertical size of the window, going below this will
-    // truncate the first element in the window making it looked bugged.
-    const static float minWindowHeight = 37.0f;
+    m_autoCompleteWindowRect.x = flWindowWidth;
+    return;
+}
 
-    const float flWindowHeight = flSinglePadding + ImClamp(
-        static_cast<float>(m_vecSuggest.size() * flItemHeight), 
-        minWindowHeight,
-        con_autocomplete_window_height.GetFloat());
+//-----------------------------------------------------------------------------
+// Purpose: determines the autocomplete window height
+//-----------------------------------------------------------------------------
+void CConsole::DetermineAutoCompleteWindowHeight(const float startPos)
+{
+    const size_t itemCount = m_vecSuggest.size();
 
-    m_autoCompleteWindowRect = ImVec2(flWindowWidth, flWindowHeight);
+    if (itemCount == 0)
+        return; // No items, no rect bounds to calculate.
+
+    const ImGuiStyle& style = ImGui::GetStyle();
+
+    const float addAmount = (style.WindowPadding.y + style.ScrollbarSize);
+    const float contentHeight = ((ImGui::GetCursorScreenPos().y - startPos) + addAmount);
+
+    m_autoCompleteWindowRect.y = ImMin(contentHeight, con_autocomplete_window_height.GetFloat());
 }
 
 //-----------------------------------------------------------------------------
