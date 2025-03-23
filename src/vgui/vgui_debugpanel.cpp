@@ -25,17 +25,15 @@
 #include <engine/client/clientstate.h>
 #include <game/client/viewrender.h>
 
-static ConVar con_drawnotify("con_drawnotify", "0", FCVAR_RELEASE | FCVAR_MATERIAL_SYSTEM_THREAD, "Draws the RUI console to the hud");
+static ConVar con_drawnotify("con_drawnotify", "0", FCVAR_RELEASE | FCVAR_MATERIAL_SYSTEM_THREAD, "Draw the most recent lines of the console to the HUD");
 
 // Various cvars that dictate how many lines and how long the text is shown
-static ConVar con_notifylines("con_notifylines", "3", FCVAR_MATERIAL_SYSTEM_THREAD, "Number of console lines to overlay for debugging", true, 1.f, false, 0.f);
-static ConVar con_notifytime("con_notifytime", "6", FCVAR_MATERIAL_SYSTEM_THREAD, "How long to display recent console text to the upper part of the game window", true, 1.f, false, 0.f);
+static ConVar con_notifylines("con_notifylines", "3", FCVAR_MATERIAL_SYSTEM_THREAD, "Number of recent console lines to show on the HUD", true, 1.f, false, 0.f);
+static ConVar con_notifytime("con_notifytime", "6", FCVAR_MATERIAL_SYSTEM_THREAD, "How long to display recent console text on the HUD", true, 1.f, false, 0.f);
 
 // Various cvars that dictate where the debug text is shown on the screen
-static ConVar con_notify_invert_x("con_notify_invert_x", "0", FCVAR_MATERIAL_SYSTEM_THREAD, "Inverts the X offset for RUI console overlay");
-static ConVar con_notify_invert_y("con_notify_invert_y", "0", FCVAR_MATERIAL_SYSTEM_THREAD, "Inverts the Y offset for RUI console overlay");
-static ConVar con_notify_offset_x("con_notify_offset_x", "10", FCVAR_MATERIAL_SYSTEM_THREAD, "X offset for RUI console overlay");
-static ConVar con_notify_offset_y("con_notify_offset_y", "10", FCVAR_MATERIAL_SYSTEM_THREAD, "Y offset for RUI console overlay");
+static ConVar con_notify_pos_x("con_notify_pos_x", "0.002f", FCVAR_MATERIAL_SYSTEM_THREAD, "X position for the HUD console", true, 0.f, true, 1.f);
+static ConVar con_notify_pos_y("con_notify_pos_y", "0.002f", FCVAR_MATERIAL_SYSTEM_THREAD, "Y position for the HUD console", true, 0.f, true, 1.f);
 
 // Various cvars that dictate the colors of script debug text
 static ConVar con_notify_script_server_clr("con_notify_script_server_clr", "130 120 245 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Script SERVER VM RUI console overlay log color");
@@ -59,27 +57,17 @@ static ConVar con_notify_common_clr("con_notify_common_clr", "255 140 80 255", F
 static ConVar con_notify_warning_clr("con_notify_warning_clr", "180 180 20 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Warning RUI console overlay log color");
 static ConVar con_notify_error_clr("con_notify_error_clr", "225 20 20 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Error RUI console overlay log color");
 
+static ConVar cl_nprintf_pos_x("cl_nprintf_pos_x", "0.002f", FCVAR_DEVELOPMENTONLY, "X position for the notify print debug overlay", true, 0.f, true, 1.f);
+static ConVar cl_nprintf_pos_y("cl_nprintf_pos_y", "0.002f", FCVAR_DEVELOPMENTONLY, "Y position for the notify print debug overlay", true, 0.f, true, 1.f);
 
-static ConVar cl_notify_invert_x("cl_notify_invert_x", "0", FCVAR_DEVELOPMENTONLY, "Inverts the X offset for console notify debug overlay");
-static ConVar cl_notify_invert_y("cl_notify_invert_y", "0", FCVAR_DEVELOPMENTONLY, "Inverts the Y offset for console notify debug overlay");
-static ConVar cl_notify_offset_x("cl_notify_offset_x", "10", FCVAR_DEVELOPMENTONLY, "X offset for console notify debug overlay");
-static ConVar cl_notify_offset_y("cl_notify_offset_y", "10", FCVAR_DEVELOPMENTONLY, "Y offset for console notify debug overlay");
+static ConVar cl_showFrameMetrics("cl_showFrameMetrics", "0", FCVAR_DEVELOPMENTONLY, "Shows the tick counter for the server/client simulation and the render frame, along with statistics regarding texture streaming memory");
+static ConVar cl_frameMetrics_pos_x("cl_frameMetrics_pos_x", "0.65f", FCVAR_DEVELOPMENTONLY, "X position for the frame metrics debug overlay", true, 0.f, true, 1.f);
+static ConVar cl_frameMetrics_pos_y("cl_frameMetrics_pos_y", "0.80f", FCVAR_DEVELOPMENTONLY, "Y position for the frame metrics debug overlay", true, 0.f, true, 1.f);
 
-static ConVar cl_showsimstats("cl_showsimstats", "0", FCVAR_DEVELOPMENTONLY, "Shows the tick counter for the server/client simulation and the render frame");
-static ConVar cl_simstats_invert_x("cl_simstats_invert_x", "1", FCVAR_DEVELOPMENTONLY, "Inverts the X offset for simulation debug overlay");
-static ConVar cl_simstats_invert_y("cl_simstats_invert_y", "1", FCVAR_DEVELOPMENTONLY, "Inverts the Y offset for simulation debug overlay");
-static ConVar cl_simstats_offset_x("cl_simstats_offset_x", "650", FCVAR_DEVELOPMENTONLY, "X offset for simulation debug overlay");
-static ConVar cl_simstats_offset_y("cl_simstats_offset_y", "120", FCVAR_DEVELOPMENTONLY, "Y offset for simulation debug overlay");
-
-static ConVar cl_showgpustats("cl_showgpustats", "0", FCVAR_DEVELOPMENTONLY, "Texture streaming debug overlay");
-static ConVar cl_gpustats_invert_x("cl_gpustats_invert_x", "1", FCVAR_DEVELOPMENTONLY, "Inverts the X offset for texture streaming debug overlay");
-static ConVar cl_gpustats_invert_y("cl_gpustats_invert_y", "1", FCVAR_DEVELOPMENTONLY, "Inverts the Y offset for texture streaming debug overlay");
-static ConVar cl_gpustats_offset_x("cl_gpustats_offset_x", "650", FCVAR_DEVELOPMENTONLY, "X offset for texture streaming debug overlay");
-static ConVar cl_gpustats_offset_y("cl_gpustats_offset_y", "105", FCVAR_DEVELOPMENTONLY, "Y offset for texture streaming debug overlay");
-
+// rename
 static ConVar cl_showmaterialinfo("cl_showmaterialinfo", "0", FCVAR_DEVELOPMENTONLY, "Draw info for the material under the crosshair on screen");
-static ConVar cl_materialinfo_offset_x("cl_materialinfo_offset_x", "0", FCVAR_DEVELOPMENTONLY, "X offset for material debug info overlay");
-static ConVar cl_materialinfo_offset_y("cl_materialinfo_offset_y", "420", FCVAR_DEVELOPMENTONLY, "Y offset for material debug info overlay");
+static ConVar cl_materialinfo_pos_x("cl_materialinfo_pos_x", "0.002f", FCVAR_DEVELOPMENTONLY, "X position for material debug info overlay", true, 0.f, true, 1.f);
+static ConVar cl_materialinfo_pos_y("cl_materialinfo_pos_y", "0.5f", FCVAR_DEVELOPMENTONLY, "Y position for material debug info overlay", true, 0.f, true, 1.f);
 
 //-----------------------------------------------------------------------------
 // Purpose: proceed a log update
@@ -95,13 +83,9 @@ void CTextOverlay::Update(void)
 	{
 		DrawNotify();
 	}
-	if (cl_showsimstats.GetBool())
+	if (cl_showFrameMetrics.GetBool())
 	{
-		DrawSimStats();
-	}
-	if (cl_showgpustats.GetBool())
-	{
-		DrawGPUStats();
+		DrawFrameMetrics();
 	}
 	if (cl_showmaterialinfo.GetBool())
 	{
@@ -144,11 +128,8 @@ void CTextOverlay::AddLog(const eDLL_T context, const char* pszText, const ssize
 //-----------------------------------------------------------------------------
 void CTextOverlay::DrawNotify(void)
 {
-	int w, h;
-	g_pGame->GetWindowRect(nullptr, nullptr, &w, &h);
-
-	int x = con_notify_invert_x.GetBool() ? w - con_notify_offset_x.GetInt() : con_notify_offset_x.GetInt();
-	int y = con_notify_invert_y.GetBool() ? h - con_notify_offset_y.GetInt() : con_notify_offset_y.GetInt();
+	Vector2D screenPos;
+	ScreenPosition(*g_pViewRender->GetMainView(), con_notify_pos_x.GetFloat(), con_notify_pos_y.GetFloat(), &screenPos);
 
 	AUTO_LOCK(m_Mutex);
 
@@ -166,7 +147,7 @@ void CTextOverlay::DrawNotify(void)
 
 			if (i == 0 && f < 0.2f)
 			{
-				y -= int(m_nFontHeight * (float(1.0f - f / 0.2f)));
+				screenPos.y -= int(m_nFontHeight * (float(1.0f - f / 0.2f)));
 			}
 		}
 		else
@@ -174,17 +155,9 @@ void CTextOverlay::DrawNotify(void)
 			c[3] = 255;
 		}
 		MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(),
-			m_nFontHeight, x, y, c.r(), c.g(), c.b(), c.a(), "%s", notify.m_Text.String());
+			m_nFontHeight, (int)screenPos.x, (int)screenPos.y, c.r(), c.g(), c.b(), c.a(), "%s", notify.m_Text.String());
 
-		if (IsX360())
-		{
-			// For some reason the fontTall value on 360 is about twice as high as it should be
-			y += 12;
-		}
-		else
-		{
-			y += m_nFontHeight;
-		}
+		screenPos.y += m_nFontHeight;
 	}
 }
 
@@ -228,29 +201,6 @@ void CTextOverlay::DrawDebugOverlay(void) const
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: draws formatted text over RUI
-// Input  : x - 
-//			y - 
-//			pszFormat - 
-//			... - 
-//-----------------------------------------------------------------------------
-void CTextOverlay::DrawFormat(const int x, const int y, const Color c, const char* pszFormat, ...) const
-{
-	char szLogbuf[4096];
-	{/////////////////////////////
-		va_list args{};
-		va_start(args, pszFormat);
-
-		vsnprintf(szLogbuf, sizeof(szLogbuf), pszFormat, args);
-
-		szLogbuf[sizeof(szLogbuf) - 1] = '\0';
-		va_end(args);
-	}/////////////////////////////
-
-	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, x, y, c.r(), c.g(), c.b(), c.a(), "%s", szLogbuf);
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: checks if the notify text is expired
 // Input  : flFrameTime - 
 //-----------------------------------------------------------------------------
@@ -289,50 +239,31 @@ void CTextOverlay::Con_NPrintf(void)
 		return;
 	}
 
-	int w, h;
-	g_pGame->GetWindowRect(nullptr, nullptr, &w, &h);
+	Vector2D screenPos;
+	ScreenPosition(*g_pViewRender->GetMainView(), cl_nprintf_pos_x.GetFloat(), cl_nprintf_pos_y.GetFloat(), &screenPos);
 
-	const int nWidth = cl_notify_invert_x.GetBool() ? w - cl_notify_offset_x.GetInt() : cl_notify_offset_x.GetInt() + m_nCon_NPrintf_Idx * m_nFontHeight;
-	const int nHeight = cl_notify_invert_y.GetBool() ? h - cl_notify_offset_y.GetInt() : cl_notify_offset_y.GetInt();
-
-	static const Color c = { 255, 255, 255, 255 };
-	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, nWidth, nHeight, c.r(), c.g(), c.b(), c.a(), "%s", m_szCon_NPrintf_Buf);
+	screenPos.y += m_nCon_NPrintf_Idx * m_nFontHeight;
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255, "%s", m_szCon_NPrintf_Buf);
 
 	m_nCon_NPrintf_Idx = 0;
 	m_szCon_NPrintf_Buf[0] = '\0';
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: draws live simulation stats on screen.
+// Purpose: draws live simulation and texture memory statistics on screen.
 //-----------------------------------------------------------------------------
-void CTextOverlay::DrawSimStats(void) const
+void CTextOverlay::DrawFrameMetrics(void) const
 {
-	int w, h;
-	g_pGame->GetWindowRect(nullptr, nullptr, &w, &h);
+	Vector2D screenPos;
+	ScreenPosition(*g_pViewRender->GetMainView(), cl_frameMetrics_pos_x.GetFloat(), cl_frameMetrics_pos_y.GetFloat(), &screenPos);
 
-	const int nWidth  = cl_simstats_invert_x.GetBool() ? w - cl_simstats_offset_x.GetInt() : cl_simstats_offset_x.GetInt();
-	const int nHeight = cl_simstats_invert_y.GetBool() ? h - cl_simstats_offset_y.GetInt() : cl_simstats_offset_y.GetInt();
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255,
+		"Server Frame: (%d) Client Frame: (%d) Render Frame: (%d)\n", g_pClientState->GetServerTickCount(), g_pClientState->GetClientTickCount(), *g_nRenderTickCount);
 
-	static const Color c = { 255, 255, 255, 255 };
+	screenPos.y += m_nFontHeight;
 
-	DrawFormat(nWidth, nHeight, c, "Server Frame: (%d) Client Frame: (%d) Render Frame: (%d)\n", 
-		g_pClientState->GetServerTickCount(), g_pClientState->GetClientTickCount(), *g_nRenderTickCount);
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: draws live gpu stats on screen.
-//-----------------------------------------------------------------------------
-void CTextOverlay::DrawGPUStats(void) const
-{
-	int w, h;
-	g_pGame->GetWindowRect(nullptr, nullptr, &w, &h);
-
-	const int nWidth  = cl_gpustats_invert_x.GetBool() ? w - cl_gpustats_offset_x.GetInt() : cl_gpustats_offset_x.GetInt();
-	const int nHeight = cl_gpustats_invert_y.GetBool() ? h - cl_gpustats_offset_y.GetInt() : cl_gpustats_offset_y.GetInt();
-
-	static const Color c = { 255, 255, 255, 255 };
-
-	DrawFormat(nWidth, nHeight, c, "%8zd/%8zd/%8zdkiB unusable/unfree/total GPU Streaming Texture memory\n",
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255,
+		"%8zd/%8zd/%8zdkiB unusable/unfree/total GPU Streaming Texture memory\n",
 		g_textureStreamMemoryUsed[TML_TRACKER_UNUSABE] / 1024, g_textureStreamMemoryUsed[TML_TRACKER_UNFREE] / 1024, *g_textureStreamMemoryTarget / 1024);
 }
 
@@ -347,9 +278,12 @@ void CTextOverlay::DrawCrosshairMaterial(void) const
 		return;
 
 	const MaterialGlue_s* const material = materialGlue->Get();
-	static const Color c = { 255, 255, 255, 255 };
 
-	DrawFormat(cl_materialinfo_offset_x.GetInt(), cl_materialinfo_offset_y.GetInt(), c, "name: %s\nguid: %llx\ndimensions: %hu x %hu\nsurface: %s/%s\nstc: %hu\ntc: %hu",
+	Vector2D screenPos;
+	ScreenPosition(*g_pViewRender->GetMainView(), cl_materialinfo_pos_x.GetFloat(), cl_materialinfo_pos_y.GetFloat(), &screenPos);
+
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255,
+		"name: %s\nguid: %llx\ndimensions: %hu x %hu\nsurface: %s/%s\nstc: %hu\ntc: %hu",
 		material->name,
 		material->guid,
 		material->width, material->height,

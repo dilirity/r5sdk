@@ -32,10 +32,8 @@ public:
 	void AddLog(const eDLL_T context, const char* pszText, const ssize_t textLen);
 	void DrawNotify(void);
 	void DrawDebugOverlay(void) const;
-	void DrawFormat(const int x, const int y, const Color c, const char* pszFormat, ...) const;
 	void ShouldDraw(const float flFrameTime);
-	void DrawSimStats(void) const;
-	void DrawGPUStats(void) const;
+	void DrawFrameMetrics(void) const;
 	void DrawCrosshairMaterial(void) const;
 
 	void Con_NPrintf(void);
