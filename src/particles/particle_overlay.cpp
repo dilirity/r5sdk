@@ -30,7 +30,7 @@ static void ParticleOverlay_AddScreenText(ParticleOverlayScreenText_s* const ove
 	// If this bool is set, the list will be rendered on the VGui
 	// interface instead of the new imgui one. The VGui interface
 	// cannot be explored in case there's too much to be displayed.
-	const bool useVGui = particle_overlay_old->GetBool() || !ImguiSystem()->IsEnabled();
+	const bool useVGui = particle_overlay_old->GetBool() || !ImguiSystem()->IsInitialized();
 
 	if (!useVGui && g_particleOverlay.IsFrozen())
 		return; // Don't render the text if the imgui list is frozen.
