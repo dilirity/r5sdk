@@ -29,16 +29,16 @@ History:
 //-----------------------------------------------------------------------------
 static ConVar con_max_lines("con_max_lines", "1024", FCVAR_DEVELOPMENTONLY | FCVAR_ACCESSIBLE_FROM_THREADS, "Maximum number of lines in the console before cleanup starts", true, 1.f, false, 0.f);
 static ConVar con_max_history("con_max_history", "512", FCVAR_DEVELOPMENTONLY, "Maximum number of command submission items before history cleanup starts", true, 0.f, false, 0.f);
+static ConVar con_max_suggest("con_max_suggest", "128", FCVAR_DEVELOPMENTONLY, "Maximum number of suggestions the autocomplete panel can hold for the console", true, 0.f, false, 0.f);
 
-static ConVar con_suggest_limit("con_suggest_limit", "128", FCVAR_DEVELOPMENTONLY, "Maximum number of suggestions the autocomplete window will show for the console", true, 0.f, false, 0.f);
-static ConVar con_suggest_helptext("con_suggest_helptext", "1", FCVAR_RELEASE, "Show CommandBase help text in autocomplete window");
+static ConVar con_suggest_helptext("con_suggest_helptext", "1", FCVAR_RELEASE, "Show CommandBase help text in autocomplete panel");
+static ConVar con_suggest_textures("con_suggest_textures", "1", FCVAR_RELEASE, "Show help textures in autocomplete panel");
 
-static ConVar con_autocomplete_window_textures("con_autocomplete_window_textures", "1", FCVAR_RELEASE, "Show help textures in autocomplete window");
-static ConVar con_autocomplete_window_width("con_autocomplete_window_width", "0.0f", FCVAR_RELEASE, "The maximum width of the console's autocomplete window", true, 0.f, false, 0.f);
-static ConVar con_autocomplete_window_height("con_autocomplete_window_height", "220.0f", FCVAR_RELEASE, "The maximum height of the console's autocomplete window", true, 0.f, false, 0.f);
+static ConVar con_suggest_panel_width("con_suggest_panel_width", "0.0f", FCVAR_RELEASE, "The maximum width of the console's autocomplete panel", true, 0.f, false, 0.f);
+static ConVar con_suggest_panel_height("con_suggest_panel_height", "220.0f", FCVAR_RELEASE, "The maximum height of the console's autocomplete panel", true, 0.f, false, 0.f);
 
-static ConVar con_autocomplete_scroll_snap_adjust_min("con_autocomplete_scroll_snap_adjust_min", "2.0f", FCVAR_RELEASE, "The adjustment value subtracted from the item's min bounds to correct scroll snapping in the autocomplete window");
-static ConVar con_autocomplete_scroll_snap_adjust_max("con_autocomplete_scroll_snap_adjust_max", "1.0f", FCVAR_RELEASE, "The adjustment value subtracted from the item's max bounds to correct scroll snapping in the autocomplete window");
+static ConVar con_suggest_scroll_snap_adjust_min("con_suggest_scroll_snap_adjust_min", "2.0f", FCVAR_RELEASE, "The adjustment value subtracted from the item's min bounds to correct scroll snapping in the autocomplete panel");
+static ConVar con_suggest_scroll_snap_adjust_max("con_suggest_scroll_snap_adjust_max", "1.0f", FCVAR_RELEASE, "The adjustment value subtracted from the item's max bounds to correct scroll snapping in the autocomplete panel");
 
 //-----------------------------------------------------------------------------
 // Console commands
@@ -547,7 +547,7 @@ void CConsole::DrawAutoCompletePanel(void)
 
         ImGui::PushID(static_cast<int>(i));
 
-        if (m_autoCompleteTexturesLoaded && con_autocomplete_window_textures.GetBool())
+        if (m_autoCompleteTexturesLoaded && con_suggest_textures.GetBool())
         {
             // Show the flag texture before the cvar name.
             const int mainTexIdx = GetFlagTextureIndex(suggest.flags);
@@ -611,8 +611,8 @@ void CConsole::DrawAutoCompletePanel(void)
                 imRect.Max.x = autocompleteWindow->InnerRect.Max.x;
 
                 // Eliminate misalignment during item snap when going up/down in the menu.
-                imRect.Min.y -= con_autocomplete_scroll_snap_adjust_min.GetFloat();
-                imRect.Max.y -= con_autocomplete_scroll_snap_adjust_max.GetFloat();
+                imRect.Min.y -= con_suggest_scroll_snap_adjust_min.GetFloat();
+                imRect.Max.y -= con_suggest_scroll_snap_adjust_max.GetFloat();
 
                 ImGui::ScrollToRect(autocompleteWindow, imRect);
                 m_autoCompletePosMoved = false;
@@ -770,7 +770,7 @@ void CConsole::CreateSuggestionsFromPartial(void)
     ICvar::Iterator iter(g_pCVar);
     for (iter.SetFirst(); iter.IsValid(); iter.Next())
     {
-        if (m_vecSuggest.size() >= con_suggest_limit.GetInt())
+        if (m_vecSuggest.size() >= con_max_suggest.GetInt())
         {
             break;
         }
@@ -902,7 +902,7 @@ void CConsole::DetermineAutoCompleteWindowPosAndWidth(void)
     m_autoCompleteWindowPos = lastItemRectMin;
     m_autoCompleteWindowPos.y += lastItemRectSize.y;
 
-    const float maxWindowWidth = con_autocomplete_window_width.GetFloat();
+    const float maxWindowWidth = con_suggest_panel_width.GetFloat();
 
     const float flWindowWidth = maxWindowWidth > 0
         ? ImMin(maxWindowWidth, lastItemRectSize.x)
@@ -927,7 +927,7 @@ void CConsole::DetermineAutoCompleteWindowHeight(const float startPos)
     const float addAmount = (style.WindowPadding.y + style.ScrollbarSize);
     const float contentHeight = ((ImGui::GetCursorScreenPos().y - startPos) + addAmount);
 
-    m_autoCompleteWindowRect.y = ImMin(contentHeight, con_autocomplete_window_height.GetFloat());
+    m_autoCompleteWindowRect.y = ImMin(contentHeight, con_suggest_panel_height.GetFloat());
 }
 
 //-----------------------------------------------------------------------------
