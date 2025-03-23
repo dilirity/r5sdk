@@ -170,5 +170,5 @@ void ImGui_SetStyle(const ImGuiStyle_t imguiStyle)
 
 	style.ItemSpacing       = ImVec2(5, 4);
 	style.FramePadding      = ImVec2(4, 4);
-	style.WindowPadding     = ImVec2(5, 5);
+	style.WindowPadding     = ImVec2(5, 4);
 }
