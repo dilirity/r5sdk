@@ -33,6 +33,14 @@ int CHLClient::Init(CHLClient* thisptr, CreateInterfaceFn appSystemFactory, CGlo
 	return CHLClient__Init(thisptr, appSystemFactory, pGlobals);
 }
 
+IUniformRandomStream* g_randomStream;
+
+int CHLClient::PostInit(CHLClient* thisptr)
+{
+	g_randomStream = (IUniformRandomStream*)GetFactorySystem()->GetFactory(VENGINE_RANDOM_INTERFACE_VERSION);
+	return CHLClient__PostInit(thisptr);
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: pre frame stage notify hook
 //-----------------------------------------------------------------------------
@@ -112,6 +120,7 @@ void VDll_Engine_Int::Detour(const bool bAttach) const
 {
 #ifndef DEDICATED
 	DetourSetup(&CHLClient__Init, &CHLClient::Init, bAttach);
+	DetourSetup(&CHLClient__PostInit, &CHLClient::PostInit, bAttach);
 	DetourSetup(&CHLClient__FrameStageNotify, &CHLClient::FrameStageNotify, bAttach);
 #endif // !DEDICATED
 }

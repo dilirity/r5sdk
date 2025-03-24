@@ -32,6 +32,7 @@ class CHLClient
 {
 public:
 	static int Init(CHLClient* thisptr, CreateInterfaceFn appSystemFactory, CGlobalVarsBase* pGlobals);
+	static int PostInit(CHLClient* thisptr);
 	static void FrameStageNotify(CHLClient* pHLClient, ClientFrameStage_t curStage);
 
 #ifndef DEDICATED
@@ -60,7 +61,7 @@ public:
 /* ==== CHLCLIENT ======================================================================================================================================================= */
 #ifndef DEDICATED
 inline int(*CHLClient__Init)(CHLClient* thisptr, CreateInterfaceFn appSystemFactory, CGlobalVarsBase* pGlobals);
-inline void*(*CHLClient__PostInit)(void);
+inline int(*CHLClient__PostInit)(CHLClient* thisptr);
 inline void*(*CHLClient__LevelShutdown)(CHLClient* thisptr);
 inline void(*CHLClient__HudProcessInput)(CHLClient* thisptr, bool bActive);
 inline void(*CHLClient__FrameStageNotify)(CHLClient* thisptr, ClientFrameStage_t frameStage);
