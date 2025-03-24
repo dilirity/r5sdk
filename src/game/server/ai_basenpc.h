@@ -119,6 +119,41 @@ struct AIScheduleState_t
 	//DECLARE_SIMPLE_DATADESC();
 };
 
+class COneThreadRandomStream : public IUniformRandomStream
+{
+public:
+	// Sets the seed of the random number generator
+	virtual void	SetSeed(const int iSeed)
+	{
+		m_random.SetSeed(iSeed);
+	}
+	virtual int		GetSeed() const
+	{
+		return m_random.GetSeed();
+	}
+
+	// Generates random numbers
+	virtual float	RandomFloat(const float flMinVal = 0.0f, const float flMaxVal = 1.0f)
+	{
+		return m_random.RandomFloat(flMinVal, flMaxVal);
+	}
+	virtual int		RandomInt(const int iMinVal, const int iMaxVal)
+	{
+		return m_random.RandomInt(iMinVal, iMaxVal);
+	}
+	virtual float	RandomFloatExp(const float flMinVal = 0.0f, const float flMaxVal = 1.0f, const float flExponent = 1.0f)
+	{
+		return m_random.RandomFloatExp(flMinVal, flMaxVal, flExponent);
+	}
+	virtual int		RandomShortMax()
+	{
+		return m_random.RandomShortMax();
+	}
+
+private:
+	CUniformRandomStream m_random;
+};
+
 //=============================================================================
 //
 //	class CAI_BaseNPC
@@ -497,7 +532,7 @@ private:
 	char gap_65ff[1];
 	int m_grappleRestoreMoveType;
 	char gap_6604[4];
-	char m_threadRandom[64];
+	COneThreadRandomStream m_threadRandom;
 };
 
 static_assert(sizeof(CAI_BaseNPC) == 0x6648);
