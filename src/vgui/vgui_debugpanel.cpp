@@ -25,7 +25,10 @@
 #include <engine/client/clientstate.h>
 #include <game/client/viewrender.h>
 
+// Various cvars that enable/disable debug text overlays
 static ConVar con_drawnotify("con_drawnotify", "0", FCVAR_RELEASE | FCVAR_MATERIAL_SYSTEM_THREAD, "Draw the most recent lines of the console to the HUD");
+static ConVar cl_showFrameMetrics("cl_showFrameMetrics", "0", FCVAR_DEVELOPMENTONLY, "Shows the tick counter for the server/client simulation and the render frame, along with statistics regarding texture streaming memory");
+static ConVar cl_showMaterialCrosshair("cl_showMaterialCrosshair", "0", FCVAR_DEVELOPMENTONLY, "Draw info for the material under the crosshair on the screen");
 
 // Various cvars that dictate how many lines and how long the text is shown
 static ConVar con_notifylines("con_notifylines", "3", FCVAR_MATERIAL_SYSTEM_THREAD, "Number of recent console lines to show on the HUD", true, 1.f, false, 0.f);
@@ -38,14 +41,11 @@ static ConVar con_notify_pos_y("con_notify_pos_y", "0.002f", FCVAR_MATERIAL_SYST
 static ConVar cl_nprintf_pos_x("cl_nprintf_pos_x", "0.002f", FCVAR_DEVELOPMENTONLY, "X position for the notify print debug overlay", true, 0.f, true, 1.f);
 static ConVar cl_nprintf_pos_y("cl_nprintf_pos_y", "0.002f", FCVAR_DEVELOPMENTONLY, "Y position for the notify print debug overlay", true, 0.f, true, 1.f);
 
-static ConVar cl_showFrameMetrics("cl_showFrameMetrics", "0", FCVAR_DEVELOPMENTONLY, "Shows the tick counter for the server/client simulation and the render frame, along with statistics regarding texture streaming memory");
 static ConVar cl_frameMetrics_pos_x("cl_frameMetrics_pos_x", "0.65f", FCVAR_DEVELOPMENTONLY, "X position for the frame metrics debug overlay", true, 0.f, true, 1.f);
 static ConVar cl_frameMetrics_pos_y("cl_frameMetrics_pos_y", "0.80f", FCVAR_DEVELOPMENTONLY, "Y position for the frame metrics debug overlay", true, 0.f, true, 1.f);
 
-// rename
-static ConVar cl_showmaterialinfo("cl_showmaterialinfo", "0", FCVAR_DEVELOPMENTONLY, "Draw info for the material under the crosshair on screen");
-static ConVar cl_materialinfo_pos_x("cl_materialinfo_pos_x", "0.002f", FCVAR_DEVELOPMENTONLY, "X position for material debug info overlay", true, 0.f, true, 1.f);
-static ConVar cl_materialinfo_pos_y("cl_materialinfo_pos_y", "0.5f", FCVAR_DEVELOPMENTONLY, "Y position for material debug info overlay", true, 0.f, true, 1.f);
+static ConVar cl_materialCrosshair_pos_x("cl_materialCrosshair_pos_x", "0.002f", FCVAR_DEVELOPMENTONLY, "X position for material debug info overlay", true, 0.f, true, 1.f);
+static ConVar cl_materialCrosshair_pos_y("cl_materialCrosshair_pos_y", "0.5f", FCVAR_DEVELOPMENTONLY, "Y position for material debug info overlay", true, 0.f, true, 1.f);
 
 //-----------------------------------------------------------------------------
 // Purpose: proceed a log update
@@ -56,7 +56,9 @@ void CTextOverlay::Update(void)
 	{
 		return;
 	}
-	Con_NPrintf();
+
+	m_updateFontFace = true;
+
 	if (con_drawnotify.GetBool())
 	{
 		DrawNotify();
@@ -65,10 +67,13 @@ void CTextOverlay::Update(void)
 	{
 		DrawFrameMetrics();
 	}
-	if (cl_showmaterialinfo.GetBool())
+	if (cl_showMaterialCrosshair.GetBool())
 	{
 		DrawCrosshairMaterial();
 	}
+
+	Con_NPrintf();
+
 	if (enable_debug_text_overlays.GetBool())
 	{
 		DrawDebugOverlay();
@@ -125,24 +130,24 @@ void CTextOverlay::DrawNotify(void)
 
 			if (i == 0 && f < 0.2f)
 			{
-				screenPos.y -= int(m_nFontHeight * (float(1.0f - f / 0.2f)));
+				screenPos.y -= int((m_nLineSpacing+1) * (float(1.0f - f / 0.2f)));
 			}
 		}
 		else
 		{
 			c[3] = 255;
 		}
-		MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(),
+		MatSystemSurface_DrawColoredText(g_pMatSystemSurface, GetFontFace(),
 			m_nFontHeight, (int)screenPos.x, (int)screenPos.y, c.r(), c.g(), c.b(), c.a(), "%s", notify.m_Text.String());
 
-		screenPos.y += m_nFontHeight;
+		screenPos.y += (m_nLineSpacing+1);
 	}
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: draws debug text overlay
 //-----------------------------------------------------------------------------
-void CTextOverlay::DrawDebugOverlay(void) const
+void CTextOverlay::DrawDebugOverlay(void)
 {
 	const OverlayText_t* pCurrText = g_pDebugOverlay->GetFirstText();
 
@@ -171,7 +176,7 @@ void CTextOverlay::DrawDebugOverlay(void) const
 		{
 			screenPos.y += (pCurrText->lineOffset * m_nLineSpacing);
 
-			MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight,
+			MatSystemSurface_DrawColoredText(g_pMatSystemSurface, GetFontFace(), m_nFontHeight,
 				(int)screenPos.x, (int)screenPos.y, pCurrText->r, pCurrText->g, pCurrText->b, pCurrText->a,
 				"%s", pCurrText->textBuf);
 		}
@@ -220,8 +225,8 @@ void CTextOverlay::Con_NPrintf(void)
 	Vector2D screenPos;
 	ScreenPosition(*g_pViewRender->GetMainView(), cl_nprintf_pos_x.GetFloat(), cl_nprintf_pos_y.GetFloat(), &screenPos);
 
-	screenPos.y += m_nCon_NPrintf_Idx * m_nFontHeight;
-	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255, "%s", m_szCon_NPrintf_Buf);
+	screenPos.y += m_nCon_NPrintf_Idx * m_nLineSpacing;
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255, "%s", m_szCon_NPrintf_Buf);
 
 	m_nCon_NPrintf_Idx = 0;
 	m_szCon_NPrintf_Buf[0] = '\0';
@@ -230,17 +235,19 @@ void CTextOverlay::Con_NPrintf(void)
 //-----------------------------------------------------------------------------
 // Purpose: draws live simulation and texture memory statistics on screen.
 //-----------------------------------------------------------------------------
-void CTextOverlay::DrawFrameMetrics(void) const
+void CTextOverlay::DrawFrameMetrics(void)
 {
 	Vector2D screenPos;
 	ScreenPosition(*g_pViewRender->GetMainView(), cl_frameMetrics_pos_x.GetFloat(), cl_frameMetrics_pos_y.GetFloat(), &screenPos);
 
-	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255,
+	const u16 fontFace = GetFontFace();
+
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, fontFace, m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255,
 		"Server Frame: (%d) Client Frame: (%d) Render Frame: (%d)\n", g_pClientState->GetServerTickCount(), g_pClientState->GetClientTickCount(), *g_nRenderTickCount);
 
-	screenPos.y += m_nFontHeight;
+	screenPos.y += m_nLineSpacing;
 
-	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255,
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, fontFace, m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255,
 		"%8zd/%8zd/%8zdkiB unusable/unfree/total GPU Streaming Texture memory\n",
 		g_textureStreamMemoryUsed[TML_TRACKER_UNUSABE] / 1024, g_textureStreamMemoryUsed[TML_TRACKER_UNFREE] / 1024, *g_textureStreamMemoryTarget / 1024);
 }
@@ -248,7 +255,7 @@ void CTextOverlay::DrawFrameMetrics(void) const
 //-----------------------------------------------------------------------------
 // Purpose: draws currently traced material info on screen.
 //-----------------------------------------------------------------------------
-void CTextOverlay::DrawCrosshairMaterial(void) const
+void CTextOverlay::DrawCrosshairMaterial(void)
 {
 	const CMaterialGlue* const materialGlue = v_GetMaterialAtCrossHair();
 
@@ -258,9 +265,9 @@ void CTextOverlay::DrawCrosshairMaterial(void) const
 	const MaterialGlue_s* const material = materialGlue->Get();
 
 	Vector2D screenPos;
-	ScreenPosition(*g_pViewRender->GetMainView(), cl_materialinfo_pos_x.GetFloat(), cl_materialinfo_pos_y.GetFloat(), &screenPos);
+	ScreenPosition(*g_pViewRender->GetMainView(), cl_materialCrosshair_pos_x.GetFloat(), cl_materialCrosshair_pos_y.GetFloat(), &screenPos);
 
-	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, v_Rui_GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255,
+	MatSystemSurface_DrawColoredText(g_pMatSystemSurface, GetFontFace(), m_nFontHeight, (int)screenPos.x, (int)screenPos.y, 255, 255, 255, 255,
 		"name: %s\nguid: %llx\ndimensions: %hu x %hu\nsurface: %s/%s\nstc: %hu\ntc: %hu",
 		material->name,
 		material->guid,
@@ -268,6 +275,20 @@ void CTextOverlay::DrawCrosshairMaterial(void) const
 		material->surfaceProp, material->surfaceProp2,
 		material->streamingTextureHandleCount,
 		material->shaderset->m_nTextureInputCount);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: retrieves the current font face, updates the handle if necessary
+//-----------------------------------------------------------------------------
+u16 CTextOverlay::GetFontFace()
+{
+	if (m_updateFontFace)
+	{
+		m_currentFontFace = v_Rui_GetFontFace();
+		m_updateFontFace = false;
+	}
+
+	return m_currentFontFace;
 }
 
 //-----------------------------------------------------------------------------
