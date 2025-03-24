@@ -28,7 +28,6 @@
 #include "game/server/gameinterface.h"
 #endif // !CLIENT_DLL
 #ifndef DEDICATED
-#include "client/cdll_engine_int.h"
 #include "game/client/cliententitylist.h"
 #include "gameui/IConsole.h"
 #include "windows/id3dx.h"
