@@ -18,7 +18,6 @@
 #ifndef DEDICATED
 #include "engine/gl_screen.h"
 #include "engine/client/cl_rcon.h"
-#include "engine/client/cdll_engine_int.h"
 #include "engine/client/clientstate.h"
 #endif // !DEDICATED
 #include "engine/client/client.h"
