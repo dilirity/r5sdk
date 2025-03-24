@@ -3,6 +3,7 @@
 // Purpose: Base NPC character with AI
 //
 //=============================================================================//
+#include "gameinterface.h"
 #include "ai_basenpc.h"
 #include "game/shared/util_shared.h"
 
