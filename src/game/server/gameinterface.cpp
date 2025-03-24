@@ -275,6 +275,7 @@ void VServerGameDLL::Detour(const bool bAttach) const
 CServerGameDLL* g_pServerGameDLL = nullptr;
 CServerGameClients* g_pServerGameClients = nullptr;
 CServerGameEnts* g_pServerGameEntities = nullptr;
+CServerRandomStream* g_randomStream = nullptr;
 
 // Holds global variables shared between engine and game.
 CGlobalVars* gpGlobals = nullptr;

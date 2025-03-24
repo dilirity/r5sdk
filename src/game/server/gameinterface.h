@@ -7,6 +7,7 @@
 #ifndef GAMEINTERFACE_H
 #define GAMEINTERFACE_H
 #include "public/eiface.h"
+#include "vscript/languages/squirrel_re/include/sqvm.h"
 
 //-----------------------------------------------------------------------------
 // Forward declarations
@@ -57,6 +58,60 @@ class CServerGameEnts : public IServerGameEnts
 {
 };
 
+//-----------------------------------------------------------------------------
+// 
+//-----------------------------------------------------------------------------
+class CServerRandomStream : public IUniformRandomStream
+{
+public:
+	// Sets the seed of the random number generator
+	virtual void	SetSeed(const int iSeed)
+	{
+		m_random.SetSeed(iSeed);
+	}
+	virtual int		GetSeed() const
+	{
+		return m_random.GetSeed();
+	}
+
+	// Generates random numbers
+	virtual float	RandomFloat(const float flMinVal = 0.0f, const float flMaxVal = 1.0f)
+	{
+		CheckAndForceScriptError();
+		return m_random.RandomFloat(flMinVal, flMaxVal);
+	}
+	virtual int		RandomInt(const int iMinVal, const int iMaxVal)
+	{
+		CheckAndForceScriptError();
+		return m_random.RandomInt(iMinVal, iMaxVal);
+	}
+	virtual float	RandomFloatExp(const float flMinVal = 0.0f, const float flMaxVal = 1.0f, const float flExponent = 1.0f)
+	{
+		CheckAndForceScriptError();
+		return m_random.RandomFloatExp(flMinVal, flMaxVal, flExponent);
+	}
+	virtual int		RandomShortMax()
+	{
+		CheckAndForceScriptError();
+		return m_random.RandomShortMax();
+	}
+
+	static inline void CheckAndForceScriptError()
+	{
+		if (sm_makeInvalid)
+			v_SQVM_ScriptError("blah");
+	}
+
+	static inline void SetInvalid(const bool invalid)
+	{
+		sm_makeInvalid = invalid;
+	}
+
+private:
+	CUniformRandomStream m_random;
+	static bool sm_makeInvalid;
+};
+
 inline bool(*CServerGameDLL__DLLInit)(CServerGameDLL* thisptr, CreateInterfaceFn appSystemFactory, CreateInterfaceFn physicsFactory, CreateInterfaceFn fileSystemFactory, CGlobalVars* pGlobals);
 inline bool(*CServerGameDLL__GameInit)(void);
 inline void(*CServerGameDLL__OnReceivedSayTextMessage)(CServerGameDLL* thisptr, int senderId, const char* text, bool isTeamChat);
@@ -71,6 +126,7 @@ inline float* g_pflServerFrameTimeBase = nullptr;
 extern CServerGameDLL* g_pServerGameDLL;
 extern CServerGameClients* g_pServerGameClients;
 extern CServerGameEnts* g_pServerGameEntities;
+extern CServerRandomStream* g_randomStream;
 
 extern CGlobalVars* gpGlobals;
 
@@ -88,6 +144,7 @@ class VServerGameDLL : public IDetour
 		LogVarAdr("g_pServerGameDLL", g_pServerGameDLL);
 		LogVarAdr("g_pServerGameClients", g_pServerGameClients);
 		LogVarAdr("g_pServerGameEntities", g_pServerGameEntities);
+		LogVarAdr("g_randomStream", g_randomStream);
 	}
 	virtual void GetFun(void) const
 	{
@@ -100,6 +157,7 @@ class VServerGameDLL : public IDetour
 	virtual void GetVar(void) const
 	{
 		g_pflServerFrameTimeBase = CMemory(CServerGameDLL__GameInit).FindPatternSelf("F3 0F 11 0D").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
+		g_randomStream = CMemory(CServerGameDLL__DLLInit).OffsetSelf(0x130).FindPatternSelf("48 8B").ResolveRelativeAddressSelf(0x3, 0x7).RCast<CServerRandomStream*>();
 	}
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const;
