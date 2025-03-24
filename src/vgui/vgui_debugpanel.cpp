@@ -35,28 +35,6 @@ static ConVar con_notifytime("con_notifytime", "6", FCVAR_MATERIAL_SYSTEM_THREAD
 static ConVar con_notify_pos_x("con_notify_pos_x", "0.002f", FCVAR_MATERIAL_SYSTEM_THREAD, "X position for the HUD console", true, 0.f, true, 1.f);
 static ConVar con_notify_pos_y("con_notify_pos_y", "0.002f", FCVAR_MATERIAL_SYSTEM_THREAD, "Y position for the HUD console", true, 0.f, true, 1.f);
 
-// Various cvars that dictate the colors of script debug text
-static ConVar con_notify_script_server_clr("con_notify_script_server_clr", "130 120 245 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Script SERVER VM RUI console overlay log color");
-static ConVar con_notify_script_client_clr("con_notify_script_client_clr", "117 116 139 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Script CLIENT VM RUI console overlay log color");
-static ConVar con_notify_script_ui_clr("con_notify_script_ui_clr", "200 110 110 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Script UI VM RUI console overlay log color");
-
-// Various cvars that dictate the colors of code debug text
-static ConVar con_notify_native_server_clr("con_notify_native_server_clr", "20 50 248 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Native SERVER RUI console overlay log color");
-static ConVar con_notify_native_client_clr("con_notify_native_client_clr", "70 70 70 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Native CLIENT RUI console overlay log color");
-static ConVar con_notify_native_ui_clr("con_notify_native_ui_clr", "200 60 60 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Native UI RUI console overlay log color");
-static ConVar con_notify_native_engine_clr("con_notify_native_engine_clr", "255 255 255 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Native engine RUI console overlay log color");
-static ConVar con_notify_native_fs_clr("con_notify_native_fs_clr", "0 100 225 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Native FileSystem RUI console overlay log color");
-static ConVar con_notify_native_rtech_clr("con_notify_native_rtech_clr", "25 120 20 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Native RTech RUI console overlay log color");
-static ConVar con_notify_native_ms_clr("con_notify_native_ms_clr", "200 20 180 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Native MaterialSystem RUI console overlay log color");
-static ConVar con_notify_native_audio_clr("con_notify_native_audio_clr", "238 43 10 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Native AudioSystem RUI console overlay log color");
-static ConVar con_notify_native_video_clr("con_notify_native_video_clr", "115 0 235 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Native VideoSystem RUI console overlay log color");
-
-static ConVar con_notify_netcon_clr("con_notify_netcon_clr", "255 255 255 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Netconsole RUI console overlay log color");
-static ConVar con_notify_common_clr("con_notify_common_clr", "255 140 80 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Common RUI console overlay log color");
-
-static ConVar con_notify_warning_clr("con_notify_warning_clr", "180 180 20 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Warning RUI console overlay log color");
-static ConVar con_notify_error_clr("con_notify_error_clr", "225 20 20 255", FCVAR_MATERIAL_SYSTEM_THREAD, "Error RUI console overlay log color");
-
 static ConVar cl_nprintf_pos_x("cl_nprintf_pos_x", "0.002f", FCVAR_DEVELOPMENTONLY, "X position for the notify print debug overlay", true, 0.f, true, 1.f);
 static ConVar cl_nprintf_pos_y("cl_nprintf_pos_y", "0.002f", FCVAR_DEVELOPMENTONLY, "Y position for the notify print debug overlay", true, 0.f, true, 1.f);
 
@@ -302,39 +280,39 @@ Color CTextOverlay::GetLogColorForType(const eDLL_T context) const
 	switch (context)
 	{
 	case eDLL_T::SCRIPT_SERVER:
-		return { con_notify_script_server_clr.GetColor() };
+		return { 130, 120, 245, 255, };
 	case eDLL_T::SCRIPT_CLIENT:
-		return { con_notify_script_client_clr.GetColor() };
+		return { 117, 116, 139, 255 };
 	case eDLL_T::SCRIPT_UI:
-		return { con_notify_script_ui_clr.GetColor() };
+		return { 200, 110, 110, 255 };
 	case eDLL_T::SERVER:
-		return { con_notify_native_server_clr.GetColor() };
+		return { 20, 50, 248, 255 };
 	case eDLL_T::CLIENT:
-		return { con_notify_native_client_clr.GetColor() };
+		return { 70, 70, 70, 255 };
 	case eDLL_T::UI:
-		return { con_notify_native_ui_clr.GetColor() };
+		return { 200, 60, 60, 255 };
 	case eDLL_T::ENGINE:
-		return { con_notify_native_engine_clr.GetColor() };
+		return { 255, 255, 255, 255 };
 	case eDLL_T::FS:
-		return { con_notify_native_fs_clr.GetColor() };
+		return { 0, 100, 225, 255 };
 	case eDLL_T::RTECH:
-		return { con_notify_native_rtech_clr.GetColor() };
+		return { 25, 120, 20, 255 };
 	case eDLL_T::MS:
-		return { con_notify_native_ms_clr.GetColor() };
+		return { 200, 20, 180, 255 };
 	case eDLL_T::AUDIO:
-		return { con_notify_native_audio_clr.GetColor() };
+		return { 238, 43, 10, 255 };
 	case eDLL_T::VIDEO:
-		return { con_notify_native_video_clr.GetColor() };
+		return { 115, 0, 235, 255 };
 	case eDLL_T::NETCON:
-		return { con_notify_netcon_clr.GetColor() };
+		return { 255, 255, 255, 255 };
 	case eDLL_T::COMMON:
-		return { con_notify_common_clr.GetColor() };
+		return { 255, 140, 80, 255 };
 	case eDLL_T::SYSTEM_WARNING:
-		return { con_notify_warning_clr.GetColor() };
+		return { 180, 180, 20, 255 };
 	case eDLL_T::SYSTEM_ERROR:
-		return { con_notify_error_clr.GetColor() };
+		return { 225, 20, 20, 255 };
 	default:
-		return { con_notify_native_engine_clr.GetColor() };
+		return { 255, 255, 255, 255 };
 	}
 }
 
