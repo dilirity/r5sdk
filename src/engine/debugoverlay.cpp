@@ -56,32 +56,67 @@ static bool DebugOverlay_CanApplyOverlay()
 //-----------------------------------------------------------------------------
 // Purpose: determines and sets the end time for the overlay
 //-----------------------------------------------------------------------------
-static void DebugOverlay_SetEndTime(const float duration, int& creationTick, int& overlayTick, float& endTime)
+template <class OverlayBaseClass>
+static void DebugOverlay_SetEndTime(OverlayBaseClass* const base, const float duration)
 {
     if (duration == 0.0f)
     {
-        // note(kawe): this was originally 'n + 1' but this
-        // makes it render for 2 frames causing moving text
-        // and shape overlays to become blurry. This seems
-        // to be done to make static text more solid on
-        // lighter backgrounds, instead of having the same
-        // characteristics of VGui text. If you wish to have
-        // it more solid, pass the constant
-        // NDEBUG_PERSIST_TILL_SECOND_NEXT_SERVER as value
-        // for the duration.
-        overlayTick = (*g_nOverlayStage) /*+ 1*/;	// stay alive for only one frame
+        // note(kawe): the server runs in its own thread, and
+        // at a different pace relative to the render thread.
+        // DrawAllDebugOverlays() is the entry point, and the
+        // only section where server debug overlays are being
+        // added. This always runs in the server frame thread.
+        // `g_nOverlayStage` has the correct pacing for server
+        // overlays, this stage counter ensures the overlay
+        // only draws for one frame, and does not render twice
+        // in a frame causing the alpha to be multiplied.
+        if (ThreadInServerFrameThread())
+        {
+            // note(kawe): this was originally 'n + 1' but this
+            // makes it render for 2 frames causing moving text
+            // and shape overlays to become blurry. This seems
+            // to be an effort to make client overlays flicker
+            // less (see comment on the `g_nRenderTickCount`
+            // assignment bellow). This increment is no longer
+            // necessary and removed as it has a side effect of
+            // rendering text overlays for 2 frames making them
+            // very hard to read on moving entities.
+            base->m_nOverlayTick = (*g_nOverlayStage)/* + 1*/;	// stay alive for only one frame
+        }
+        else
+        {
+            // note(kawe): for client overlays, we must set the
+            // start tick to the current render tick to ensure
+            // it only renders once during its lifetime. Previously,
+            // this was set to `g_nOverlayStage + 1`, however this
+            // stage counter is meant to be used for server
+            // overlays and will cause client overlays to render
+            // twice sporadically when the frame times are low
+            // enough. This causes a very apparent flickering
+            // effect. In the `g_nOverlayStage` assignment above, I
+            // added a comment regarding the extra increment, this
+            // seems to be an effort to soften this effect on the
+            // client, with the side effect of it rendering server
+            // overlays twice consistently. This new method fixes
+            // all these issues making the increment no longer needed.
+            base->m_nCreationTick = *g_nRenderTickCount;
+        }
     }
     else if (duration == (NDEBUG_PERSIST_TILL_SECOND_NEXT_SERVER))
     {
-        creationTick = (*g_nRenderTickCount) + 1;
+        base->m_nCreationTick = (*g_nRenderTickCount) + 1;
     }
     else if (duration == NDEBUG_PERSIST_TILL_NEXT_SERVER)
     {
-        endTime = NDEBUG_PERSIST_TILL_NEXT_SERVER;
+        base->m_flEndTime = NDEBUG_PERSIST_TILL_NEXT_SERVER;
     }
     else
     {
-        endTime = g_pClientState->GetClientTime() + duration;
+#ifndef DEDICATED
+        base->m_flEndTime = g_pClientState->GetClientTime() + duration;
+#else
+        base->m_flEndTime = g_pServer->GetTime();
+#endif
     }
 }
 
@@ -177,7 +212,11 @@ bool OverlayBase_t::IsDead() const
         return false;
     }
 
+#ifndef DEDICATED
     return m_flEndTime < g_pClientState->GetClientTime();
+#else
+    return m_flEndTime < g_pServer->GetTime();
+#endif
 }
 
 //------------------------------------------------------------------------------
@@ -191,7 +230,7 @@ void OverlayBase_t::SetEndTime(const float duration)
     if (m_Type == OverlayType_t::OVERLAY_SPLINE)
         m_nCreationTick = *g_nRenderTickCount;
     else
-        DebugOverlay_SetEndTime(duration, m_nCreationTick, m_nOverlayTick, m_flEndTime);
+        DebugOverlay_SetEndTime(this, duration);
 }
 
 //------------------------------------------------------------------------------
@@ -201,8 +240,15 @@ void OverlayBase_t::SetEndTime(const float duration)
 void OverlayText_t::SetEndTime(const float duration)
 {
     (*g_nNewTextOverlays)++;
+    DebugOverlay_SetEndTime(this, duration);
+}
 
-    DebugOverlay_SetEndTime(duration, m_nCreationTick, m_nOverlayTick, m_flEndTime);
+//------------------------------------------------------------------------------
+// Purpose: detour proxy for setting the overlay's end time
+//------------------------------------------------------------------------------
+static void DebugOverlay_SetEndTime(OverlayBase_t* const pOverlay, const float flDuration)
+{
+    pOverlay->SetEndTime(flDuration);
 }
 
 //------------------------------------------------------------------------------
@@ -628,6 +674,7 @@ void VDebugOverlay::Detour(const bool bAttach) const
 {
     DetourSetup(&v_DebugOverlay_DrawAllOverlays, &DebugOverlay_DrawAllOverlays, bAttach);
     DetourSetup(&v_DebugOverlay_ClearAllOverlays, &DebugOverlay_ClearAllOverlays, bAttach);
+    DetourSetup(&v_DebugOverlay_SetEndTime, &DebugOverlay_SetEndTime, bAttach);
 
     if (bAttach)
     {

@@ -228,6 +228,8 @@ inline void(*v_DebugOverlay_DebugDebugOverlays)(void* unk1, unsigned short unk2,
 inline void (*v_DebugOverlay_AddEntityTextOverlay)(CIVDebugOverlay* const thisptr, const int entIndex, const int lineOffset, const float duration,
 	const int r, const int g, const int b, const int a, const char* const format, ...);
 
+inline void(*v_DebugOverlay_SetEndTime)(OverlayBase_t* const pOverlay, const float flDuration);
+
 inline OverlayBase_t** s_pOverlays = nullptr;
 inline OverlayText_t** s_pOverlayText = nullptr;
 inline CThreadMutex* s_OverlayMutex = nullptr;
@@ -253,6 +255,7 @@ class VDebugOverlay : public IDetour
 		LogFunAdr("DebugOverlay_ClearAllOverlays", v_DebugOverlay_ClearAllOverlays);
 		LogFunAdr("DebugOverlay_DebugDebugOverlays", v_DebugOverlay_DebugDebugOverlays);
 		LogFunAdr("DebugOverlay_AddEntityTextOverlay", v_DebugOverlay_AddEntityTextOverlay);
+		LogFunAdr("DebugOverlay_SetEndTime", v_DebugOverlay_SetEndTime);
 		LogVarAdr("s_pOverlays", s_pOverlays);
 		LogVarAdr("s_pOverlayText", s_pOverlayText);
 		LogVarAdr("s_OverlayMutex", s_OverlayMutex);
@@ -268,6 +271,7 @@ class VDebugOverlay : public IDetour
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 48 8D 0D ?? ?? ?? ?? FF 15 ?? ?? ?? ?? 48 8B 0D").GetPtr(v_DebugOverlay_ClearAllOverlays);
 		Module_FindPattern(g_GameDll, "4C 8B DC 45 89 43 ?? 66 89 54 24").GetPtr(v_DebugOverlay_DebugDebugOverlays);
 		Module_FindPattern(g_GameDll, "40 53 56 57 48 83 EC ?? 48 8D B4 24").GetPtr(v_DebugOverlay_AddEntityTextOverlay);
+		Module_FindPattern(g_GameDll, "48 83 EC ?? FF 05 ?? ?? ?? ?? 48 8B D1").GetPtr(v_DebugOverlay_SetEndTime);
 	}
 	virtual void GetVar(void) const
 	{
