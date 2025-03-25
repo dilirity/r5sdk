@@ -666,10 +666,10 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 #ifndef DEDICATED
 	REGISTER(VGame); // REGISTER CLIENT ONLY!
 	REGISTER(VGL_RSurf);
-
-	REGISTER(VDebugOverlay); // !TODO: This also needs to be exposed to server dll!!!
 	REGISTER(VKeys);
 #endif // !DEDICATED
+
+	REGISTER(VDebugOverlay);
 
 	// VScript
 	REGISTER(VSquirrel);

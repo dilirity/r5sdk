@@ -20,12 +20,12 @@ add_sources( SOURCE_GROUP "Collision"
     "traceinit.h"
 )
 
-if( NOT ${PROJECT_NAME} STREQUAL "engine_ds" )
 add_sources( SOURCE_GROUP "Debug"
     "debugoverlay.cpp"
     "debugoverlay.h"
 )
 
+if( NOT ${PROJECT_NAME} STREQUAL "engine_ds" )
 add_sources( SOURCE_GROUP "Input"
     "keys.cpp"
     "keys.h"

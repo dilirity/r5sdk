@@ -11,11 +11,15 @@
 #include "tier1/cvar.h"
 #include "tier2/renderutils.h"
 #include "mathlib/mathlib.h"
+#ifndef DEDICATED
 #include "engine/client/clientstate.h"
+#endif // !DEDICATED
 #include "engine/host_cmd.h"
 #include "engine/cmodel.h"
 #include "engine/debugoverlay.h"
+#ifndef DEDICATED
 #include "materialsystem/cmaterialsystem.h"
+#endif // !DEDICATED
 #ifndef CLIENT_DLL
 #include "engine/server/server.h"
 #include "game/server/entitylist.h"
