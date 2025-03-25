@@ -112,6 +112,8 @@ static bool DebugOverlay_GetEntityOriginClientOrServer(const int entNum, Vector3
 
     if (!clientEntity)
         return false;
+
+    CM_WorldSpaceCenter(clientEntity->GetCollideable(), &origin);
 #endif // DEDICATED
 
     return true;
