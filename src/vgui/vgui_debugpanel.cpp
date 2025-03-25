@@ -48,9 +48,9 @@ static ConVar cl_materialCrosshair_pos_x("cl_materialCrosshair_pos_x", "0.002f",
 static ConVar cl_materialCrosshair_pos_y("cl_materialCrosshair_pos_y", "0.5f", FCVAR_DEVELOPMENTONLY, "Y position for material debug info overlay", true, 0.f, true, 1.f);
 
 //-----------------------------------------------------------------------------
-// Purpose: proceed a log update
+// Purpose: update the mini console
 //-----------------------------------------------------------------------------
-void CTextOverlay::Update(void)
+void CTextOverlay::UpdateMiniConsole(void)
 {
 	if (!g_pMatSystemSurface)
 	{
@@ -63,6 +63,20 @@ void CTextOverlay::Update(void)
 	{
 		DrawNotify();
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: update the in-game debug panels
+//-----------------------------------------------------------------------------
+void CTextOverlay::UpdateInGamePanels(void)
+{
+	if (!g_pMatSystemSurface)
+	{
+		return;
+	}
+
+	m_updateFontFace = true;
+
 	if (cl_showFrameMetrics.GetBool())
 	{
 		DrawFrameMetrics();

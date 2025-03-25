@@ -20,10 +20,16 @@ int CEngineVGui::VPaint(CEngineVGui* const thisptr, const PaintMode_t mode)
 {
 	const int result = CEngineVGui__Paint(thisptr, mode);
 
-	if (/*mode == PaintMode_t::PAINT_UIPANELS ||*/ mode == PaintMode_t::PAINT_INGAMEPANELS) // Render in-main menu and in-game.
+	if (mode == PaintMode_t::PAINT_UIPANELS)
 	{
 		if (r_drawvgui->GetBool())
-			g_TextOverlay.Update();
+			g_TextOverlay.UpdateMiniConsole();
+	}
+
+	if (mode == PaintMode_t::PAINT_INGAMEPANELS)
+	{
+		if (r_drawvgui->GetBool())
+			g_TextOverlay.UpdateInGamePanels();
 	}
 
 	return result;

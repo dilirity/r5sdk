@@ -15,7 +15,9 @@ public:
 		memset(m_szCon_NPrintf_Buf, '\0', sizeof(m_szCon_NPrintf_Buf));
 	}
 
-	void Update(void);
+	void UpdateMiniConsole(void);
+	void UpdateInGamePanels(void);
+
 	void AddLog(const eDLL_T context, const char* pszText, const ssize_t textLen);
 	void DrawNotify(void);
 	void DrawDebugOverlay(void);
