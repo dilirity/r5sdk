@@ -63,7 +63,6 @@ public:
 
 	void BroadcastMessage(CNetMessage* const msg, const bool onlyActive, const bool reliable);
 	static void RunFrame(CServer* pServer);
-	static void FrameJob(double flFrameTime, bool bRunOverlays, bool bUpdateFrame);
 #endif // !CLIENT_DLL
 
 private:
@@ -119,7 +118,6 @@ extern ConVar sv_globalBanlist;
 extern ConVar sv_banlistRefreshRate;
 
 /* ==== CSERVER ========================================================================================================================================================= */
-inline void(*CServer__FrameJob)(double flFrameTime, bool bRunOverlays, bool bUpdateFrame);
 inline void(*CServer__RunFrame)(CServer* pServer);
 inline CClient*(*CServer__ConnectClient)(CServer* pServer, user_creds_s* pCreds);
 inline void*(*CServer__RejectConnection)(CServer* pServer, int iSocket, netadr_t* pNetAdr, const char* szMessage);
@@ -132,7 +130,6 @@ class VServer : public IDetour
 	virtual void GetAdr(void) const
 	{
 #ifndef CLIENT_DLL
-		LogFunAdr("CServer::FrameJob", CServer__FrameJob);
 		LogFunAdr("CServer::RunFrame", CServer__RunFrame);
 		LogFunAdr("CServer::ConnectClient", CServer__ConnectClient);
 		LogFunAdr("CServer::RejectConnection", CServer__RejectConnection);
@@ -144,7 +141,6 @@ class VServer : public IDetour
 	virtual void GetFun(void) const
 	{
 #ifndef CLIENT_DLL
-		Module_FindPattern(g_GameDll, "48 89 6C 24 ?? 56 41 54 41 56").GetPtr(CServer__FrameJob);
 		Module_FindPattern(g_GameDll, "40 55 57 41 55 41 57 48 8D AC 24 ?? ?? ?? ??").GetPtr(CServer__ConnectClient);
 
 		Module_FindPattern(g_GameDll, "E8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 0D ?? ?? ?? ?? 88 05 ?? ?? ?? ??").FollowNearCallSelf().GetPtr(CServer__RunFrame);

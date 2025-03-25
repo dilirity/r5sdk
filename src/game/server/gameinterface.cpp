@@ -12,6 +12,7 @@
 #include "public/const.h"
 #include "common/protocol.h"
 #include "common/callback.h"
+#include "rtech/liveapi/liveapi.h"
 #include "engine/server/sv_main.h"
 #include "gameinterface.h"
 #include "entitylist.h"
@@ -258,9 +259,32 @@ void CServerGameClients::_ProcessUserCmds(CServerGameClients* thisp, edict_t edi
 	pPlayer->ProcessUserCmds(cmds, numCmds, totalCmds, droppedPackets, paused);
 }
 
-static void RunFrameServer(double flFrameTime, bool bRunOverlays, bool bUniformUpdate)
+//---------------------------------------------------------------------------------
+// Purpose: dispatches the server frame job, this calls ExecuteFrameServerJob(),
+//          anything you add in this function will either be before, or after the
+//          server frame job has ran, so ThreadInServerFrameThread() will always
+//          return false here. If you need to run code in the server frame thread,
+//          consider adding your code in ExecuteFrameServerJob().
+// Input  : flFrameTime - 
+//			bRunOverlays - 
+//			bUpdateFrame - 
+//---------------------------------------------------------------------------------
+static void DispatchFrameServerJob(double flFrameTime, bool bRunOverlays, bool bUniformUpdate)
 {
-	v_RunFrameServer(flFrameTime, bRunOverlays, bUniformUpdate);
+	v_DispatchFrameServerJob(flFrameTime, bRunOverlays, bUniformUpdate);
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: executes the server frame job
+// Input  : flFrameTime - 
+//			bRunOverlays - 
+//			bUpdateFrame - 
+//---------------------------------------------------------------------------------
+static void ExecuteFrameServerJob(double flFrameTime, bool bRunOverlays, bool bUpdateFrame)
+{
+	v_ExecuteFrameServerJob(flFrameTime, bRunOverlays, bUpdateFrame);
+
+	LiveAPISystem()->RunFrame();
 	DrawAllDebugOverlays();
 }
 
@@ -269,7 +293,8 @@ void VServerGameDLL::Detour(const bool bAttach) const
 	DetourSetup(&CServerGameDLL__DLLInit, &CServerGameDLL::DLLInit, bAttach);
 	DetourSetup(&CServerGameDLL__OnReceivedSayTextMessage, &CServerGameDLL::OnReceivedSayTextMessage, bAttach);
 	DetourSetup(&CServerGameClients__ProcessUserCmds, CServerGameClients::_ProcessUserCmds, bAttach);
-	DetourSetup(&v_RunFrameServer, &RunFrameServer, bAttach);
+	DetourSetup(&v_DispatchFrameServerJob, &DispatchFrameServerJob, bAttach);
+	DetourSetup(&v_ExecuteFrameServerJob, &ExecuteFrameServerJob, bAttach);
 }
 
 CServerGameDLL* g_pServerGameDLL = nullptr;

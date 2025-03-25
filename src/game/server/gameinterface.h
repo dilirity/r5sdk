@@ -119,7 +119,8 @@ inline void(*CServerGameDLL__OnReceivedSayTextMessage)(CServerGameDLL* thisptr, 
 inline void(*CServerGameClients__ProcessUserCmds)(CServerGameClients* thisp, edict_t edict, bf_read* buf,
 	int numCmds, int totalCmds, int droppedPackets, bool ignore, bool paused);
 
-inline void(*v_RunFrameServer)(double flFrameTime, bool bRunOverlays, bool bUniformUpdate);
+inline void(*v_DispatchFrameServerJob)(double flFrameTime, bool bRunOverlays, bool bUniformUpdate);
+inline void(*v_ExecuteFrameServerJob)(double flFrameTime, bool bRunOverlays, bool bUniformUpdate);
 
 inline float* g_pflServerFrameTimeBase = nullptr;
 
@@ -139,7 +140,8 @@ class VServerGameDLL : public IDetour
 		LogFunAdr("CServerGameDLL::GameInit", CServerGameDLL__GameInit);
 		LogFunAdr("CServerGameDLL::OnReceivedSayTextMessage", CServerGameDLL__OnReceivedSayTextMessage);
 		LogFunAdr("CServerGameClients::ProcessUserCmds", CServerGameClients__ProcessUserCmds);
-		LogFunAdr("RunFrameServer", v_RunFrameServer);
+		LogFunAdr("DispatchFrameServerJob", v_DispatchFrameServerJob);
+		LogFunAdr("ExecuteFrameServerJob", v_ExecuteFrameServerJob);
 		LogVarAdr("g_flServerFrameTimeBase", g_pflServerFrameTimeBase);
 		LogVarAdr("g_pServerGameDLL", g_pServerGameDLL);
 		LogVarAdr("g_pServerGameClients", g_pServerGameClients);
@@ -152,7 +154,9 @@ class VServerGameDLL : public IDetour
 		Module_FindPattern(g_GameDll, "48 83 EC 28 48 8B 0D ?? ?? ?? ?? 48 8D 15 ?? ?? ?? ?? 48 8B 01 FF 90 ?? ?? ?? ?? 48 8B 0D ?? ?? ?? ?? 48 8B 01").GetPtr(CServerGameDLL__GameInit);
 		Module_FindPattern(g_GameDll, "85 D2 0F 8E ?? ?? ?? ?? 4C 8B DC").GetPtr(CServerGameDLL__OnReceivedSayTextMessage);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 55 41 55 41 57").GetPtr(CServerGameClients__ProcessUserCmds);
-		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 57 48 83 EC 30 0F 29 74 24 ?? 48 8D 0D ?? ?? ?? ??").GetPtr(v_RunFrameServer);
+
+		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 57 48 83 EC 30 0F 29 74 24 ?? 48 8D 0D ?? ?? ?? ??").GetPtr(v_DispatchFrameServerJob);
+		Module_FindPattern(g_GameDll, "48 89 6C 24 ?? 56 41 54 41 56").GetPtr(v_ExecuteFrameServerJob);
 	}
 	virtual void GetVar(void) const
 	{

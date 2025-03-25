@@ -20,7 +20,6 @@
 #include "ebisusdk/EbisuSDK.h"
 #include "public/edict.h"
 #include "pluginsystem/pluginsystem.h"
-#include "rtech/liveapi/liveapi.h"
 #include "game/server/gameinterface.h"
 
 //---------------------------------------------------------------------------------
@@ -203,18 +202,6 @@ void CServer::BroadcastMessage(CNetMessage* const msg, const bool onlyActive, co
 }
 
 //---------------------------------------------------------------------------------
-// Purpose: Runs the server frame job
-// Input  : flFrameTime - 
-//			bRunOverlays - 
-//			bUpdateFrame - 
-//---------------------------------------------------------------------------------
-void CServer::FrameJob(double flFrameTime, bool bRunOverlays, bool bUpdateFrame)
-{
-	CServer__FrameJob(flFrameTime, bRunOverlays, bUpdateFrame);
-	LiveAPISystem()->RunFrame();
-}
-
-//---------------------------------------------------------------------------------
 // Purpose: Runs the server frame
 // Input  : *pServer - 
 //---------------------------------------------------------------------------------
@@ -228,9 +215,7 @@ void VServer::Detour(const bool bAttach) const
 {
 	DetourSetup(&CServer__RunFrame, &CServer::RunFrame, bAttach);
 	DetourSetup(&CServer__ConnectClient, &CServer::ConnectClient, bAttach);
-	DetourSetup(&CServer__FrameJob, &CServer::FrameJob, bAttach);
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 CServer* g_pServer = nullptr;
