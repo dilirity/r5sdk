@@ -31,7 +31,6 @@
 #endif // !DEDICATED
 #if !defined(CLIENT_DLL) && !defined (DEDICATED)
 #include "game/shared/ai_utility_shared.h"
-#include "game/server/ai_network.h"
 #endif // !CLIENT_DLL && !DEDICATED
 
 ConVar enable_debug_text_overlays("enable_debug_text_overlays", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT | FCVAR_GAMEDLL, "Enable rendering of debug text overlays");
