@@ -55,24 +55,9 @@ struct OverlayBox_t : public OverlayBase_t
 {
 	OverlayBox_t(void) { m_Type = OverlayType_t::OVERLAY_BOX; }
 
-	struct Transforms
-	{
-		Transforms()
-		{
-			xmm[0] = LoadZeroSIMD();
-			xmm[1] = LoadZeroSIMD();
-			xmm[2] = LoadZeroSIMD();
-		};
-		union
-		{
-			fltx4 xmm[3];
-			matrix3x4a_t mat;
-		};
-	};
-
-	Transforms transforms;
-	Vector3D mins;
-	Vector3D maxs;
+	matrix3x4a_t    transforms;
+	Vector3D        mins;
+	Vector3D        maxs;
 	int             r;
 	int             g;
 	int             b;

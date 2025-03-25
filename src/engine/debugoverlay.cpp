@@ -257,11 +257,11 @@ static void DebugOverlay_DrawOverlay(OverlayBase_t* const pOverlay)
 
         if (pBox->a > 0)
         {
-            RenderBox(pBox->transforms.mat, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, pBox->a), !pBox->noDepthTest);
+            RenderBox(pBox->transforms, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, pBox->a), !pBox->noDepthTest);
         }
         if (pBox->a < 255)
         {
-            v_RenderWireFrameBox(pBox->transforms.mat, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, 255), !pBox->noDepthTest);
+            v_RenderWireFrameBox(pBox->transforms, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, 255), !pBox->noDepthTest);
         }
 
         break;
