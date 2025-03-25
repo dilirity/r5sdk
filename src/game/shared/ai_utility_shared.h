@@ -32,7 +32,7 @@ public:
 		const bool bDepthBuffer) const;
 
 	static shortx8 PackNodeLink(i32 a, i32 b, i32 c = 0, i32 d = 0);
-	int GetNearestNodeToPos(const CAI_Network* pAINetwork, const Vector3D* vec) const;
+	static int GetNearestNodeToPos(const CAI_Network* pAINetwork, const Vector3D* vec);
 	bool IsTileWithinRange(const dtMeshTile* pTile, const VPlane* vPlane, const Vector3D& vCamera, const float flCameraRadius) const;
 
 private:

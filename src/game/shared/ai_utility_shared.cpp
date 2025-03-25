@@ -306,7 +306,7 @@ bool CAI_Utility::IsTileWithinRange(const dtMeshTile* pTile, const VPlane* vPlan
 //          *vPos       - 
 // Output : node index ('NO_NODE' if no node has been found)
 //------------------------------------------------------------------------------
-int CAI_Utility::GetNearestNodeToPos(const CAI_Network* pAINetwork, const Vector3D* vPos) const
+int CAI_Utility::GetNearestNodeToPos(const CAI_Network* pAINetwork, const Vector3D* vPos)
 {
     int result; // rax
     unsigned int v3; // er10
