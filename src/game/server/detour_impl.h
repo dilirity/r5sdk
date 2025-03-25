@@ -34,6 +34,11 @@ inline dtStatus(*dtNavMeshQuery__closestPointOnPoly)(dtNavMeshQuery* query, cons
 inline dtStatus(*dtNavMeshQuery__closestPointOnPolyBoundary)(dtNavMeshQuery* query, const dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, float* dist);
 inline dtStatus(*dtNavMeshQuery__getPolyHeight)(dtNavMeshQuery* query, const dtPolyRef ref, const rdVec3D* pos, float* height, rdVec3D* normal);
 
+inline dtStatus(*dtNavMeshQuery__queryPolygonsSmallArea)(dtNavMeshQuery* query, const rdVec3D* center, const rdVec3D* halfExtents,
+	const dtQueryFilter* filter, dtPolyRef* polys, int* polyCount);
+inline dtStatus(*dtNavMeshQuery__queryPolygonsLargeArea)(dtNavMeshQuery* query, const rdVec3D* center, const rdVec3D* halfExtents,
+	const dtQueryFilter* filter, dtPolyRef* polys, int* polyCount);
+
 inline dtNode*(*dtNodePool__getPool)(dtNodePool* pool, const dtPolyRef id, const unsigned char state);
 
 constexpr const char* NAVMESH_PATH = "maps/navmesh/";
@@ -70,6 +75,9 @@ class VRecast : public IDetour
 		LogFunAdr("dtNavMeshQuery::closestPointOnPolyBoundary", dtNavMeshQuery__closestPointOnPolyBoundary);
 		LogFunAdr("dtNavMeshQuery::getPolyHeight", dtNavMeshQuery__getPolyHeight);
 
+		LogFunAdr("dtNavMeshQuery::queryPolygonsSmallArea", dtNavMeshQuery__queryPolygonsSmallArea);
+		LogFunAdr("dtNavMeshQuery::queryPolygonsLargeArea", dtNavMeshQuery__queryPolygonsLargeArea);
+
 		LogFunAdr("dtNodePool::getPool", dtNodePool__getPool);
 
 		LogVarAdr("g_navMeshArray[ NavMeshType_e::NAVMESH_COUNT ]", g_navMeshArray);
@@ -89,6 +97,8 @@ class VRecast : public IDetour
 		Module_FindPattern(g_GameDll, "4C 89 44 24 ?? 53 55 56 57 41 55 48 81 EC").GetPtr(dtNavMeshQuery__closestPointOnPoly);
 		Module_FindPattern(g_GameDll, "40 53 57 41 55 41 56 41 57").GetPtr(dtNavMeshQuery__closestPointOnPolyBoundary);
 		Module_FindPattern(g_GameDll, "4C 89 4C 24 ?? 4C 89 44 24 ?? 53 56 57 41 56").GetPtr(dtNavMeshQuery__getPolyHeight);
+		Module_FindPattern(g_GameDll, "4C 8B DC 4D 89 4B ?? 53").GetPtr(dtNavMeshQuery__queryPolygonsSmallArea);
+		Module_FindPattern(g_GameDll, "48 8B C4 4C 89 48 ?? 48 89 48 ?? 53 55 56").GetPtr(dtNavMeshQuery__queryPolygonsLargeArea);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 44 8B CA").GetPtr(dtNodePool__getPool);
 	}
 	virtual void GetVar(void) const
