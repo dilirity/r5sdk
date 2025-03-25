@@ -230,11 +230,7 @@ bool OverlayBase_t::IsDead() const
 void OverlayBase_t::SetEndTime(const float duration)
 {
     (*g_nNewOtherOverlays)++;
-
-    if (m_Type == OverlayType_t::OVERLAY_SPLINE)
-        m_nCreationTick = *g_nRenderTickCount;
-    else
-        DebugOverlay_SetEndTime(this, duration);
+    DebugOverlay_SetEndTime(this, duration);
 }
 
 //------------------------------------------------------------------------------
