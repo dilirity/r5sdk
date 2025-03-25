@@ -160,31 +160,24 @@ bool OverlayBase_t::IsDead() const
         return false;
     }
 
-    if (g_pClientState->IsPaused())
+    if (m_nCreationTick != -1)
+        return m_nCreationTick < *g_nRenderTickCount;
+
+    if (m_nOverlayTick != -1)
+        return m_nOverlayTick < *g_nOverlayTickCount;
+
+    if (!DebugOverlay_CanApplyOverlay())
     {
-        // Keep rendering the overlay if the client simulation is paused.
+        // Keep rendering the overlay if the simulation is paused.
         return false;
     }
 
-    if (m_nCreationTick == -1)
+    if (m_flEndTime == NDEBUG_PERSIST_TILL_NEXT_SERVER)
     {
-        if (m_nOverlayTick == -1)
-        {
-            if (m_flEndTime == NDEBUG_PERSIST_TILL_NEXT_SERVER)
-            {
-                return false;
-            }
-            return g_pClientState->GetClientTime() >= m_flEndTime;
-        }
-        else
-        {
-            return m_nOverlayTick < *g_nOverlayTickCount;
-        }
+        return false;
     }
-    else
-    {
-        return m_nCreationTick < *g_nRenderTickCount;
-    }
+
+    return m_flEndTime < g_pClientState->GetClientTime();
 }
 
 //------------------------------------------------------------------------------
