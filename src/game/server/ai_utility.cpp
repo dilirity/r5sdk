@@ -304,7 +304,10 @@ bool Detour_IsLoaded()
 //-----------------------------------------------------------------------------
 void Detour_HotSwap()
 {
-    Assert(ThreadInMainOrServerFrameThread());
+    // Make sure when we hotswap, that the calling thread has latched
+    // into the server frame thread, or has waited for its completion.
+    // We cannot start the mutation while the server frame is active.
+    Assert(ThreadCouldDoServerWork());
 
     if (g_pServerScript)
         g_pServerScript->ExecuteCodeCallback("CodeCallback_OnNavMeshHotSwapBegin");
