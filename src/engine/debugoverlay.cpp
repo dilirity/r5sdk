@@ -38,7 +38,7 @@ static ConVar r_debug_overlay_nodecay("r_debug_overlay_nodecay", "0", FCVAR_DEVE
 //------------------------------------------------------------------------------
 // Purpose: returns whether the overlay can be added at this moment
 //------------------------------------------------------------------------------
-static bool DebugOverlay_CanAddOverlay()
+static bool DebugOverlay_CanApplyOverlay()
 {
 #ifndef DEDICATED
     if (!g_pClientState->IsPaused())
@@ -124,7 +124,7 @@ static bool DebugOverlay_GetEntityOriginClientOrServer(const int entNum, Vector3
 //------------------------------------------------------------------------------
 void CIVDebugOverlay::AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration)
 {
-    if (!DebugOverlay_CanAddOverlay())
+    if (!DebugOverlay_CanApplyOverlay())
         return;
 
     AUTO_LOCK(*s_OverlayMutex);
@@ -463,7 +463,7 @@ static void DebugOverlay_AddTextOverlay(const Vector3D& pos, const int lineOffse
 void CIVDebugOverlay::AddEntityTextOverlay(CIVDebugOverlay* const thisptr, const int entIndex, const int lineOffset, const float duration, 
                                             const int r, const int g, const int b, const int a, const char* const format, ...)
 {
-    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanAddOverlay())
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
         return;
 
     Vector3D pos;
@@ -486,7 +486,7 @@ void CIVDebugOverlay::AddEntityTextOverlay(CIVDebugOverlay* const thisptr, const
 //-----------------------------------------------------------------------------
 void CIVDebugOverlay::AddTextOverlay(CIVDebugOverlay* const thisptr, const Vector3D& origin, const float duration, const char* const format, ...)
 {
-    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanAddOverlay())
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
         return;
 
     AUTO_LOCK(*s_OverlayMutex);
@@ -504,7 +504,7 @@ void CIVDebugOverlay::AddTextOverlay(CIVDebugOverlay* const thisptr, const Vecto
 //-----------------------------------------------------------------------------
 void CIVDebugOverlay::AddTextOverlayAtOffset(CIVDebugOverlay* const thisptr, const Vector3D& origin, const int lineOffset, const float duration, const char* const format, ...)
 {
-    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanAddOverlay())
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
         return;
 
     AUTO_LOCK(*s_OverlayMutex);
@@ -542,7 +542,7 @@ void CIVDebugOverlay::AddTextOverlayRGBu32(CIVDebugOverlay* const thisptr, const
 void CIVDebugOverlay::AddTextOverlayRGBf32(CIVDebugOverlay* const thisptr, const Vector3D& origin, const int lineOffset, const float duration,
     const float r, const float g, const float b, const float a, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(8, 9)
 {
-    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanAddOverlay())
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
         return;
 
     AUTO_LOCK(*s_OverlayMutex);
@@ -603,7 +603,7 @@ static void DebugOverlay_AddScreenTextOverlay(const Vector2D& pos, const int lin
 void CIVDebugOverlay::AddScreenTextOverlayAtOffset(CIVDebugOverlay* const thisptr, const Vector2D& screenPos, const int lineOffset,
     const float flDuration, const int r, const int g, const int b, const int a, const char* const text)
 {
-    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanAddOverlay())
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
         return;
 
     const ssize_t textLen = (ssize_t)strlen(text);
@@ -620,7 +620,7 @@ void CIVDebugOverlay::AddScreenTextOverlayAtOffset(CIVDebugOverlay* const thispt
 //-----------------------------------------------------------------------------
 void CIVDebugOverlay::AddScreenTextOverlayAtCenter(CIVDebugOverlay* const thisptr, IVDebugOverlay* const unused1, const char* const text, const void* unused2, const int unk1, const int unk2)
 {
-    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanAddOverlay())
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
         return;
 
     const ssize_t textLen = (ssize_t)strlen(text);
