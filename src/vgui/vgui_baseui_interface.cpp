@@ -26,10 +26,6 @@ int CEngineVGui::VPaint(CEngineVGui* const thisptr, const PaintMode_t mode)
 			g_TextOverlay.Update();
 	}
 
-	// This must always be called, even when VGui is disabled because
-	// we still need to decay old text overlays. Else they will stack
-	// up forever and burn CPU.
-	g_pDebugOverlay->ClearDeadTextOverlays();
 	return result;
 }
 

@@ -8,6 +8,7 @@
 #include "core/stdafx.h"
 #include "tier0/frametask.h"
 #include "engine/host.h"
+#include "engine/debugoverlay.h"
 #ifndef DEDICATED
 #include "windows/id3dx.h"
 #include "geforce/reflex.h"
@@ -75,7 +76,8 @@ void _Host_RunFrame(void* unused, float time)
 	g_TextOverlay.ShouldDraw(time);
 #endif // !DEDICATED
 
-	return v_Host_RunFrame(unused, time);
+	v_Host_RunFrame(unused, time);
+	DebugOverlay_HandleDecayed();
 }
 
 void Host_Error(const char* const error, ...)

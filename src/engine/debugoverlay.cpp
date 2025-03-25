@@ -293,7 +293,7 @@ static void DebugOverlay_DestroyOverlay(OverlayBase_t* const pOverlay)
 // Purpose: draws a generic overlay
 // Input  : *pOverlay - 
 //------------------------------------------------------------------------------
-static void DebugOverlay_DrawOverlay(OverlayBase_t* const pOverlay)
+static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
 {
     AUTO_LOCK(*s_OverlayMutex);
 
@@ -301,7 +301,7 @@ static void DebugOverlay_DrawOverlay(OverlayBase_t* const pOverlay)
     {
     case OverlayType_t::OVERLAY_BOX:
     {
-        OverlayBox_t* pBox = static_cast<OverlayBox_t*>(pOverlay);
+        const OverlayBox_t* const pBox = static_cast<const OverlayBox_t*>(pOverlay);
 
         if (pBox->a > 0)
         {
@@ -316,7 +316,7 @@ static void DebugOverlay_DrawOverlay(OverlayBase_t* const pOverlay)
     }
     case OverlayType_t::OVERLAY_SPHERE:
     {
-        OverlaySphere_t* pSphere = static_cast<OverlaySphere_t*>(pOverlay);
+        const OverlaySphere_t* const pSphere = static_cast<const OverlaySphere_t*>(pOverlay);
         v_RenderWireframeSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi,
             Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), r_debug_draw_depth_test.GetBool());
 
@@ -324,7 +324,7 @@ static void DebugOverlay_DrawOverlay(OverlayBase_t* const pOverlay)
     }
     case OverlayType_t::OVERLAY_LINE:
     {
-        OverlayLine_t* pLine = static_cast<OverlayLine_t*>(pOverlay);
+        const OverlayLine_t* const pLine = static_cast<const OverlayLine_t*>(pOverlay);
         v_RenderLine(pLine->origin, pLine->dest, Color(pLine->r, pLine->g, pLine->b, pLine->a), !pLine->noDepthTest);
 
         break;
@@ -339,21 +339,21 @@ static void DebugOverlay_DrawOverlay(OverlayBase_t* const pOverlay)
     case OverlayType_t::OVERLAY_SPLINE:
     {
         // This is used for the Smart Pistol laser.
-        OverlayLine_t* pLaser = reinterpret_cast<OverlayLine_t*>(pOverlay);
-        v_RenderLine(pLaser->origin, pLaser->dest, Color(pLaser->r, pLaser->g, pLaser->b, pLaser->a), !pLaser->noDepthTest);
+        const OverlayLine_t* const pSpline = reinterpret_cast<const OverlayLine_t*>(pOverlay);
+        v_RenderLine(pSpline->origin, pSpline->dest, Color(pSpline->r, pSpline->g, pSpline->b, pSpline->a), !pSpline->noDepthTest);
 
         break;
     }
     case OverlayType_t::OVERLAY_TRIANGLE:
     {
-        OverlayTriangle_t* pTriangle = reinterpret_cast<OverlayTriangle_t*>(pOverlay);
+        const OverlayTriangle_t* const pTriangle = reinterpret_cast<const OverlayTriangle_t*>(pOverlay);
         RenderTriangle(pTriangle->p1, pTriangle->p2, pTriangle->p3, Color(pTriangle->r, pTriangle->g, pTriangle->b, pTriangle->a), !pTriangle->noDepthTest);
 
         break;
     }
     case OverlayType_t::OVERLAY_SWEPT_BOX:
     {
-        OverlaySweptBox_t* pSweptBox = reinterpret_cast<OverlaySweptBox_t*>(pOverlay);
+        const OverlaySweptBox_t* const pSweptBox = reinterpret_cast<const OverlaySweptBox_t*>(pOverlay);
         RenderWireframeSweptBox(pSweptBox->start, pSweptBox->end, pSweptBox->angles, pSweptBox->mins, pSweptBox->maxs, 
             Color(pSweptBox->r, pSweptBox->g, pSweptBox->b, pSweptBox->a), r_debug_draw_depth_test.GetBool());
         break;
@@ -365,7 +365,7 @@ static void DebugOverlay_DrawOverlay(OverlayBase_t* const pOverlay)
     }
     case OverlayType_t::OVERLAY_CAPSULE:
     {
-        OverlayCapsule_t* pCapsule = static_cast<OverlayCapsule_t*>(pOverlay);
+        const OverlayCapsule_t* const pCapsule = static_cast<const OverlayCapsule_t*>(pOverlay);
         RenderCapsule(pCapsule->start, pCapsule->end, pCapsule->radius, Color(pCapsule->r, pCapsule->g, pCapsule->b, pCapsule->a), !pCapsule->noDepthTest);
 
         break;
@@ -379,15 +379,57 @@ static void DebugOverlay_DrawOverlay(OverlayBase_t* const pOverlay)
 //------------------------------------------------------------------------------
 static void DebugOverlay_DrawAllOverlays(const bool bRender)
 {
+    const bool bOverlayEnabled = (bRender && enable_debug_overlays->GetBool());
+
+    if (!bOverlayEnabled)
+        return;
+
+    AUTO_LOCK(*s_OverlayMutex);
+    const OverlayBase_t* pCurrOverlay = *s_pOverlays;
+
+    while (pCurrOverlay)
+    {
+        bool bShouldDraw = false;
+
+        if (pCurrOverlay->m_nCreationTick == -1)
+        {
+            if (pCurrOverlay->m_nOverlayTick == -1 ||
+                pCurrOverlay->m_nOverlayTick == *g_nOverlayTickCount)
+            {
+                bShouldDraw = true;
+            }
+        }
+        else
+        {
+            bShouldDraw = pCurrOverlay->m_nCreationTick == *g_nRenderTickCount;
+        }
+        if (bOverlayEnabled && bShouldDraw)
+        {
+            DebugOverlay_DrawOverlay(pCurrOverlay);
+        }
+
+        pCurrOverlay = pCurrOverlay->m_pNextOverlay;
+    }
+
+#if !defined (CLIENT_DLL) && !defined (DEDICATED)
+    g_AIUtility.RunRenderFrame();
+#endif // !CLIENT_DLL && !DEDICATED
+}
+
+//------------------------------------------------------------------------------
+// Purpose : clear dead overlays
+//------------------------------------------------------------------------------
+static void DebugOverlay_ClearDeadOverlays()
+{
     AUTO_LOCK(*s_OverlayMutex);
 
-    const bool bOverlayEnabled = (bRender && enable_debug_overlays->GetBool());
     OverlayBase_t* pCurrOverlay = *s_pOverlays;
     OverlayBase_t* pPrevOverlay = nullptr;
     OverlayBase_t* pNextOverlay = nullptr;
 
     while (pCurrOverlay)
     {
+        // Is it time to kill this overlay?
         if (pCurrOverlay->IsDead())
         {
             if (pPrevOverlay)
@@ -407,36 +449,10 @@ static void DebugOverlay_DrawAllOverlays(const bool bRender)
         }
         else
         {
-            bool bShouldDraw = false;
-
-            if (pCurrOverlay->m_nCreationTick == -1)
-            {
-                if (pCurrOverlay->m_nOverlayTick == *g_nOverlayTickCount ||
-                    pCurrOverlay->m_nOverlayTick == -1)
-                {
-                    bShouldDraw = true;
-                }
-            }
-            else
-            {
-                bShouldDraw = pCurrOverlay->m_nCreationTick == *g_nRenderTickCount;
-            }
-            if (bOverlayEnabled && bShouldDraw)
-            {
-                DebugOverlay_DrawOverlay(pCurrOverlay);
-            }
-
             pPrevOverlay = pCurrOverlay;
             pCurrOverlay = pCurrOverlay->m_pNextOverlay;
         }
     }
-
-#ifndef CLIENT_DLL
-    if (bOverlayEnabled)
-    {
-        g_AIUtility.RunRenderFrame();
-    }
-#endif // !CLIENT_DLL
 }
 
 //-----------------------------------------------------------------------------
@@ -461,6 +477,21 @@ static void DebugOverlay_ClearAllOverlays()
     }
 
     *s_bDrawGrid = false;
+}
+
+//------------------------------------------------------------------------------
+// Purpose : clears all dead overlays
+//------------------------------------------------------------------------------
+void DebugOverlay_HandleDecayed()
+{
+    // These must always be called, even when the debug overlay is disabled
+    // because existing ones still needs to be decayed. Also with the design
+    // of the implementation in the engine, the debug interface is always
+    // called, even when its disabled. Its up to the engine and SDK to deal
+    // with the calls, which is to just run the regular decaying logic here
+    // while not rendering them out.
+    DebugOverlay_ClearDeadOverlays();
+    g_pDebugOverlay->ClearDeadTextOverlays();
 }
 
 //-----------------------------------------------------------------------------

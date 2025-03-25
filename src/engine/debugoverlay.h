@@ -221,6 +221,8 @@ private:
 
 inline CIVDebugOverlay* g_pDebugOverlay = nullptr;
 
+extern void DebugOverlay_HandleDecayed();
+
 inline void(*v_DebugOverlay_DrawAllOverlays)(bool bDraw);
 inline void(*v_DebugOverlay_ClearAllOverlays)(void);
 inline void(*v_DebugOverlay_DebugDebugOverlays)(void* unk1, unsigned short unk2, unsigned int unk3, float unk4);
