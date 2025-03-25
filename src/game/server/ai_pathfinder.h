@@ -17,13 +17,12 @@
 #include "ai_component.h"
 #include "ai_navtypes.h"
 #include "ai_network.h"
+#include "ai_movetypes.h"
 
 #include "recast/Detour/Include/DetourNavMeshQuery.h"
 
-struct CTriDebugOverlay
-{
-	OverlayLine_t** m_debugTriOverlayLine;
-};
+// Value remained unchanged for R5, see [r5apex_ds + 0xF31AF0].
+#define NUM_NPC_DEBUG_OVERLAYS 50
 
 class CAI_Pathfinder : public CAI_Component
 {
@@ -38,6 +37,30 @@ public:
 	const dtQueryFilter* GetNavMeshFilter() const { return &m_navFilter; }
 
 private:
+	class CTriDebugOverlay
+	{
+	public:
+		void AddTriOverlayLines(const Vector3D& vecStart, const Vector3D& vecApex, const Vector3D& vecEnd, const AIMoveTrace_t& startTrace, const AIMoveTrace_t& endTrace, const bool bPathClear);
+		void ClearTriOverlayLines(void);
+		void FadeTriOverlayLines(void);
+
+	private:
+		void AddTriOverlayLine(const Vector3D& origin, const Vector3D& dest, const int r, const int g, const int b, const bool noDepthTest);
+
+		struct OverlayLine_s
+		{
+			Vector3D origin;
+			Vector3D dest;
+			int r;
+			int g;
+			int b;
+			bool noDepthTest;
+			bool draw;
+		};
+
+		OverlayLine_s** m_debugTriOverlayLine;
+	};
+
 	CTriDebugOverlay m_TriDebugOverlay;
 	float m_flLimitDistFactor;
 	float m_flLastStaleLinkCheckTime;
