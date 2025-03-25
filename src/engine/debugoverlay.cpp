@@ -379,6 +379,10 @@ static void DebugOverlay_DrawAllOverlays(const bool bRender)
     if (!bOverlayEnabled)
         return;
 
+#if !defined (CLIENT_DLL) && !defined (DEDICATED)
+    g_AIUtility.RunRenderFrame();
+#endif // !CLIENT_DLL && !DEDICATED
+
     AUTO_LOCK(*s_OverlayMutex);
     const OverlayBase_t* pCurrOverlay = *s_pOverlays;
 
@@ -405,10 +409,6 @@ static void DebugOverlay_DrawAllOverlays(const bool bRender)
 
         pCurrOverlay = pCurrOverlay->m_pNextOverlay;
     }
-
-#if !defined (CLIENT_DLL) && !defined (DEDICATED)
-    g_AIUtility.RunRenderFrame();
-#endif // !CLIENT_DLL && !DEDICATED
 }
 
 //------------------------------------------------------------------------------
