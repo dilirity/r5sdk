@@ -506,7 +506,10 @@ static void DebugOverlay_AddTextOverlay(const Vector3D& pos, const int lineOffse
     newOverlay->textBuf = new char[textLen + 1];
 
     if (!newOverlay->textBuf)
+    {
+        delete newOverlay;
         return;
+    }
 
     Q_strncpy(newOverlay->textBuf, text, textLen + 1);
 
@@ -646,7 +649,10 @@ static void DebugOverlay_AddScreenTextOverlay(const Vector2D& pos, const int lin
     newOverlay->textBuf = new char[textLen + 1];
 
     if (!newOverlay->textBuf)
+    {
+        delete newOverlay;
         return;
+    }
 
     Q_strncpy(newOverlay->textBuf, text, textLen + 1);
 
