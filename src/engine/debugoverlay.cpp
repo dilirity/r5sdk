@@ -187,7 +187,6 @@ bool OverlayBase_t::IsDead() const
 void OverlayBase_t::SetEndTime(const float duration)
 {
     (*g_nNewOtherOverlays)++;
-    m_nServerCount = g_pClientState->GetServerCount();
 
     if (m_Type == OverlayType_t::OVERLAY_SPLINE)
         m_nCreationTick = *g_nRenderTickCount;
@@ -202,7 +201,6 @@ void OverlayBase_t::SetEndTime(const float duration)
 void OverlayText_t::SetEndTime(const float duration)
 {
     (*g_nNewTextOverlays)++;
-    m_nServerCount = g_pClientState->GetServerCount();
 
     DebugOverlay_SetEndTime(duration, m_nCreationTick, m_nOverlayTick, m_flEndTime);
 }

@@ -35,7 +35,6 @@ struct OverlayBase_t
 		m_Type          = OverlayType_t::OVERLAY_BOX;
 		m_nCreationTick = -1;
 		m_flEndTime     = 0.0f;
-		m_nServerCount  = -1;
 		m_pNextOverlay  = nullptr;
 		m_nOverlayTick  = -1;
 	}
@@ -45,8 +44,8 @@ struct OverlayBase_t
 	OverlayType_t   m_Type;          // What type of overlay is it?
 	int             m_nCreationTick; // Duration -1 means go away after this frame #
 	float           m_flEndTime;     // When does this box go away
-	int             m_nServerCount;  // Latch server count, too
-	OverlayBase_t*  m_pNextOverlay;  // 16
+	// There is 4 bytes padding here.
+	OverlayBase_t*  m_pNextOverlay;  // The next overlay
 	int             m_nOverlayTick;  // 24
 	// There is 4 bytes padding here.
 };
