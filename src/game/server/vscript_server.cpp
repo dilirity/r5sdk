@@ -14,16 +14,17 @@
 //=============================================================================//
 
 #include "core/stdafx.h"
+#include "common/callback.h"
 #include "engine/server/server.h"
+#include "engine/host_state.h"
+#include "engine/debugoverlay.h"
 #include "game/shared/vscript_shared.h"
 #include "vscript/vscript.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 
 #include "liveapi/liveapi.h"
 #include "vscript_server.h"
-#include <engine/host_state.h>
 #include "player.h"
-#include <common/callback.h>
 #include "detour_impl.h"
 
 /*
@@ -42,6 +43,84 @@ static void SQVM_ServerScript_f(const CCommand& args)
     }
 }
 static ConCommand script("script", SQVM_ServerScript_f, "Run input code as SERVER script on the VM", FCVAR_DEVELOPMENTONLY | FCVAR_GAMEDLL | FCVAR_CHEAT | FCVAR_SERVER_FRAME_THREAD);
+
+//-----------------------------------------------------------------------------
+// Purpose: calculates the duration for the debug text overlay
+//-----------------------------------------------------------------------------
+static float ServerScript_DebugScreenText_DetermineDuration(HSQUIRRELVM v)
+{
+    const float serverFPS = script_server_fps->GetFloat();
+    // Make sure the overlay exists as long as the entire server
+    // script frame, as it must last until the next call from the
+    // server is initiated. Otherwise the following happens:
+    // 
+    // - 1 / script_server_fps < NDEBUG_PERSIST_TILL_NEXT_SERVER =
+    //                           text will flicker as they decay
+    //                           before the next frame is fired.
+    // - 1 / script_server_fps > NDEBUG_PERSIST_TILL_NEXT_SERVER =
+    //                           text will overlap with previous
+    //                           as the prev hasn't decayed yet.
+    return 1.0f / serverFPS;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: internal handler for adding debug texts on screen through scripts
+//-----------------------------------------------------------------------------
+static void ServerScript_Internal_DebugScreenTextWithColor(HSQUIRRELVM v, const Vector2D& screenPos, const Color color, const char* const text)
+{
+    const float duration = ServerScript_DebugScreenText_DetermineDuration(v);
+    g_pDebugOverlay->AddScreenTextOverlay(screenPos, 0, duration, color.r(), color.g(), color.b(), color.a(), text);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: adds a debug text on the screen at given position
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_DebugScreenText(HSQUIRRELVM v)
+{
+    if (g_pDebugOverlay)
+    {
+        SQFloat posX;
+        SQFloat posY;
+        const SQChar* text;
+
+        sq_getfloat(v, 2, &posX);
+        sq_getfloat(v, 3, &posY);
+        sq_getstring(v, 4, &text);
+
+        const Color color(255, 255, 255, 255);
+        ServerScript_Internal_DebugScreenTextWithColor(v, { posX, posY }, color, text);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: adds a debug text on the screen at given position with color
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_DebugScreenTextWithColor(HSQUIRRELVM v)
+{
+    if (g_pDebugOverlay)
+    {
+        SQFloat posX;
+        SQFloat posY;
+        const SQChar* text;
+        const SQVector3D* colorVec;
+
+        sq_getfloat(v, 2, &posX);
+        sq_getfloat(v, 3, &posY);
+        sq_getstring(v, 4, &text);
+        sq_getvector(v, 5, &colorVec);
+
+        const Color color(
+            Clamp((int)(colorVec->x * 255), 0, 255),
+            Clamp((int)(colorVec->y * 255), 0, 255),
+            Clamp((int)(colorVec->z * 255), 0, 255), 255);
+
+        ServerScript_Internal_DebugScreenTextWithColor(v, { posX, posY }, color, text);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: sets whether the server could auto reload at this time (e.g. if
@@ -550,6 +629,9 @@ static void Script_RegisterServerFirstPersonProxyClassFuncs()
 
 void VScriptServer::Detour(const bool bAttach) const
 {
+    DetourSetup(&v_ServerScript_DebugScreenText, &ServerScript_DebugScreenText, bAttach);
+    DetourSetup(&v_ServerScript_DebugScreenTextWithColor, &ServerScript_DebugScreenTextWithColor, bAttach);
+
     DetourSetup(&v_Script_RegisterServerEntityClassFuncs, &Script_RegisterServerEntityClassFuncs, bAttach);
     DetourSetup(&v_Script_RegisterServerPlayerClassFuncs, &Script_RegisterServerPlayerClassFuncs, bAttach);
     DetourSetup(&v_Script_RegisterServerAIClassFuncs, &Script_RegisterServerAIClassFuncs, bAttach);

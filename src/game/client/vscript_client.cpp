@@ -18,10 +18,12 @@
 //=============================================================================//
 
 #include "core/stdafx.h"
+#include "tier0/frametask.h"
 #include "tier1/keyvalues.h"
 #include "engine/cmodel_bsp.h"
 #include "engine/host_state.h"
 #include "engine/client/cl_main.h"
+#include "engine/debugoverlay.h"
 #include "networksystem/pylon.h"
 #include "networksystem/listmanager.h"
 #include "networksystem/hostmanager.h"
@@ -31,7 +33,6 @@
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 
 #include "vscript_client.h"
-#include <tier0/frametask.h>
 
 /*
 =====================
@@ -67,6 +68,65 @@ static void SQVM_UIScript_f(const CCommand& args)
 
 static ConCommand script_client("script_client", SQVM_ClientScript_f, "Run input code as CLIENT script on the VM", FCVAR_DEVELOPMENTONLY | FCVAR_CLIENTDLL | FCVAR_CHEAT);
 static ConCommand script_ui("script_ui", SQVM_UIScript_f, "Run input code as UI script on the VM", FCVAR_DEVELOPMENTONLY | FCVAR_CLIENTDLL | FCVAR_CHEAT);
+
+//-----------------------------------------------------------------------------
+// Purpose: internal handler for adding debug texts on screen through scripts
+//-----------------------------------------------------------------------------
+static void ClientScript_Internal_DebugScreenTextWithColor(HSQUIRRELVM v, const Vector2D& screenPos, const Color color, const char* const text)
+{
+    g_pDebugOverlay->AddScreenTextOverlay(screenPos, 0, 0.f, color.r(), color.g(), color.b(), color.a(), text);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: adds a debug text on the screen at given position
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_DebugScreenText(HSQUIRRELVM v)
+{
+    if (g_pDebugOverlay)
+    {
+        SQFloat posX;
+        SQFloat posY;
+        const SQChar* text;
+
+        sq_getfloat(v, 2, &posX);
+        sq_getfloat(v, 3, &posY);
+        sq_getstring(v, 4, &text);
+
+        const Color color(255, 255, 255, 255);
+
+        ClientScript_Internal_DebugScreenTextWithColor(v, { posX, posY }, color, text);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: adds a debug text on the screen at given position with color
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_DebugScreenTextWithColor(HSQUIRRELVM v)
+{
+    if (g_pDebugOverlay)
+    {
+        SQFloat posX;
+        SQFloat posY;
+        const SQChar* text;
+        const SQVector3D* colorVec;
+
+        sq_getfloat(v, 2, &posX);
+        sq_getfloat(v, 3, &posY);
+        sq_getstring(v, 4, &text);
+        sq_getvector(v, 5, &colorVec);
+
+        const Color color(
+            Clamp((int)(colorVec->x * 255), 0, 255),
+            Clamp((int)(colorVec->y * 255), 0, 255),
+            Clamp((int)(colorVec->z * 255), 0, 255), 255);
+
+        ClientScript_Internal_DebugScreenTextWithColor(v, { posX, posY }, color, text);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: checks if the server index is valid, raises an error if not
@@ -702,6 +762,9 @@ static void Script_RegisterClientFirstPersonProxyClassFuncs()
 
 void VScriptClient::Detour(const bool bAttach) const
 {
+    DetourSetup(&v_ClientScript_DebugScreenText, &ClientScript_DebugScreenText, bAttach);
+    DetourSetup(&v_ClientScript_DebugScreenTextWithColor, &ClientScript_DebugScreenTextWithColor, bAttach);
+
     DetourSetup(&v_Script_RegisterClientEntityClassFuncs, &Script_RegisterClientEntityClassFuncs, bAttach);
     DetourSetup(&v_Script_RegisterClientPlayerClassFuncs, &Script_RegisterClientPlayerClassFuncs, bAttach);
     DetourSetup(&v_Script_RegisterClientAIClassFuncs, &Script_RegisterClientAIClassFuncs, bAttach);

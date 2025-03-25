@@ -14,6 +14,9 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s);
 	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(UI_Script_##functionName),      \
 	helpString, returnType, parameters, UIScript_##functionName, __VA_ARGS__)            \
 
+inline SQRESULT(*v_ClientScript_DebugScreenText)(HSQUIRRELVM v);
+inline SQRESULT(*v_ClientScript_DebugScreenTextWithColor)(HSQUIRRELVM v);
+
 inline void (*v_Script_RegisterClientEntityClassFuncs)();
 inline void (*v_Script_RegisterClientPlayerClassFuncs)();
 inline void (*v_Script_RegisterClientCombatCharacterClassFuncs)();
@@ -61,6 +64,12 @@ class VScriptClient : public IDetour
 	}
 	virtual void GetFun(void) const
 	{
+		Module_FindPattern(g_GameDll, "40 53 48 83 EC ? 48 8B 41 ? 48 8B D9 81 78 ? ? ? ? ? 75 ? F3 0F 10 50 ? EB ? 66 0F 6E 50 ? 0F 5B D2 81 78 ? ? ? ? ? 75 ? F3 0F 10 48 ? EB ? 66 0F 6E 48 ? 0F 5B C9 48 8B 0D ? ? ? ? 48 85 C9")
+			.GetPtr(v_ClientScript_DebugScreenText);
+
+		Module_FindPattern(g_GameDll, "40 53 48 83 EC ? 4C 8B 41 ? 48 8B D9 41 81 78 ? ? ? ? ? 75 ? F3 41 0F 10 48 ? EB ? 66 41 0F 6E 48 ? 0F 5B C9 41 81 78 ? ? ? ? ? 75 ? F3 41 0F 10 40 ? EB ? 66 41 0F 6E 40 ? 0F 5B C0 4D 8D 48 ? 4D 8B 40 ? 49 83 C0 ? E8 ? ? ? ? 48 8B 4B ? 83 B9 ? ? ? ? ? 75 ? 33 C0 48 83 C4 ? 5B C3 48 8B 89 ? ? ? ? 48 8B D3 E8 ? ? ? ? B8 ? ? ? ? 48 83 C4 ? 5B C3 CC CC CC CC CC CC CC CC CC CC CC CC CC 40 53 48 83 EC ? 48 8B 41")
+			.GetPtr(v_ClientScript_DebugScreenTextWithColor);
+
 		Module_FindPattern(g_GameDll, "40 55 48 8B EC 48 83 EC ?? 80 3D ?? ?? ?? ?? ?? 0F 85 ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 5C 24 ?? 48 89 05 ?? ?? ?? ?? 48 8D 0D ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? C6 05 ?? ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 C7 05")
 			.GetPtr(v_Script_RegisterClientEntityClassFuncs);
 
