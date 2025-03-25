@@ -271,10 +271,9 @@ static void DebugOverlay_DestroyOverlay(OverlayBase_t* const pOverlay)
         delete pOverlay;
 
         break;
-        // The laser line overlay, used for the smart pistol's guidance
-        // line, appears to be not deleted in this particular function.
-        // Its unclear whether or not something else takes care of this,
-        // research needed!!!
+        // Splines aren't allocated, they are stored in s_splineOverlays
+        // which is a static array of 300 * OverlayLine_t. Just mark it
+        // destroyed here so the spline item can be reused.
     case OverlayType_t::OVERLAY_SPLINE:
         pOverlay->m_Type = OverlayType_t::OVERLAY_DESTROYED;
         break;
