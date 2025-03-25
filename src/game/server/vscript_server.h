@@ -25,7 +25,7 @@ inline void (*v_Script_RegisterServerFirstPersonProxyClassFuncs)();
 
 inline ScriptClassDescriptor_t* g_serverScriptEntityStruct;
 inline ScriptClassDescriptor_t* g_serverScriptPlayerStruct;
-inline ScriptClassDescriptor_t* g_serverScriptCombatCharacterStruct; // todo: verify.
+inline ScriptClassDescriptor_t* g_serverScriptCombatCharacterStruct;
 inline ScriptClassDescriptor_t* g_serverScriptAIStruct;
 inline ScriptClassDescriptor_t* g_serverScriptWeaponStruct;
 inline ScriptClassDescriptor_t* g_serverScriptProjectileStruct;
