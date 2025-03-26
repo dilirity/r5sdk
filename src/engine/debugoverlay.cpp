@@ -105,7 +105,7 @@ static void DebugOverlay_SetEndTime(OverlayBaseClass* const base, const float du
             base->m_nCreationTick = *g_nRenderTickCount;
         }
     }
-    else if (duration == (NDEBUG_PERSIST_TILL_SECOND_NEXT_SERVER))
+    else if (duration == (NDEBUG_PERSIST_TILL_NEXT_CLIENT))
     {
         base->m_nCreationTick = (*g_nRenderTickCount) + 1;
     }

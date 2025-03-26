@@ -6,8 +6,13 @@
 #include "public/idebugoverlay.h"
 #include "public/vphysics/vphysics_interface.h"
 
+// When used as a duration by a server-side NDebugOverlay:: call,
+// causes the overlay to persist until the next server update.
 constexpr auto NDEBUG_PERSIST_TILL_NEXT_SERVER = (0.01023f);
-constexpr auto NDEBUG_PERSIST_TILL_SECOND_NEXT_SERVER = (NDEBUG_PERSIST_TILL_NEXT_SERVER * 2);
+
+// When used as a duration by a client-side script function call,
+// causes the overlay to persist until the next client update.
+constexpr auto NDEBUG_PERSIST_TILL_NEXT_CLIENT = (0.02046f);
 
 extern ConVar enable_debug_text_overlays;
 extern ConVar r_debug_draw_depth_test;
