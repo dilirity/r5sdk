@@ -74,7 +74,7 @@ static ConCommand script_ui("script_ui", SQVM_UIScript_f, "Run input code as UI 
 //-----------------------------------------------------------------------------
 static void ClientScript_Internal_DebugScreenTextWithColor(HSQUIRRELVM v, const Vector2D& screenPos, const Color color, const char* const text)
 {
-    g_pDebugOverlay->AddScreenTextOverlay(screenPos, 0, 0.f, color.r(), color.g(), color.b(), color.a(), text);
+    g_pDebugOverlay->AddScreenTextOverlay(screenPos, 0, NDEBUG_PERSIST_TILL_NEXT_CLIENT, color.r(), color.g(), color.b(), color.a(), text);
 }
 
 //-----------------------------------------------------------------------------
