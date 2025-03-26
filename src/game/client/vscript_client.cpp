@@ -72,9 +72,9 @@ static ConCommand script_ui("script_ui", SQVM_UIScript_f, "Run input code as UI 
 //-----------------------------------------------------------------------------
 // Purpose: internal handler for adding debug texts on screen through scripts
 //-----------------------------------------------------------------------------
-static void ClientScript_Internal_DebugScreenTextWithColor(HSQUIRRELVM v, const Vector2D& screenPos, const Color color, const char* const text)
+static void ClientScript_Internal_DebugScreenTextWithColor(HSQUIRRELVM v, const float posX, const float posY, const Color color, const char* const text)
 {
-    g_pDebugOverlay->AddScreenTextOverlay(screenPos, 0, NDEBUG_PERSIST_TILL_NEXT_CLIENT, color.r(), color.g(), color.b(), color.a(), text);
+    g_pDebugOverlay->AddScreenTextOverlay(posX, posY, NDEBUG_PERSIST_TILL_NEXT_CLIENT, color.r(), color.g(), color.b(), color.a(), text);
 }
 
 //-----------------------------------------------------------------------------
@@ -94,7 +94,7 @@ static SQRESULT ClientScript_DebugScreenText(HSQUIRRELVM v)
 
         const Color color(255, 255, 255, 255);
 
-        ClientScript_Internal_DebugScreenTextWithColor(v, { posX, posY }, color, text);
+        ClientScript_Internal_DebugScreenTextWithColor(v, posX, posY, color, text);
     }
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -122,7 +122,7 @@ static SQRESULT ClientScript_DebugScreenTextWithColor(HSQUIRRELVM v)
             Clamp((int)(colorVec->y * 255), 0, 255),
             Clamp((int)(colorVec->z * 255), 0, 255), 255);
 
-        ClientScript_Internal_DebugScreenTextWithColor(v, { posX, posY }, color, text);
+        ClientScript_Internal_DebugScreenTextWithColor(v, posX, posY, color, text);
     }
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);

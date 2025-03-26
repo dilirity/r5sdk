@@ -45,7 +45,7 @@ static void ParticleOverlay_AddScreenText(ParticleOverlayScreenText_s* const ove
 	if (len > 0)
 	{
 		if (useVGui)
-			g_pDebugOverlay->AddScreenTextOverlay(overlay->position, overlay->lineOffset, 0.0f, 255, 255, 255, 255, buf);
+			g_pDebugOverlay->AddScreenTextOverlayAtOffset(overlay->position.x, overlay->position.y, overlay->lineOffset, 0.0f, 255, 255, 255, 255, buf);
 		else
 			g_particleOverlay.AppendText(buf, (size_t)len);
 

@@ -730,15 +730,15 @@ void CIVDebugOverlay::AddTextOverlayRGBf32(CIVDebugOverlay* const thisptr, const
 //-----------------------------------------------------------------------------
 // Purpose: internal wrapper for adding new screen positioned overlay text
 //-----------------------------------------------------------------------------
-static void DebugOverlay_AddScreenTextOverlay(const Vector2D& pos, const int lineOffset, const float duration,
-    const int r, const int g, const int b, const int a, const char* const text, const ssize_t textLen)
+static void DebugOverlay_AddScreenTextOverlay(const float flXpos, const float flYpos, const int lineOffset,
+    const float duration, const int r, const int g, const int b, const int a, const char* const text, const ssize_t textLen)
 {
     OverlayText_t* const newOverlay = new OverlayText_t;
 
     if (!newOverlay)
         return;
 
-    newOverlay->screenPos = pos;
+    newOverlay->screenPos.Init(flXpos, flYpos);
 
     newOverlay->textLen = textLen;
     newOverlay->textBuf = new char[textLen + 1];
@@ -768,8 +768,8 @@ static void DebugOverlay_AddScreenTextOverlay(const Vector2D& pos, const int lin
 //-----------------------------------------------------------------------------
 // Purpose: add new screen positioned overlay text at offset
 //-----------------------------------------------------------------------------
-void CIVDebugOverlay::AddScreenTextOverlayAtOffset(CIVDebugOverlay* const thisptr, const Vector2D& screenPos, const int lineOffset,
-    const float flDuration, const int r, const int g, const int b, const int a, const char* const text)
+void CIVDebugOverlay::AddScreenTextOverlayAtOffsetInternal(CIVDebugOverlay* const thisptr, const float flXPos, const float flYPos,
+    const int lineOffset, const float flDuration, const int r, const int g, const int b, const int a, const char* const text)
 {
     if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
         return;
@@ -780,13 +780,13 @@ void CIVDebugOverlay::AddScreenTextOverlayAtOffset(CIVDebugOverlay* const thispt
         return; // Empty.
 
     AUTO_LOCK(*s_OverlayMutex);
-    DebugOverlay_AddScreenTextOverlay(screenPos, lineOffset, flDuration, r, g, b, a, text, textLen);
+    DebugOverlay_AddScreenTextOverlay(flXPos, flYPos, lineOffset, flDuration, r, g, b, a, text, textLen);
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: add new screen positioned overlay text at center
+// Purpose: add new screen positioned overlay text
 //-----------------------------------------------------------------------------
-void CIVDebugOverlay::AddScreenTextOverlayAtCenter(CIVDebugOverlay* const thisptr, IVDebugOverlay* const unused1, const char* const text, const void* unused2, const int unk1, const int unk2)
+void CIVDebugOverlay::AddScreenTextOverlayInternal(CIVDebugOverlay* const thisptr, const float flXPos, const float flYPos, const float flDuration, const int r, const int g, const int b, const int a, const char* const text)
 {
     if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
         return;
@@ -797,7 +797,7 @@ void CIVDebugOverlay::AddScreenTextOverlayAtCenter(CIVDebugOverlay* const thispt
         return; // Empty.
 
     AUTO_LOCK(*s_OverlayMutex);
-    DebugOverlay_AddScreenTextOverlay({0.5f, 0.5f}, 0, 0.f, 255, 0, 0, unk2, text, textLen);
+    DebugOverlay_AddScreenTextOverlay(flXPos, flYPos, 0, flDuration, r, g, b, a, text, textLen);
 }
 
 //-----------------------------------------------------------------------------
@@ -912,7 +912,7 @@ void VDebugOverlay::Detour(const bool bAttach) const
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddPhysicsEntityTextOverlay, 0, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddPhysicsTextOverlay, 4, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddPhysicsTextOverlayAtOffset, 5, &null);
-        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddScreenTextOverlayAtOffset, 6, &null);
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddScreenTextOverlayInternal, 6, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddSweptBoxInternal, 7, &null); // NEW: now supports setting depth testing.
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddPhysicsTextOverlayRGBf32, 8, &null);
 
@@ -921,7 +921,8 @@ void VDebugOverlay::Detour(const bool bAttach) const
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddSphereOverlayInternal, 3, &null); // NEW: now supports setting depth testing.
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayAtOffset, 8, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlay, 9, &null);
-        CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddScreenTextOverlayAtOffset, 10, &null);
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddScreenTextOverlayAtOffsetInternal , 10, &null);
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddScreenTextOverlayInternal, 11, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddSweptBoxInternal, 12, &null); // NEW: now supports setting depth testing.
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayRGBu32, 24, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayRGBf32, 25, &null);

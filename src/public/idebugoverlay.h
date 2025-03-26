@@ -30,8 +30,8 @@ public:
 
 	// Also a AddScreenTextOverlay function, but never used in the engine and gutted so its impossible to know the parameters.
 	// Since this isn't used, it will be replaced with a new implementation in the future.
-	virtual void AddScreenTextOverlay(const Vector2D& screenPos, const int lineOffset, const float flDuration, const int r, const int g, const int b, const int a, const char* const text) = 0;
-	virtual void AddScreenTextOverlayCenter(IVDebugOverlay* const unused1, const char* const text, const void* unused2, const int unk1, const int unk2) = 0;
+	virtual void AddScreenTextOverlayAtOffset(const float flXPos, const float flYPos, const int lineOffset, const float flDuration, const int r, const int g, const int b, const int a, const char* const text) = 0;
+	virtual void AddScreenTextOverlay(const float flXPos, const float flYPos, const float flDuration, const int r, const int g, const int b, const int a, const char* const text) = 0;
 
 	virtual void AddSweptBoxOverlay(const Vector3D& start, const Vector3D& end, const Vector3D& mins, const Vector3D& max, const QAngle& angles, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
 	virtual void AddGridOverlay(const Vector3D& origin) = 0;

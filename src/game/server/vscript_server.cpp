@@ -66,10 +66,10 @@ static float ServerScript_DebugScreenText_DetermineDuration(HSQUIRRELVM v)
 //-----------------------------------------------------------------------------
 // Purpose: internal handler for adding debug texts on screen through scripts
 //-----------------------------------------------------------------------------
-static void ServerScript_Internal_DebugScreenTextWithColor(HSQUIRRELVM v, const Vector2D& screenPos, const Color color, const char* const text)
+static void ServerScript_Internal_DebugScreenTextWithColor(HSQUIRRELVM v, const float posX, const float posY, const Color color, const char* const text)
 {
     const float duration = ServerScript_DebugScreenText_DetermineDuration(v);
-    g_pDebugOverlay->AddScreenTextOverlay(screenPos, 0, duration, color.r(), color.g(), color.b(), color.a(), text);
+    g_pDebugOverlay->AddScreenTextOverlay(posX, posY, duration, color.r(), color.g(), color.b(), color.a(), text);
 }
 
 //-----------------------------------------------------------------------------
@@ -88,7 +88,7 @@ static SQRESULT ServerScript_DebugScreenText(HSQUIRRELVM v)
         sq_getstring(v, 4, &text);
 
         const Color color(255, 255, 255, 255);
-        ServerScript_Internal_DebugScreenTextWithColor(v, { posX, posY }, color, text);
+        ServerScript_Internal_DebugScreenTextWithColor(v, posX, posY, color, text);
     }
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -116,7 +116,7 @@ static SQRESULT ServerScript_DebugScreenTextWithColor(HSQUIRRELVM v)
             Clamp((int)(colorVec->y * 255), 0, 255),
             Clamp((int)(colorVec->z * 255), 0, 255), 255);
 
-        ServerScript_Internal_DebugScreenTextWithColor(v, { posX, posY }, color, text);
+        ServerScript_Internal_DebugScreenTextWithColor(v, posX, posY, color, text);
     }
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);

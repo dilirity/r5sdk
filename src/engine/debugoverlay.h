@@ -205,8 +205,8 @@ public: // Hook statics:
 	static void AddTextOverlay(CIVDebugOverlay* const thisptr, const Vector3D& origin, const float duration, const char* const format, ...);
 	static void AddTextOverlayAtOffset(CIVDebugOverlay* const thisptr, const Vector3D& origin, const int lineOffset, const float duration, const char* const format, ...);
 
-	static void AddScreenTextOverlayAtOffset(CIVDebugOverlay* const thisptr, const Vector2D& screenPos, const int lineOffset, const float flDuration, const int r, const int g, const int b, const int a, const char* const text);
-	static void AddScreenTextOverlayAtCenter(CIVDebugOverlay* const thisptr, IVDebugOverlay* const unused1, const char* const text, const void* unused2, const int unk1, const int unk2);
+	static void AddScreenTextOverlayAtOffsetInternal(CIVDebugOverlay* const thisptr, const float flXPos, const float flYPos, const int lineOffset, const float flDuration, const int r, const int g, const int b, const int a, const char* const text);
+	static void AddScreenTextOverlayInternal(CIVDebugOverlay* const thisptr, const float flXPos, const float flYPos, const float flDuration, const int r, const int g, const int b, const int a, const char* const text);
 
 	static void AddTextOverlayRGBu32(CIVDebugOverlay* const thisptr, const Vector3D& origin, const int lineOffset, const float duration,
 		const int r, const int g, const int b, const int a, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(9, 10);
