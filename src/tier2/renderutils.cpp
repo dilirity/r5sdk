@@ -419,6 +419,124 @@ static void RenderTriangleInternal(const Vector3D& p1, const Vector3D& p2, const
     ctx->EndRenderer();
 }
 
+struct RenderSphereQueue_s
+{
+    void (*function)(const Vector3D& vCenter, const float flRadius, const int nTheta,
+        const int nPhi, const Color c, IMaterial* const pMaterial);
+    Vector3D vCenter;
+    float flRadius;
+    int nTheta;
+    int nPhi;
+    Color color;
+    IMaterial* pMaterial;
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: process and advance swept box render queue
+//-----------------------------------------------------------------------------
+static void RenderSphereQueueFunctor(CallQueue_s* const queue)
+{
+    RenderSphereQueue_s* const item = (RenderSphereQueue_s*)queue->GetCurrentCallItem();
+    item->function(item->vCenter, item->flRadius, item->nTheta, item->nPhi, item->color, item->pMaterial);
+
+    // Advance the queue.
+    queue->currentCallIndex += sizeof(RenderSphereQueue_s);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: render sphere:
+// +z                _+y
+// ^                 /|
+// |                /
+// |   .--"|"--.   /
+//  .'     |     '.
+// /       |       \
+// | <----( )---->-|--> +r
+// \       |       /
+//  '.     |     .'
+//    "-.._|_..-"   --> +x
+//-----------------------------------------------------------------------------
+static void RenderSphereInternal(const Vector3D& vCenter, const float flRadius, const int nTheta,
+    const int nPhi, const Color c, IMaterial* const pMaterial)
+{
+    InitializeStandardMaterials();
+
+    // Queue it off if this is called outside the render thread.
+    if ((*g_fnHasRenderCallQueue)())
+    {
+        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(RenderSphereQueueFunctor, sizeof(RenderSphereQueue_s), 7);
+        RenderSphereQueue_s* const item = (RenderSphereQueue_s*)queue->GetCurrentAllocatedItem();
+
+        item->function = RenderSphereInternal;
+        item->vCenter = vCenter;
+        item->flRadius = flRadius;
+        item->nTheta = nTheta;
+        item->nPhi = nPhi;
+        item->color = c;
+        item->pMaterial = pMaterial;
+
+        (*g_fnAdvanceRenderCallQueue)(sizeof(RenderSphereQueue_s));
+        return;
+    }
+
+    CMatRenderContext* const ctx = g_pMaterialSystem->GetRenderContext();
+    CMeshVertexBuilder vertexBuilder;
+
+    if (vertexBuilder.Begin(ctx, nPhi * (nTheta + 1)))
+    {
+        ctx->Bind(pMaterial);
+
+        for (int i = 0; i < nPhi; ++i)
+        {
+            const float phi = (i / (float)(nPhi - 1)) * (float)M_PI;
+            const float cs = cos(phi) * flRadius;
+            const float sn = sin(phi) * flRadius;
+
+            for (int j = 0; j < (nTheta + 1); ++j)
+            {
+                const float u = j / (float)nTheta;
+                const float theta = 2.0f * (float)M_PI * u;
+
+                Vector3D vecPos;
+
+                vecPos.x = (cos(theta) * sn) + vCenter.x;
+                vecPos.y = (sin(theta) * sn) + vCenter.y;
+                vecPos.z = cs + vCenter.z;
+
+                vertexBuilder.AppendVertex(vecPos, c);
+            }
+        }
+
+        vertexBuilder.End(ctx);
+        CMeshIndexBuilder indexBuilder;
+
+        if (indexBuilder.Begin(ctx, nTheta * (6 * nPhi - 6)))
+        {
+            // Emit the triangle strips.
+            for (int i = 0; i < nPhi - 1; ++i)
+            {
+                for (int j = 0; j < nTheta; j++)
+                {
+                    const int curr = (nTheta + 1) * i + j;
+
+                    indexBuilder.AppendIndex((u16)(curr));
+                    indexBuilder.AppendIndex((u16)(curr + 1));
+                    indexBuilder.AppendIndex((u16)(curr + (nTheta + 1) + 1));
+                    indexBuilder.AppendIndex((u16)(curr));
+                    indexBuilder.AppendIndex((u16)(curr + (nTheta + 1) + 1));
+                    indexBuilder.AppendIndex((u16)(curr + (nTheta + 1)));
+                }
+            }
+
+            indexBuilder.End(ctx);
+            ctx->DrawTriangleListIndexed(vertexBuilder.GetParams(), indexBuilder.GetParams(), 0);
+        }
+    }
+
+    // Need to call this to decrement context ref counter.
+    ctx->EndRenderer();
+}
+
 //-----------------------------------------------------------------------------
 // purpose: capsule vertices
 //-----------------------------------------------------------------------------
@@ -624,6 +742,15 @@ void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, 
         pMaterial = bZBuffer ? s_transNormalZBoth : s_transIgnoreZBoth;
 
     RenderTriangleInternal(p1, p2, p3, c, pMaterial);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: public proxy for RenderSphereInternal
+//-----------------------------------------------------------------------------
+void RenderSphere(const Vector3D& vCenter, const float flRadius, const int nTheta, const int nPhi, const Color c, const bool bZBuffer)
+{
+    IMaterial* const pMaterial = bZBuffer ? s_transNormalZFront : s_transIgnoreZFront;
+    RenderSphereInternal(vCenter, flRadius, nTheta, nPhi, c, pMaterial);
 }
 
 //-----------------------------------------------------------------------------

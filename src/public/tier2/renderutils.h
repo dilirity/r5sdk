@@ -19,6 +19,7 @@ void RenderBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vect
 void RenderWireframeSweptBox(const Vector3D& vStart, const Vector3D& vEnd, const QAngle& angles,
 	const Vector3D& vMins, const Vector3D& vMaxs, const Color c, const bool bZBuffer);
 void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, const bool bZBuffer);
+void RenderSphere(const Vector3D& vCenter, const float flRadius, const int nTheta, const int nPhi, const Color c, const bool bZBuffer);
 void RenderCapsule(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const Color c, const bool bZBuffer);
 
 ///////////////////////////////////////////////////////////////////////////////
