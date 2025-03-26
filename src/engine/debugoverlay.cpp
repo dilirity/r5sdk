@@ -791,6 +791,103 @@ void CIVDebugOverlay::AddScreenTextOverlayAtCenter(CIVDebugOverlay* const thispt
     DebugOverlay_AddScreenTextOverlay({0.5f, 0.5f}, 0, 0.f, 255, 0, 0, unk2, text, textLen);
 }
 
+//-----------------------------------------------------------------------------
+// These are the same as above, except we have to shift the 'this' pointer back
+// with sizeof(void*) bytes because we call CIVDebugOverlay methods which uses
+// its member variables, IVPhysicsDebugOverlay methods will have the thisptr
+// shifted with 8 bytes forward due to compiler optimizations. Only functions
+// using member variables or IVDebugOverlay methods have been duplicated here.
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Purpose: add new entity positioned overlay text
+//-----------------------------------------------------------------------------
+void CIVDebugOverlay::AddPhysicsEntityTextOverlay(CIVDebugOverlay* const thisptr, const int entIndex, const int lineOffset, const float duration, const int r, const int g, const int b, const int a, const char* const format, ...)
+{
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
+        return;
+
+    Vector3D pos;
+
+    if (!DebugOverlay_GetEntityOriginClientOrServer(entIndex, pos))
+        return;
+
+    AUTO_LOCK(*s_OverlayMutex);
+    CIVDebugOverlay* const thisprAdj = (CIVDebugOverlay*)((intptr_t)(thisptr)-sizeof(void*));
+
+    va_start(thisprAdj->m_argptr, format);
+    const int textLen = Q_vsnprintf(thisprAdj->m_text, sizeof(thisprAdj->m_text), format, thisprAdj->m_argptr);
+    va_end(thisprAdj->m_argptr);
+
+    if (textLen > 0)
+        DebugOverlay_AddTextOverlay(pos, lineOffset, duration, r, g, b, a, thisprAdj->m_text, textLen);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: add new world positioned overlay text
+//-----------------------------------------------------------------------------
+void CIVDebugOverlay::AddPhysicsTextOverlay(CIVDebugOverlay* const thisptr, const Vector3D& origin, const float duration, const char* const format, ...)
+{
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
+        return;
+
+    AUTO_LOCK(*s_OverlayMutex);
+    CIVDebugOverlay* const thisprAdj = (CIVDebugOverlay*)((intptr_t)(thisptr)-sizeof(void*));
+
+    va_start(thisprAdj->m_argptr, format);
+    const int textLen = Q_vsnprintf(thisprAdj->m_text, sizeof(thisprAdj->m_text), format, thisprAdj->m_argptr);
+    va_end(thisprAdj->m_argptr);
+
+    if (textLen > 0)
+        DebugOverlay_AddTextOverlay(origin, 0, duration, 255, 255, 255, 255, thisprAdj->m_text, textLen);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: add new world positioned overlay text at line offset
+//-----------------------------------------------------------------------------
+void CIVDebugOverlay::AddPhysicsTextOverlayAtOffset(CIVDebugOverlay* const thisptr, const Vector3D& origin, const int lineOffset, const float duration, const char* const format, ...)
+{
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
+        return;
+
+    AUTO_LOCK(*s_OverlayMutex);
+    CIVDebugOverlay* const thisprAdj = (CIVDebugOverlay*)((intptr_t)(thisptr)-sizeof(void*));
+
+    va_start(thisprAdj->m_argptr, format);
+    const int textLen = Q_vsnprintf(thisprAdj->m_text, sizeof(thisprAdj->m_text), format, thisprAdj->m_argptr);
+    va_end(thisprAdj->m_argptr);
+
+    if (textLen > 0)
+        DebugOverlay_AddTextOverlay(origin, lineOffset, duration, 255, 255, 255, 255, thisprAdj->m_text, textLen);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: add new world positioned overlay text using float color
+//-----------------------------------------------------------------------------
+void CIVDebugOverlay::AddPhysicsTextOverlayRGBf32(CIVDebugOverlay* const thisptr, const Vector3D& origin, const int lineOffset, const float duration,
+    const float r, const float g, const float b, const float a, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(8, 9)
+{
+    if (!enable_debug_text_overlays.GetBool() || !DebugOverlay_CanApplyOverlay())
+        return;
+
+    AUTO_LOCK(*s_OverlayMutex);
+    CIVDebugOverlay* const thisprAdj = (CIVDebugOverlay*)((intptr_t)(thisptr)-sizeof(void*));
+
+    va_start(thisprAdj->m_argptr, format);
+    const int textLen = Q_vsnprintf(thisprAdj->m_text, sizeof(thisprAdj->m_text), format, thisprAdj->m_argptr);
+    va_end(thisprAdj->m_argptr);
+
+    if (textLen > 0)
+    {
+        const int cr = (int)Clamp(r * 255.f, 0.f, 255.f);
+        const int cg = (int)Clamp(g * 255.f, 0.f, 255.f);
+        const int cb = (int)Clamp(b * 255.f, 0.f, 255.f);
+        const int ca = (int)Clamp(a * 255.f, 0.f, 255.f);
+
+        DebugOverlay_AddTextOverlay(origin, lineOffset, duration, cr, cg, cb, ca, thisprAdj->m_text, textLen);
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 void VDebugOverlay::Detour(const bool bAttach) const
 {
@@ -803,12 +900,12 @@ void VDebugOverlay::Detour(const bool bAttach) const
         void* null;
 
         // Replace the nulled functions in the IVPhysicsDebugOverlay implementation with ours.
-        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddEntityTextOverlay, 0, &null);
-        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlay, 4, &null);
-        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayAtOffset, 5, &null);
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddPhysicsEntityTextOverlay, 0, &null);
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddPhysicsTextOverlay, 4, &null);
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddPhysicsTextOverlayAtOffset, 5, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddScreenTextOverlayAtOffset, 6, &null);
-        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayRGBf32, 8, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddSweptBoxInternal, 7, &null); // NEW: now supports setting depth testing.
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddPhysicsTextOverlayRGBf32, 8, &null);
 
         // Replace the nulled functions in the IVDebugOverlay implementation with ours.
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddEntityTextOverlay, 0, &null);
