@@ -221,8 +221,9 @@ void CIVDebugOverlay::AddSweptBoxInternal(CIVDebugOverlay* const thisptr, const 
 
 //-----------------------------------------------------------------------------
 // Purpose: add new overlay capsule
-//------------------------------------------------------------------------------
-void CIVDebugOverlay::AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration)
+//-----------------------------------------------------------------------------
+void CIVDebugOverlay::AddCapsuleOverlayInternal(CIVDebugOverlay* const thisptr, const Vector3D& vStart, const Vector3D& vEnd,
+    const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration)
 {
     if (!DebugOverlay_CanApplyOverlay())
         return;
@@ -327,7 +328,6 @@ static void DebugOverlay_DestroyOverlay(OverlayBase_t* const pOverlay)
     case OverlayType_t::OVERLAY_CUSTOM_MESH:
     case OverlayType_t::OVERLAY_TRIANGLE:
     case OverlayType_t::OVERLAY_SWEPT_BOX:
-    case OverlayType_t::OVERLAY_UNKNOWN:
     case OverlayType_t::OVERLAY_CAPSULE:
         pOverlay->m_Type = OverlayType_t::OVERLAY_DESTROYED;
         delete pOverlay;
@@ -412,11 +412,6 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
         const OverlaySweptBox_t* const pSweptBox = reinterpret_cast<const OverlaySweptBox_t*>(pOverlay);
         RenderWireframeSweptBox(pSweptBox->start, pSweptBox->end, pSweptBox->angles, pSweptBox->mins, pSweptBox->maxs,
             Color(pSweptBox->r, pSweptBox->g, pSweptBox->b, pSweptBox->a), !pSweptBox->noDepthTest);
-        break;
-    }
-    case OverlayType_t::OVERLAY_UNKNOWN:
-    {
-        //printf("UNK0 %p\n", pOverlay);
         break;
     }
     case OverlayType_t::OVERLAY_CAPSULE:
@@ -824,5 +819,9 @@ void VDebugOverlay::Detour(const bool bAttach) const
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddSweptBoxInternal, 12, &null); // NEW: now supports setting depth testing.
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayRGBu32, 24, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayRGBf32, 25, &null);
+
+        // The overlay adder at index 27 is unknown and never used, its renderer also doesn't
+        // exist. Replaced with capsule renderer allowing us to add these through the interface.
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddCapsuleOverlayInternal, 27, &null);
     }
 }

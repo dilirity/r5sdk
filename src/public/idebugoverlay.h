@@ -55,7 +55,7 @@ public:
 	virtual void AddTextOverlayRGBf32(const Vector3D& origin, const int lineOffset, const float duration, const float r, const float g, const float b, const float a, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(9, 10) = 0;
 
 	virtual void AddLineOverlayWithAlpha(const Vector3D& vStart, const Vector3D& vEnd, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
-	virtual void AddUnknownOverlay(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const float& unk1, const float& unk2, const float flDuration) = 0; // Unknown shape, renderer also not available.
+	virtual void AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
 };
 
 #endif // IDEBUGOVERLAY_H

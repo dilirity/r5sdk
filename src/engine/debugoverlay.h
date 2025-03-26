@@ -25,11 +25,8 @@ enum class OverlayType_t
 	OVERLAY_SPLINE,
 	OVERLAY_TRIANGLE,
 	OVERLAY_SWEPT_BOX,
-	OVERLAY_UNKNOWN, // see 0x140209440, possibly a tetrahedron or quadrilateral?
+	OVERLAY_CAPSULE, // see 0x140209440, possibly a tetrahedron or quadrilateral? Never used. Now replaced with capsule.
 	OVERLAY_DESTROYED, // see 0x140208230, DestroyOverlay sets all destroyed overlays to this.
-
-	// Custom SDK overlays start from here.
-	OVERLAY_CAPSULE,
 };
 
 struct OverlayBase_t
@@ -218,9 +215,9 @@ public: // Hook statics:
 		const float r, const float g, const float b, const float a, PRINTF_FORMAT_STRING const char* const format, ...) FMTFUNCTION(9, 10);
 
 public:
-	void AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration);
 	static void AddSphereOverlayInternal(CIVDebugOverlay* const thisptr, const Vector3D& vOrigin, const float flRadius, const int nTheta, const int nPhi, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration);
 	static void AddSweptBoxInternal(CIVDebugOverlay* const thisptr, const Vector3D& start, const Vector3D& end, const Vector3D& mins, const Vector3D& max, const QAngle& angles, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration);
+	static void AddCapsuleOverlayInternal(CIVDebugOverlay* const thisptr, const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration);
 
 private:
 	char m_text[1024];
