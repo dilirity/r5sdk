@@ -15,7 +15,6 @@ constexpr auto NDEBUG_PERSIST_TILL_NEXT_SERVER = (0.01023f);
 constexpr auto NDEBUG_PERSIST_TILL_NEXT_CLIENT = (0.02046f);
 
 extern ConVar enable_debug_text_overlays;
-extern ConVar r_debug_draw_depth_test;
 
 enum class OverlayType_t
 {
@@ -81,6 +80,7 @@ struct OverlaySphere_t : public OverlayBase_t
 	int             g;
 	int             b;
 	int             a;
+	bool            noDepthTest;
 };
 
 struct OverlayLine_t : public OverlayBase_t
@@ -135,6 +135,7 @@ struct OverlaySweptBox_t : public OverlayBase_t
 	int             g;
 	int             b;
 	int             a;
+	bool            noDepthTest;
 };
 
 struct OverlayCapsule_t : public OverlayBase_t
@@ -218,6 +219,8 @@ public: // Hook statics:
 
 public:
 	void AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration);
+	static void AddSphereOverlayInternal(CIVDebugOverlay* const thisptr, const Vector3D& vOrigin, const float flRadius, const int nTheta, const int nPhi, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration);
+	static void AddSweptBoxInternal(CIVDebugOverlay* const thisptr, const Vector3D& start, const Vector3D& end, const Vector3D& mins, const Vector3D& max, const QAngle& angles, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration);
 
 private:
 	char m_text[1024];

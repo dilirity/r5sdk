@@ -364,7 +364,7 @@ void Line_f(const CCommand& args)
 		end[i] = float(atof(args[i + 4]));
 	}
 
-	g_pDebugOverlay->AddLineOverlay(start, end, 255, 255, 0, !r_debug_draw_depth_test.GetBool(), 100);
+	g_pDebugOverlay->AddLineOverlay(start, end, 255, 255, 0, true, 100);
 }
 
 /*
@@ -390,7 +390,7 @@ void Triangle_f(const CCommand& args)
 		p2[i] = float(atof(args[i + 4]));
 		p3[i] = float(atof(args[i + 7]));
 	}
-	g_pDebugOverlay->AddTriangleOverlay(p1, p2, p3, 230, 40, 20, 200, !r_debug_draw_depth_test.GetBool(), 100);
+	g_pDebugOverlay->AddTriangleOverlay(p1, p2, p3, 230, 40, 20, 200, true, 100);
 }
 
 /*
@@ -419,7 +419,7 @@ void Sphere_f(const CCommand& args)
 	const int theta = atoi(args[5]);
 	const int phi = atoi(args[6]);
 
-	g_pDebugOverlay->AddSphereOverlay(start, radius, theta, phi, 20, 210, 255, 200, 100);
+	g_pDebugOverlay->AddSphereOverlay(start, radius, theta, phi, 20, 210, 255, 80, true, 100);
 }
 
 /*
@@ -446,7 +446,7 @@ void Capsule_f(const CCommand& args)
 	}
 
 	const float radius = float(atof(args[7]));
-	g_pDebugOverlay->AddCapsuleOverlay(start, end, radius, 141, 233, 135, 200, !r_debug_draw_depth_test.GetBool(), 100);
+	g_pDebugOverlay->AddCapsuleOverlay(start, end, radius, 141, 233, 135, 200, true, 100);
 }
 #endif // !DEDICATED
 
@@ -506,7 +506,7 @@ void BHit_f(const CCommand& args)
 		if (pEntity)
 		{
 			g_pDebugOverlay->AddSphereOverlay( // Render a debug sphere at the client's predicted entity origin.
-				pEntity->GetAbsOrigin(), 10.f, 8, 6, 20, 60, 255, 255, r_visualizetraces_duration->GetFloat());
+				pEntity->GetAbsOrigin(), 10.f, 8, 6, 20, 60, 255, 255, !bhit_depth_test.GetBool(), r_visualizetraces_duration->GetFloat());
 		}
 	}
 #endif // !DEDICATED

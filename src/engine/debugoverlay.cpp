@@ -34,9 +34,7 @@
 #endif // !CLIENT_DLL && !DEDICATED
 
 ConVar enable_debug_text_overlays("enable_debug_text_overlays", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT | FCVAR_GAMEDLL, "Enable rendering of debug text overlays");
-
-ConVar r_debug_draw_depth_test("r_debug_draw_depth_test", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Toggle depth test for other debug draw functionality");
-static ConVar r_debug_overlay_nodecay("r_debug_overlay_nodecay", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Keeps all debug overlays alive regardless of their lifetime. Use command 'clear_debug_overlays' to clear everything");
+static ConVar debug_overlay_nodecay("debug_overlay_nodecay", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Keeps all debug overlays alive regardless of their lifetime. Use command 'clear_debug_overlays' to clear everything");
 
 //------------------------------------------------------------------------------
 // Purpose: returns whether the overlay can be added at this moment
@@ -159,6 +157,69 @@ static bool DebugOverlay_GetEntityOriginClientOrServer(const int entNum, Vector3
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: add new overlay sphere
+//-----------------------------------------------------------------------------
+void CIVDebugOverlay::AddSphereOverlayInternal(CIVDebugOverlay* const thisptr, const Vector3D& vOrigin, const float flRadius,
+    const int nTheta, const int nPhi, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration)
+{
+    if (!DebugOverlay_CanApplyOverlay())
+        return;
+
+    AUTO_LOCK(*s_OverlayMutex);
+    OverlaySphere_t* const newOverlay = new OverlaySphere_t;
+
+    if (!newOverlay)
+        return;
+
+    newOverlay->vOrigin = vOrigin;
+    newOverlay->flRadius = flRadius;
+    newOverlay->nTheta = nTheta;
+    newOverlay->nPhi = nPhi;
+    newOverlay->r = r;
+    newOverlay->g = g;
+    newOverlay->b = b;
+    newOverlay->a = a;
+    newOverlay->noDepthTest = noDepthTest;
+
+    newOverlay->SetEndTime(flDuration);
+
+    newOverlay->m_pNextOverlay = *s_pOverlays;
+    *s_pOverlays = newOverlay;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: add new overlay swept box
+//-----------------------------------------------------------------------------
+void CIVDebugOverlay::AddSweptBoxInternal(CIVDebugOverlay* const thisptr, const Vector3D& start, const Vector3D& end, const Vector3D& mins,
+    const Vector3D& max, const QAngle& angles, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration)
+{
+    if (!DebugOverlay_CanApplyOverlay())
+        return;
+
+    AUTO_LOCK(*s_OverlayMutex);
+    OverlaySweptBox_t* const newOverlay = new OverlaySweptBox_t;
+
+    if (!newOverlay)
+        return;
+
+    newOverlay->start = start;
+    newOverlay->end = end;
+    newOverlay->mins = mins;
+    newOverlay->maxs = max;
+    newOverlay->angles = angles;
+    newOverlay->r = r;
+    newOverlay->g = g;
+    newOverlay->b = b;
+    newOverlay->a = a;
+    newOverlay->noDepthTest = noDepthTest;
+
+    newOverlay->SetEndTime(flDuration);
+
+    newOverlay->m_pNextOverlay = *s_pOverlays;
+    *s_pOverlays = newOverlay;
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: add new overlay capsule
 //------------------------------------------------------------------------------
 void CIVDebugOverlay::AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration)
@@ -193,7 +254,7 @@ void CIVDebugOverlay::AddCapsuleOverlay(const Vector3D& vStart, const Vector3D& 
 //------------------------------------------------------------------------------
 bool OverlayBase_t::IsDead() const
 {
-    if (r_debug_overlay_nodecay.GetBool())
+    if (debug_overlay_nodecay.GetBool())
     {
         // Keep rendering the overlay if no-decay is set.
         return false;
@@ -313,7 +374,7 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
     {
         const OverlaySphere_t* const pSphere = static_cast<const OverlaySphere_t*>(pOverlay);
         v_RenderWireframeSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi,
-            Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), r_debug_draw_depth_test.GetBool());
+            Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), !pSphere->noDepthTest);
 
         break;
     }
@@ -349,8 +410,8 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
     case OverlayType_t::OVERLAY_SWEPT_BOX:
     {
         const OverlaySweptBox_t* const pSweptBox = reinterpret_cast<const OverlaySweptBox_t*>(pOverlay);
-        RenderWireframeSweptBox(pSweptBox->start, pSweptBox->end, pSweptBox->angles, pSweptBox->mins, pSweptBox->maxs, 
-            Color(pSweptBox->r, pSweptBox->g, pSweptBox->b, pSweptBox->a), r_debug_draw_depth_test.GetBool());
+        RenderWireframeSweptBox(pSweptBox->start, pSweptBox->end, pSweptBox->angles, pSweptBox->mins, pSweptBox->maxs,
+            Color(pSweptBox->r, pSweptBox->g, pSweptBox->b, pSweptBox->a), !pSweptBox->noDepthTest);
         break;
     }
     case OverlayType_t::OVERLAY_UNKNOWN:
@@ -751,14 +812,16 @@ void VDebugOverlay::Detour(const bool bAttach) const
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlay, 4, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayAtOffset, 5, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddScreenTextOverlayAtOffset, 6, &null);
-        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddScreenTextOverlayAtCenter, 7, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayRGBf32, 8, &null);
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVPhysicsDebugOverlay_VFTable, CIVDebugOverlay::AddSweptBoxInternal, 7, &null); // NEW: now supports setting depth testing.
 
         // Replace the nulled functions in the IVDebugOverlay implementation with ours.
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddEntityTextOverlay, 0, &null);
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddSphereOverlayInternal, 3, &null); // NEW: now supports setting depth testing.
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayAtOffset, 8, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlay, 9, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddScreenTextOverlayAtOffset, 10, &null);
+        CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddSweptBoxInternal, 12, &null); // NEW: now supports setting depth testing.
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayRGBu32, 24, &null);
         CMemory::HookVirtualMethod((uintptr_t)g_pIVDebugOverlay_VFTable, CIVDebugOverlay::AddTextOverlayRGBf32, 25, &null);
     }

@@ -18,7 +18,7 @@ public:
 	virtual void AddEntityTextOverlay(const int entIndex, const int lineOffset, const float duration, const int r, const int g, const int b, const int a, PRINTF_FORMAT_STRING const char* const format, ...) = 0;
 	virtual void AddTransformedBoxOverlay(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
 	virtual void AddBoxOverlay(const Vector3D& VOrigin, const Vector3D& vMins, const Vector3D& vMaxs, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
-	virtual void AddSphereOverlay(const Vector3D& vOrigin, const float flRadius, const int nTheta, const int nPhi, const int r, const int g, const int b, const int a, const float flDuration) = 0;
+	virtual void AddSphereOverlay(const Vector3D& vOrigin, const float flRadius, const int nTheta, const int nPhi, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
 	virtual void AddTriangleOverlay(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
 	virtual void AddLineOverlay(const Vector3D& vStart, const Vector3D& vEnd, const int r, const int g, const int b, const bool noDepthTest, const float flDuration) = 0;
 	virtual void AddSplineOverlay(const Vector3D& vStart, const Vector3D& vEnd, const int r, const int g, const int b, const bool noDepthTest, const float flDuration) = 0;
@@ -33,7 +33,7 @@ public:
 	virtual void AddScreenTextOverlay(const Vector2D& screenPos, const int lineOffset, const float flDuration, const int r, const int g, const int b, const int a, const char* const text) = 0;
 	virtual void AddScreenTextOverlayCenter(IVDebugOverlay* const unused1, const char* const text, const void* unused2, const int unk1, const int unk2) = 0;
 
-	virtual void AddSweptBoxOverlay(const Vector3D& start, const Vector3D& end, const Vector3D& mins, const Vector3D& max, const QAngle& angles, const int r, const int g, const int b, const int a, const float flDuration) = 0;
+	virtual void AddSweptBoxOverlay(const Vector3D& start, const Vector3D& end, const Vector3D& mins, const Vector3D& max, const QAngle& angles, const int r, const int g, const int b, const int a, const bool noDepthTest, const float flDuration) = 0;
 	virtual void AddGridOverlay(const Vector3D& origin) = 0;
 	virtual void AddCoordFrameOverlay(const matrix3x4_t& frame, float flScale, int vColorTable[3][3] = NULL) = 0;
 
