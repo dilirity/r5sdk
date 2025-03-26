@@ -373,8 +373,17 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
     case OverlayType_t::OVERLAY_SPHERE:
     {
         const OverlaySphere_t* const pSphere = static_cast<const OverlaySphere_t*>(pOverlay);
-        v_RenderWireframeSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi,
-            Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), !pSphere->noDepthTest);
+
+        if (pSphere->a > 0)
+        {
+            RenderSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi,
+                Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), !pSphere->noDepthTest);
+        }
+        if (pSphere->a < 255)
+        {
+            v_RenderWireframeSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi,
+                Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), !pSphere->noDepthTest);
+        }
 
         break;
     }
