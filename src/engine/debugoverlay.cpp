@@ -60,7 +60,7 @@ static bool DebugOverlay_CanApplyOverlay()
 // Purpose: determines and sets the end time for the overlay
 //-----------------------------------------------------------------------------
 template <class OverlayBaseClass>
-static void DebugOverlay_SetEndTime(OverlayBaseClass* const base, const float duration)
+static void DebugOverlay_SetEndTime(OverlayBaseClass* const base, const float duration, const bool nonTextOverlay)
 {
     if (duration == 0.0f)
     {
@@ -76,15 +76,16 @@ static void DebugOverlay_SetEndTime(OverlayBaseClass* const base, const float du
         if (ThreadInServerFrameThread())
         {
             // note(kawe): this was originally 'n + 1' but this
-            // makes it render for 2 frames causing moving text
-            // and shape overlays to become blurry. This seems
-            // to be an effort to make client overlays flicker
-            // less (see comment on the `g_nRenderTickCount`
-            // assignment bellow). This increment is no longer
-            // necessary and removed as it has a side effect of
-            // rendering text overlays for 2 frames making them
-            // very hard to read on moving entities.
-            base->m_nOverlayTick = (*g_nOverlayStage)/* + 1*/;	// stay alive for only one frame
+            // makes debug text overlays to render for 2 frames
+            // resulting in a trail effect when text is being
+            // displayed on moving entities. Text is rendered
+            // at a different point during the frame than the
+            // non-text overlays causing this effect, so only
+            // increment if we have a non-text overlay. For
+            // non-text overlays we need the increment as it
+            // ensures the server overlay runs for the entirety
+            // of the client frame without rendering twice.
+            base->m_nOverlayTick = (*g_nOverlayStage) + nonTextOverlay;	// stay alive for only one frame
         }
         else
         {
@@ -229,7 +230,7 @@ bool OverlayBase_t::IsDead() const
 void OverlayBase_t::SetEndTime(const float duration)
 {
     (*g_nNewOtherOverlays)++;
-    DebugOverlay_SetEndTime(this, duration);
+    DebugOverlay_SetEndTime(this, duration, true);
 }
 
 //------------------------------------------------------------------------------
@@ -239,7 +240,7 @@ void OverlayBase_t::SetEndTime(const float duration)
 void OverlayText_t::SetEndTime(const float duration)
 {
     (*g_nNewTextOverlays)++;
-    DebugOverlay_SetEndTime(this, duration);
+    DebugOverlay_SetEndTime(this, duration, false);
 }
 
 //------------------------------------------------------------------------------
@@ -368,46 +369,75 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
 }
 
 //------------------------------------------------------------------------------
-// Purpose : overlay drawing entrypoint
-// Input  : bRender - won't render anything if false
+// Purpose : overlay drawing and decaying entry point
+// Input   : bDraw - only runs the decaying logic if false
 //------------------------------------------------------------------------------
-static void DebugOverlay_DrawAllOverlays(const bool bRender)
+static void DebugOverlay_DrawAllOverlays(const bool bDraw)
 {
-    const bool bOverlayEnabled = (bRender && enable_debug_overlays->GetBool());
-
-    if (!bOverlayEnabled)
-        return;
-
-#if !defined (CLIENT_DLL) && !defined (DEDICATED)
-    g_AIUtility.RunRenderFrame();
-#endif // !CLIENT_DLL && !DEDICATED
-
     AUTO_LOCK(*s_OverlayMutex);
-    const OverlayBase_t* pCurrOverlay = *s_pOverlays;
+
+    const bool bOverlayEnabled = (bDraw && enable_debug_overlays->GetBool());
+    OverlayBase_t* pCurrOverlay = *s_pOverlays;
+    OverlayBase_t* pPrevOverlay = nullptr;
+    OverlayBase_t* pNextOverlay = nullptr;
 
     while (pCurrOverlay)
     {
-        bool bShouldDraw = false;
-
-        if (pCurrOverlay->m_nCreationTick == -1)
+        // Is it time to kill this overlay?
+        if (pCurrOverlay->IsDead())
         {
-            if (pCurrOverlay->m_nOverlayTick == -1 ||
-                pCurrOverlay->m_nOverlayTick == *g_nOverlayTickCount)
+            if (pPrevOverlay)
             {
-                bShouldDraw = true;
+                // If I had a last overlay reset it's next pointer
+                pPrevOverlay->m_pNextOverlay = pCurrOverlay->m_pNextOverlay;
             }
+            else
+            {
+                // If the first line, reset the s_pOverlays pointer
+                *s_pOverlays = pCurrOverlay->m_pNextOverlay;
+            }
+
+            pNextOverlay = pCurrOverlay->m_pNextOverlay;
+            DebugOverlay_DestroyOverlay(pCurrOverlay);
+            pCurrOverlay = pNextOverlay;
         }
         else
         {
-            bShouldDraw = pCurrOverlay->m_nCreationTick == *g_nRenderTickCount;
-        }
-        if (bOverlayEnabled && bShouldDraw)
-        {
-            DebugOverlay_DrawOverlay(pCurrOverlay);
-        }
+            if (bOverlayEnabled)
+            {
+                bool bShouldDraw = false;
 
-        pCurrOverlay = pCurrOverlay->m_pNextOverlay;
+                if (pCurrOverlay->m_nCreationTick == -1)
+                {
+                    if (pCurrOverlay->m_nOverlayTick == *g_nOverlayTickCount ||
+                        pCurrOverlay->m_nOverlayTick == -1)
+                    {
+                        bShouldDraw = true;
+                    }
+                }
+                else
+                {
+                    bShouldDraw = pCurrOverlay->m_nCreationTick == *g_nRenderTickCount;
+                }
+                if (bShouldDraw)
+                {
+                    DebugOverlay_DrawOverlay(pCurrOverlay);
+                }
+            }
+
+            pPrevOverlay = pCurrOverlay;
+            pCurrOverlay = pCurrOverlay->m_pNextOverlay;
+        }
     }
+
+    g_pDebugOverlay->ClearDeadTextOverlays();
+
+#if !defined(CLIENT_DLL) && !defined (DEDICATED)
+    if (bOverlayEnabled)
+    {
+        g_AIUtility.RunRenderFrame();
+    }
+#endif // !CLIENT_DLL && !DEDICATED
 }
 
 //------------------------------------------------------------------------------
@@ -474,16 +504,17 @@ static void DebugOverlay_ClearAllOverlays()
 }
 
 //------------------------------------------------------------------------------
-// Purpose : clears all dead overlays
+// Purpose : clear all dead overlays; this is a separate version of the decaying
+//           logic found in DebugOverlay_DrawAllOverlays(). The dedicated server
+//           needs to call this function as DebugOverlay_DrawAllOverlays() won't
+//           be called as this is initiated from CViewRender, which is not on.
 //------------------------------------------------------------------------------
 void DebugOverlay_HandleDecayed()
 {
     // These must always be called, even when the debug overlay is disabled
-    // because existing ones still needs to be decayed. Also with the design
-    // of the implementation in the engine, the debug interface is always
-    // called, even when its disabled. Its up to the engine and SDK to deal
-    // with the calls, which is to just run the regular decaying logic here
-    // while not rendering them out.
+    // because the calls to the debug interface still take place. Its up to
+    // the engine and SDK to deal with these calls. Not calling these will
+    // cause overlays to stack up forever.
     DebugOverlay_ClearDeadOverlays();
     g_pDebugOverlay->ClearDeadTextOverlays();
 }
