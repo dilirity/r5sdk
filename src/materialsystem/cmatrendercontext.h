@@ -19,13 +19,13 @@ public:
         CallVFunc<void>(index, this, material);
     }
 
-    inline void* GetDynamicMesh(const int vertexCount, DirectDrawVertexParams_s* const drawParams, const int unknown)
+    inline void* GetDynamicVertexBuffer(const int vertexCount, DirectDrawVertexParams_s* const drawParams, const int unknown)
     {
         const static int index = 83;
         return CallVFunc<void*>(index, this, vertexCount, drawParams, unknown);
     }
 
-    inline void EndDynamicMesh(const int vertexCount)
+    inline void EndDynamicVertexBuffer(const int vertexCount)
     {
         const static int index = 85;
         return CallVFunc<void>(index, this, vertexCount);

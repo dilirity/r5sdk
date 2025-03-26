@@ -9,8 +9,8 @@ public:
 
 	inline void AppendVertex(const Vector3D& vec, const Color color)
 	{
-		*m_meshBuffer = { vec, color };
-		m_meshBuffer++;
+		*m_vertexBuffer = { vec, color };
+		m_vertexBuffer++;
 
 #ifdef _DEBUG
 		m_vertexCount++;
@@ -27,7 +27,7 @@ private:
 		Color col;
 	};
 
-	MeshVertex_s* m_meshBuffer;
+	MeshVertex_s* m_vertexBuffer;
 	DirectDrawVertexParams_s m_vertexParams;
 
 #ifdef _DEBUG

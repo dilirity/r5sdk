@@ -15,8 +15,8 @@ bool CMeshVertexBuilder::Begin(CMatRenderContext* const ctx, const int vertexCou
     m_vertexParams.vertexBufferOffset = 0;
     m_vertexParams.vertexCount = 0;
 
-    m_meshBuffer = (MeshVertex_s*)ctx->GetDynamicMesh(vertexCount, &m_vertexParams, 13);
-    return m_meshBuffer != nullptr;
+    m_vertexBuffer = (MeshVertex_s*)ctx->GetDynamicVertexBuffer(vertexCount, &m_vertexParams, 13);
+    return m_vertexBuffer != nullptr;
 }
 
 void CMeshVertexBuilder::End(CMatRenderContext* const ctx) const
@@ -26,7 +26,7 @@ void CMeshVertexBuilder::End(CMatRenderContext* const ctx) const
     // vertices than allocated.
     Assert(m_vertexCount == m_vertexParams.vertexCount);
 #endif // _DEBUG
-    ctx->EndDynamicMesh(m_vertexParams.vertexCount);
+    ctx->EndDynamicVertexBuffer(m_vertexParams.vertexCount);
 }
 
 bool CMeshIndexBuilder::Begin(CMatRenderContext* const ctx, const int indexCount)
