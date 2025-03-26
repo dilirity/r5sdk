@@ -101,7 +101,7 @@ float CClientState::GetClientTime() const
 {
     if (m_bClockCorrectionEnabled)
     {
-        return (float)m_ClockDriftMgr.m_nSimulationTick * g_pCommonHostState->interval_per_tick;
+        return (float)m_ClockDriftMgr.m_nClientTick * g_pCommonHostState->interval_per_tick;
     }
     else
     {
