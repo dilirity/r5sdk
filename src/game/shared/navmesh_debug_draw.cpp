@@ -13,6 +13,7 @@ rdNavMeshDebugDraw::rdNavMeshDebugDraw()
 {
 	m_currentVertCount = 0;
 	m_expectedVertCount = 0;
+	m_primitiveSize = 0.0f;
 
 	m_drawOffset.Init(0.f, 0.f, 0.f);
 
@@ -46,8 +47,6 @@ void rdNavMeshDebugDraw::texture(bool state)
 //------------------------------------------------------------------------------
 void rdNavMeshDebugDraw::begin(const duDebugDrawPrimitives prim, const float size, const rdVec3D* offset)
 {
-	rdIgnoreUnused(size);
-
 	switch (prim)
 	{
 	case duDebugDrawPrimitives::DU_DRAW_POINTS:
@@ -66,6 +65,7 @@ void rdNavMeshDebugDraw::begin(const duDebugDrawPrimitives prim, const float siz
 
 	m_currentPrimitive = prim;
 	m_currentVertCount = 0;
+	m_primitiveSize = size;
 
 	m_drawOffset.Init(offset->x, offset->y, offset->z);
 }
@@ -124,18 +124,23 @@ void rdNavMeshDebugDraw::handleAppend(const float x, const float y, const float 
 	switch (m_currentPrimitive)
 	{
 	case duDebugDrawPrimitives::DU_DRAW_POINTS:
-		// Unhandled for now.
-		rdAssert(0); // If you hit this, implement it.
+		if (m_primitiveColor.a() == 0)
+		{
+			m_primitiveColor[3] = 255;
+			RenderWireframeSphere(m_primitiveVertices[0], m_primitiveSize, 5, 5, m_primitiveColor, true);
+		}
+		else
+			RenderSphere(m_primitiveVertices[0], m_primitiveSize, 5, 5, m_primitiveColor, true);
 		break;
 	case duDebugDrawPrimitives::DU_DRAW_LINES:
-		v_RenderLine(m_primitiveVertices[0], m_primitiveVertices[1], m_primitiveColor, true);
+		RenderLine(m_primitiveVertices[0], m_primitiveVertices[1], m_primitiveColor, true);
 		break;
 	case duDebugDrawPrimitives::DU_DRAW_TRIS:
 		RenderTriangle(m_primitiveVertices[0], m_primitiveVertices[1], m_primitiveVertices[2], m_primitiveColor, true);
 		break;
 	case duDebugDrawPrimitives::DU_DRAW_QUADS:
-		// Unhandled for now.
-		rdAssert(0); // If you hit this, implement it.
+		RenderTriangle(m_primitiveVertices[0], m_primitiveVertices[1], m_primitiveVertices[2], m_primitiveColor, true);
+		RenderTriangle(m_primitiveVertices[1], m_primitiveVertices[3], m_primitiveVertices[2], m_primitiveColor, true);
 		break;
 	}
 
@@ -149,7 +154,7 @@ void rdNavMeshDebugDraw::end()
 {
 	// If hit, not all vertices were provided during begin and end.
 	// This means there was a mismatch between the number of given
-	// vertices and the selected primitive type.
+	// vertices and the number required for selected primitive type.
 	rdAssert(m_currentVertCount == 0);
 
 	m_currentPrimitive = duDebugDrawPrimitives::DU_DRAW_UNDEFINED;

@@ -41,6 +41,7 @@ public:
 private:
 	int m_currentVertCount;
 	int m_expectedVertCount;
+	float m_primitiveSize;
 
 	Vector3D m_drawOffset;
 	Vector3D m_primitiveVertices[4];
