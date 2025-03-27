@@ -1,5 +1,4 @@
 #pragma once
-#include "imgui/misc/imgui_logger.h"
 #include "imgui_surface.h"
 
 class CStreamOverlay : public CImguiSurface

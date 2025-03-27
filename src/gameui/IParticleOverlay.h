@@ -1,5 +1,4 @@
 #pragma once
-#include "imgui/misc/imgui_utility.h"
 #include "imgui_surface.h"
 
 class CParticleOverlay : public CImguiSurface
