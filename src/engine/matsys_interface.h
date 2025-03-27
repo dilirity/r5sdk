@@ -1,7 +1,7 @@
 #ifndef MATSYS_INTERFACE_H
 #define MATSYS_INTERFACE_H
 
-#include "public/imaterialsystem.h"
+#include "public/materialsystem/imaterialsystem.h"
 #include "public/inputsystem/ButtonCode.h"
 
 //-------------------------------------------------------------------------

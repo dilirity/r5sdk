@@ -2,7 +2,7 @@
 #define MATERIALSYSTEM_H
 #include "cmaterialglue.h"
 #include "cmatrendercontext.h"
-#include "public/imaterialsystem.h"
+#include "public/materialsystem/imaterialsystem.h"
 
 class CMaterialSystem
 {

@@ -9,7 +9,7 @@
 #include "public/avi/iavi.h"
 #include "public/avi/ibik.h"
 #include "public/const.h"
-#include "public/imaterial.h"
+#include "public/materialsystem/imaterial.h"
 #include "game/client/hud.h"
 
 //-----------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 #include "core/stdafx.h"
 #include "tier0/commandline.h"
-#include "public/imaterialsystem.h"
+#include "public/materialsystem/imaterialsystem.h"
 #include "engine/matsys_interface.h"
 
 // Disabled, as this patch **only** works if we are writing the file.

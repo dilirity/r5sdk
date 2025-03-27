@@ -1,8 +1,8 @@
 #ifndef FILESYSTEM_H
 #define FILESYSTEM_H
 
-#include "public/ifilesystem.h"
-#include "public/ifile.h"
+#include "filesystem/ifilesystem.h"
+#include "filesystem/ifile.h"
 #include "filesystem/basefilesystem.h"
 
 class CFileSystem_Stdio : public CBaseFileSystem

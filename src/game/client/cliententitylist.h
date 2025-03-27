@@ -11,7 +11,7 @@
 #include "tier1/utlvector.h"
 #include "tier1/utllinkedlist.h"
 
-#include "public/icliententitylist.h"
+#include "game/client/icliententitylist.h"
 
 #include "icliententityinternal.h"
 #include "entitylist_clientbase.h"

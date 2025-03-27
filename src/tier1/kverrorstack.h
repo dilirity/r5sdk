@@ -1,6 +1,6 @@
 #ifndef KVERRORSTACK_H
 #define KVERRORSTACK_H
-#include "ikeyvaluessystem.h"
+#include "vstdlib/ikeyvaluessystem.h"
 
 // a simple class to keep track of a stack of valid parsed symbols
 const int MAX_ERROR_STACK = 64;

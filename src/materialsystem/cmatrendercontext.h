@@ -1,6 +1,6 @@
 #ifndef MATRENDERCONTEXT_H
 #define MATRENDERCONTEXT_H
-#include "imaterial.h"
+#include "materialsystem/imaterial.h"
 #include "materialsystem/imatrendercontext.h"
 
 class CMatRenderContext

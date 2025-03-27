@@ -13,8 +13,8 @@
 
 #include "mathlib/vector.h"
 #include "tier1/string_t.h"
-#include "public/iservernetworkable.h"
-#include "public/iserverentity.h"
+#include "game/server/iservernetworkable.h"
+#include "game/server/iserverentity.h"
 #include "engine/gl_model_private.h"
 #include "game/shared/collisionproperty.h"
 #include "game/shared/shareddefs.h"

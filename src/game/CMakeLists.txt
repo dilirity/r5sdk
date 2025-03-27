@@ -189,16 +189,8 @@ add_sources( SOURCE_GROUP "LiveAPI"
     "server/liveapi/liveapi.h"
 )
 
-add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/iserverentity.h"
-    "${ENGINE_SOURCE_DIR}/public/iservernetworkable.h"
-    "${ENGINE_SOURCE_DIR}/public/iserverunknown.h"
-)
-
-add_sources( SOURCE_GROUP "Public/AI"
-    "${ENGINE_SOURCE_DIR}/public/game/server/ai_agent.h"
-    "${ENGINE_SOURCE_DIR}/public/game/server/ai_hull.h"
-    "${ENGINE_SOURCE_DIR}/public/game/server/ai_navmesh.h"
+file( GLOB GAME_SERVER_PUBLIC_HEADERS
+    "${ENGINE_SOURCE_DIR}/public/game/server/*"
 )
 
 endif()
@@ -262,28 +254,14 @@ add_sources( SOURCE_GROUP "Script"
     "client/vscript_client.h"
 )
 
-add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/icliententity.h"
-    "${ENGINE_SOURCE_DIR}/public/icliententitylist.h"
-    "${ENGINE_SOURCE_DIR}/public/iclientnetworkable.h"
-    "${ENGINE_SOURCE_DIR}/public/iclientrenderable.h"
-    "${ENGINE_SOURCE_DIR}/public/iclientthinkable.h"
-    "${ENGINE_SOURCE_DIR}/public/iclientunknown.h"
-
-    "${ENGINE_SOURCE_DIR}/public/game/client/iinput.h"
+file( GLOB GAME_CLIENT_PUBLIC_HEADERS
+    "${ENGINE_SOURCE_DIR}/public/game/client/*"
 )
 
 endif()
 
-add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/basehandle.h"
-    "${ENGINE_SOURCE_DIR}/public/edict.h"
-    "${ENGINE_SOURCE_DIR}/public/eiface.h"
-    "${ENGINE_SOURCE_DIR}/public/globalvars_base.h"
-    "${ENGINE_SOURCE_DIR}/public/ihandleentity.h"
-
-    "${ENGINE_SOURCE_DIR}/public/game/shared/weapon_types.h"
-    "${ENGINE_SOURCE_DIR}/public/game/shared/in_buttons.h"
+file( GLOB GAME_SHARED_PUBLIC_HEADERS
+    "${ENGINE_SOURCE_DIR}/public/game/shared/*"
 )
 
 end_sources()

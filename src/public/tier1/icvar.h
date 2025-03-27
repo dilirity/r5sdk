@@ -1,5 +1,5 @@
-#ifndef ICVAR_H
-#define ICVAR_H
+#ifndef TIER1_ICVAR_H
+#define TIER1_ICVAR_H
 #include "tier0/annotations.h"
 #include "iconvar.h"
 #include "appframework/IAppSystem.h"
@@ -187,4 +187,4 @@ inline ICvar::Iterator::~Iterator(void)
 	delete m_pIter;
 }
 
-#endif // ICVAR_H
+#endif // TIER1_ICVAR_H

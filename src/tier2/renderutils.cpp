@@ -13,7 +13,7 @@
 #include "mathlib/mathlib.h"
 #include "tier2/renderutils.h"
 #include "rtech/pak/pakstate.h"
-#include "imaterial.h"
+#include "materialsystem/imaterial.h"
 #include "materialsystem/cmaterialsystem.h"
 #include "materialsystem/cmatrendercontext.h"
 #include "materialsystem/cmatqueuedrendercontext.h"

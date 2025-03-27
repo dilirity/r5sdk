@@ -11,8 +11,8 @@
 #ifdef _WIN32
 #pragma once
 #endif
-#include "..\gametrace.h"
-#include "..\ihandleentity.h"
+#include "gametrace.h"
+#include "game/shared/ihandleentity.h"
 #include "ICollideable.h"
 
 //-----------------------------------------------------------------------------

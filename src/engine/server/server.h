@@ -4,7 +4,7 @@
 #include "networksystem/pylon.h"
 #include "engine/client/client.h"
 #include "engine/networkstringtable.h"
-#include "public/iserver.h"
+#include "inetmsghandler.h"
 #ifndef CLIENT_DLL
 #include "vengineserver_impl.h"
 #endif // !CLIENT_DLL
@@ -33,7 +33,7 @@ public:
 	inline int GetTick(void) const { return m_nTickCount; }
 	inline bool CanApplyOverlays(void) const { return m_bApplyOverlays; }
 
-#ifndef CLIENT_DLL // Only the connectionless packet handler is implemented on the client via the IServer base class.
+#ifndef CLIENT_DLL // Only the connectionless packet handler is implemented on the client engine.
 	int GetNumHumanPlayers(void) const;
 	int GetNumFakeClients(void) const;
 	int GetNumClients(void) const;

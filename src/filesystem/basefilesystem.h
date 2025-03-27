@@ -1,5 +1,5 @@
 #pragma once
-#include "public/ifilesystem.h"
+#include "filesystem/ifilesystem.h"
 
 class CBaseFileSystem : public CTier1AppSystem<IFileSystem>
 {

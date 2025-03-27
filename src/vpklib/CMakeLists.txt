@@ -9,7 +9,7 @@ add_sources( SOURCE_GROUP "Private"
 )
 
 add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/ipackedstore.h"
+    "${ENGINE_SOURCE_DIR}/public/filesystem/ipackedstore.h"
 )
 
 end_sources()

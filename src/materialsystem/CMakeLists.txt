@@ -20,9 +20,9 @@ add_sources( SOURCE_GROUP "Private"
 )
 
 add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/imaterial.h"
-    "${ENGINE_SOURCE_DIR}/public/imaterialinternal.h"
-    "${ENGINE_SOURCE_DIR}/public/imaterialsystem.h"
+    "${ENGINE_SOURCE_DIR}/public/materialsystem/imaterial.h"
+    "${ENGINE_SOURCE_DIR}/public/materialsystem/imaterialinternal.h"
+    "${ENGINE_SOURCE_DIR}/public/materialsystem/imaterialsystem.h"
     "${ENGINE_SOURCE_DIR}/public/materialsystem/meshbuilder.h"
 )
 
@@ -39,7 +39,7 @@ add_sources( SOURCE_GROUP "Private"
 )
 
 add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/imaterialsystem.h"
+    "${ENGINE_SOURCE_DIR}/public/materialsystem/imaterialsystem.h"
     "${ENGINE_SOURCE_DIR}/public/materialsystem/imatrendercontext.h"
     "${ENGINE_SOURCE_DIR}/public/materialsystem/meshbuilder.h"
 )

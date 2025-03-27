@@ -10,9 +10,5 @@ add_sources( SOURCE_GROUP "Private"
     "interfaces.h"
 )
 
-add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/ikeyvaluessystem.h"
-)
-
 end_sources()
 target_precompile_headers( ${PROJECT_NAME} PRIVATE ${GLOBAL_PCH} )

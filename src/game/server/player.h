@@ -12,8 +12,8 @@
 #include "mathlib/vector4d.h"
 #include "mathlib/bitvec.h"
 #include "public/studio.h"
-#include "public/playerstate.h"
 
+#include "game/shared/playerstate.h"
 #include "game/shared/animation.h"
 #include "game/shared/status_effect.h"
 #include "game/shared/takedamageinfo.h"

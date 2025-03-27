@@ -10,9 +10,8 @@ add_sources( SOURCE_GROUP "Private"
     "filesystem.h"
 )
 
-add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/ifile.h"
-    "${ENGINE_SOURCE_DIR}/public/ifilesystem.h"
+file( GLOB FILESYSTEM_PUBLIC_HEADERS
+    "${ENGINE_SOURCE_DIR}/public/filesystem/*"
 )
 
 end_sources()
@@ -28,8 +27,8 @@ add_sources( SOURCE_GROUP "Private"
     "filesystem_std.h"
 )
 
-add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/ifilesystem.h"
+file( GLOB FILESYSTEM_PUBLIC_HEADERS
+    "${ENGINE_SOURCE_DIR}/public/filesystem/*"
 )
 
 end_sources()

@@ -1,8 +1,8 @@
 #ifndef ANIMATION_H
 #define ANIMATION_H
 #include "mathlib/vector.h"
-#include "public/studio.h"
-#include "public/ihandleentity.h"
+#include "game/shared/ihandleentity.h"
+#include "studio.h"
 #include "predictioncopy.h"
 
 class CAnimationLayer

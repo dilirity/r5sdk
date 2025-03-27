@@ -2,7 +2,7 @@
 #include "mathlib/color.h"
 #include "tier1/utlbuffer.h"
 #include "tier1/exprevaluator.h"
-#include "public/ifilesystem.h"
+#include "filesystem/ifilesystem.h"
 
 #define KEYVALUES_TOKEN_SIZE	(1024 * 32)
 

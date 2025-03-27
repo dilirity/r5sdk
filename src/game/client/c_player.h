@@ -1,14 +1,15 @@
 #ifndef C_PLAYER_H
 #define C_PLAYER_H
 
-#include "icliententity.h"
-#include "icliententitylist.h"
-#include "iclientnetworkable.h"
-#include "iclientrenderable.h"
-#include "iclientthinkable.h"
-#include "iclientunknown.h"
-#include "ihandleentity.h"
-#include "playerstate.h"
+#include "game/shared/ihandleentity.h"
+#include "game/shared/playerstate.h"
+
+#include "game/client/icliententity.h"
+#include "game/client/icliententitylist.h"
+#include "game/client/iclientnetworkable.h"
+#include "game/client/iclientrenderable.h"
+#include "game/client/iclientthinkable.h"
+#include "game/client/iclientunknown.h"
 #include "vscript/ivscript.h"
 
 #include "input.h"

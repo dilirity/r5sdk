@@ -6,6 +6,6 @@
 //===========================================================================//
 
 #include "core/stdafx.h"
-#include "public/basehandle.h"
+#include "game/shared/basehandle.h"
 #include "baseentity.h"
 #include "networkproperty.h"

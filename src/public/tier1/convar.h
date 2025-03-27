@@ -13,8 +13,8 @@
 #define CONVAR_H
 
 #include "mathlib/color.h"
-#include "public/iconvar.h"
-#include "public/iconcommand.h"
+#include "tier1/iconvar.h"
+#include "tier1/iconcommand.h"
 #include "tier1/cmd.h"
 #include "tier1/utlvector.h"
 #include "tier1/utlstring.h"

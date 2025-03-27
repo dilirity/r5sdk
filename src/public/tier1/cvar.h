@@ -13,8 +13,8 @@
 #define CVAR_H
 
 #include "vstdlib/concommandhash.h"
-#include "public/icvar.h"
-#include "public/iconvar.h"
+#include "tier1/icvar.h"
+#include "tier1/iconvar.h"
 #include "tier1/utlmap.h"
 #include "tier1/utlvector.h"
 #include "tier1/utlstring.h"

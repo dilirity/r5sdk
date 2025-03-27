@@ -1,5 +1,5 @@
-#ifndef ICONCOMMAND_H
-#define ICONCOMMAND_H
+#ifndef TIER1_ICONCOMMAND_H
+#define TIER1_ICONCOMMAND_H
 #include "icvar.h"
 
 //-----------------------------------------------------------------------------
@@ -20,4 +20,4 @@ public:
 	virtual bool RegisterConCommandBase(ConCommandBase* const pVar) = 0;
 };
 
-#endif // ICONCOMMAND_H
+#endif // TIER1_ICONCOMMAND_H

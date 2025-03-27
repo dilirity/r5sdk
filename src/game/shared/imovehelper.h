@@ -13,7 +13,7 @@
 #endif
 
 #include "tier0/annotations.h"
-#include "public/ihandleentity.h"
+#include "game/shared/ihandleentity.h"
 
 typedef CBaseHandle EntityHandle_t;
 class IPhysicsSurfaceProps; // !TODO: reverse vtable.

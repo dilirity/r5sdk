@@ -1,7 +1,7 @@
 #ifndef TIER0_FRAMETASK_H
 #define TIER0_FRAMETASK_H
 
-#include "public/iframetask.h"
+#include "tier0/iframetask.h"
 
 //=============================================================================//
 // This class is set up to run before each frame, committed tasks are scheduled

@@ -3,7 +3,7 @@
 #include "tier1/mempool.h"
 #include "common/protocol.h"
 #include "public/inetmsghandler.h"
-#include "public/isnapshotmgr.h"
+#include "engine/isnapshotmgr.h"
 #include "engine/net_chan.h"
 #include "engine/networkstringtable.h"
 #include "engine/clockdriftmgr.h"

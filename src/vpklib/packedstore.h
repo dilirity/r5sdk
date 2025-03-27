@@ -10,8 +10,8 @@
 #define PACKEDSTORE_H
 
 #include "public/const.h"
-#include "public/ipackedstore.h"
-#include "public/ifilesystem.h"
+#include "public/filesystem/ipackedstore.h"
+#include "public/filesystem/ifilesystem.h"
 #include "public/tier1/strtools.h"
 #include "public/tier1/utlvector.h"
 #include "public/tier1/utlstring.h"

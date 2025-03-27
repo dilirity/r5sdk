@@ -6,6 +6,7 @@
 //=============================================================================//
 
 #include "core/stdafx.h"
+#include "mathlib/color.h"
 #include "tier0/memstd.h"
 #include "tier1/strtools.h"
 #include "tier1/keyvalues.h"
@@ -14,8 +15,7 @@
 #include "tier1/kverrorcontext.h"
 #include "tier1/kvtokenreader.h"
 #include "vstdlib/keyvaluessystem.h"
-#include "public/ifilesystem.h"
-#include "mathlib/color.h"
+#include "filesystem/ifilesystem.h"
 #include "rtech/stryder/stryder.h"
 #include "engine/sys_dll2.h"
 #include "engine/cmodel_bsp.h"

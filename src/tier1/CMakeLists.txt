@@ -40,12 +40,6 @@ add_sources( SOURCE_GROUP "Private"
 file( GLOB TIER1_PUBLIC_HEADERS
     "${ENGINE_SOURCE_DIR}/public/tier1/*"
 )
-add_sources( SOURCE_GROUP "Public"
-    "${TIER1_PUBLIC_HEADERS}"
-    "${ENGINE_SOURCE_DIR}/public/iconcommand.h"
-    "${ENGINE_SOURCE_DIR}/public/iconvar.h"
-    "${ENGINE_SOURCE_DIR}/public/icvar.h"
-)
 
 end_sources()
 

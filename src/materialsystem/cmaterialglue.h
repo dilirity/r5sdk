@@ -1,7 +1,7 @@
 #pragma once
 #ifndef DEDICATED
 #include "materialsystem/cshaderglue.h"
-#include "public/imaterialinternal.h"
+#include "public/materialsystem/imaterialinternal.h"
 #include "public/materialsystem/shader_vcs_version.h"
 #include "public/rendersystem/schema/texture.g.h"
 

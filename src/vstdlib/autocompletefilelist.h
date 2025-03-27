@@ -10,7 +10,7 @@
 #ifdef _WIN32
 #pragma once
 #endif
-#include "public/iconvar.h"
+#include "tier1/iconvar.h"
 
 //-----------------------------------------------------------------------------
 // Purpose: Simple helper class for doing autocompletion of all files in a specific directory by extension

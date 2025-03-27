@@ -1,7 +1,7 @@
 #ifndef FILESYSTEM_H
 #define FILESYSTEM_H
-#include <tier1/keyvalues.h>
-#include "ifilesystem.h"
+#include "tier1/keyvalues.h"
+#include "filesystem/ifilesystem.h"
 
 class CBaseFileSystem : public CTier1AppSystem<IFileSystem>
 {

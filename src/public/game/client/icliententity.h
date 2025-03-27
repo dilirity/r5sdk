@@ -1,8 +1,8 @@
 #ifndef ICLIENTENTITY_H
 #define ICLIENTENTITY_H
 
+#include "game/shared/ihandleentity.h"
 #include "iclientunknown.h"
-#include "ihandleentity.h"
 #include "iclientrenderable.h"
 #include "iclientnetworkable.h"
 #include "iclientthinkable.h"

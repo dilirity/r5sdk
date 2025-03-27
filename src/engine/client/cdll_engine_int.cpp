@@ -5,12 +5,12 @@
 
 #include "core/stdafx.h"
 /*****************************************************************************/
-#include "tier1/cvar.h"
 #include "tier0/commandline.h"
+#include "tier1/cvar.h"
+#include "tier1/keyvalues.h"
 #include "engine/net_chan.h"
 #include "engine/client/cl_rcon.h"
 #include "networksystem/bansystem.h"
-#include "tier1/keyvalues.h"
 #include "windows/id3dx.h"
 #include "geforce/reflex.h"
 #include "vengineclient_impl.h"

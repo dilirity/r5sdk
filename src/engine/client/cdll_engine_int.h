@@ -2,7 +2,6 @@
 #ifndef DEDICATED // We should think about not including this file at all in dedicated tbh.
 #include "public/globalvars_base.h"
 #include "public/client_class.h"
-#include "public/icliententitylist.h"
 #endif // !DEDICATED
 #include "game/shared/usercmd.h"
 

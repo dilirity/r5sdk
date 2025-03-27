@@ -8,7 +8,7 @@
 #define ICLIENTUNKNOWN_H
 
 #include "tier0/platform.h"
-#include "ihandleentity.h"
+#include "game/shared/ihandleentity.h"
 
 class ICollideable;
 class IClientNetworkable;

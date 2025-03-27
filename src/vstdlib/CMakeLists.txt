@@ -15,7 +15,7 @@ add_sources( SOURCE_GROUP "Private"
 )
 
 add_sources( SOURCE_GROUP "Public"
-    "${ENGINE_SOURCE_DIR}/public/ikeyvaluessystem.h"
+    "${ENGINE_SOURCE_DIR}/public/vstdlib/ikeyvaluessystem.h"
 )
 
 end_sources()

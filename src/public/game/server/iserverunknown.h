@@ -13,7 +13,7 @@
 #endif
 
 
-#include "ihandleentity.h"
+#include "game/shared/ihandleentity.h"
 
 //-------------------------------------------------------------------------------------
 // Forward declarations
