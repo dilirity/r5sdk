@@ -34,7 +34,7 @@ static inline void ClampServerFPSToTicks()
 bool CEngine::_Frame(CEngine* thisp)
 {
 #ifdef DEDICATED
-	if (server_fps_clampToTicks.GetBool() && TICK_INTERVAL > 0.0f)
+	if (server_fps_clampToTicks.GetBool())
 		ClampServerFPSToTicks();
 #endif // DEDICATED
 
