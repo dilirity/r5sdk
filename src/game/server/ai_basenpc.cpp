@@ -59,7 +59,7 @@ static ConVar ai_debug_tasks("ai_debug_tasks", "0", FCVAR_DEVELOPMENTONLY, "Debu
 
 void CAI_BaseNPC::_TaskFail(CAI_BaseNPC* thisptr, const AI_TaskFailureCode_t code)
 {
-	if (ai_debug_tasks.GetBool())
+	if (ai_debug_tasks.GetBool() || thisptr->m_debugOverlays & OVERLAY_TASK_TEXT_BIT)
 	{
 		thisptr->m_failText = TaskFailureToString(code);
 		thisptr->m_failedSchedule = thisptr->GetCurSchedule();
