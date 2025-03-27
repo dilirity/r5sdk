@@ -188,7 +188,7 @@ static const int s_boxFaceIndicesInsideOut[6][4] =
 //-----------------------------------------------------------------------------
 // Purpose: generates the box vertices from the rotation matrix
 //-----------------------------------------------------------------------------
-static void GenerateBoxVertices(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Vector3D pVerts[8])
+static void GenerateBoxVertices(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Vector3D pVerts[8])
 {
     Vector3D vecPos;
     for (int i = 0; i < 8; ++i)
@@ -197,14 +197,14 @@ static void GenerateBoxVertices(const matrix3x4_t& fRotateMatrix, const Vector3D
         vecPos.y = (i & 0x2) ? vMaxs.y : vMins.y;
         vecPos.z = (i & 0x4) ? vMaxs.z : vMins.z;
 
-        VectorTransform(vecPos, fRotateMatrix, pVerts[i]);
+        VectorTransform(vecPos, fTransformMatrix, pVerts[i]);
     }
 }
 
 struct RenderBoxQueue_s
 {
-    void (*function)(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial, bool bInsideOut);
-    matrix3x4_t fRotateMatrix;
+    void (*function)(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial, bool bInsideOut);
+    matrix3x4_t fTransformMatrix;
     Vector3D vMins;
     Vector3D vMaxs;
     Color color;
@@ -218,7 +218,7 @@ struct RenderBoxQueue_s
 static void RenderBoxQueueFunctor(CallQueue_s* const queue)
 {
     RenderBoxQueue_s* const item = (RenderBoxQueue_s*)queue->GetCurrentCallItem();
-    item->function(item->fRotateMatrix, item->vMins, item->vMaxs, item->color, item->material, item->bInsideOut);
+    item->function(item->fTransformMatrix, item->vMins, item->vMaxs, item->color, item->material, item->bInsideOut);
 
     // Advance the queue.
     queue->currentCallIndex += sizeof(RenderBoxQueue_s);
@@ -238,7 +238,7 @@ static void RenderBoxQueueFunctor(CallQueue_s* const queue)
 // |::::::::::|/
 // +----------+ --> +x
 //-----------------------------------------------------------------------------
-static void RenderBoxInternal(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial, bool bInsideOut)
+static void RenderBoxInternal(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial, bool bInsideOut)
 {
     InitializeStandardMaterials();
 
@@ -248,7 +248,7 @@ static void RenderBoxInternal(const matrix3x4_t& fRotateMatrix, const Vector3D& 
         RenderBoxQueue_s* const item = (RenderBoxQueue_s*)queue->GetCurrentAllocatedItem();
 
         item->function = RenderBoxInternal;
-        item->fRotateMatrix = fRotateMatrix;
+        item->fTransformMatrix = fTransformMatrix;
         item->vMins = vMins;
         item->vMaxs = vMaxs;
         item->color = c;
@@ -267,7 +267,7 @@ static void RenderBoxInternal(const matrix3x4_t& fRotateMatrix, const Vector3D& 
         ctx->Bind(pMaterial);
 
         Vector3D p[8];
-        GenerateBoxVertices(fRotateMatrix, vMins, vMaxs, p);
+        GenerateBoxVertices(fTransformMatrix, vMins, vMaxs, p);
 
         // Draw the box
         for (int i = 0; i < 6; i++)
@@ -292,8 +292,8 @@ static void RenderBoxInternal(const matrix3x4_t& fRotateMatrix, const Vector3D& 
 
 struct RenderWireframeBoxQueue_s
 {
-    void (*function)(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial);
-    matrix3x4_t fRotateMatrix;
+    void (*function)(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial);
+    matrix3x4_t fTransformMatrix;
     Vector3D vMins;
     Vector3D vMaxs;
     Color color;
@@ -306,7 +306,7 @@ struct RenderWireframeBoxQueue_s
 static void RenderWireframeBoxQueueFunctor(CallQueue_s* const queue)
 {
     RenderWireframeBoxQueue_s* const item = (RenderWireframeBoxQueue_s*)queue->GetCurrentCallItem();
-    item->function(item->fRotateMatrix, item->vMins, item->vMaxs, item->color, item->material);
+    item->function(item->fTransformMatrix, item->vMins, item->vMaxs, item->color, item->material);
 
     // Advance the queue.
     queue->currentCallIndex += sizeof(RenderWireframeBoxQueue_s);
@@ -326,7 +326,7 @@ static void RenderWireframeBoxQueueFunctor(CallQueue_s* const queue)
 // |/         |/
 // +----------+ --> +x
 //-----------------------------------------------------------------------------
-static void RenderWireframeBoxInternal(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial)
+static void RenderWireframeBoxInternal(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial)
 {
     InitializeStandardMaterials();
 
@@ -336,7 +336,7 @@ static void RenderWireframeBoxInternal(const matrix3x4_t& fRotateMatrix, const V
         RenderWireframeBoxQueue_s* const item = (RenderWireframeBoxQueue_s*)queue->GetCurrentAllocatedItem();
 
         item->function = RenderWireframeBoxInternal;
-        item->fRotateMatrix = fRotateMatrix;
+        item->fTransformMatrix = fTransformMatrix;
         item->vMins = vMins;
         item->vMaxs = vMaxs;
         item->color = c;
@@ -354,7 +354,7 @@ static void RenderWireframeBoxInternal(const matrix3x4_t& fRotateMatrix, const V
         ctx->Bind(pMaterial);
 
         Vector3D p[8];
-        GenerateBoxVertices(fRotateMatrix, vMins, vMaxs, p);
+        GenerateBoxVertices(fTransformMatrix, vMins, vMaxs, p);
 
         // Draw the box
         for (int i = 0; i < 6; i++)
