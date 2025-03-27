@@ -365,7 +365,7 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
         }
         if (pBox->a < 255)
         {
-            v_RenderWireFrameBox(pBox->transforms, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, 255), !pBox->noDepthTest);
+            RenderWireframeBox(pBox->transforms, pBox->mins, pBox->maxs, Color(pBox->r, pBox->g, pBox->b, 255), !pBox->noDepthTest);
         }
 
         break;
@@ -381,7 +381,7 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
         }
         if (pSphere->a < 255)
         {
-            v_RenderWireframeSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi,
+            RenderWireframeSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi,
                 Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), !pSphere->noDepthTest);
         }
 
@@ -390,7 +390,7 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
     case OverlayType_t::OVERLAY_LINE:
     {
         const OverlayLine_t* const pLine = static_cast<const OverlayLine_t*>(pOverlay);
-        v_RenderLine(pLine->origin, pLine->dest, Color(pLine->r, pLine->g, pLine->b, pLine->a), !pLine->noDepthTest);
+        RenderLine(pLine->origin, pLine->dest, Color(pLine->r, pLine->g, pLine->b, pLine->a), !pLine->noDepthTest);
 
         break;
     }
@@ -405,7 +405,7 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
     {
         // This is used for the Smart Pistol laser.
         const OverlayLine_t* const pSpline = reinterpret_cast<const OverlayLine_t*>(pOverlay);
-        v_RenderLine(pSpline->origin, pSpline->dest, Color(pSpline->r, pSpline->g, pSpline->b, pSpline->a), !pSpline->noDepthTest);
+        RenderLine(pSpline->origin, pSpline->dest, Color(pSpline->r, pSpline->g, pSpline->b, pSpline->a), !pSpline->noDepthTest);
 
         break;
     }
