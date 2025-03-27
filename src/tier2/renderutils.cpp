@@ -203,7 +203,7 @@ static void GenerateBoxVertices(const matrix3x4_t& fTransformMatrix, const Vecto
 
 struct RenderBoxQueue_s
 {
-    void (*function)(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial, bool bInsideOut);
+    void (*function)(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, const Color c, IMaterial* const pMaterial, const bool bInsideOut);
     matrix3x4_t fTransformMatrix;
     Vector3D vMins;
     Vector3D vMaxs;
@@ -238,7 +238,7 @@ static void RenderBoxQueueFunctor(CallQueue_s* const queue)
 // |::::::::::|/
 // +----------+ --> +x
 //-----------------------------------------------------------------------------
-static void RenderBoxInternal(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial, bool bInsideOut)
+static void RenderBoxInternal(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, const Color c, IMaterial* const pMaterial, const bool bInsideOut)
 {
     InitializeStandardMaterials();
 
@@ -292,7 +292,7 @@ static void RenderBoxInternal(const matrix3x4_t& fTransformMatrix, const Vector3
 
 struct RenderWireframeBoxQueue_s
 {
-    void (*function)(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial);
+    void (*function)(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, const Color c, IMaterial* const pMaterial);
     matrix3x4_t fTransformMatrix;
     Vector3D vMins;
     Vector3D vMaxs;
@@ -326,7 +326,7 @@ static void RenderWireframeBoxQueueFunctor(CallQueue_s* const queue)
 // |/         |/
 // +----------+ --> +x
 //-----------------------------------------------------------------------------
-static void RenderWireframeBoxInternal(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial)
+static void RenderWireframeBoxInternal(const matrix3x4_t& fTransformMatrix, const Vector3D& vMins, const Vector3D& vMaxs, const Color c, IMaterial* const pMaterial)
 {
     InitializeStandardMaterials();
 
@@ -666,7 +666,7 @@ static void RenderSphereQueueFunctor(CallQueue_s* const queue)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: render sphere:
+// Purpose: render a sphere:
 // +z                _+y
 // ^                 /|
 // |                /
@@ -812,7 +812,7 @@ static void RenderCapsuleQueueFunctor(CallQueue_s* const queue)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: render capsule:
+// Purpose: render a capsule:
 // +z           _+y
 // ^            /|
 // |           /
@@ -977,15 +977,15 @@ void RenderLine(const Vector3D& v1, const Vector3D& v2, const Color color, const
 //-----------------------------------------------------------------------------
 // Purpose: public proxies for RenderBoxInternal
 //-----------------------------------------------------------------------------
-void RenderBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, const bool bZBuffer)
+void RenderBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, const Color c, const bool bZBuffer)
 {
-    IMaterial* const pMaterial = DetermineFaceMaterial(color, bZBuffer);
-    RenderBoxInternal(vTransforms, vMins, vMaxs, color, pMaterial, false);
+    IMaterial* const pMaterial = DetermineFaceMaterial(c, bZBuffer);
+    RenderBoxInternal(vTransforms, vMins, vMaxs, c, pMaterial, false);
 }
-void RenderWireframeBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, const bool bZBuffer)
+void RenderWireframeBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, const Color c, const bool bZBuffer)
 {
-    IMaterial* const pMaterial = DetermineWireframeMaterial(color, bZBuffer);
-    RenderWireframeBoxInternal(vTransforms, vMins, vMaxs, color, pMaterial);
+    IMaterial* const pMaterial = DetermineWireframeMaterial(c, bZBuffer);
+    RenderWireframeBoxInternal(vTransforms, vMins, vMaxs, c, pMaterial);
 }
 
 //-----------------------------------------------------------------------------
@@ -1048,7 +1048,7 @@ void RenderCapsule(const Vector3D& vStart, const Vector3D& vEnd, const float flR
 // |/         |/
 // +----------+ --> +x
 //-----------------------------------------------------------------------------
-void DebugDrawBox(const Vector3D& vOrigin, const QAngle& vAngles, const Vector3D& vMins, const Vector3D& vMaxs, Color color, bool bZBuffer)
+void DebugDrawBox(const Vector3D& vOrigin, const QAngle& vAngles, const Vector3D& vMins, const Vector3D& vMaxs, const Color color, const bool bZBuffer)
 {
     Vector3D vPoints[8];
     PointsFromAngledBox(vAngles, vMins, vMaxs, &*vPoints);
@@ -1084,9 +1084,10 @@ void DebugDrawBox(const Vector3D& vOrigin, const QAngle& vAngles, const Vector3D
 // |    |    |
 //  "-._|_.-" --> +x
 //-----------------------------------------------------------------------------
-void DebugDrawCylinder(const Vector3D& vOrigin, const QAngle& vAngles, float flRadius, float flHeight, Color color, int nSides, bool bZBuffer)
+void DebugDrawCylinder(const Vector3D& vOrigin, const QAngle& vAngles, const float flRadius, const float flHeight, const Color color, const int nSides, const bool bZBuffer)
 {
-    float flDegrees = 360.f / float(nSides);
+    const float flDegrees = 360.f / float(nSides);
+
     QAngle vComposed;
     Vector3D vForward;
     CUtlVector<Vector3D> vecPoints(0, nSides);
@@ -1104,8 +1105,8 @@ void DebugDrawCylinder(const Vector3D& vOrigin, const QAngle& vAngles, float flR
 
     for (int i = 0; i < nSides; i++)
     {
-        Vector3D vStart = vecPoints[i];
-        Vector3D vEnd = i == 0 ? vecPoints[nSides - 1] : vecPoints[i - 1];
+        const Vector3D& vStart = vecPoints[i];
+        const Vector3D& vEnd = i == 0 ? vecPoints[nSides - 1] : vecPoints[i - 1];
 
         RenderLine(vStart, vEnd, color, bZBuffer);
         RenderLine(vStart + (vForward * flHeight), vEnd + (vForward * flHeight), color, bZBuffer);
@@ -1126,7 +1127,7 @@ void DebugDrawCylinder(const Vector3D& vOrigin, const QAngle& vAngles, float flR
 //  '.     |     .'
 //    "-.._|_..-"   --> +x
 //-----------------------------------------------------------------------------
-void DebugDrawSphere(const Vector3D& vOrigin, float flRadius, Color color, int nSegments, bool bZBuffer)
+void DebugDrawSphere(const Vector3D& vOrigin, const float flRadius, const Color color, const int nSegments, const bool bZBuffer)
 {
     DebugDrawCircle(vOrigin, { 90.f, 0.f, 0.f }, flRadius, color, nSegments, bZBuffer);
     DebugDrawCircle(vOrigin, { 0.f, 90.f, 0.f }, flRadius, color, nSegments, bZBuffer);
@@ -1143,7 +1144,7 @@ void DebugDrawSphere(const Vector3D& vOrigin, float flRadius, Color color, int n
 // /       |       \ /--> +r
 // | <----( )---->-|/ --> +x
 //-----------------------------------------------------------------------------
-void DebugDrawHemiSphere(const Vector3D& vOrigin, const QAngle& vAngles, const Vector3D& vRadius, Color color, int nSegments, bool bZBuffer)
+void DebugDrawHemiSphere(const Vector3D& vOrigin, const QAngle& vAngles, const Vector3D& vRadius, const Color color, const int nSegments, const bool bZBuffer)
 {
     const float flDegrees = 360.0f / float(nSegments * 2);
     bool bFirstLoop = true;
@@ -1200,13 +1201,14 @@ void DebugDrawHemiSphere(const Vector3D& vOrigin, const QAngle& vAngles, const V
 //  '.           .'
 //    "-..___..-"   --> +x
 //-----------------------------------------------------------------------------
-void DebugDrawCircle(const Vector3D& vOrigin, const QAngle& vAngles, float flRadius, Color color, int nSegments, bool bZBuffer)
+void DebugDrawCircle(const Vector3D& vOrigin, const QAngle& vAngles, const float flRadius, const Color color, const int nSegments, const bool bZBuffer)
 {
-    bool bFirstLoop = true;
-    float flDegrees = 360.f / float(nSegments);
+    const float flDegrees = 360.f / float(nSegments);
 
     Vector3D vStart, vEnd, vFirstend, vForward;
     QAngle vComposed;
+
+    bool bFirstLoop = true;
 
     for (int i = 0; i < nSegments; i++)
     {
@@ -1241,7 +1243,7 @@ void DebugDrawCircle(const Vector3D& vOrigin, const QAngle& vAngles, float flRad
 // |              |
 // '--------------' --> +x
 //-----------------------------------------------------------------------------
-void DebugDrawSquare(const Vector3D& vOrigin, const QAngle& vAngles, float flSquareSize, Color color, bool bZBuffer)
+void DebugDrawSquare(const Vector3D& vOrigin, const QAngle& vAngles, const float flSquareSize, const Color color, const bool bZBuffer)
 {
     DebugDrawCircle(vOrigin, vAngles, flSquareSize, color, 4, bZBuffer);
 }
@@ -1259,7 +1261,7 @@ void DebugDrawSquare(const Vector3D& vOrigin, const QAngle& vAngles, float flSqu
 //  /            \
 // '--------------' --> +x
 //-----------------------------------------------------------------------------
-void DebugDrawTriangle(const Vector3D& vOrigin, const QAngle& vAngles, float flTriangleSize, Color color, bool bZBuffer)
+void DebugDrawTriangle(const Vector3D& vOrigin, const QAngle& vAngles, const float flTriangleSize, const Color color, const bool bZBuffer)
 {
     DebugDrawCircle(vOrigin, vAngles, flTriangleSize, color, 3, bZBuffer);
 }
@@ -1275,11 +1277,11 @@ void DebugDrawTriangle(const Vector3D& vOrigin, const QAngle& vAngles, float flT
 //   /  \
 //  /    --> +x
 //-----------------------------------------------------------------------------
-void DebugDrawMark(const Vector3D& vOrigin, float flRadius, const vector<int>& vColor, bool bZBuffer)
+void DebugDrawMark(const Vector3D& vOrigin, float flRadius, const Color c, const bool bZBuffer)
 {
-    RenderLine((vOrigin - Vector3D{ flRadius, 0.f, 0.f }), (vOrigin + Vector3D{ flRadius, 0.f, 0.f }), Color(vColor[0], vColor[1], vColor[2], vColor[3]), bZBuffer);
-    RenderLine((vOrigin - Vector3D{ 0.f, flRadius, 0.f }), (vOrigin + Vector3D{ 0.f, flRadius, 0.f }), Color(vColor[0], vColor[1], vColor[2], vColor[3]), bZBuffer);
-    RenderLine((vOrigin - Vector3D{ 0.f, 0.f, flRadius }), (vOrigin + Vector3D{ 0.f, 0.f, flRadius }), Color(vColor[0], vColor[1], vColor[2], vColor[3]), bZBuffer);
+    RenderLine((vOrigin - Vector3D{ flRadius, 0.f, 0.f }), (vOrigin + Vector3D{ flRadius, 0.f, 0.f }), c, bZBuffer);
+    RenderLine((vOrigin - Vector3D{ 0.f, flRadius, 0.f }), (vOrigin + Vector3D{ 0.f, flRadius, 0.f }), c, bZBuffer);
+    RenderLine((vOrigin - Vector3D{ 0.f, 0.f, flRadius }), (vOrigin + Vector3D{ 0.f, 0.f, flRadius }), c, bZBuffer);
 }
 
 //-----------------------------------------------------------------------------
@@ -1293,7 +1295,7 @@ void DebugDrawMark(const Vector3D& vOrigin, float flRadius, const vector<int>& v
 //   /  \
 //       --> +x
 //-----------------------------------------------------------------------------
-void DrawStar(const Vector3D& vOrigin, float flRadius, bool bZBuffer)
+void DrawStar(const Vector3D& vOrigin, const float flRadius, const bool bZBuffer)
 {
     Vector3D vForward;
     for (int i = 0; i < 50; i++)
@@ -1315,7 +1317,7 @@ void DrawStar(const Vector3D& vOrigin, float flRadius, bool bZBuffer)
 //    |
 //    |   --> +x
 //-----------------------------------------------------------------------------
-void DebugDrawArrow(const Vector3D& vOrigin, const Vector3D& vEnd, float flArraySize, Color color, bool bZBuffer)
+void DebugDrawArrow(const Vector3D& vOrigin, const Vector3D& vEnd, const float flArraySize, const Color color, const bool bZBuffer)
 {
     Vector3D vAngles;
 
@@ -1335,7 +1337,7 @@ void DebugDrawArrow(const Vector3D& vOrigin, const Vector3D& vEnd, float flArray
 // |/
 // +----------> +x
 //-----------------------------------------------------------------------------
-void DebugDrawAxis(const Vector3D& vOrigin, const QAngle& vAngles, float flScale, bool bZBuffer)
+void DebugDrawAxis(const Vector3D& vOrigin, const QAngle& vAngles, const float flScale, const bool bZBuffer)
 {
     Vector3D vForward, vRight, vUp;
     AngleVectors(vAngles, &vForward, &vRight, &vUp);
