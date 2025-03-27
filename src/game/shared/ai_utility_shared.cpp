@@ -42,6 +42,7 @@ static ConVar navmesh_draw_tile_cells("navmesh_draw_tile_cells", "0", FCVAR_DEVE
 
 static ConVar navmesh_draw_poly_faces("navmesh_draw_poly_faces", "1", FCVAR_DEVELOPMENTONLY, "Draws the polygon faces of the NavMesh tiles");
 static ConVar navmesh_draw_poly_detail("navmesh_draw_poly_detail", "0", FCVAR_DEVELOPMENTONLY, "Draws the detail of the NavMesh polygons");
+static ConVar navmesh_draw_poly_verts("navmesh_draw_poly_verts", "0", FCVAR_DEVELOPMENTONLY, "Draws the vertices of the NavMesh polygons");
 static ConVar navmesh_draw_poly_centers("navmesh_draw_poly_centers", "0", FCVAR_DEVELOPMENTONLY, "Draws the center of the NavMesh polygons");
 
 static ConVar navmesh_draw_poly_bounds_inner("navmesh_draw_poly_bounds_inner", "1", FCVAR_DEVELOPMENTONLY, "Draws the inner polygon bounds of the NavMesh tiles");
@@ -91,6 +92,8 @@ void CAI_Utility::RunRenderFrame(void)
                 navmeshDrawFlags |= DU_DRAW_DETOURMESH_POLY_FACES;
             if (navmesh_draw_poly_detail.GetBool())
                 navmeshDrawFlags |= DU_DRAW_DETOURMESH_POLY_EDGES;
+            if (navmesh_draw_poly_verts.GetBool())
+                navmeshDrawFlags |= DU_DRAW_DETOURMESH_POLY_VERTS;
             if (navmesh_draw_poly_bounds_inner.GetBool())
                 navmeshDrawFlags |= DU_DRAW_DETOURMESH_POLY_BOUNDS_INNER;
             if (navmesh_draw_poly_bounds_outer.GetBool())
