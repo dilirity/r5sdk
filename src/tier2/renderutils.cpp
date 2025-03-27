@@ -455,7 +455,27 @@ static void RenderSweptBoxQueueFunctor(CallQueue_s* const queue)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: renders an extruded box
+// Purpose: renders an extruded box:
+//            +----------+ --> vStart
+//           /|         /|
+//          / |        / |
+//         +----------+  |
+//        /|  +------/|--+
+//       / | /      / | /
+//      /  |/      /  |/
+//     /   +------/---+
+//    /   /      /   /
+//   /   /      /   /
+//  +   /      + --/--> angles
+// |   /      |   /
+// |  +-------|--+
+// | /|       | /|
+// |/ |       |/ |
+// +----------+  |
+// |  +-------|--+
+// | /        | /
+// |/         |/
+// +----------+ --> vEnd
 //-----------------------------------------------------------------------------
 static void RenderWireframeSweptBoxInternal(const Vector3D& vStart, const Vector3D& vEnd,
     const QAngle& angles, const Vector3D& vMins, const Vector3D& vMaxs, const Color c, IMaterial* const pMaterial)
