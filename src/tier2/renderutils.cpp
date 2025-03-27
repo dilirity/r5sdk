@@ -22,11 +22,17 @@
 //-----------------------------------------------------------------------------
 // Purpose: standard materials
 //-----------------------------------------------------------------------------
+static IMaterial* s_opaqueIgnoreZWire;
 static IMaterial* s_transIgnoreZWire;
+static IMaterial* s_opaqueNormalZWire;
 static IMaterial* s_transNormalZWire;
+static IMaterial* s_opaqueIgnoreZFront;
 static IMaterial* s_transIgnoreZFront;
+static IMaterial* s_opaqueNormalZFront;
 static IMaterial* s_transNormalZFront;
+static IMaterial* s_opaqueIgnoreZBoth;
 static IMaterial* s_transIgnoreZBoth;
+static IMaterial* s_opaqueNormalZBoth;
 static IMaterial* s_transNormalZBoth;
 
 static bool s_standardMaterialsInitialized = false;
@@ -48,21 +54,113 @@ static void InitializeStandardMaterials()
     s_standardMaterialsInitialized = true;
     Assert(g_pakLoadApi);
 
+    s_opaqueIgnoreZWire = (IMaterial*)g_pakLoadApi->FindAssetByName("material/opaque_ignorez_wire_rgdu.rpak");
     s_transIgnoreZWire = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_ignorez_wire_rgdu.rpak");
+
+    s_opaqueNormalZWire = (IMaterial*)g_pakLoadApi->FindAssetByName("material/opaque_normalz_wire_rgdu.rpak");
     s_transNormalZWire = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_normalz_wire_rgdu.rpak");
+
+    s_opaqueIgnoreZFront = (IMaterial*)g_pakLoadApi->FindAssetByName("material/opaque_ignorez_front_rgdu.rpak");
     s_transIgnoreZFront = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_ignorez_front_rgdu.rpak");
+
+    s_opaqueNormalZFront = (IMaterial*)g_pakLoadApi->FindAssetByName("material/opaque_normalz_front_rgdu.rpak");
     s_transNormalZFront = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_normalz_front_rgdu.rpak");
+
+    s_opaqueIgnoreZBoth = (IMaterial*)g_pakLoadApi->FindAssetByName("material/opaque_ignorez_both_rgdu.rpak");
     s_transIgnoreZBoth = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_ignorez_both_rgdu.rpak");
+
+    s_opaqueNormalZBoth = (IMaterial*)g_pakLoadApi->FindAssetByName("material/opaque_normalz_both_rgdu.rpak");
     s_transNormalZBoth = (IMaterial*)g_pakLoadApi->FindAssetByName("material/trans_normalz_both_rgdu.rpak");
 
     // Make sure all standard materials have loaded, if this fails, then most
     // likely the startup.rpak is corrupt or the materials have been renamed.
+    Assert(s_opaqueIgnoreZWire);
     Assert(s_transIgnoreZWire);
+
+    Assert(s_opaqueNormalZWire);
     Assert(s_transNormalZWire);
+
+    Assert(s_opaqueIgnoreZFront);
     Assert(s_transIgnoreZFront);
+
+    Assert(s_opaqueNormalZFront);
     Assert(s_transNormalZFront);
+
+    Assert(s_opaqueIgnoreZBoth);
     Assert(s_transIgnoreZBoth);
+
+    Assert(s_opaqueNormalZBoth);
     Assert(s_transNormalZBoth);
+}
+
+struct RenderLineQueue_s
+{
+    void (*function)(const Vector3D& p1, const Vector3D& p2, const Color c, IMaterial* const pMaterial);
+    Vector3D v1;
+    Vector3D v2;
+    Color color;
+    IMaterial* material;
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: process and advance line render queue
+//-----------------------------------------------------------------------------
+static void RenderLineQueueFunctor(CallQueue_s* const queue)
+{
+    RenderLineQueue_s* const item = (RenderLineQueue_s*)queue->GetCurrentCallItem();
+    item->function(item->v1, item->v2, item->color, item->material);
+
+    // Advance the queue.
+    queue->currentCallIndex += sizeof(RenderLineQueue_s);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: renders a line:
+//        _+v1
+//        /|
+//       /
+//      /
+//     /
+//    /
+//  |/
+//   -+v2
+//-----------------------------------------------------------------------------
+static void RenderLineInternal(const Vector3D& v1, const Vector3D& v2, const Color c, IMaterial* const pMaterial)
+{
+    InitializeStandardMaterials();
+
+    // Queue it off if this is called outside the render thread.
+    if ((*g_fnHasRenderCallQueue)())
+    {
+        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(RenderLineQueueFunctor, sizeof(RenderLineQueue_s), 7);
+        RenderLineQueue_s* const item = (RenderLineQueue_s*)queue->GetCurrentAllocatedItem();
+
+        item->function = RenderLineInternal;
+        item->v1 = v1;
+        item->v2 = v2;
+        item->color = c;
+        item->material = pMaterial;
+
+        (*g_fnAdvanceRenderCallQueue)(sizeof(RenderLineQueue_s));
+        return;
+    }
+
+    CMatRenderContext* const ctx = g_pMaterialSystem->GetRenderContext();
+    CMeshVertexBuilder vertexBuilder;
+
+    if (vertexBuilder.Begin(ctx, 2))
+    {
+        ctx->Bind(pMaterial);
+
+        vertexBuilder.AppendVertex(v1, c);
+        vertexBuilder.AppendVertex(v2, c);
+
+        vertexBuilder.End(ctx);
+        ctx->DrawLineList(vertexBuilder.GetParams(), nullptr, 0);
+    }
+
+    // Need to call this to decrement context ref counter.
+    ctx->EndRenderer();
 }
 
 //-----------------------------------------------------------------------------
@@ -127,7 +225,18 @@ static void RenderBoxQueueFunctor(CallQueue_s* const queue)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: renders a solid box
+// Purpose: renders a solid box:
+// +z              _+y
+// ^               /|
+// |              /
+// |  +----------+
+// | /::::::::::/|
+//  /::::::::::/:|
+// +----------+::|
+// |::::::::::|::+
+// |::::::::::|:/
+// |::::::::::|/
+// +----------+ --> +x
 //-----------------------------------------------------------------------------
 static void RenderBoxInternal(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial, bool bInsideOut)
 {
@@ -178,6 +287,89 @@ static void RenderBoxInternal(const matrix3x4_t& fRotateMatrix, const Vector3D& 
 
         vertexBuilder.End(ctx);
         ctx->DrawTriangleList(vertexBuilder.GetParams(), nullptr, 0);
+    }
+}
+
+struct RenderWireframeBoxQueue_s
+{
+    void (*function)(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial);
+    matrix3x4_t fRotateMatrix;
+    Vector3D vMins;
+    Vector3D vMaxs;
+    Color color;
+    IMaterial* material;
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: process and advance wireframe box render queue
+//-----------------------------------------------------------------------------
+static void RenderWireframeBoxQueueFunctor(CallQueue_s* const queue)
+{
+    RenderWireframeBoxQueue_s* const item = (RenderWireframeBoxQueue_s*)queue->GetCurrentCallItem();
+    item->function(item->fRotateMatrix, item->vMins, item->vMaxs, item->color, item->material);
+
+    // Advance the queue.
+    queue->currentCallIndex += sizeof(RenderWireframeBoxQueue_s);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: renders a wireframe box:
+// +z              _+y
+// ^               /|
+// |              /
+// |  +----------+
+// | /|         /|
+//  / |        / |
+// +----------+  |
+// |  +-------|--+
+// | /        | /
+// |/         |/
+// +----------+ --> +x
+//-----------------------------------------------------------------------------
+static void RenderWireframeBoxInternal(const matrix3x4_t& fRotateMatrix, const Vector3D& vMins, const Vector3D& vMaxs, Color c, IMaterial* pMaterial)
+{
+    InitializeStandardMaterials();
+
+    if ((*g_fnHasRenderCallQueue)())
+    {
+        CallQueue_s* const queue = (*g_fnAddRenderCallQueueItem)(RenderWireframeBoxQueueFunctor, sizeof(RenderWireframeBoxQueue_s), 7);
+        RenderWireframeBoxQueue_s* const item = (RenderWireframeBoxQueue_s*)queue->GetCurrentAllocatedItem();
+
+        item->function = RenderWireframeBoxInternal;
+        item->fRotateMatrix = fRotateMatrix;
+        item->vMins = vMins;
+        item->vMaxs = vMaxs;
+        item->color = c;
+        item->material = pMaterial;
+
+        (*g_fnAdvanceRenderCallQueue)(sizeof(RenderWireframeBoxQueue_s));
+        return;
+    }
+
+    CMatRenderContext* const ctx = g_pMaterialSystem->GetRenderContext();
+    CMeshVertexBuilder vertexBuilder;
+
+    if (vertexBuilder.Begin(ctx, 48))
+    {
+        ctx->Bind(pMaterial);
+
+        Vector3D p[8];
+        GenerateBoxVertices(fRotateMatrix, vMins, vMaxs, p);
+
+        // Draw the box
+        for (int i = 0; i < 6; i++)
+        {
+            const int* const ppFaceIndices = s_boxFaceIndices[i];
+
+            for (int j = 0; j < 4; ++j)
+            {
+                vertexBuilder.AppendVertex(p[ppFaceIndices[j]], c);
+                vertexBuilder.AppendVertex(p[ppFaceIndices[(j == 3) ? 0 : j + 1]], c);
+            }
+        }
+
+        vertexBuilder.End(ctx);
+        ctx->DrawLineList(vertexBuilder.GetParams(), nullptr, 0);
     }
 }
 
@@ -377,7 +569,17 @@ static void RenderTriangleQueueFunctor(CallQueue_s* const queue)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: process and advance triangle render queue
+// Purpose: renders a triangle:
+// +z              _+y
+// |               /|
+// |      /\      /
+// |     /::\    /
+// |    /::::\  /
+// |   /::::::\
+// |  /::::::::\
+// | /::::::::::\
+//  /::::::::::::\
+// '--------------' --> +x
 //-----------------------------------------------------------------------------
 static void RenderTriangleInternal(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, IMaterial* const pMaterial)
 {
@@ -711,13 +913,59 @@ static void RenderCapsuleInternal(const Vector3D& vStart, const Vector3D& vEnd, 
     ctx->EndRenderer();
 }
 
-//-----------------------------------------------------------------------------
-// Purpose: public proxy for RenderBoxInternal
-//-----------------------------------------------------------------------------
-void RenderBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, bool bZBuffer)
+static inline IMaterial* DetermineWireframeMaterial(const Color c, const bool bZBuffer)
 {
-    IMaterial* const mat = bZBuffer ? s_transNormalZFront : s_transIgnoreZFront;
-    RenderBoxInternal(vTransforms, vMins, vMaxs, color, mat, false);
+    if (c.a() == 255)
+        return bZBuffer ? s_opaqueNormalZWire : s_opaqueIgnoreZWire;
+    else
+        return bZBuffer ? s_transNormalZWire : s_transIgnoreZWire;
+}
+
+static inline IMaterial* DetermineFaceMaterial(const Color c, const bool bZBuffer)
+{
+    if (c.a() == 255)
+        return bZBuffer ? s_opaqueNormalZFront : s_opaqueIgnoreZFront;
+    else
+        return bZBuffer ? s_transNormalZFront : s_transIgnoreZFront;
+}
+
+static inline IMaterial* DetermineTriangleMaterial(Color& c, const bool bZBuffer)
+{
+    if (c.a() == 0)
+    {
+        c[3] = 255;
+        return bZBuffer ? s_opaqueNormalZWire : s_opaqueIgnoreZWire;
+    }
+    else
+    {
+        if (c.a() == 255)
+            return bZBuffer ? s_opaqueNormalZBoth : s_opaqueIgnoreZBoth;
+        else
+            return bZBuffer ? s_transNormalZBoth : s_transIgnoreZBoth;
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: public proxy for RenderLineInternal
+//-----------------------------------------------------------------------------
+void RenderLine(const Vector3D& v1, const Vector3D& v2, const Color color, const bool bZBuffer)
+{
+    IMaterial* const pMaterial = DetermineFaceMaterial(color, bZBuffer);
+    RenderLineInternal(v1, v2, color, pMaterial);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: public proxies for RenderBoxInternal
+//-----------------------------------------------------------------------------
+void RenderBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, const bool bZBuffer)
+{
+    IMaterial* const pMaterial = DetermineFaceMaterial(color, bZBuffer);
+    RenderBoxInternal(vTransforms, vMins, vMaxs, color, pMaterial, false);
+}
+void RenderWireframeBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vector3D& vMaxs, Color color, const bool bZBuffer)
+{
+    IMaterial* const pMaterial = DetermineWireframeMaterial(color, bZBuffer);
+    RenderWireframeBoxInternal(vTransforms, vMins, vMaxs, color, pMaterial);
 }
 
 //-----------------------------------------------------------------------------
@@ -726,30 +974,30 @@ void RenderBox(const matrix3x4_t& vTransforms, const Vector3D& vMins, const Vect
 void RenderWireframeSweptBox(const Vector3D& vStart, const Vector3D& vEnd, const QAngle& angles,
     const Vector3D& vMins, const Vector3D& vMaxs, const Color c, const bool bZBuffer)
 {
-    IMaterial* const pMaterial = bZBuffer ? s_transNormalZWire : s_transIgnoreZWire;
+    IMaterial* const pMaterial = DetermineWireframeMaterial(c, bZBuffer);
     RenderWireframeSweptBoxInternal(vStart, vEnd, angles, vMins, vMaxs, c, pMaterial);
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: public proxy for RenderTriangleInternal
 //-----------------------------------------------------------------------------
-void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, const Color c, const bool bZBuffer)
+void RenderTriangle(const Vector3D& p1, const Vector3D& p2, const Vector3D& p3, Color c, const bool bZBuffer)
 {
-    IMaterial* pMaterial;
-    if (c.a() < 1)
-        pMaterial = bZBuffer ? s_transNormalZWire : s_transIgnoreZWire;
-    else
-        pMaterial = bZBuffer ? s_transNormalZBoth : s_transIgnoreZBoth;
-
+    IMaterial* const pMaterial = DetermineTriangleMaterial(c, bZBuffer);
     RenderTriangleInternal(p1, p2, p3, c, pMaterial);
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: public proxy for RenderSphereInternal
+// Purpose: public proxies for RenderSphereInternal
 //-----------------------------------------------------------------------------
 void RenderSphere(const Vector3D& vCenter, const float flRadius, const int nTheta, const int nPhi, const Color c, const bool bZBuffer)
 {
-    IMaterial* const pMaterial = bZBuffer ? s_transNormalZFront : s_transIgnoreZFront;
+    IMaterial* const pMaterial = DetermineFaceMaterial(c, bZBuffer);
+    RenderSphereInternal(vCenter, flRadius, nTheta, nPhi, c, pMaterial);
+}
+void RenderWireframeSphere(const Vector3D& vCenter, const float flRadius, const int nTheta, const int nPhi, const Color c, const bool bZBuffer)
+{
+    IMaterial* const pMaterial = DetermineWireframeMaterial(c, bZBuffer);
     RenderSphereInternal(vCenter, flRadius, nTheta, nPhi, c, pMaterial);
 }
 
@@ -758,7 +1006,7 @@ void RenderSphere(const Vector3D& vCenter, const float flRadius, const int nThet
 //-----------------------------------------------------------------------------
 void RenderCapsule(const Vector3D& vStart, const Vector3D& vEnd, const float flRadius, const Color c, const bool bZBuffer)
 {
-    IMaterial* const pMaterial = bZBuffer ? s_transNormalZWire : s_transIgnoreZWire;
+    IMaterial* const pMaterial = DetermineWireframeMaterial(c, bZBuffer);
     RenderCapsuleInternal(vStart, vEnd, flRadius, c, pMaterial);
 }
 
@@ -785,20 +1033,20 @@ void DebugDrawBox(const Vector3D& vOrigin, const QAngle& vAngles, const Vector3D
     Vector3D vPoints[8];
     PointsFromAngledBox(vAngles, vMins, vMaxs, &*vPoints);
 
-    v_RenderLine(vOrigin + vPoints[0], vOrigin + vPoints[1], color, bZBuffer);
-    v_RenderLine(vOrigin + vPoints[1], vOrigin + vPoints[2], color, bZBuffer);
-    v_RenderLine(vOrigin + vPoints[2], vOrigin + vPoints[3], color, bZBuffer);
-    v_RenderLine(vOrigin + vPoints[3], vOrigin + vPoints[0], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[0], vOrigin + vPoints[1], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[1], vOrigin + vPoints[2], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[2], vOrigin + vPoints[3], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[3], vOrigin + vPoints[0], color, bZBuffer);
 
-    v_RenderLine(vOrigin + vPoints[4], vOrigin + vPoints[5], color, bZBuffer);
-    v_RenderLine(vOrigin + vPoints[5], vOrigin + vPoints[6], color, bZBuffer);
-    v_RenderLine(vOrigin + vPoints[6], vOrigin + vPoints[7], color, bZBuffer);
-    v_RenderLine(vOrigin + vPoints[7], vOrigin + vPoints[4], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[4], vOrigin + vPoints[5], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[5], vOrigin + vPoints[6], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[6], vOrigin + vPoints[7], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[7], vOrigin + vPoints[4], color, bZBuffer);
 
-    v_RenderLine(vOrigin + vPoints[0], vOrigin + vPoints[4], color, bZBuffer);
-    v_RenderLine(vOrigin + vPoints[1], vOrigin + vPoints[5], color, bZBuffer);
-    v_RenderLine(vOrigin + vPoints[2], vOrigin + vPoints[6], color, bZBuffer);
-    v_RenderLine(vOrigin + vPoints[3], vOrigin + vPoints[7], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[0], vOrigin + vPoints[4], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[1], vOrigin + vPoints[5], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[2], vOrigin + vPoints[6], color, bZBuffer);
+    RenderLine(vOrigin + vPoints[3], vOrigin + vPoints[7], color, bZBuffer);
 }
 
 //-----------------------------------------------------------------------------
@@ -839,9 +1087,9 @@ void DebugDrawCylinder(const Vector3D& vOrigin, const QAngle& vAngles, float flR
         Vector3D vStart = vecPoints[i];
         Vector3D vEnd = i == 0 ? vecPoints[nSides - 1] : vecPoints[i - 1];
 
-        v_RenderLine(vStart, vEnd, color, bZBuffer);
-        v_RenderLine(vStart + (vForward * flHeight), vEnd + (vForward * flHeight), color, bZBuffer);
-        v_RenderLine(vStart, vStart + (vForward * flHeight), color, bZBuffer);
+        RenderLine(vStart, vEnd, color, bZBuffer);
+        RenderLine(vStart + (vForward * flHeight), vEnd + (vForward * flHeight), color, bZBuffer);
+        RenderLine(vStart, vStart + (vForward * flHeight), color, bZBuffer);
     }
 }
 
@@ -904,10 +1152,10 @@ void DebugDrawHemiSphere(const Vector3D& vOrigin, const QAngle& vAngles, const V
 
         if (!bFirstLoop)
         {
-            v_RenderLine(vStart[0], vEnd[0], color, bZBuffer);
-            v_RenderLine(vStart[1], vEnd[1], color, bZBuffer);
-            v_RenderLine(vStart[2], vEnd[2], color, bZBuffer);
-            v_RenderLine(vStart[3], vEnd[3], color, bZBuffer);
+            RenderLine(vStart[0], vEnd[0], color, bZBuffer);
+            RenderLine(vStart[1], vEnd[1], color, bZBuffer);
+            RenderLine(vStart[2], vEnd[2], color, bZBuffer);
+            RenderLine(vStart[3], vEnd[3], color, bZBuffer);
         }
 
         bFirstLoop = false;
@@ -950,14 +1198,14 @@ void DebugDrawCircle(const Vector3D& vOrigin, const QAngle& vAngles, float flRad
             vFirstend = vEnd;
 
         if (!bFirstLoop)
-            v_RenderLine(vStart, vEnd, color, bZBuffer);
+            RenderLine(vStart, vEnd, color, bZBuffer);
 
         vStart = vEnd;
 
         bFirstLoop = false;
     }
 
-    v_RenderLine(vEnd, vFirstend, color, bZBuffer);
+    RenderLine(vEnd, vFirstend, color, bZBuffer);
 }
 
 //-----------------------------------------------------------------------------
@@ -1009,9 +1257,9 @@ void DebugDrawTriangle(const Vector3D& vOrigin, const QAngle& vAngles, float flT
 //-----------------------------------------------------------------------------
 void DebugDrawMark(const Vector3D& vOrigin, float flRadius, const vector<int>& vColor, bool bZBuffer)
 {
-    v_RenderLine((vOrigin - Vector3D{ flRadius, 0.f, 0.f }), (vOrigin + Vector3D{ flRadius, 0.f, 0.f }), Color(vColor[0], vColor[1], vColor[2], vColor[3]), bZBuffer);
-    v_RenderLine((vOrigin - Vector3D{ 0.f, flRadius, 0.f }), (vOrigin + Vector3D{ 0.f, flRadius, 0.f }), Color(vColor[0], vColor[1], vColor[2], vColor[3]), bZBuffer);
-    v_RenderLine((vOrigin - Vector3D{ 0.f, 0.f, flRadius }), (vOrigin + Vector3D{ 0.f, 0.f, flRadius }), Color(vColor[0], vColor[1], vColor[2], vColor[3]), bZBuffer);
+    RenderLine((vOrigin - Vector3D{ flRadius, 0.f, 0.f }), (vOrigin + Vector3D{ flRadius, 0.f, 0.f }), Color(vColor[0], vColor[1], vColor[2], vColor[3]), bZBuffer);
+    RenderLine((vOrigin - Vector3D{ 0.f, flRadius, 0.f }), (vOrigin + Vector3D{ 0.f, flRadius, 0.f }), Color(vColor[0], vColor[1], vColor[2], vColor[3]), bZBuffer);
+    RenderLine((vOrigin - Vector3D{ 0.f, 0.f, flRadius }), (vOrigin + Vector3D{ 0.f, 0.f, flRadius }), Color(vColor[0], vColor[1], vColor[2], vColor[3]), bZBuffer);
 }
 
 //-----------------------------------------------------------------------------
@@ -1031,7 +1279,7 @@ void DrawStar(const Vector3D& vOrigin, float flRadius, bool bZBuffer)
     for (int i = 0; i < 50; i++)
     {
         AngleVectors({ RandomFloat(0.f, 360.f), RandomFloat(0.f, 360.f), RandomFloat(0.f, 360.f) }, &vForward);
-        v_RenderLine(vOrigin, vOrigin + vForward * flRadius, Color(RandomInt(0, 255), RandomInt(0, 255), RandomInt(0, 255), 255), bZBuffer);
+        RenderLine(vOrigin, vOrigin + vForward * flRadius, Color(RandomInt(0, 255), RandomInt(0, 255), RandomInt(0, 255), 255), bZBuffer);
     }
 }
 
@@ -1051,7 +1299,7 @@ void DebugDrawArrow(const Vector3D& vOrigin, const Vector3D& vEnd, float flArray
 {
     Vector3D vAngles;
 
-    v_RenderLine(vOrigin, vEnd, color, bZBuffer);
+    RenderLine(vOrigin, vEnd, color, bZBuffer);
     AngleVectors(Vector3D(vEnd - vOrigin).Normalized().AsQAngle(), &vAngles);
     DebugDrawCircle(vEnd, vAngles.AsQAngle(), flArraySize, color, 3, bZBuffer);
 }
@@ -1072,9 +1320,9 @@ void DebugDrawAxis(const Vector3D& vOrigin, const QAngle& vAngles, float flScale
     Vector3D vForward, vRight, vUp;
     AngleVectors(vAngles, &vForward, &vRight, &vUp);
 
-    v_RenderLine(vOrigin, vOrigin + vForward * flScale, Color(0, 255, 0, 255), bZBuffer);
-    v_RenderLine(vOrigin, vOrigin + vUp * flScale, Color(255, 0, 0, 255), bZBuffer);
-    v_RenderLine(vOrigin, vOrigin + vRight * flScale, Color(0, 0, 255, 255), bZBuffer);
+    RenderLine(vOrigin, vOrigin + vForward * flScale, Color(0, 255, 0, 255), bZBuffer);
+    RenderLine(vOrigin, vOrigin + vUp * flScale, Color(255, 0, 0, 255), bZBuffer);
+    RenderLine(vOrigin, vOrigin + vRight * flScale, Color(0, 0, 255, 255), bZBuffer);
 }
 
 void V_RenderUtils::Detour(const bool bAttach) const
