@@ -202,21 +202,24 @@ bool CBrowser::DrawSurface(void)
         return false;
     }
 
-    ImGui::BeginTabBar("CompMenu");
-    if (ImGui::BeginTabItem("Browsing"))
+    if (ImGui::BeginTabBar("CompMenu"))
     {
-        DrawBrowserPanel();
-        ImGui::EndTabItem();
-    }
+        if (ImGui::BeginTabItem("Browsing"))
+        {
+            DrawBrowserPanel();
+            ImGui::EndTabItem();
+        }
 #ifndef CLIENT_DLL
-    if (ImGui::BeginTabItem("Hosting"))
-    {
-        DrawHostPanel();
-        ImGui::EndTabItem();
-    }
+        if (ImGui::BeginTabItem("Hosting"))
+        {
+            DrawHostPanel();
+            ImGui::EndTabItem();
+        }
 #endif // !CLIENT_DLL
 
-    ImGui::EndTabBar();
+        ImGui::EndTabBar();
+    }
+
     ImGui::End();
 
     return true;
