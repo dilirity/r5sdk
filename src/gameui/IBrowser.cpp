@@ -568,6 +568,7 @@ void CBrowser::DrawHostPanel(void)
     }
 
     ImGui::Spacing();
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f, 4.0f)); // Make drop down borders consistent.
 
     if (ImGui::BeginCombo("Mode", m_gameMode.c_str()))
     {
@@ -603,6 +604,8 @@ void CBrowser::DrawHostPanel(void)
         g_InstalledMapsMutex.Unlock();
         ImGui::EndCombo();
     }
+
+    ImGui::PopStyleVar();
 
     m_queryGlobalBanList = sv_globalBanlist.GetBool(); // Sync toggle with 'sv_globalBanlist'.
     if (ImGui::Checkbox("Load global banned list", &m_queryGlobalBanList))
