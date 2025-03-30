@@ -193,23 +193,12 @@ static void Pak_RunAssetLoadingJobs(PakFile_s* const pak)
 //-----------------------------------------------------------------------------
 static PakHandle_t Pak_LoadAsync(const char* const fileName, CAlignedMemAlloc* const allocator, const int logChannel, const bool bUnk)
 {
-    if (!Pak_FileExists(fileName))
-    {
-        Error(eDLL_T::RTECH, NO_ERROR, "%s: Failed; file '%s' doesn't exist\n", __FUNCTION__, fileName);
-        return PAK_INVALID_HANDLE;
-    }
-
-    // NOTE: errors are always logged, regardless of the selected channel ID!
     const int selectedLogChannel = pak_debugchannel.GetInt();
 
     if (selectedLogChannel && (selectedLogChannel == -1 || logChannel == selectedLogChannel))
         Msg(eDLL_T::RTECH, "Loading pak file: '%s'\n", fileName);
 
     const PakHandle_t pakId = v_Pak_LoadAsync(fileName, allocator, logChannel, bUnk);
-
-    if (pakId == PAK_INVALID_HANDLE)
-        Error(eDLL_T::RTECH, NO_ERROR, "%s: Failed read '%s' results '%d'\n", __FUNCTION__, fileName, pakId);
-
     return pakId;
 }
 
