@@ -33,18 +33,18 @@ abstract_class ITraceFilter
 {
 public:
 	virtual ~ITraceFilter() {};
-	virtual bool ShouldHitEntity(IHandleEntity* pEntity, int contentsMask) = 0;
+	virtual bool ShouldHitEntity(IHandleEntity* const pEntity, const int contentsMask) = 0;
 	virtual TraceType_t	GetTraceType() const = 0;
-	virtual bool Unknown() const = 0;
+	virtual bool ShouldBlockTrace(trace_t* const pTrace) = 0;
 };
 
 class CTraceFilter : public ITraceFilter
 {
 public:
-	//virtual TraceType_t	GetTraceType() const
-	//{
-	//	return TRACE_EVERYTHING;
-	//}
+	virtual TraceType_t	GetTraceType() const
+	{
+		return TRACE_EVERYTHING;
+	}
 };
 
 //-----------------------------------------------------------------------------
