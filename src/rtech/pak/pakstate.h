@@ -7,6 +7,12 @@
 #include "rtech/async/asyncio.h"
 #include "rtech/ipakfile.h"
 
+extern void Pak_SetBaseLoadPath(const char* const basePath);
+extern void Pak_SetOverrideLoadPath(const char* const basePath);
+
+extern const char* Pak_GetBaseLoadPath();
+extern const char* Pak_GetOverrideLoadPath();
+
 struct PakLoadFuncs_s
 {
 	// initializes the global states for RPak files and async reads.

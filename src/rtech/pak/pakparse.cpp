@@ -456,7 +456,7 @@ static bool Pak_ProcessPakFile(PakFile_s* const pak)
                         return memoryData->patchSrcSize == 0;
 
                     char pakPatchPath[MAX_PATH] = {};
-                    sprintf(pakPatchPath, PAK_PLATFORM_PATH"%s", pak->memoryData.fileName);
+                    sprintf(pakPatchPath, "%s%s", Pak_GetBaseLoadPath(), pak->memoryData.fileName);
 
                     // get path of next patch rpak to load
                     if (pak->memoryData.patchIndices[pak->patchCount])
@@ -873,7 +873,7 @@ static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
     // parsed and loaded from the base pak here.
     if (nameUnqualified == pakFilePath)
     {
-        snprintf(relativeFilePath, sizeof(relativeFilePath), "paks\\Win64\\%s", pakFilePath);
+        snprintf(relativeFilePath, sizeof(relativeFilePath), "%s%s", Pak_GetBaseLoadPath(), pakFilePath);
         // if this pak is patched, load the last patch file first before proceeding
         // with any other pak that is getting patched. note that the patch number
         // does not indicate which pak file is the actual last patch file; a patch

@@ -84,11 +84,6 @@
 
 // base pak directory containing paks sorted in platform specific subdirectories
 #define PAK_BASE_PATH "paks\\"
-#define PAK_PLATFORM_PATH PAK_BASE_PATH"Win64\\"
-
-// pak override directory; the system will looks for pak files in this directory
-// first before falling back to PAK_PLATFORM_PATH
-#define PAK_PLATFORM_OVERRIDE_PATH PAK_BASE_PATH"Win64_override\\"
 
 // the handle that should be returned when a pak failed to load or process
 #define PAK_INVALID_HANDLE -1

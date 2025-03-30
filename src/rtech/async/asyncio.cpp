@@ -4,6 +4,7 @@
 //
 //=============================================================================//
 #include "rtech/ipakfile.h"
+#include "rtech/pak/pakstate.h"
 #include "rtech/pak/paktools.h"
 #include "asyncio.h"
 
@@ -23,7 +24,7 @@ int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* c
     if (fileToLoad && *fileToLoad)
     {
         // is this a pak file and do we have an override
-        if (strstr(fileToLoad, PAK_PLATFORM_PATH) &&
+        if (strstr(fileToLoad, Pak_GetBaseLoadPath()) &&
             Pak_FileOverrideExists(fileToLoad, overridePath, sizeof(overridePath)))
         {
             fileToLoad = overridePath;

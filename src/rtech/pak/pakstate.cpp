@@ -10,6 +10,32 @@
 #include "pakdecode.h"
 #include "paktools.h"
 #include "pakstate.h"
+
+static const char* s_pakBaseLoadPath = nullptr;
+static const char* s_pakOverrideLoadPath = nullptr;
+
+void Pak_SetBaseLoadPath(const char* const basePath)
+{
+	s_pakBaseLoadPath = basePath;
+}
+
+void Pak_SetOverrideLoadPath(const char* const basePath)
+{
+	s_pakOverrideLoadPath = basePath;
+}
+
+const char* Pak_GetBaseLoadPath()
+{
+	Assert(s_pakBaseLoadPath);
+	return s_pakBaseLoadPath;
+}
+
+const char* Pak_GetOverrideLoadPath()
+{
+	Assert(s_pakOverrideLoadPath);
+	return s_pakOverrideLoadPath;
+}
+
 /*
 =====================
 Pak_ListPaks_f
@@ -216,8 +242,8 @@ static void Pak_Decompress_f(const CCommand& args)
 		return;
 	}
 
-	const CFmtStr1024 inPakFile(PAK_PLATFORM_PATH "%s", args.Arg(1));
-	const CFmtStr1024 outPakFile(PAK_PLATFORM_OVERRIDE_PATH "%s", args.Arg(1));
+	const CFmtStr1024 inPakFile("%s%s", Pak_GetBaseLoadPath(), args.Arg(1));
+	const CFmtStr1024 outPakFile("%s%s", Pak_GetOverrideLoadPath(), args.Arg(1));
 
 	if (!Pak_DecodePakFile(inPakFile.String(), outPakFile.String()))
 	{
@@ -241,8 +267,8 @@ static void Pak_Compress_f(const CCommand& args)
 		return;
 	}
 
-	const CFmtStr1024 inPakFile(PAK_PLATFORM_OVERRIDE_PATH "%s", args.Arg(1));
-	const CFmtStr1024 outPakFile(PAK_PLATFORM_PATH "%s", args.Arg(1));
+	const CFmtStr1024 inPakFile("%s%s", Pak_GetOverrideLoadPath(), args.Arg(1));
+	const CFmtStr1024 outPakFile("%s%s", Pak_GetBaseLoadPath(), args.Arg(1));
 
 	// NULL means default compress level
 	const int compressLevel = args.ArgC() > 2 ? atoi(args.Arg(2)) : NULL;
