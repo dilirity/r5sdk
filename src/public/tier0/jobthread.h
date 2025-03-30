@@ -1,6 +1,8 @@
 #ifndef JOBTHREAD_H
 #define JOBTHREAD_H
 
+#define JT_JOB_GROUP_BASE_ID 0x3000
+
 typedef uint32_t JobID_t;
 typedef uint8_t JobTypeID_t;
 typedef uint32_t JobAffinity_t;

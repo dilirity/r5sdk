@@ -94,7 +94,6 @@
 #define PAK_INVALID_HANDLE -1
 
 #define PAK_MAX_DISPATCH_LOAD_JOBS 4
-#define PAK_DEFAULT_JOB_GROUP_ID 0x3000
 
 //-----------------------------------------------------------------------------
 // Forward declarations
