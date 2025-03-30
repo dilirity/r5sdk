@@ -382,7 +382,7 @@ static void DebugOverlay_DrawOverlay(const OverlayBase_t* const pOverlay)
         if (pSphere->a < 255)
         {
             RenderWireframeSphere(pSphere->vOrigin, pSphere->flRadius, pSphere->nTheta, pSphere->nPhi,
-                Color(pSphere->r, pSphere->g, pSphere->b, pSphere->a), !pSphere->noDepthTest);
+                Color(pSphere->r, pSphere->g, pSphere->b, 255), !pSphere->noDepthTest);
         }
 
         break;
