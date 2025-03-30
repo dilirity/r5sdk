@@ -91,6 +91,7 @@ inline __int64(*JT_WaitForJobAndOnlyHelpWithJobTypes)(JobID_t, uint64_t unkMask1
 inline bool(*JT_AcquireFifoLockOrHelp)(struct JobFifoLock_s* pFifo);
 inline void(*JT_ReleaseFifoLock)(struct JobFifoLock_s* pFifo);
 
+inline JobID_t(*JT_BeginJobGroup)(const JobID_t jobId);
 inline void(*JT_EndJobGroup)(const JobID_t jobId);
 
 inline unsigned int (*JT_AllocateJob)(); // Returns an index to the 'job_JT_Context' array
@@ -111,7 +112,9 @@ class VJobThread : public IDetour
 		LogFunAdr("JT_AcquireFifoLockOrHelp", JT_AcquireFifoLockOrHelp);
 		LogFunAdr("JT_ReleaseFifoLock", JT_ReleaseFifoLock);
 
+		LogFunAdr("JT_BeginJobGroup", JT_BeginJobGroup);
 		LogFunAdr("JT_EndJobGroup", JT_EndJobGroup);
+
 		LogFunAdr("JT_AllocateJob", JT_AllocateJob);
 		LogFunAdr("JTGuts_AddJob_Internal", JTGuts_AddJob_Internal);
 		LogVarAdr("job_JT_Context", job_JT_Context);
@@ -126,6 +129,7 @@ class VJobThread : public IDetour
 		Module_FindPattern(g_GameDll, "48 83 EC 08 65 48 8B 04 25 ?? ?? ?? ?? 4C 8B C1").GetPtr(JT_AcquireFifoLockOrHelp);
 		Module_FindPattern(g_GameDll, "48 83 EC 28 44 8B 11").GetPtr(JT_ReleaseFifoLock);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 41 56 48 83 EC 30 65 48 8B 04 25 ?? ?? ?? ?? BA ?? ?? ?? ??").GetPtr(JT_AllocateJob);
+		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 8B D9 E8 ?? ?? ?? ?? 44 8B C0").GetPtr(JT_BeginJobGroup);
 		Module_FindPattern(g_GameDll, "8B D1 48 8D 05 ?? ?? ?? ?? 81 E2 ?? ?? ?? ?? 48 C1 E2 06 48 03 D0 E9 ?? ?? ?? ??").GetPtr(JT_EndJobGroup);
 		Module_FindPattern(g_GameDll, "48 89 74 24 ? 57 48 83 EC 20 0F B6 F1").GetPtr(JTGuts_AddJob_Internal);
 	}
