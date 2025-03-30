@@ -16,13 +16,21 @@ const char* UTIL_GetEntityScriptInfo(CBaseEntity* pEnt)
 	return v_UTIL_GetEntityScriptInfo(pEnt);
 }
 
-CTraceFilterSimple::CTraceFilterSimple(const IHandleEntity* pPassEntity, int collisionGroup, ShouldHitFunc_t pExtraShouldHitCheckFn)
+CTraceFilterSimple::CTraceFilterSimple(const IHandleEntity* pPassEntity, const int collisionGroup, ShouldHitFunc_t pExtraShouldHitCheckFn)
 {
-	void** pVTable = reinterpret_cast<void**>(&*this); // Assign vftable pointer to the implementation supplied by the engine.
-	*pVTable = reinterpret_cast<void*>(g_pTraceFilterSimpleVFTable);
-
-	m_collisionGroup = collisionGroup;
+	m_reserved = 0;
 	m_pPassEntity = pPassEntity;
-	m_traceType = 0;
+	m_collisionGroup = collisionGroup;
 	m_pExtraShouldHitCheckFunction = pExtraShouldHitCheckFn;
+}
+
+bool CTraceFilterSimple::ShouldHitEntity(IHandleEntity* const pEntity, const int contentsMask)
+{
+	return v_TraceFilter_ShouldHitEntity(pEntity, m_pPassEntity, m_pExtraShouldHitCheckFunction, contentsMask, m_collisionGroup);
+}
+
+bool CTraceFilterSimple::ShouldBlockTrace(trace_t* const pTrace)
+{
+	NOTE_UNUSED(pTrace);
+	return false;
 }
