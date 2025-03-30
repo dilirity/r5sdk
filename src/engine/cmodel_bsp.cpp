@@ -561,18 +561,19 @@ CHECK_LOAD_STATUS:
 //-----------------------------------------------------------------------------
 void Mod_PreloadPaks()
 {
-    static const char* const preloadFile = "paks/preload.rson";
-    bool parseFailure = false;
+    char preloadFilePath[MAX_OSPATH];
+    snprintf(preloadFilePath, sizeof(preloadFilePath), "%s%s", Pak_GetBaseLoadPath(), "preload.rson");
 
-    RSON::Node_t* const rson = RSON::LoadFromFile(preloadFile, "GAME", &parseFailure);
+    bool parseFailure = false;
+    RSON::Node_t* const rson = RSON::LoadFromFile(preloadFilePath, "GAME", &parseFailure);
 
     if (!rson)
     {
         if (parseFailure)
-            Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: failure parsing file '%s'\n", __FUNCTION__, preloadFile);
+            Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: failure parsing file '%s'\n", __FUNCTION__, preloadFilePath);
         else
         {
-            Warning(eDLL_T::ENGINE, "%s: could not load file '%s'\n", __FUNCTION__, preloadFile);
+            Warning(eDLL_T::ENGINE, "%s: could not load file '%s'\n", __FUNCTION__, preloadFilePath);
             return; // No preload file, thus no error. Warn and return out.
         }
     }
@@ -581,12 +582,12 @@ void Mod_PreloadPaks()
     const RSON::Field_t* const key = rson->FindKey(arrayName);
 
     if (!key)
-        Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: missing array key \"%s\" in file '%s'\n", __FUNCTION__, arrayName, preloadFile);
+        Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: missing array key \"%s\" in file '%s'\n", __FUNCTION__, arrayName, preloadFilePath);
 
     if ((key->m_Node.m_Type != (RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_STRING)) &&
         (key->m_Node.m_Type != (RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_VALUE)))
     {
-        Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: expected an array of strings in file '%s'\n", __FUNCTION__, preloadFile);
+        Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: expected an array of strings in file '%s'\n", __FUNCTION__, preloadFilePath);
     }
 
     for (int i = 0; i < key->m_Node.m_nValueCount; i++)
