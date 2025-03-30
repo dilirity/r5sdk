@@ -22,7 +22,6 @@
 #include "tier1/keyvalues.h"
 #include "engine/cmodel_bsp.h"
 #include "engine/host_state.h"
-#include "engine/client/cl_main.h"
 #include "engine/debugoverlay.h"
 #include "networksystem/pylon.h"
 #include "networksystem/listmanager.h"
@@ -147,15 +146,6 @@ static SQBool Script_CheckServerIndexAndFailure(HSQUIRRELVM v, SQInteger iServer
     }
 
     return true;
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: checks whether this SDK build is a client dll
-//-----------------------------------------------------------------------------
-static SQRESULT ClientScript_IsClientDLL(HSQUIRRELVM v)
-{
-    sq_pushbool(v, ::IsClientDLL());
-    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 static void Internal_UIScript_RequestForServerBrowserListThreaded()
@@ -611,7 +601,6 @@ void Script_RegisterClientFunctions(CSquirrelVM* s)
 //---------------------------------------------------------------------------------
 void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
 {
-    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, IsClientDLL, "Returns whether this build is client only", "bool", "");
 }
 
 //---------------------------------------------------------------------------------
