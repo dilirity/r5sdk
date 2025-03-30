@@ -18,9 +18,10 @@
 #include "engine/server/server.h"
 #include "engine/host_state.h"
 #include "engine/debugoverlay.h"
-#include "game/shared/vscript_shared.h"
 #include "vscript/vscript.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
+#include "game/shared/vscript_shared.h"
+#include "game/shared/vscript_debug_overlay_shared.h"
 
 #include "liveapi/liveapi.h"
 #include "vscript_server.h"
@@ -43,6 +44,30 @@ static void SQVM_ServerScript_f(const CCommand& args)
     }
 }
 static ConCommand script("script", SQVM_ServerScript_f, "Run input code as SERVER script on the VM", FCVAR_DEVELOPMENTONLY | FCVAR_GAMEDLL | FCVAR_CHEAT | FCVAR_SERVER_FRAME_THREAD);
+
+//-----------------------------------------------------------------------------
+// Purpose: server NDebugOverlay proxies
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_DebugDrawSolidBox(HSQUIRRELVM v)
+{
+    return SharedScript_DebugDrawSolidBox(v);
+}
+static SQRESULT ServerScript_DebugDrawSweptBox(HSQUIRRELVM v)
+{
+    return SharedScript_DebugDrawSweptBox(v);
+}
+static SQRESULT ServerScript_DebugDrawTriangle(HSQUIRRELVM v)
+{
+    return SharedScript_DebugDrawTriangle(v);
+}
+static SQRESULT ServerScript_DebugDrawSolidSphere(HSQUIRRELVM v)
+{
+    return SharedScript_DebugDrawSolidSphere(v);
+}
+static SQRESULT ServerScript_DebugDrawCapsule(HSQUIRRELVM v)
+{
+    return SharedScript_DebugDrawCapsule(v);
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: calculates the duration for the debug text overlay
@@ -111,11 +136,7 @@ static SQRESULT ServerScript_DebugScreenTextWithColor(HSQUIRRELVM v)
         sq_getstring(v, 4, &text);
         sq_getvector(v, 5, &colorVec);
 
-        const Color color(
-            Clamp((int)(colorVec->x * 255), 0, 255),
-            Clamp((int)(colorVec->y * 255), 0, 255),
-            Clamp((int)(colorVec->z * 255), 0, 255), 255);
-
+        const Color color = Script_VectorToColor(colorVec, 1.0f);
         ServerScript_Internal_DebugScreenTextWithColor(v, posX, posY, color, text);
     }
 
@@ -493,6 +514,12 @@ void Script_RegisterServerEnums(CSquirrelVM* const s)
 //---------------------------------------------------------------------------------
 void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
 {
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, DebugDrawSolidBox, "Draw a debug overlay solid box", "void", "vector origin, vector mins, vector maxs, vector color, float alpha, bool drawThroughWorld, float duration");
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, DebugDrawSweptBox, "Draw a debug overlay swept box", "void", "vector start, vector end, vector mins, vector maxs, vector angles, vector color, float alpha, bool drawThroughWorld, float duration");
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, DebugDrawTriangle, "Draw a debug overlay triangle", "void", "vector p1, vector p2, vector p3, vector color, float alpha, bool drawThroughWorld, float duration");
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, DebugDrawSolidSphere, "Draw a debug overlay solid sphere", "void", "vector origin, float radius, int theta, int phi, vector color, float alpha, bool drawThroughWorld, float duration");
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, DebugDrawCapsule, "Draw a debug overlay capsule", "void", "vector start, vector end, float radius, vector color, float alpha, bool drawThroughWorld, float duration");
+
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SetAutoReloadState, "Set whether we can auto-reload the server", "void", "bool canAutoReload");
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, GetServerID, "Gets the current server ID", "string", "");
 

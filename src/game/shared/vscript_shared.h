@@ -1,5 +1,6 @@
 #ifndef VSCRIPT_SHARED_H
 #define VSCRIPT_SHARED_H
+#include "mathlib/color.h"
 #include "vscript/languages/squirrel_re/include/squirrel.h"
 #include "vscript/languages/squirrel_re/vsquirrel.h"
 
@@ -18,6 +19,15 @@ void Script_RegisterListenServerConstants(CSquirrelVM* s);
 #define DEFINE_SHARED_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...)          \
 	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(SHARED_SCRIPT( Script_##functionName )), \
 	helpString, returnType, parameters, SharedScript_##functionName, __VA_ARGS__)                 \
+
+inline Color Script_VectorToColor(const SQVector3D* const vec, const SQFloat alpha)
+{
+	return Color(
+		Clamp((int)(vec->x * 255), 0, 255),
+		Clamp((int)(vec->y * 255), 0, 255),
+		Clamp((int)(vec->z * 255), 0, 255),
+		Clamp((int)(alpha * 255), 0, 255));
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 class VScriptShared : public IDetour

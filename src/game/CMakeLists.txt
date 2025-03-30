@@ -80,6 +80,8 @@ add_sources( SOURCE_GROUP "Shared"
 add_sources( SOURCE_GROUP "Script"
     "shared/vscript_shared.cpp"
     "shared/vscript_shared.h"
+    "shared/vscript_debug_overlay_shared.cpp"
+    "shared/vscript_debug_overlay_shared.h"
 )
 
 endif()
