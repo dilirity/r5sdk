@@ -163,7 +163,7 @@ static void Pak_RunAssetLoadingJobs(PakFile_s* const pak)
             // have to cast it to a bigger size to send it as param to JTGuts_AddJob().
             const int64_t pakId = pak->memoryData.pakId;
 
-            JTGuts_AddJob(jobTypeId, pak->memoryData.assetLoadJobId, (void*)pakId, (void*)(uint64_t)currentAsset);
+            JTGuts_AddJob(jobTypeId, pak->memoryData.assetLoadJobGroupId, (void*)pakId, (void*)(uint64_t)currentAsset);
         }
         else
         {
@@ -177,7 +177,7 @@ static void Pak_RunAssetLoadingJobs(PakFile_s* const pak)
 
         if (currentAsset == pak->memoryData.pakHeader.assetCount)
         {
-            JT_EndJobGroup(pak->memoryData.assetLoadJobId);
+            JT_EndJobGroup(pak->memoryData.assetLoadJobGroupId);
             return;
         }
 
@@ -667,7 +667,7 @@ static bool Pak_ProcessAssets(PakLoadedInfo_s* const loadedInfo)
         }
     }
 
-    if (!JT_IsJobDone(pak->memoryData.assetLoadJobId))
+    if (!JT_IsJobDone(pak->memoryData.assetLoadJobGroupId))
         return false;
 
     uint32_t i = 0;

@@ -680,7 +680,7 @@ struct PakMemoryData_s
 	size_t fileSize;
 
 	PakHandle_t pakId;
-	JobID_t assetLoadJobId;
+	JobID_t assetLoadJobGroupId;
 	int* loadedAssetIndices;
 	uint8_t** memPageBuffers;
 
