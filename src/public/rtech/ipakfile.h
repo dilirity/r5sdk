@@ -277,6 +277,13 @@ struct PakTracker_s
 	char gap_9DC04[522240];
 };
 
+struct PakGuidDescriptor_s
+{
+	int unk1;
+	int unk2;
+	uint64_t unk3;
+};
+
 class PakLoadedInfo_s
 {
 public:
@@ -315,11 +322,11 @@ public:
 	CAlignedMemAlloc* allocator;
 	PakGuid_t* assetGuids; // size of the array is assetCount
 	void* slabBuffers[PAK_SLAB_BUFFER_TYPES];
-	void* guidDestriptors;
+	PakGuidDescriptor_s* guidDestriptors;
 	FILETIME fileTime;
 	PakFile_s* pakFile;
 	StreamingInfo_t streamInfo[STREAMING_SET_COUNT];
-	uint32_t fileHandle;
+	int fileHandle;
 	uint8_t unkAC;
 	HMODULE hModule;
 
@@ -698,7 +705,10 @@ struct PakMemoryData_s
 	PakPage_u* pageDescriptors;
 	uint32_t* fileRelations;
 
-	char gap5E0[32];
+	void* ptr5E0;
+	void* ptr5E8;
+	void* ptr5F0;
+	void* ptr5F8;
 
 	PakPatchDataHeader_s* patchDataHeader;
 	PakAsset_s** ppAssetEntries;

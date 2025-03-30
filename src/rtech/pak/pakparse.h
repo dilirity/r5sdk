@@ -9,6 +9,7 @@
 
 // This function returns the pak handle of the patch master RPak
 inline PakHandle_t(*v_Pak_Initialize)(int mode);
+inline bool(*v_Pak_SetupBuffersAndLoad)(const PakHandle_t handle);
 
 inline PakHandle_t(*v_Pak_LoadAsync)(const char* fileName, CAlignedMemAlloc* allocator, int nIdx, bool bUnk);
 inline PakStatus_e(*v_Pak_WaitAsync)(PakHandle_t handle, void* finishCallback);
@@ -34,6 +35,7 @@ class V_PakParse : public IDetour
 	virtual void GetAdr(void) const
 	{
 		LogFunAdr("Pak_Initialize", v_Pak_Initialize);
+		LogFunAdr("Pak_SetupBuffersAndLoad", v_Pak_SetupBuffersAndLoad);
 
 		LogFunAdr("Pak_LoadAsync", v_Pak_LoadAsync);
 		LogFunAdr("Pak_WaitAsync", v_Pak_WaitAsync);
@@ -50,6 +52,8 @@ class V_PakParse : public IDetour
 	virtual void GetFun(void) const
 	{
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 8B D9 E8 ?? ?? ?? ??").GetPtr(v_Pak_Initialize);
+		Module_FindPattern(g_GameDll, "89 4C 24 ?? 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ?? ?? ?? ?? B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 2B E0 8B C1").GetPtr(v_Pak_SetupBuffersAndLoad);
+
 		Module_FindPattern(g_GameDll, "E8 ?? ?? ?? ?? 89 03 8B 0B").FollowNearCallSelf().GetPtr(v_Pak_LoadAsync);
 		Module_FindPattern(g_GameDll, "40 53 55 48 83 EC 38 48 89 74 24 ??").GetPtr(v_Pak_WaitAsync);
 		Module_FindPattern(g_GameDll, "E8 ?? ?? ?? ?? 85 FF 74 0C").FollowNearCallSelf().GetPtr(v_Pak_UnloadAsync);

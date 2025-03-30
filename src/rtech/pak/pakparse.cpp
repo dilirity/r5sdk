@@ -839,459 +839,362 @@ static bool Pak_StartLoadingPak(PakLoadedInfo_s* const loadedInfo)
     return true;
 }
 
-// #STR: "(%02u).rpak", "Couldn't read package file \"%s\".\n", "Error 0x%08x", "paks\\Win64\\%s"
-//bool Pak_SetupBuffersAndLoad(PakHandle_t pakId)
-//{
-//    __int64 v2; // rdi
-//    const char* pakFilePath; // rsi
-//    unsigned int v7; // ebx
-//    unsigned int v8; // r14d
-//    char** v9; // r12
-//    int v10; // eax
-//    __int64 v11; // r11
-//    char v12; // al
-//    char* i; // rdx
-//    uint32_t pakFileHandle; // eax
-//    bool result; // al
-//    int AsyncFile; // bl
-//    signed __int64 v19; // rbx
-//    char v20; // r14
-//    __int64 v21; // rdx
-//    const char* v22; // rax
-//    __int64 v23; // rbx
-//    __int64 asset_entry_count_var; // rax MAPDST
-//    __int64 patchIndex; // r11
-//    __int64 memPageCount; // r9
-//    __int64 virtualSegmentCount; // rcx
-//    __int64 v32; // r8
-//    __int64 v33; // rcx
-//    __int64 v34; // r14
-//    __int64 v35; // r12
-//    uint64_t ringBufferStreamSize; // rsi
-//    uint64_t ringBufferOutSize; // rax
-//    PakFile_t* pak; // rax MAPDST
-//    _DWORD* v40; // rax
-//    __int64 v43; // rdx
-//    uint8_t** v44; // rcx
-//    PakAsset_t** v45; // rdx
-//    PakPatchFileHeader_t* p_patchHeader; // rcx
-//    uint16_t v47; // ax
-//    PakPatchFileHeader_t* p_decompressedSize; // rdx
-//    __int64 v49; // rcx
-//    __int64 v50; // rax
-//    unsigned __int16* v51; // rcx
-//    char* v52; // rcx
-//    char* v53; // rdx
-//    __int64 v54; // rax
-//    PakSegmentHeader_t* v55; // rdx
-//    __int64 v56; // rcx
-//    __int64 v57; // rax
-//    PakPageHeader_t* v58; // rcx
-//    __int64 descriptorCount; // rdx
-//    PakPage_t* v60; // rcx
-//    __int64 assetCount; // rax
-//    PakAsset_t* v62; // r8
-//    __int64 guidDescriptorCount; // r9
-//    PakPage_t* v64; // rdx
-//    __int64 relationsCounts; // rcx
-//    uint32_t* v66; // rax
-//    __int64 v67; // rdx
-//    uint32_t* v68; // rcx
-//    __int64 v69; // r8
-//    uint32_t* v70; // rax
-//    __int64 v71; // rcx
-//    PakPatchDataHeader_t* patchDataHeader; // rax
-//    size_t v73; // rdx
-//    uint8_t* ringBuffer; // rax
-//    bool v75; // zf
-//    __int64 v76; // r10
-//    unsigned __int64 v77; // r8
-//    __int64 v78; // rax
-//    PakFileHeader_t pakHdr; // [rsp+40h] [rbp-C0h] BYREF
-//    __int64 v80; // [rsp+C0h] [rbp-40h]
-//    __int64 v81; // [rsp+C8h] [rbp-38h]
-//    char relativeFilePath[260]; // [rsp+E0h] [rbp-20h] BYREF
-//    char v84[12]; // [rsp+1E4h] [rbp+E4h] BYREF
-//    CHAR LibFileName[4]; // [rsp+1F0h] [rbp+F0h] BYREF
-//    char v86[8252]; // [rsp+1F4h] [rbp+F4h]
-//    size_t pak_file_size_var; // [rsp+2248h] [rbp+2148h] BYREF
-//    __int64 v89; // [rsp+2250h] [rbp+2150h]
-//    uint64_t v90; // [rsp+2258h] [rbp+2158h]
-//
-//    v2 = 0i64;
-//
-//    PakLoadedInfo_t* const loadedInfo = Pak_GetPakInfo(pakId);
-//
-//    loadedInfo->status = PAK_STATUS_LOAD_STARTING;
-//    pakFilePath = loadedInfo->fileName;
-//
-//    //
-//    assert(pakFilePath);
-//
-//    const char* nameUnqualified = V_UnqualifiedFileName(pakFilePath);
-//
-//    if (nameUnqualified != pakFilePath)
-//        goto LABEL_27;
-//
-//    snprintf(relativeFilePath, 0x100ui64, "paks\\Win64\\%s", pakFilePath);
-//
-//    v7 = g_nPatchEntryCount;
-//    v8 = 0;
-//
-//    // if this pak is patched, load the last patch file first before proceeding
-//    // with any other pak that is getting patched. note that the patch number
-//    // does not indicate which pak file is the actual last patch file; a patch
-//    // with number (01) can also patch (02) and base, these details are
-//    // determined from the pak file header
-//    if (g_nPatchEntryCount)
-//    {
-//        v9 = g_pszPakPatchList;
-//
-//        int n;
-//        while (1)
-//        {
-//            n = V_stricmp(pakFilePath, v9[(v7 + v8) >> 1]);
-//
-//            if (n >= 0)
-//                break;
-//
-//            v7 = v11;
-//        LABEL_13:
-//            if (v8 >= v7)
-//                goto SKIP_PATCH_LOADING;
-//        }
-//
-//        if (n > 0)
-//        {
-//            v8 = v11 + 1;
-//            goto LABEL_13;
-//        }
-//
-//        const int patchNumber = g_pnPatchNumbers[v11];
-//
-//        if (patchNumber)
-//        {
-//            char* const extension = (char*)V_GetFileExtension(pakFilePath, true);
-//            snprintf(extension, &relativeFilePath[sizeof(relativeFilePath)] - extension, "(%02u).rpak", patchNumber);
-//        }
-//    }
-//
-//    if (!g_nPatchEntryCount)
-//        goto SKIP_PATCH_LOADING;
-//
-//    v9 = g_pszPakPatchList;
-//    while (1)
-//    {
-//        LOBYTE(v10) = stricmp(pakFilePath, v9[(v7 + v8) >> 1]);
-//        if (v10 >= 0)
-//            break;
-//        v7 = v11;
-//    LABEL_13:
-//        if (v8 >= v7)
-//            goto SKIP_PATCH_LOADING;
-//    }
-//    if (v10 > 0)
-//    {
-//        v8 = v11 + 1;
-//        goto LABEL_13;
-//    }
-//
-//    const int patchNumber = g_pnPatchNumbers[v11];
-//
-//    if (patchNumber)
-//    {
-//        char* const extension = (char*)V_GetFileExtension(pakFilePath, true);
-//        snprintf(extension, &relativeFilePath[sizeof(relativeFilePath)] - extension, "(%02u).rpak", patchNumber);
-//    }
-//
-//SKIP_PATCH_LOADING:
-//    pakFilePath = relativeFilePath;
-//LABEL_27:
-//    pakFileHandle = FS_OpenAsyncFile(pakFilePath, loadedInfo->logLevel, &pak_file_size_var);
-//
-//    if (pakFileHandle == FS_ASYNC_FILE_INVALID)
-//    {
-//        if (async_debug_level.GetInt() >= loadedInfo->logLevel)
-//            Error(eDLL_T::RTECH, NO_ERROR, "Couldn't read package file \"%s\".\n", pakFilePath);
-//
-//        loadedInfo->status = PAK_STATUS_ERROR;
-//        return false;
-//    }
-//
-//    loadedInfo->fileHandle = pakFileHandle;
-//
-//    // file appears truncated/corrupt
-//    if (pak_file_size_var < sizeof(PakFileHeader_t))
-//    {
-//        loadedInfo->status = PAK_STATUS_ERROR;
-//        return false;
-//    }
-//
-//    AsyncFile = v_FS_ReadAsyncFile(pakFileHandle, 0i64, sizeof(PakFileHeader_t), &pakHdr, 0i64, 0i64, 4);
-//    v_FS_WaitForAsyncRead(AsyncFile);
-//
-//    size_t bytesProcessed = 0;
-//    const char* statusMsg = "(no reason)";
-//    const uint8_t currentStatus = g_pakLoadApi->CheckAsyncRequest(AsyncFile, &bytesProcessed, &statusMsg);
-//
-//    if (currentStatus == AsyncHandleStatus_t::FS_ASYNC_ERROR)
-//    {
-//        Error(eDLL_T::RTECH, EXIT_FAILURE, "Error reading pak file \"%s\" -- %s\n", pak->memoryData.fileName, statusMsg);
-//
-//        loadedInfo->status = PAK_STATUS_ERROR;
-//        return false;
-//    }
-//
-//    if (pakHdr.magic != PAK_HEADER_MAGIC || pakHdr.version != PAK_HEADER_VERSION)
-//    {
-//        loadedInfo->status = PAK_STATUS_ERROR;
-//        return false;
-//    }
-//
-//    if (pakHdr.flags & PAK_HEADER_FLAGS_HAS_MODULE_EXTENDED)
-//    {
-//        v22 = V_GetFileExtension(pakFilePath);
-//        v23 = v22 - pakFilePath;
-//
-//        if ((unsigned __int64)(v22 - pakFilePath + 4) >= 0x2000)
-//        {
-//            loadedInfo->status = PAK_STATUS_ERROR;
-//            return false;
-//        }
-//
-//        memcpy(LibFileName, pakFilePath, v22 - pakFilePath);
-//
-//        *(_DWORD*)&LibFileName[v23] = *(_DWORD*)".dll";
-//        v86[v23] = '\0';
-//
-//        const HMODULE hModule = LoadLibraryA(LibFileName);
-//        loadedInfo->hModule = hModule;
-//
-//        if (!hModule)
-//        {
-//            loadedInfo->status = PAK_STATUS_ERROR;
-//            return false;
-//        }
-//    }
-//
-//    loadedInfo->fileTime = pakHdr.fileTime;
-//    asset_entry_count_var = pakHdr.assetCount;
-//
-//    loadedInfo->assetCount = pakHdr.assetCount;
-//
-//    asset_entry_count_var = pakHdr.assetCount;
-//    patchIndex = pakHdr.patchIndex;
-//    memPageCount = pakHdr.memPageCount;
-//    virtualSegmentCount = pakHdr.virtualSegmentCount;
-//    v32 = *(unsigned int*)&pakHdr.unk2[4];
-//
-//    loadedInfo->assetGuids = (PakGuid_t*)loadedInfo->allocator->Alloc(sizeof(PakGuid_t) * asset_entry_count_var, 8);
-//
-//    size_t streamingFilesBuifSize = pakHdr.streamingFilesBufSize[STREAMING_SET_OPTIONAL] + pakHdr.streamingFilesBufSize[STREAMING_SET_MANDATORY];
-//
-//    v81 = 8 * memPageCount;
-//
-//    pak_file_size_var = streamingFilesBuifSize
-//        + ((_WORD)patchIndex != 0 ? 8 : 0)
-//        + 2
-//        * (patchIndex
-//            + 2
-//            * (pakHdr.relationsCounts
-//                + *(unsigned int*)pakHdr.unk2
-//                + 3 * memPageCount
-//                + 2 * (pakHdr.descriptorCount + pakHdr.guidDescriptorCount + 16i64 + 2 * (asset_entry_count_var + patchIndex + 4 * asset_entry_count_var + virtualSegmentCount))))
-//        + v32;
-//
-//    v80 = 4 * asset_entry_count_var;
-//    v90 = pak_file_size_var + 2080;
-//    v33 = -((_DWORD)pak_file_size_var + 2080 + 4 * (_DWORD)asset_entry_count_var) & 7;
-//    v89 = v33;
-//    v34 = 4 * asset_entry_count_var + pak_file_size_var + 2080 + v33 + 8 * memPageCount + 12 * asset_entry_count_var;
-//    v35 = (-(4 * (_DWORD)asset_entry_count_var + (_DWORD)pak_file_size_var + 2080 + (_DWORD)v33 + 8 * (_DWORD)memPageCount + 12 * (_DWORD)asset_entry_count_var) & 7) + 4088i64;
-//
-//    if ((pakHdr.flags & 0x100) != 0)
-//    {
-//        ringBufferStreamSize = PAK_DECODE_IN_RING_BUFFER_SIZE;
-//        ringBufferOutSize = PAK_DECODE_OUT_RING_BUFFER_SIZE;
-//
-//        if (pakHdr.compressedSize < PAK_DECODE_IN_RING_BUFFER_SIZE && !(_WORD)patchIndex)
-//            ringBufferStreamSize = (pakHdr.compressedSize + PAK_DECODE_IN_RING_BUFFER_SMALL_MASK) & 0xFFFFFFFFFFFFF000ui64;
-//    }
-//    else
-//    {
-//        ringBufferStreamSize = 0i64;
-//        ringBufferOutSize = PAK_DECODE_IN_RING_BUFFER_SIZE;
-//    }
-//
-//    if (ringBufferOutSize > pakHdr.decompressedSize && !(_WORD)patchIndex)
-//        ringBufferOutSize = (pakHdr.decompressedSize + PAK_DECODE_IN_RING_BUFFER_SMALL_MASK) & 0xFFFFFFFFFFFFF000ui64;
-//
-//    pak = (PakFile_t*)AlignedMemAlloc()->Alloc(v34 + v35 + ringBufferOutSize + ringBufferStreamSize, 8);
-//
-//    if (pak)
-//    {
-//        loadedInfo->pakFile = pak;
-//
-//        *(_QWORD*)&pak->processedPageCount = 0i64;
-//        *(_QWORD*)&pak->patchCount = 0i64;
-//        *(_QWORD*)&pak->numProcessedPointers = 0i64;
-//        *(_QWORD*)&pak->memoryData.someAssetCount = 0i64;
-//
-//        v40 = (_DWORD*)loadedInfo->allocator->Alloc(16i64 * pakHdr.guidDescriptorCount + 8, 8i64);
-//        loadedInfo->guidDestriptors = v40;
-//
-//        *v40 = 0;
-//
-//        *(_DWORD*)(loadedInfo->guidDestriptors + 4i64) = 0;
-//
-//        pak->memoryData.pakHeader = pakHdr;
-//
-//        pak->memoryData.pakId = pakId;
-//        pak->memoryData.qword2D0 = pak_file_size_var;
-//
-//        JobID_t jobId = PAK_DEFAULT_JOB_GROUP_ID;
-//
-//        if (pakHdr.assetCount)
-//            jobId = JT_BeginJobGroup(0);
-//
-//        pak->memoryData.unkJobID = jobId;
-//
-//
-//        v43 = v81;
-//        v44 = (uint8_t**)((char*)pak + v89 + v90 + v80);
-//        pak->memoryData.memPageBuffers = v44;
-//        v45 = (PakAsset_t**)((char*)v44 + v43);
-//        pak->memoryData.ppAssetEntries = v45;
-//        pak->memoryData.qword2E0 = (int*)&v45[pakHdr.assetCount];
-//        p_patchHeader = &pak->memoryData.patchHeader;
-//        v47 = pak->memoryData.pakHeader.patchIndex;
-//
-//        p_decompressedSize = (PakPatchFileHeader_t*)&pak->memoryData.patchHeader.decompressedSize;
-//        if (!v47)
-//            p_decompressedSize = &pak->memoryData.patchHeader;
-//        if (!v47)
-//            p_patchHeader = 0i64;
-//
-//        pak->memoryData.patchDataHeader = (PakPatchDataHeader_t*)p_patchHeader;
-//        v49 = pak->memoryData.pakHeader.patchIndex;
-//        pak->memoryData.patchHeaders = p_decompressedSize;
-//        v50 = pak->memoryData.pakHeader.patchIndex;
-//        v51 = (unsigned __int16*)&p_decompressedSize[v49];
-//        pak->memoryData.patchIndices = v51;
-//        v52 = (char*)&v51[v50];
-//        v53 = &v52[pak->memoryData.pakHeader.streamingFilesBufSize[0]];
-//        pak->memoryData.streamingFilePaths[0] = v52;
-//        v54 = pak->memoryData.pakHeader.streamingFilesBufSize[1];
-//        pak->memoryData.streamingFilePaths[1] = v53;
-//        v55 = (PakSegmentHeader_t*)&v53[v54];
-//        v56 = pak->memoryData.pakHeader.virtualSegmentCount;
-//        pak->memoryData.segmentHeaders = v55;
-//        v57 = pak->memoryData.pakHeader.memPageCount;
-//        v58 = (PakPageHeader_t*)&v55[v56];
-//        pak->memoryData.pageHeaders = v58;
-//        descriptorCount = pak->memoryData.pakHeader.descriptorCount;
-//        v60 = (PakPage_t*)&v58[v57];
-//        pak->memoryData.virtualPointers = v60;
-//        assetCount = pak->memoryData.pakHeader.assetCount;
-//        v62 = (PakAsset_t*)&v60[descriptorCount];
-//        pak->memoryData.assetEntries = v62;
-//        guidDescriptorCount = pak->memoryData.pakHeader.guidDescriptorCount;
-//        v64 = (PakPage_t*)&v62[assetCount];
-//        pak->memoryData.guidDescriptors = v64;
-//        relationsCounts = pak->memoryData.pakHeader.relationsCounts;
-//        v66 = (uint32_t*)&v64[guidDescriptorCount];
-//        pak->memoryData.fileRelations = v66;
-//        v67 = *(unsigned int*)pak->memoryData.pakHeader.unk2;
-//        v68 = &v66[relationsCounts];
-//        *(_QWORD*)pak->memoryData.gap5E0 = v68;
-//        v69 = *(unsigned int*)&pak->memoryData.pakHeader.unk2[4];
-//        *(_QWORD*)&pak->memoryData.gap5E0[16] = 0i64;
-//        v70 = &v68[v67];
-//        *(_QWORD*)&pak->memoryData.gap5E0[8] = v70;
-//        v71 = (__int64)v70 + v69;
-//        *(_QWORD*)&pak->memoryData.gap5E0[24] = (char*)v70 + v69;
-//        if (pak->memoryData.pakHeader.patchIndex)
-//        {
-//            patchDataHeader = pak->memoryData.patchDataHeader;
-//            if (patchDataHeader->editStreamSize)
-//            {
-//                *(_QWORD*)&pak->memoryData.gap5E0[16] = v71;
-//                *(_QWORD*)&pak->memoryData.gap5E0[24] = v71 + (unsigned int)patchDataHeader->editStreamSize;
-//            }
-//        }
-//        v73 = PAK_DECODE_IN_RING_BUFFER_MASK;
-//
-//        pak->memoryData.fileName = loadedInfo->fileName;
-//        pak->fileStream.qword0 = 0i64;
-//        pak->fileStream.fileSize = pakHdr.compressedSize;
-//        pak->fileStream.fileHandle = loadedInfo->fileHandle;
-//        loadedInfo->fileHandle = FS_ASYNC_FILE_INVALID;
-//
-//        pak->fileStream.bufferMask = PAK_DECODE_IN_RING_BUFFER_MASK;
-//
-//        ringBuffer = (uint8_t*)(((unsigned __int64)pak + v35 + v34) & 0xFFFFFFFFFFFFF000ui64);
-//
-//        pak->fileStream.buffer = ringBuffer;
-//        pak->fileStream.numDataChunksProcessed = 0;
-//        pak->fileStream.numDataChunks = 0;
-//        pak->fileStream.fileReadStatus = 3;
-//        pak->fileStream.finishedLoadingPatches = 0;
-//        pak->fileStream.numLoadedFiles = 0;
-//        pak->fileStream.bytesStreamed = sizeof(PakFileHeader_t);
-//        pak->decompBuffer = &ringBuffer[ringBufferStreamSize];
-//        pak->inputBytePos = sizeof(PakFileHeader_t);
-//        pak->byte1F8 = 0;
-//        pak->byte1FD = 1;
-//        pak->isOffsetted_MAYBE = 0;
-//        pak->isCompressed = 0;
-//
-//        // FINISHME: this means if the pak file is not encoded, but we should also
-//        // check on the zstd flags
-//        v75 = (pakHdr.flags & 0x100) == 0;
-//
-//        pak->headerSize = sizeof(PakFileHeader_s);
-//
-//        if (!v75)
-//            v73 = PAK_DECODE_OUT_RING_BUFFER_MASK;
-//
-//        pak->maxCopySize = v73;
-//        memset(&pak->pakDecoder, 0, sizeof(pak->pakDecoder));
-//
-//        pak->pakDecoder.outBufBytePos = 128i64;
-//        pak->pakDecoder.decompSize = 128i64;
-//        pak->memoryData.processedPatchedDataSize = 128i64;
-//        v76 = pakHdr.patchIndex;
-//        v77 = pakHdr.descriptorCount + 2 * (pakHdr.patchIndex + (unsigned __int64)pakHdr.assetCount + 4i64 * pakHdr.assetCount + pakHdr.virtualSegmentCount);
-//        v78 = pakHdr.memPageCount;
-//
-//        pak->memoryData.field_2A8 = 0i64;
-//        pak->memoryData.patchData = 0i64;
-//        pak->memoryData.patchDataPtr = 0i64;
-//        pak->memoryData.bitBuf.m_dataBuf = 0i64;
-//        pak->memoryData.bitBuf.m_bitsAvailable = 0;
-//        pak->memoryData.patchDataOffset = 0;
-//        pak->memoryData.patchSrcSize = v82 + ((_WORD)v76 != 0 ? 8 : 0) + 2 * (v76 + 6 * v78 + 4 * v77);
-//        pak->memoryData.patchDstPtr = (char*)&pak->memoryData.patchHeader;
-//        pak->memoryData.patchFunc = g_pakPatchApi[0];
-//
-//        LOBYTE(v2) = pakHdr.patchIndex == 0;
-//        pak->memoryData.numBytesToProcess_maybe = pak->memoryData.pakHeader.decompressedSize + v2 - 0x80;
-//
-//        Pak_ProcessPakFile(pak);
-//        return true;
-//    }
-//    else
-//    {
-//        loadedInfo->status = PAK_STATUS_ERROR;
-//        return false;
-//    }
-//
-//    return result;
-//}
+//-----------------------------------------------------------------------------
+// retrieves the patch index to load for given rpak file, returns NULL if no
+// patches are to be loaded for given pak file.
+//-----------------------------------------------------------------------------
+static uint32 Pak_GetPatchIndexForPak(const char* const pakName)
+{
+    int totalPatchCount = g_pakGlobals->numPatchedPaks;
 
+    if (!totalPatchCount)
+        return 0;
+
+    int iterator = 0;
+
+    while (iterator < totalPatchCount)
+    {
+        const int index = (totalPatchCount + iterator) >> 1;
+        const int compareResult = stricmp(pakName, g_pakGlobals->patchedPakFiles[index]);
+
+        if (compareResult < 0)
+            totalPatchCount = index;
+        else if (compareResult > 0)
+            iterator = index + 1;
+        else
+            return g_pakGlobals->patchNumbers[index];
+    }
+
+    return 0; // Found nothing.
+}
+
+static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
+{
+    PakLoadedInfo_s* const loadedInfo = Pak_GetPakInfo(pakId);
+    loadedInfo->status = PAK_STATUS_LOAD_STARTING;
+
+    const char* pakFilePath = loadedInfo->fileName;
+    assert(pakFilePath);
+
+    const char* nameUnqualified = V_UnqualifiedFileName(pakFilePath);
+    char relativeFilePath[MAX_OSPATH];
+
+    // Only do this for the base pak file, path formatting is only performed on
+    // the base paks and patch paks derive from it. Patch paks are also only
+    // parsed and loaded from the base pak here.
+    if (nameUnqualified == pakFilePath)
+    {
+        snprintf(relativeFilePath, sizeof(relativeFilePath), "paks\\Win64\\%s", pakFilePath);
+        // if this pak is patched, load the last patch file first before proceeding
+        // with any other pak that is getting patched. note that the patch number
+        // does not indicate which pak file is the actual last patch file; a patch
+        // with number (01) can also patch (02) and base, these details are
+        // determined from the pak file header
+        const uint32_t patchIndexToLoad = Pak_GetPatchIndexForPak(pakFilePath);
+
+        if (patchIndexToLoad)
+        {
+            char* const extension = (char*)V_GetFileExtension(relativeFilePath, true);
+            snprintf(extension, &relativeFilePath[sizeof(relativeFilePath)] - extension, "(%02u).rpak", patchIndexToLoad);
+        }
+
+        pakFilePath = relativeFilePath;
+    }
+
+    size_t totalPakFileBufSize;
+    const int pakFileHandle = FS_OpenAsyncFile(pakFilePath, loadedInfo->logChannel, &totalPakFileBufSize);
+
+    if (pakFileHandle == FS_ASYNC_FILE_INVALID)
+    {
+        Error(eDLL_T::RTECH, loadedInfo->logChannel == 5 ? EXIT_FAILURE : 0, "Couldn't read package file \"%s\".\n", pakFilePath);
+
+        loadedInfo->status = PAK_STATUS_ERROR;
+        return false;
+    }
+
+    loadedInfo->fileHandle = pakFileHandle;
+
+    // File is truncated or corrupt.
+    if (totalPakFileBufSize < sizeof(PakFileHeader_s))
+    {
+        loadedInfo->status = PAK_STATUS_ERROR;
+        return false;
+    }
+
+    PakFileHeader_s pakHdr;
+    const int asyncFile = v_FS_ReadAsyncFile(pakFileHandle, 0, sizeof(PakFileHeader_s), &pakHdr, 0, 0, 4);
+
+    const char* statusMsg = "(no reason)";
+    const uint8_t currentStatus = g_pakLoadApi->WaitAndCheckAsyncRequest(asyncFile, nullptr, &statusMsg);
+
+    if (currentStatus == AsyncHandleStatus_s::Status_e::FS_ASYNC_ERROR)
+    {
+        Error(eDLL_T::RTECH, EXIT_FAILURE, "Error reading pak file \"%s\" -- %s\n", pakFilePath, statusMsg);
+
+        loadedInfo->status = PAK_STATUS_ERROR;
+        return false;
+    }
+
+    if (pakHdr.magic != PAK_HEADER_MAGIC ||
+        pakHdr.version != PAK_HEADER_VERSION)
+    {
+        loadedInfo->status = PAK_STATUS_ERROR;
+        return false;
+    }
+
+    char libraryFilePath[MAX_OSPATH];
+
+    if (pakHdr.flags & PAK_HEADER_FLAGS_HAS_MODULE_EXTENDED)
+    {
+        const char* const extStart = V_GetFileExtension(pakFilePath, true);
+
+        // Loaded a pak file without an extension.
+        if (extStart == pakFilePath)
+        {
+            loadedInfo->status = PAK_STATUS_ERROR;
+            return false;
+        }
+
+        const size_t unqualifiedFileNameLen = (extStart - pakFilePath);
+        const size_t numCopyBytesLeft = sizeof(libraryFilePath) - unqualifiedFileNameLen;
+
+        const static char dllExt[] = ".dll";
+
+        // String buffer couldn't contain new extension. This happens when the
+        // .dll extension is larger than the file's original extension, and the
+        // original file path was using everything but the last 4 or less bytes
+        // of the buffer. This should never happen on this platform. All paks
+        // always have the .rpak extension as well so this really is to prevent
+        // stack smashes in exceptional cases.
+        if (numCopyBytesLeft < sizeof(dllExt))
+        {
+            loadedInfo->status = PAK_STATUS_ERROR;
+            return false;
+        }
+
+        memcpy(libraryFilePath, pakFilePath, unqualifiedFileNameLen);
+        memcpy(&libraryFilePath[unqualifiedFileNameLen], dllExt, sizeof(dllExt));
+
+        const HMODULE hModule = LoadLibraryA(libraryFilePath);
+        loadedInfo->hModule = hModule;
+
+        if (!hModule)
+        {
+            loadedInfo->status = PAK_STATUS_ERROR;
+            return false;
+        }
+    }
+
+    loadedInfo->fileTime = pakHdr.fileTime;
+    loadedInfo->assetCount = pakHdr.assetCount;
+
+    uint32_t assetCount = pakHdr.assetCount;
+    const uint16_t patchIndex = pakHdr.patchIndex;
+    const uint16_t memPageCount = pakHdr.memPageCount;
+    const uint16_t memSlabCount = pakHdr.memSlabCount;
+    const __int64 v32 = *(unsigned int*)&pakHdr.unk2[4];
+
+    loadedInfo->assetGuids = (PakGuid_t*)loadedInfo->allocator->Alloc(sizeof(PakGuid_t) * assetCount, 8);
+
+    const size_t streamingFilesBufSize = pakHdr.streamingFilesBufSize[STREAMING_SET_OPTIONAL] + pakHdr.streamingFilesBufSize[STREAMING_SET_MANDATORY];
+    const size_t memPagePointersBufSize = 8 * memPageCount;
+
+    totalPakFileBufSize = streamingFilesBufSize
+        + (patchIndex != 0 ? 8 : 0)
+        + 2
+        * (patchIndex
+            + 2
+            * (pakHdr.dependentsCount
+                + *(unsigned int*)pakHdr.unk2
+                + 3 * memPageCount
+                + 2 * (pakHdr.pointerCount + pakHdr.usesCount + 16i64 + 2 * (assetCount + patchIndex + 4 * assetCount + memSlabCount))))
+        + v32;
+
+    const __int64 v80 = 4 * assetCount;
+    const uint64_t v90 = totalPakFileBufSize + 2080;
+    const __int64 v33 = -((int)totalPakFileBufSize + 2080 + 4 * (int)assetCount) & 7;
+    const __int64 v89 = v33;
+    const __int64 v34 = 4 * assetCount + totalPakFileBufSize + 2080 + v33 + 8 * memPageCount + 12 * assetCount;
+    const __int64 v35 = (-(4 * (int)assetCount + (int)totalPakFileBufSize + 2080 + (int)v33 + 8 * (int)memPageCount + 12 * (int)assetCount) & 7) + 4088i64;
+
+    uint64_t ringBufferStreamSize;
+    uint64_t ringBufferOutSize;
+
+    if ((pakHdr.flags & 0x100) != 0)
+    {
+        ringBufferStreamSize = PAK_DECODE_IN_RING_BUFFER_SIZE;
+        ringBufferOutSize = PAK_DECODE_OUT_RING_BUFFER_SIZE;
+
+        if (pakHdr.compressedSize < PAK_DECODE_IN_RING_BUFFER_SIZE && !patchIndex)
+            ringBufferStreamSize = (pakHdr.compressedSize + PAK_DECODE_IN_RING_BUFFER_SMALL_MASK) & 0xFFFFFFFFFFFFF000ui64;
+    }
+    else
+    {
+        ringBufferStreamSize = 0;
+        ringBufferOutSize = PAK_DECODE_IN_RING_BUFFER_SIZE;
+    }
+
+    if (ringBufferOutSize > pakHdr.decompressedSize && !patchIndex)
+        ringBufferOutSize = (pakHdr.decompressedSize + PAK_DECODE_IN_RING_BUFFER_SMALL_MASK) & 0xFFFFFFFFFFFFF000ui64;
+
+    PakFile_s* const pak = (PakFile_s*)AlignedMemAlloc()->Alloc(v34 + v35 + ringBufferOutSize + ringBufferStreamSize, 8);
+
+    if (!pak)
+    {
+        loadedInfo->status = PAK_STATUS_ERROR;
+        return false;
+    }
+
+    loadedInfo->pakFile = pak;
+
+    pak->processedPageCount = 0;
+    pak->firstPageIdx = 0;
+    pak->patchCount = 0;
+    pak->dword14 = 0;
+    pak->numProcessedPointers = 0;
+    pak->processedAssetCount = 0;
+    pak->memoryData.someAssetCount = 0;
+    pak->memoryData.numShiftedPointers = 0;
+
+    PakGuidDescriptor_s* const guidBuf = (PakGuidDescriptor_s*)loadedInfo->allocator->Alloc(sizeof(PakGuidDescriptor_s) * pakHdr.usesCount + 8, 8);
+    loadedInfo->guidDestriptors = guidBuf;
+
+    guidBuf->unk1 = 0;
+    guidBuf->unk2 = 0;
+
+    pak->memoryData.pakHeader = pakHdr;
+
+    pak->memoryData.pakId = pakId;
+    pak->memoryData.fileSize = totalPakFileBufSize;
+
+    pak->memoryData.assetLoadJobGroupId = pakHdr.assetCount
+        ? JT_BeginJobGroup(0)
+        : JT_JOB_GROUP_BASE_ID;
+
+    uint8_t** v44 = (uint8_t**)((char*)pak + v89 + v90 + v80);
+    pak->memoryData.memPageBuffers = v44;
+    PakAsset_s** v45 = (PakAsset_s**)((char*)v44 + memPagePointersBufSize);
+    pak->memoryData.ppAssetEntries = v45;
+    pak->memoryData.loadedAssetIndices = (int*)&v45[pakHdr.assetCount];
+
+    PakPatchFileHeader_s* p_patchDataHeader = &pak->memoryData.patchHeader;
+    PakPatchFileHeader_s* p_patchFileHeader = (PakPatchFileHeader_s*)&pak->memoryData.patchHeader.decompressedSize;
+
+    const uint16_t patchIndexCached = pak->memoryData.pakHeader.patchIndex;
+
+    if (!patchIndexCached)
+    {
+        p_patchDataHeader = nullptr;
+        p_patchFileHeader = &pak->memoryData.patchHeader;
+    }
+
+    pak->memoryData.patchDataHeader = (PakPatchDataHeader_s*)p_patchDataHeader;
+    pak->memoryData.patchHeaders = p_patchFileHeader;
+    uint16_t* v51 = (unsigned __int16*)&p_patchFileHeader[patchIndexCached];
+    pak->memoryData.patchIndices = v51;
+    char* v52 = (char*)&v51[patchIndexCached];
+    char* v53 = &v52[pak->memoryData.pakHeader.streamingFilesBufSize[STREAMING_SET_MANDATORY]];
+    pak->memoryData.streamingFilePaths[STREAMING_SET_MANDATORY] = v52;
+    __int64 v54 = pak->memoryData.pakHeader.streamingFilesBufSize[STREAMING_SET_OPTIONAL];
+    pak->memoryData.streamingFilePaths[STREAMING_SET_OPTIONAL] = v53;
+    PakSlabHeader_s* v55 = (PakSlabHeader_s*)&v53[v54];
+    __int64 v56 = pak->memoryData.pakHeader.memSlabCount;
+    pak->memoryData.slabHeaders = v55;
+    __int64 v57 = pak->memoryData.pakHeader.memPageCount;
+    PakPageHeader_s* const v58 = (PakPageHeader_s*)&v55[v56];
+    pak->memoryData.pageHeaders = v58;
+    const uint32_t pointerCount = pak->memoryData.pakHeader.pointerCount;
+    PakPage_u* const v60 = (PakPage_u*)&v58[v57];
+    pak->memoryData.virtualPointers = v60;
+    assetCount = pak->memoryData.pakHeader.assetCount;
+    PakAsset_s* const v62 = (PakAsset_s*)&v60[pointerCount];
+    pak->memoryData.assetEntries = v62;
+    const uint32_t usesCount = pak->memoryData.pakHeader.usesCount;
+    PakPage_u* pageDescriptors = (PakPage_u*)&v62[assetCount];
+    pak->memoryData.pageDescriptors = pageDescriptors;
+    const uint32_t dependentsCount = pak->memoryData.pakHeader.dependentsCount;
+    uint32_t* const v66 = (uint32_t*)&pageDescriptors[usesCount];
+    pak->memoryData.fileRelations = v66;
+    const __int64 v67 = *(unsigned int*)pak->memoryData.pakHeader.unk2;
+    uint32_t* const v68 = &v66[dependentsCount];
+    pak->memoryData.ptr5E0 = v68;
+    const __int64 v69 = *(unsigned int*)&pak->memoryData.pakHeader.unk2[4];
+    pak->memoryData.ptr5F0 = nullptr;
+    uint32_t* v70 = &v68[v67];
+    pak->memoryData.ptr5E8 = v70;
+    const __int64 v71 = (__int64)v70 + v69;
+    pak->memoryData.ptr5F8 = (char*)v70 + v69;
+
+    if (patchIndexCached)
+    {
+        PakPatchDataHeader_s* const patchDataHeader = pak->memoryData.patchDataHeader;
+        if (patchDataHeader->editStreamSize)
+        {
+            *(_QWORD*)&pak->memoryData.ptr5F0 = v71;
+            *(_QWORD*)&pak->memoryData.ptr5F8 = v71 + (unsigned int)patchDataHeader->editStreamSize;
+        }
+    }
+
+    pak->memoryData.fileName = loadedInfo->fileName;
+    pak->fileStream.readOffset = 0;
+    pak->fileStream.fileSize = pakHdr.compressedSize;
+    pak->fileStream.fileHandle = loadedInfo->fileHandle;
+    loadedInfo->fileHandle = FS_ASYNC_FILE_INVALID;
+
+    pak->fileStream.bufferMask = PAK_DECODE_IN_RING_BUFFER_MASK;
+
+    uint8_t* const ringBuffer = (uint8_t*)(((unsigned __int64)pak + v35 + v34) & 0xFFFFFFFFFFFFF000ui64);
+
+    pak->fileStream.buffer = ringBuffer;
+    pak->fileStream.numDataChunksProcessed = 0;
+    pak->fileStream.numDataChunks = 0;
+    pak->fileStream.fileReadStatus = AsyncHandleStatus_s::Status_e::FS_ASYNC_CANCELLED;
+    pak->fileStream.finishedLoadingPatches = 0;
+    pak->fileStream.numLoadedFiles = 0;
+    pak->fileStream.bytesStreamed = sizeof(PakFileHeader_s);
+    pak->decompBuffer = &ringBuffer[ringBufferStreamSize];
+    pak->inputBytePos = sizeof(PakFileHeader_s);
+    pak->processedStreamCount = 0;
+    pak->resetInBytePos = true;
+    pak->updateBytePosPostProcess = false;
+    pak->isCompressed = false;
+
+    pak->headerSize = sizeof(PakFileHeader_s);
+
+    // FINISHME: this means if the pak file is not encoded, but we should also
+    // check on the zstd flags
+    pak->maxCopySize = (pakHdr.flags & 0x100) != 0
+        ? PAK_DECODE_OUT_RING_BUFFER_MASK
+        : PAK_DECODE_IN_RING_BUFFER_MASK;
+
+    memset(&pak->pakDecoder, 0, sizeof(pak->pakDecoder));
+
+    pak->pakDecoder.outBufBytePos = sizeof(PakFileHeader_s);
+    pak->pakDecoder.decompSize = sizeof(PakFileHeader_s);
+    pak->memoryData.processedPatchedDataSize = sizeof(PakFileHeader_s);
+    const uint64_t v77 = pakHdr.pointerCount + 2 * (pakHdr.patchIndex + (unsigned __int64)pakHdr.assetCount + 4i64 * pakHdr.assetCount + pakHdr.memSlabCount);
+
+    pak->memoryData.field_2A8 = 0ull;
+    pak->memoryData.patchData = nullptr;
+    pak->memoryData.patchDataPtr = nullptr;
+    pak->memoryData.bitBuf.m_dataBuf = 0;
+    pak->memoryData.bitBuf.m_bitsAvailable = 0;
+    pak->memoryData.patchDataOffset = 0;
+    pak->memoryData.patchSrcSize = streamingFilesBufSize + (pakHdr.patchIndex != 0 ? 8 : 0) + 2 * (pakHdr.patchIndex + 6 * pakHdr.memPageCount + 4 * v77);
+    pak->memoryData.patchDstPtr = (char*)&pak->memoryData.patchHeader;
+    pak->memoryData.patchFunc = g_pakPatchApi[0];
+
+    const bool isBasePatch = pakHdr.patchIndex == 0;
+    pak->memoryData.numPatchBytesToProcess = pak->memoryData.pakHeader.decompressedSize + isBasePatch - sizeof(PakFileHeader_s);
+
+    Pak_ProcessPakFile(pak);
+    return true;
+}
 
 void V_PakParse::Detour(const bool bAttach) const
 {
+    DetourSetup(&v_Pak_SetupBuffersAndLoad, &Pak_SetupBuffersAndLoad, bAttach);
+
     DetourSetup(&v_Pak_LoadAsync, &Pak_LoadAsync, bAttach);
     DetourSetup(&v_Pak_UnloadAsync, &Pak_UnloadAsync, bAttach);
 
