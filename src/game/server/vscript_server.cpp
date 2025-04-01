@@ -490,6 +490,153 @@ static SQRESULT ServerScript_NavMesh_GetNearestPosInBounds(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: saves a recorded animation on the disk to be used by bakery
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_SaveRecordedAnimation(HSQUIRRELVM v)
+{
+    if (!developer->GetBool())
+    {
+        v_SQVM_ScriptError("SaveRecordedAnimation() is dev only!");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    AnimRecordingAssetHeader_s* const animRecording = v_ServerScript_GetRecordedAnimationFromCurrentStack(v);
+
+    if (!animRecording)
+    {
+        v_SQVM_ScriptError("Parameter must be a recorded animation");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    if (animRecording->numRecordedFrames == 0)
+    {
+        v_SQVM_ScriptError("Recorded animation has 0 frames");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const SQChar* fileName;
+    sq_getstring(v, 3, &fileName);
+
+    char fileNameBuf[MAX_OSPATH];
+    const int fmtResult = snprintf(fileNameBuf, sizeof(fileNameBuf), "anim_recording/%s.anir", fileName);
+
+    if (fmtResult < 0)
+    {
+        v_SQVM_ScriptError("Failed to format recorded animation file name; provided name \"%s\" is invalid", fileName);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    FileSystem()->CreateDirHierarchy("anim_recording/", "MOD");
+    FileHandle_t animRecordingFile = FileSystem()->Open(fileNameBuf, "wb", "MOD");
+
+    if (animRecordingFile == FILESYSTEM_INVALID_HANDLE)
+    {
+        v_SQVM_ScriptError("Failed to open recorded animation file \"%s\" for write", fileNameBuf);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    AnimRecordingFileHeader_s fileHdr;
+
+    fileHdr.magic = ANIR_FILE_MAGIC;
+    fileHdr.fileVersion = ANIR_FILE_VERSION;
+    fileHdr.assetVersion = ANIR_ASSET_VERSION;
+
+    fileHdr.startPos = animRecording->startPos;
+    fileHdr.startAngles = animRecording->startAngles;
+
+    fileHdr.stringBufSize = 0;
+
+    fileHdr.numElements = 0;
+    fileHdr.numSequences = 0;
+
+    fileHdr.numRecordedFrames = animRecording->numRecordedFrames;
+    fileHdr.numRecordedOverlays = animRecording->numRecordedOverlays;
+
+    fileHdr.animRecordingId = animRecording->animRecordingId;
+    FileSystem()->Write(&fileHdr, sizeof(AnimRecordingFileHeader_s), animRecordingFile);
+
+    // This information can only be retrieved by counting the number
+    // of valid pose parameter names.
+    int numElems = 0;
+    int stringBufLen = 0;
+
+    // Write out the pose parameters.
+    for (int i = 0; i < ANIR_MAX_ELEMENTS; i++)
+    {
+        const char* const poseParamName = animRecording->poseParamNames[i];
+
+        if (poseParamName)
+            numElems++;
+        else
+            break;
+
+        const ssize_t strLen = (ssize_t)strlen(poseParamName) + 1; // Include the null too.
+        FileSystem()->Write(poseParamName, strLen, animRecordingFile);
+
+        stringBufLen += (int)strLen;
+    }
+
+    // Write out the pose values.
+    for (int i = 0; i < numElems; i++)
+    {
+        const Vector2D* poseParamValue = &animRecording->poseParamValues[i];
+        FileSystem()->Write(poseParamValue, sizeof(Vector2D), animRecordingFile);
+    }
+
+    int numSeqs = 0;
+
+    // Write out the animation sequence names.
+    for (int i = 0; i < ANIR_MAX_SEQUENCES; i++)
+    {
+        const char* const animSequenceName = animRecording->animSequences[i];
+
+        if (animSequenceName)
+            numSeqs++;
+        else
+            break;
+
+        const ssize_t strLen = (ssize_t)strlen(animSequenceName) + 1; // Include the null too.
+        FileSystem()->Write(animSequenceName, strLen, animRecordingFile);
+
+        stringBufLen += (int)strLen;
+    }
+
+    // Write out the recorded frames.
+    for (int i = 0; i < animRecording->numRecordedFrames; i++)
+    {
+        assert(animRecording->recordedFrames);
+
+        const AnimRecordingFrame_s* const frame = &animRecording->recordedFrames[i];
+        FileSystem()->Write(frame, sizeof(AnimRecordingFrame_s), animRecordingFile);
+    }
+
+    // Write out the recorded overlays.
+    for (int i = 0; i < animRecording->numRecordedOverlays; i++)
+    {
+        assert(animRecording->recordedOverlays);
+
+        const AnimRecordingOverlay_s* const overlay = &animRecording->recordedOverlays[i];
+        FileSystem()->Write(overlay, sizeof(AnimRecordingOverlay_s), animRecordingFile);
+    }
+
+    // Update the data in the header if we ended up writing
+    // elements and sequences.
+    if (numElems > 0 || numSeqs > 0)
+    {
+        FileSystem()->Seek(animRecordingFile, offsetof(AnimRecordingFileHeader_s, stringBufSize), FILESYSTEM_SEEK_HEAD);
+
+        FileSystem()->Write(&stringBufLen, sizeof(int), animRecordingFile);
+        FileSystem()->Write(&numElems, sizeof(int), animRecordingFile);
+        FileSystem()->Write(&numSeqs, sizeof(int), animRecordingFile);
+    }
+
+    FileSystem()->Close(animRecordingFile);
+
+    Msg(eDLL_T::SERVER, "Recorded animation saved to \"%s\"\n", fileNameBuf);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //---------------------------------------------------------------------------------
 // Purpose: registers script functions in SERVER context
 // Input  : *s - 
@@ -525,6 +672,8 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPos, "Finds the nearest position to the provided point on the hull's NavMesh using the hull's bounds as extents", "vector ornull", "vector searchPoint, int hullType");
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPosInBounds, "Finds the nearest position to the provided point on the hull's NavMesh using provided bounds as extents", "vector ornull", "vector searchPoint, vector halfExtents, int hullType");
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SaveRecordedAnimation, "Saves an anim_recording asset to be used by bakery. (dev only)", "void", "var recordedAnim, string fileName");
 }
 
 //---------------------------------------------------------------------------------
