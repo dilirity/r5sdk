@@ -22,6 +22,7 @@
 #include "game/shared/player_viewoffset.h"
 #include "game/shared/player_melee.h"
 #include "game/shared/r1/grapple.h"
+#include "game/server/anim_recording.h"
 
 #include "playerlocaldata.h"
 #include "basecombatcharacter.h"
@@ -679,9 +680,9 @@ private:
 	float m_trackedState[52];
 	int m_prevTrackedState;
 	Vector3D m_prevTrackedStatePos;
-	char m_recordingAnim[8];
+	AnimRecordingAssetHeader_s* m_recordingAnim;
 	char m_animRecordFile[8];
-	char m_animRecordButtons[4];
+	int m_animRecordButtons;
 	float m_minimapTargetZoomScale;
 	float m_minimapTargetLerpTime;
 	bool m_sendMovementCallbacks;
