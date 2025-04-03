@@ -66,7 +66,7 @@ static_assert(sizeof(Ray_t) == 0x70);
 struct csurface_t
 {
 	const char* name;
-	short surfaceProp;
+	unsigned char surfaceProp;
 	uint16_t flags;
 };
 
