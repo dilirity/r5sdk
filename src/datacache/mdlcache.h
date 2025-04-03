@@ -233,34 +233,31 @@ public:
 
 	inline studiodata_t* GetStudioData(const MDLHandle_t handle)
 	{
-		EnterCriticalSection(&m_MDLMutex);
+		AUTO_LOCK(m_MDLMutex);
 		studiodata_t* const studioData = m_MDLDict.Element(handle);
-		LeaveCriticalSection(&m_MDLMutex);
 
 		return studioData;
 	}
 
 	inline const char* GetModelName(const MDLHandle_t handle)
 	{
-		EnterCriticalSection(&m_MDLMutex);
+		AUTO_LOCK(m_MDLMutex);
 		const char* const modelName = m_MDLDict.GetElementName(handle);
-		LeaveCriticalSection(&m_MDLMutex);
 
 		return modelName;
 	}
 
 	inline void* GetMaterialTable(const MDLHandle_t handle)
 	{
-		EnterCriticalSection(&m_MDLMutex);
+		AUTO_LOCK(m_MDLMutex);
 		studiodata_t* const studioData = m_MDLDict.Element(handle);
-		LeaveCriticalSection(&m_MDLMutex);
 
 		return &studioData->materialTable;
 	}
 
 private:
 	CUtlDict<studiodata_t*, MDLHandle_t> m_MDLDict;
-	CRITICAL_SECTION m_MDLMutex;
+	CThreadMutex m_MDLMutex;
 	// !TODO: reverse the rest
 };
 
