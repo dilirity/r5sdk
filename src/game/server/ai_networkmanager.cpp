@@ -54,8 +54,8 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 	masterTimer.Start();
 	timer.Start();
 
-	FileSystem()->CreateDirHierarchy(AINETWORK_PATH, "GAME");
-	FileHandle_t pAIGraph = FileSystem()->Open(szGraphPath, "wb", "GAME");
+	FileSystem()->CreateDirHierarchy(AINETWORK_PATH, "DEFAULT_WRITE_PATH");
+	FileHandle_t pAIGraph = FileSystem()->Open(szGraphPath, "wb", "DEFAULT_WRITE_PATH");
 	if (!pAIGraph)
 	{
 		Error(eDLL_T::SERVER, NO_ERROR, "%s - Unable to write to '%s' (read-only?)\n", __FUNCTION__, szGraphPath);
@@ -366,7 +366,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 	// -------------------------------
 	// Dump NavMesh CRC
 	// -------------------------------
-	FileHandle_t pNavMesh = FileSystem()->Open(szMeshPath, "rb", "GAME");
+	FileHandle_t pNavMesh = FileSystem()->Open(szMeshPath, "rb", "DEFAULT_WRITE_PATH");
 	uint32_t nNavMeshCRC = NULL;
 
 	if (!pNavMesh)
@@ -430,7 +430,7 @@ void CAI_NetworkManager::LoadNetworkGraph(CAI_NetworkManager* pManager, CUtlBuff
 	uint32_t nNavMeshCRC = NULL;   // NavMesh CRC from local NM file.
 	uint32_t nAiRuntimeCRC = pManager->GetRuntimeCRC();
 
-	FileHandle_t pNavMesh = FileSystem()->Open(szMeshPath, "rb", "GAME");
+	FileHandle_t pNavMesh = FileSystem()->Open(szMeshPath, "rb", "DEFAULT_WRITE_PATH");
 	if (!pNavMesh)
 	{
 		Warning(eDLL_T::SERVER, "%s - No %s NavMesh found. Unable to calculate CRC for AI Network\n", __FUNCTION__, NavMesh_GetNameForType(NAVMESH_LARGE));
