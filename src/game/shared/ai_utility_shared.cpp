@@ -221,10 +221,14 @@ void CAI_Utility::DrawAIScriptNetwork(
             *reinterpret_cast<const Vector3D*>(&xOrigin));
 
         static const Color boxColor(0, 255, 0, 30);
-        static const Color linkColor(255, 0, 0, 255);
+        RenderBox(vTransforms, *reinterpret_cast<const Vector3D*>(&s_xMins),
+            *reinterpret_cast<const Vector3D*>(&s_xMaxs), boxColor, bUseDepthBuffer);
 
-        g_pDebugOverlay->AddTransformedBoxOverlay(vTransforms, *reinterpret_cast<const Vector3D*>(&s_xMins),
-            *reinterpret_cast<const Vector3D*>(&s_xMaxs), boxColor.r(), boxColor.g(), boxColor.b(), boxColor.a(), !bUseDepthBuffer, 0.0f);
+        static const Color boxColorWireframe(0, 255, 0, 255);
+        RenderWireframeBox(vTransforms, *reinterpret_cast<const Vector3D*>(&s_xMins),
+            *reinterpret_cast<const Vector3D*>(&s_xMaxs), boxColorWireframe, bUseDepthBuffer);
+
+        static const Color linkColor(255, 0, 0, 255);
 
         if (bDrawNearest) // Render links to the nearest node.
         {
@@ -238,12 +242,12 @@ void CAI_Utility::DrawAIScriptNetwork(
                 if (p.second) // Only render if link hasn't already been rendered.
                 {
                     const CAI_ScriptNode* pNearestNode = &pNetwork->m_ScriptNode[nNearest];
-                    g_pDebugOverlay->AddLineOverlay(pScriptNode->m_vOrigin, pNearestNode->m_vOrigin, linkColor.r(), linkColor.g(), linkColor.b(), !bUseDepthBuffer, 0.0f);
+                    RenderLine(pScriptNode->m_vOrigin, pNearestNode->m_vOrigin, linkColor, bUseDepthBuffer);
                 }
             }
         }
         else if (i > 0) // Render links in the order the AI Network was build.
-            g_pDebugOverlay->AddLineOverlay((pScriptNode - 1)->m_vOrigin, pScriptNode->m_vOrigin, linkColor.r(), linkColor.g(), linkColor.b(), !bUseDepthBuffer, 0.0f);
+            RenderLine((pScriptNode - 1)->m_vOrigin, pScriptNode->m_vOrigin, linkColor, bUseDepthBuffer);
     }
 }
 
