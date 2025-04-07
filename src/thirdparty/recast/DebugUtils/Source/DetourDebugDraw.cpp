@@ -79,6 +79,9 @@ static void drawPolyMeshFaces(duDebugDraw* dd, const dtNavMesh& mesh, const dtNa
 			else
 				col = getPolySurfaceColor(dd, p, tileAlpha);
 		}
+
+		if (p->flags & DT_POLYFLAGS_DISABLED)
+			col = duDarkenCol(col);
 		
 		for (int j = 0; j < pd->triCount; ++j)
 		{
@@ -440,6 +443,9 @@ static void drawOffMeshConnections(duDebugDraw* dd, const dtNavMesh& mesh, const
 			col = duRGBA(255,196,0,220);
 		else
 			col = duDarkenCol(duTransCol(dd->areaToFaceCol(p->getArea()), 220));
+
+		if (p->flags & DT_POLYFLAGS_DISABLED)
+			col = duDarkenCol(col);
 
 		const rdVec3D* va = &tile->verts[p->verts[0]];
 		const rdVec3D* vb = &tile->verts[p->verts[1]];

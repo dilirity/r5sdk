@@ -306,10 +306,7 @@ void Editor_StaticTileMeshCommon::renderTileMeshData()
 	if (m_navMesh && m_navQuery)
 	{
 		if (m_tileMeshDrawFlags & DU_DRAW_RECASTMESH_NAVMESH)
-		{
 			duDebugDrawNavMeshWithClosedList(&m_dd, *m_navMesh, *m_navQuery, detourDrawOffset, m_navMeshDrawFlags, m_traverseLinkDrawParams);
-			duDebugDrawNavMeshPolysWithFlags(&m_dd, *m_navMesh, DT_POLYFLAGS_DISABLED, detourDrawOffset, detourDrawFlags, duRGBA(0, 0, 0, 128));
-		}
 	}
 
 	glDepthMask(GL_TRUE);
@@ -584,10 +581,7 @@ void Editor_DynamicTileMeshCommon::renderTileMeshData()
 	if (m_navMesh && m_navQuery)
 	{
 		if (recastDrawFlags & DU_DRAW_RECASTMESH_NAVMESH)
-		{
 			duDebugDrawNavMeshWithClosedList(&m_dd, *m_navMesh, *m_navQuery, detourDrawOffset, detourDrawFlags, m_traverseLinkDrawParams);
-			duDebugDrawNavMeshPolysWithFlags(&m_dd, *m_navMesh, DT_POLYFLAGS_DISABLED, detourDrawOffset, detourDrawFlags, duRGBA(0, 0, 0, 128));
-		}
 	}
 
 	int selectedVolumeIndex = -1;
