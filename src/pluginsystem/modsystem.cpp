@@ -324,7 +324,7 @@ void CModSystem::ModInstance_t::ParseConVars()
 			{
 				if (g_pCVar->FindCommandBase(pszName) != nullptr)
 				{
-					Warning(eDLL_T::ENGINE, NO_ERROR, "Failed to register ConVar '%s' for mod '%s' ('%s'); already registered.\n",
+					Warning(eDLL_T::ENGINE, "Failed to register ConVar '%s' for mod '%s' ('%s'); already registered.\n",
 						pszName, m_Name.String(), m_ModID.String());
 
 					continue;
