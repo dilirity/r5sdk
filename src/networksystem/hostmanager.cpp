@@ -47,14 +47,13 @@ static void HostManager_HandleCommandInternal(const char* const map, const char*
     const bool samePlaylist = v_Playlists_Parse(mode);
     char commandBuf[512];
 
+    mp_gamemode->SetValue(mode);
+
     if (!samePlaylist || !hasPendingMap)
     {
         snprintf(commandBuf, sizeof(commandBuf), "%s %s\n", changeLevel ? "changelevel" : "map", map);
         Cbuf_AddText(Cbuf_GetCurrentPlayer(), commandBuf, cmd_source_t::kCommandSrcCode);
     }
-
-    snprintf(commandBuf, sizeof(commandBuf), "mp_gamemode %s\n", mode);
-    Cbuf_AddText(Cbuf_GetCurrentPlayer(), commandBuf, cmd_source_t::kCommandSrcCode);
 }
 
 //-----------------------------------------------------------------------------
