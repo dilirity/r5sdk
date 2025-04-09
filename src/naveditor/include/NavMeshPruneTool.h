@@ -27,7 +27,7 @@ class NavMeshPruneTool : public EditorTool
 {
 	Editor* m_editor;
 	
-	class NavmeshFlags* m_flags;
+	class NavMeshFlags* m_flags;
 
 	rdVec3D m_hitPos;
 	bool m_hitPosSet;
@@ -47,7 +47,7 @@ public:
 	virtual void handleRender();
 	virtual void handleRenderOverlay(double* model, double* proj, int* view);
 
-	void pruneUnvisitedTilesAndPolys(dtNavMesh* nav, NavmeshFlags* flags);
+	void pruneUnvisitedTilesAndPolys(dtNavMesh* nav, NavMeshFlags* flags);
 
 private:
 	// Explicitly disabled copy constructor and copy assignment operator.

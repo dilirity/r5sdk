@@ -27,7 +27,7 @@
 #	define snprintf _snprintf
 #endif
 
-class NavmeshFlags
+class NavMeshFlags
 {
 	struct TileFlags
 	{
@@ -42,12 +42,12 @@ class NavmeshFlags
 	int m_ntiles;
 
 public:
-	NavmeshFlags() :
+	NavMeshFlags() :
 		m_nav(0), m_tiles(0), m_ntiles(0)
 	{
 	}
 	
-	~NavmeshFlags()
+	~NavMeshFlags()
 	{
 		for (int i = 0; i < m_ntiles; ++i)
 			m_tiles[i].purge();
@@ -120,7 +120,7 @@ public:
 	
 };
 
-static void floodNavMesh(dtNavMesh* nav, NavmeshFlags* flags, dtPolyRef start, unsigned char flag)
+static void floodNavMesh(dtNavMesh* nav, NavMeshFlags* flags, dtPolyRef start, unsigned char flag)
 {
 	// If already visited, skip.
 	if (flags->getFlags(start))
@@ -157,7 +157,7 @@ static void floodNavMesh(dtNavMesh* nav, NavmeshFlags* flags, dtPolyRef start, u
 	}
 }
 
-void NavMeshPruneTool::pruneUnvisitedTilesAndPolys(dtNavMesh* nav, NavmeshFlags* flags)
+void NavMeshPruneTool::pruneUnvisitedTilesAndPolys(dtNavMesh* nav, NavMeshFlags* flags)
 {
 	for (int i = 0; i < nav->getMaxTiles(); ++i)
 	{
@@ -282,7 +282,7 @@ void NavMeshPruneTool::handleClick(const rdVec3D* s, const rdVec3D* p, const int
 	{
 		if (!m_flags)
 		{
-			m_flags = new NavmeshFlags;
+			m_flags = new NavMeshFlags;
 			m_flags->init(nav);
 		}
 
