@@ -651,7 +651,7 @@ void InputGeom::drawOffMeshConnections(duDebugDraw* dd, const rdVec3D* offset, c
 
 		const unsigned int conColor = hilightIdx == i ? duRGBA(192,0,128,192) : duRGBA(152,0,78,192);
 
-		duAppendArc(dd, v[0].x, v[0].y, v[0].z, v[0].x, v[0].y, v[0].z, 0.25f,
+		duAppendArc(dd, v[0].x, v[0].y, v[0].z, v[1].x, v[1].y, v[1].z, 0.25f,
 			(m_offMeshConDirs[i] & DT_OFFMESH_CON_BIDIR) ? 30.0f : 0.0f, 30.0f, conColor);
 
 		rdVec3D* r = &m_offMeshConRefPos[i];

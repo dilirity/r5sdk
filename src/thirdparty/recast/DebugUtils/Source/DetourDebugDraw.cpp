@@ -778,7 +778,7 @@ void duDebugDrawNavMeshPoly(duDebugDraw* dd, const dtNavMesh& mesh, dtPolyRef re
 			dd->begin(DU_DRAW_LINES, 2.0f, offset);
 
 			// Connection arc.
-			duAppendArc(dd, con->posa.x,con->posa.y,con->posb.z, con->posb.x,con->posb.y,con->posb.z, 0.25f,
+			duAppendArc(dd, con->posa.x,con->posa.y,con->posa.z, con->posb.x,con->posb.y,con->posb.z, 0.25f,
 #if DT_NAVMESH_SET_VERSION >= 7
 						30.f,
 #else
