@@ -511,6 +511,9 @@ void dtNavMesh::unconnectLinks(dtMeshTile* tile, dtMeshTile* target)
 				j = tile->links[j].next;
 			}
 		}
+
+		if (poly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
+			poly->flags &= ~DT_POLYFLAGS_JUMP_LINKED;
 	}
 }
 

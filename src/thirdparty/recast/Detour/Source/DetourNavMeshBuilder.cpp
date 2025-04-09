@@ -1726,6 +1726,12 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 
 		const dtMeshTile* landTile = nav->getTileAt(tx, ty, header->layer);
 
+		// note(amos): this gets triggered when the land tile of the off-mesh
+		// connection was removed but the off-mesh connection poly flags still
+		// had the DT_POLYFLAGS_JUMP_LINKED flag. This means there is a code
+		// bug somewhere. (See dtNavMesh::unconnectLinks for the solution.)
+		rdAssert(landTile);
+
 		if (landTile == tile)
 			continue; // Already dealt with when fixing up internal links.
 
