@@ -501,6 +501,13 @@ void dtNavMesh::unconnectLinks(dtMeshTile* tile, dtMeshTile* target)
 					poly->firstLink = nj;
 				else
 					tile->links[pj].next = nj;
+
+				// note(kawe): If we unlink the target from the off-mesh
+				// connection, we must mark this off-mesh connection as
+				// open so that it can be removed in dtUpdateNavMeshData.
+				if (poly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
+					poly->flags &= ~DT_POLYFLAGS_JUMP_LINKED;
+
 				tile->freeLink(j);
 				j = nj;
 			}
@@ -511,9 +518,6 @@ void dtNavMesh::unconnectLinks(dtMeshTile* tile, dtMeshTile* target)
 				j = tile->links[j].next;
 			}
 		}
-
-		if (poly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
-			poly->flags &= ~DT_POLYFLAGS_JUMP_LINKED;
 	}
 }
 
