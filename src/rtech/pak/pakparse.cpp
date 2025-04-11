@@ -1023,8 +1023,15 @@ static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
         ringBufferOutSize = PAK_DECODE_IN_RING_BUFFER_SIZE;
     }
 
-    if (ringBufferOutSize > pakHdr.decompressedSize && !patchIndex)
-        ringBufferOutSize = (pakHdr.decompressedSize + PAK_DECODE_IN_RING_BUFFER_SMALL_MASK) & 0xFFFFFFFFFFFFF000ui64;
+    // NOTE: for the ZStd decoder we should avoid setting the ring buffer size
+    // bellow PAK_DECODE_OUT_RING_BUFFER_SIZE as ZStd needs the entire window.
+    // Not adhering to this will result in a buffer overrun when trying to
+    // decode an RPak that has a decompressed size below PAK_DECODE_OUT_RING_BUFFER_SIZE.
+    if ((pakHdr.flags & PAK_HEADER_FLAGS_ZSTD_ENCODED) == 0)
+    {
+        if (ringBufferOutSize > pakHdr.decompressedSize && !patchIndex)
+            ringBufferOutSize = (pakHdr.decompressedSize + PAK_DECODE_IN_RING_BUFFER_SMALL_MASK) & 0xFFFFFFFFFFFFF000ui64;
+    }
 
     PakFile_s* const pak = (PakFile_s*)AlignedMemAlloc()->Alloc(v34 + v35 + ringBufferOutSize + ringBufferStreamSize, 8);
 
