@@ -1392,6 +1392,11 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 					}
 				}
 
+				// Remove the link connecting the off-mesh connection
+				// poly to the base poly.
+				tile->freeLink(poly.firstLink);
+				poly.firstLink = DT_NULL_LINK;
+
 				continue;
 			}
 
