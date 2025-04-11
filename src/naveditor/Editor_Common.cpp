@@ -306,7 +306,7 @@ void Editor_StaticTileMeshCommon::renderTileMeshData()
 	if (m_navMesh && m_navQuery)
 	{
 		if (m_tileMeshDrawFlags & DU_DRAW_RECASTMESH_NAVMESH)
-			duDebugDrawNavMeshWithClosedList(&m_dd, *m_navMesh, *m_navQuery, detourDrawOffset, m_navMeshDrawFlags, m_traverseLinkDrawParams);
+			duDebugDrawNavMeshWithClosedList(&m_dd, *m_navMesh, *m_navQuery, detourDrawOffset, detourDrawFlags, m_traverseLinkDrawParams);
 	}
 
 	glDepthMask(GL_TRUE);
