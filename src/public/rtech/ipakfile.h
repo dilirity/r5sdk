@@ -19,10 +19,9 @@
 #define PAK_HEADER_FLAGS_HAS_MODULE (1<<0)
 #define PAK_HEADER_FLAGS_HAS_MODULE_EXTENDED (PAK_HEADER_FLAGS_HAS_MODULE | (1<<1))
 
-#define PAK_HEADER_FLAGS_COMPRESSED (1<<8)
-
-// use the ZStd decoder instead of the RTech one
-#define PAK_HEADER_FLAGS_ZSTREAM_ENCODED (1<<9)
+// compression flags, code uses this to select which decoder to use.
+#define PAK_HEADER_FLAGS_RTECH_ENCODED (1<<8)
+#define PAK_HEADER_FLAGS_ZSTD_ENCODED (1<<9)
 
 // max amount of types at runtime in which assets will be tracked
 #define PAK_MAX_TRACKED_TYPES 64
@@ -445,14 +444,14 @@ struct PakFileHeader_s
 
 	inline PakDecodeMode_e GetCompressionMode() const
 	{
-		if (flags & PAK_HEADER_FLAGS_ZSTREAM_ENCODED)
+		if (flags & PAK_HEADER_FLAGS_ZSTD_ENCODED)
 			return PakDecodeMode_e::MODE_ZSTD;
 
 		// NOTE: this should be the first check once we rebuilt function
 		// 14043F300 and alloc ring buffer for the flags individually instead
 		// instead of having to define the main compress flag (which really
 		// just means that the pak is using the RTech decoder)
-		else if (flags & PAK_HEADER_FLAGS_COMPRESSED)
+		else if (flags & PAK_HEADER_FLAGS_RTECH_ENCODED)
 			return PakDecodeMode_e::MODE_RTECH;
 
 		return PakDecodeMode_e::MODE_DISABLED;

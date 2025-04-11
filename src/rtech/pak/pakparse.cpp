@@ -1009,7 +1009,7 @@ static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
     uint64_t ringBufferStreamSize;
     uint64_t ringBufferOutSize;
 
-    if ((pakHdr.flags & 0x100) != 0)
+    if ((pakHdr.flags & (PAK_HEADER_FLAGS_RTECH_ENCODED|PAK_HEADER_FLAGS_ZSTD_ENCODED)) != 0)
     {
         ringBufferStreamSize = PAK_DECODE_IN_RING_BUFFER_SIZE;
         ringBufferOutSize = PAK_DECODE_OUT_RING_BUFFER_SIZE;
@@ -1150,9 +1150,7 @@ static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
 
     pak->headerSize = sizeof(PakFileHeader_s);
 
-    // FINISHME: this means if the pak file is not encoded, but we should also
-    // check on the zstd flags
-    pak->maxCopySize = (pakHdr.flags & 0x100) != 0
+    pak->maxCopySize = (pakHdr.flags & PAK_HEADER_FLAGS_RTECH_ENCODED|PAK_HEADER_FLAGS_ZSTD_ENCODED) != 0
         ? PAK_DECODE_OUT_RING_BUFFER_MASK
         : PAK_DECODE_IN_RING_BUFFER_MASK;
 

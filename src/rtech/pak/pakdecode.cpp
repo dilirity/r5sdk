@@ -781,8 +781,8 @@ bool Pak_BufferToBufferDecode(uint8_t* const inBuf, uint8_t* const outBuf, const
 	*outHeader = *inHeader;
 
 	// remove compress flags
-	outHeader->flags &= ~PAK_HEADER_FLAGS_COMPRESSED;
-	outHeader->flags &= ~PAK_HEADER_FLAGS_ZSTREAM_ENCODED;
+	outHeader->flags &= ~PAK_HEADER_FLAGS_RTECH_ENCODED;
+	outHeader->flags &= ~PAK_HEADER_FLAGS_ZSTD_ENCODED;
 
 	// equal compressed size with decompressed
 	outHeader->compressedSize = outHeader->decompressedSize;
