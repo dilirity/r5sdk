@@ -1732,6 +1732,10 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 		// bug somewhere. (See dtNavMesh::unconnectLinks for the solution.)
 		rdAssert(landTile);
 
+		// Drop it anyways for release builds. (Might want to add warnings in the future.)
+		if (!landTile)
+			continue;
+
 		if (landTile == tile)
 			continue; // Already dealt with when fixing up internal links.
 
