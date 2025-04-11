@@ -444,15 +444,10 @@ struct PakFileHeader_s
 
 	inline PakDecodeMode_e GetCompressionMode() const
 	{
+		if (flags & PAK_HEADER_FLAGS_RTECH_ENCODED)
+			return PakDecodeMode_e::MODE_RTECH;
 		if (flags & PAK_HEADER_FLAGS_ZSTD_ENCODED)
 			return PakDecodeMode_e::MODE_ZSTD;
-
-		// NOTE: this should be the first check once we rebuilt function
-		// 14043F300 and alloc ring buffer for the flags individually instead
-		// instead of having to define the main compress flag (which really
-		// just means that the pak is using the RTech decoder)
-		else if (flags & PAK_HEADER_FLAGS_RTECH_ENCODED)
-			return PakDecodeMode_e::MODE_RTECH;
 
 		return PakDecodeMode_e::MODE_DISABLED;
 	}
