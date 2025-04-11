@@ -23,13 +23,11 @@
 
 float rdCalcSlopeAngle(const rdVec3D* v1, const rdVec3D* v2)
 {
-	// math_refactor(kawe): use rdVsub here.
-	const float deltaX = v2->x - v1->x;
-	const float deltaY = v2->y - v1->y;
-	const float deltaZ = v2->z - v1->z;
+	rdVec3D delta;
+	rdVsub(&delta, v2, v1);
 
-	const float horizontalDistance = rdMathSqrtf((deltaX*deltaX)+(deltaY*deltaY));
-	const float slopeAngleRadians = rdMathAtan2f(deltaZ, horizontalDistance);
+	const float horizontalDistance = rdMathSqrtf((delta.x*delta.x)+(delta.y*delta.y));
+	const float slopeAngleRadians = rdMathAtan2f(delta.z, horizontalDistance);
 	const float slopeAngleDegrees = rdRadToDeg(slopeAngleRadians);
 
 	return slopeAngleDegrees;

@@ -493,10 +493,11 @@ void dtNavMesh::unconnectLinks(dtMeshTile* tile, dtMeshTile* target)
 		unsigned int pj = DT_NULL_LINK;
 		while (j != DT_NULL_LINK)
 		{
-			if (decodePolyIdTile(tile->links[j].ref) == targetNum)
+			const dtLink& currLink = tile->links[j];
+			if (decodePolyIdTile(currLink.ref) == targetNum)
 			{
 				// Remove link.
-				unsigned int nj = tile->links[j].next;
+				unsigned int nj = currLink.next;
 				if (pj == DT_NULL_LINK)
 					poly->firstLink = nj;
 				else
@@ -513,9 +514,9 @@ void dtNavMesh::unconnectLinks(dtMeshTile* tile, dtMeshTile* target)
 			}
 			else
 			{
-				// Advance
+				// Advance.
 				pj = j;
-				j = tile->links[j].next;
+				j = currLink.next;
 			}
 		}
 	}
@@ -647,15 +648,15 @@ dtPolyRef dtNavMesh::clampOffMeshVertToPoly(dtOffMeshConnection* con, dtMeshTile
 	return ref;
 }
 
-static bool connectOffMeshLink(dtMeshTile* tile, dtPoly* fromPoly, const dtPolyRef toPolyRef, const unsigned char side,
+static bool connectOffMeshLink(dtMeshTile* fromTile, dtPoly* fromPoly, const dtPolyRef toPolyRef, const unsigned char side,
 	unsigned char edge, unsigned char traverseType, unsigned char order)
 {
-	unsigned int idx = tile->allocLink();
+	unsigned int idx = fromTile->allocLink();
 
 	if (idx == DT_NULL_LINK)
 		return false;
 
-	dtLink* link = &tile->links[idx];
+	dtLink* link = &fromTile->links[idx];
 	link->ref = toPolyRef;
 	link->edge = edge;
 	link->side = side;

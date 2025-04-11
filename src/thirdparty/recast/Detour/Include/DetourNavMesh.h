@@ -325,7 +325,7 @@ struct dtPoly
 	/// The poly group id determining to which island it belongs, and to which it connects.
 	unsigned short groupId;
 
-	/// The poly surface area. (Quantized by #DT_POLY_AREA_QUANT_FACTOR).
+	/// The poly surface area. (Quantized by #DT_POLY_AREA_QUANT_FACTOR.)
 	unsigned short surfaceArea;
 
 #if DT_NAVMESH_SET_VERSION >= 7
@@ -647,7 +647,7 @@ public:
 	unsigned char* data;					///< The tile data. (Not directly accessed under normal situations.)
 
 	int dataSize;							///< Size of the tile data.
-	int flags;								///< Tile flags. (See: #dtTileFlags)
+	int flags;								///< Tile flags. (See: #dtTileFlags.)
 	dtMeshTile* next;						///< The next free tile, or the next tile in the spatial grid.
 	dtMeshTileMemoryTracker* tracker;		///< The tiles memory tracker, called after destruction. (See [r5apex_ds + F437D9] for usage.)
 private:

@@ -1337,7 +1337,7 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 	// Iterate through this tile's polys, indexing them by their new poly ids
 	for (int i = 0; i < header->polyCount; i++)
 	{
-		const dtPoly& poly = tile->polys[i];
+		dtPoly& poly = tile->polys[i];
 
 		// Unlinked polygon, drop it.
 		if (poly.groupId == DT_UNLINKED_POLY_GROUP && (poly.flags & DT_POLYFLAGS_DISABLED))
@@ -1371,10 +1371,11 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 				unsigned int pj = DT_NULL_LINK;
 				while (j != DT_NULL_LINK)
 				{
-					if (nav->decodePolyIdPoly(tile->links[j].ref) == (unsigned int)i)
+					const dtLink& currLink = tile->links[j];
+					if (nav->decodePolyIdPoly(currLink.ref) == (unsigned int)i)
 					{
 						// Remove link.
-						unsigned int nk = tile->links[j].next;
+						unsigned int nk = currLink.next;
 						if (pj == DT_NULL_LINK)
 							basePoly.firstLink = nk;
 						else
@@ -1388,7 +1389,7 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 					{
 						// Advance
 						pj = j;
-						j = tile->links[j].next;
+						j = currLink.next;
 					}
 				}
 
