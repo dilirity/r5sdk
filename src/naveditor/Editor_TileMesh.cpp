@@ -51,6 +51,7 @@ class NavMeshTileTool : public EditorTool
 {
 	Editor_TileMesh* m_editor;
 	dtNavMesh* m_navMesh;
+	dtNavMeshQuery* m_navQuery;
 	rdVec3D m_hitPos;
 	rdVec3D m_nearestPos;
 	int m_selectedSide;
@@ -97,7 +98,8 @@ public:
 	NavMeshTileTool() :
 		m_editor(0),
 		m_navMesh(0),
-		m_selectedSide(-1),
+		m_navQuery(0),
+		m_selectedSide(-2),
 		m_selectedTraverseType(-2),
 		m_markedTileRef(0),
 		m_lastMarkedTileRef(0),
@@ -124,6 +126,7 @@ public:
 	{
 		m_editor = (Editor_TileMesh*)editor;
 		m_navMesh = editor->getNavMesh();
+		m_navQuery = editor->getNavMeshQuery();
 	}
 	
 	virtual void reset() {}
@@ -188,7 +191,7 @@ public:
 				char* pEnd = nullptr;
 				m_markedPolyRef = (dtPolyRef)STR_TO_ID(m_polyRefTextInput, &pEnd, 10);
 			}
-			ImGui::SliderInt("Tile Side", &m_selectedSide, -1, 7, "%d", ImGuiSliderFlags_NoInput);
+			ImGui::SliderInt("Tile Side", &m_selectedSide, -2, 7, "%d", ImGuiSliderFlags_NoInput);
 			ImGui::PopItemWidth();
 		}
 
@@ -203,9 +206,7 @@ public:
 			m_nearestPos.init(0.0f, 0.0f, 0.0f);
 		}
 
-		dtNavMeshQuery* query = m_editor->getNavMeshQuery();
-
-		if (query && m_navMesh)
+		if (m_navQuery && m_navMesh)
 		{
 			ImGui::Separator();
 			ImGui::Text("Dumpers");
@@ -227,7 +228,7 @@ public:
 						FileIO io;
 
 						if (io.openForWrite(buf))
-							duDumpTraverseLinkDetail(*m_navMesh, query, i, &io);
+							duDumpTraverseLinkDetail(*m_navMesh, m_navQuery, i, &io);
 					}
 				}
 				else
@@ -236,7 +237,7 @@ public:
 					FileIO io;
 
 					if (io.openForWrite(buf))
-						duDumpTraverseLinkDetail(*m_navMesh, query, m_selectedTraverseType, &io);
+						duDumpTraverseLinkDetail(*m_navMesh, m_navQuery, m_selectedTraverseType, &io);
 				}
 			}
 		}
@@ -262,7 +263,7 @@ public:
 
 				if (shift)
 				{
-					if (dtStatusFailed(m_editor->getNavMeshQuery()->findNearestPoly(&m_hitPos, &halfExtents, &filter, &m_markedPolyRef, &m_nearestPos)))
+					if (dtStatusFailed(m_navQuery->findNearestPoly(&m_hitPos, &halfExtents, &filter, &m_markedPolyRef, &m_nearestPos)))
 					{
 						m_markedPolyRef = 0;
 						m_nearestPos.init(0.0f, 0.0f, 0.0f);
@@ -323,24 +324,26 @@ public:
 					rdVsad(&m_nearestPos, &bmin, &bmax, 0.5f);
 				}
 
-				duDrawTraverseLinkParams params;
-				duDebugDrawMeshTile(&m_editor->getDebugDraw(), *m_navMesh, 0, tile, debugDrawOffset, m_editor->getNavMeshDrawFlags(), params);
+				duDebugDrawMeshTile(&m_editor->getDebugDraw(), *m_navMesh, m_navQuery, tile, debugDrawOffset, m_editor->getNavMeshDrawFlags(), m_editor->getTraverseLinkDrawParams());
 
-				const int side = (m_selectedSide != -1) 
-					? m_selectedSide
-					: rdClassifyPointOutsideBounds(&m_hitPos, &header->bmin, &header->bmax);
-
-				if (side != 0xff)
+				if (m_selectedSide > -2)
 				{
-					const int MAX_NEIS = 32; // Max neighbors
-					dtMeshTile* neis[MAX_NEIS];
+					const int side = (m_selectedSide != -1)
+						? m_selectedSide
+						: rdClassifyPointOutsideBounds(&m_hitPos, &header->bmin, &header->bmax);
 
-					const int nneis = m_navMesh->getNeighbourTilesAt(header->x, header->y, side, neis, MAX_NEIS);
-
-					for (int i = 0; i < nneis; i++)
+					if (side != 0xff)
 					{
-						const dtMeshTile* neiTile = neis[i];
-						duDebugDrawMeshTile(&m_editor->getDebugDraw(), *m_navMesh, 0, neiTile, debugDrawOffset, m_editor->getNavMeshDrawFlags(), params);
+						const int MAX_NEIS = 32; // Max neighbors
+						dtMeshTile* neis[MAX_NEIS];
+
+						const int nneis = m_navMesh->getNeighbourTilesAt(header->x, header->y, side, neis, MAX_NEIS);
+
+						for (int i = 0; i < nneis; i++)
+						{
+							const dtMeshTile* neiTile = neis[i];
+							duDebugDrawMeshTile(&m_editor->getDebugDraw(), *m_navMesh, m_navQuery, neiTile, debugDrawOffset, m_editor->getNavMeshDrawFlags(), m_editor->getTraverseLinkDrawParams());
+						}
 					}
 				}
 			}

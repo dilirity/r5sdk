@@ -311,6 +311,7 @@ public:
 	void setToolState(int type, EditorToolState* s) { m_toolStates[type] = s; }
 
 	EditorDebugDraw& getDebugDraw() { return m_dd; }
+	duDrawTraverseLinkParams& getTraverseLinkDrawParams() { return m_traverseLinkDrawParams; }
 	const rdVec3D* getRecastDrawOffset() const { return &m_recastDrawOffset; }
 	const rdVec3D* getDetourDrawOffset() const { return &m_detourDrawOffset; }
 
