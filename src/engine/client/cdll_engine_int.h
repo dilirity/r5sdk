@@ -55,6 +55,12 @@ public:
 		const static int index = 59;
 		return CallVFunc<bool>(index, this, msgType, msgData);
 	}
+
+	void SetSoundState(const i8 bState)
+	{
+		const static int index = 125;
+		CallVFunc<void>(index, this, bState);
+	}
 };
 
 /* ==== CHLCLIENT ======================================================================================================================================================= */
@@ -62,7 +68,7 @@ public:
 inline int(*CHLClient__Init)(CHLClient* thisptr, CreateInterfaceFn appSystemFactory, CGlobalVarsBase* pGlobals);
 inline int(*CHLClient__PostInit)(CHLClient* thisptr);
 inline void*(*CHLClient__LevelShutdown)(CHLClient* thisptr);
-inline void(*CHLClient__HudProcessInput)(CHLClient* thisptr, bool bActive);
+inline void(*CHLClient__SetSoundState)(CHLClient* thisptr, bool bActive);
 inline void(*CHLClient__FrameStageNotify)(CHLClient* thisptr, ClientFrameStage_t frameStage);
 inline ClientClass*(*CHLClient__GetAllClasses)();
 #endif // !DEDICATED
@@ -79,7 +85,7 @@ class VDll_Engine_Int : public IDetour
 		LogFunAdr("CHLClient::Init", CHLClient__Init);
 		LogFunAdr("CHLClient::PostInit", CHLClient__PostInit);
 		LogFunAdr("CHLClient::LevelShutdown", CHLClient__LevelShutdown);
-		LogFunAdr("CHLClient::HudProcessInput", CHLClient__HudProcessInput);
+		LogFunAdr("CHLClient::SetSoundState", CHLClient__SetSoundState);
 		LogFunAdr("CHLClient::FrameStageNotify", CHLClient__FrameStageNotify);
 		LogFunAdr("CHLClient::GetAllClasses", CHLClient__GetAllClasses);
 #endif // !DEDICATED
@@ -92,11 +98,9 @@ class VDll_Engine_Int : public IDetour
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 80 3D ?? ?? ?? ?? ?? 49 8B D8 75").GetPtr(CHLClient__Init);
 		Module_FindPattern(g_GameDll, "48 83 EC 28 48 83 3D ?? ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ??").GetPtr(CHLClient__PostInit);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 48 8B F9 48 8D 0D ?? ?? ?? ??").GetPtr(CHLClient__LevelShutdown);
+		Module_FindPattern(g_GameDll, "48 83 EC 28 0F B6 0D ?? ?? ?? ?? 88 15 ?? ?? ?? ??").GetPtr(CHLClient__SetSoundState);
 		Module_FindPattern(g_GameDll, "48 83 EC 28 89 15 ?? ?? ?? ??").GetPtr(CHLClient__FrameStageNotify);
 		Module_FindPattern(g_GameDll, "48 8B 05 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC 48 8B 05 ?? ?? ?? ?? 48 8D 0D ?? ?? ?? ??").GetPtr(CHLClient__GetAllClasses);
-#endif // !DEDICATED
-#ifndef DEDICATED
-		Module_FindPattern(g_GameDll, "48 83 EC 28 0F B6 0D ?? ?? ?? ?? 88 15 ?? ?? ?? ??").GetPtr(CHLClient__HudProcessInput);
 #endif // !DEDICATED
 	}
 	virtual void GetVar(void) const
