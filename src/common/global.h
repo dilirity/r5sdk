@@ -93,6 +93,8 @@ extern ConVar* player_userCmdsQueueWarning;
 extern ConVar* player_disallow_negative_frametime;
 
 extern ConVar* script_server_fps;
+
+extern ConVar* hudchat_dead_can_only_talk_to_other_dead;
 #endif // CLIENT_DLL
 extern ConVar* sv_cheats;
 extern ConVar* sv_visualizetraces;

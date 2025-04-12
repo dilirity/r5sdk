@@ -14,9 +14,17 @@ class CBanSystem
 public:
 	struct Banned_t
 	{
-		Banned_t(const char* ipAddress = "", NucleusID_t nucleusId = NULL)
+		enum BanType_e
+		{
+			CONNECT = 0,
+			COMMUNICATION
+		};
+
+		Banned_t(const char* ipAddress = "", NucleusID_t nucleusId = NULL, BanType_e banType = BanType_e::CONNECT, const char* const banExpiry = nullptr)
 			: m_Address(ipAddress)
 			, m_NucleusID(nucleusId)
+			, m_BanType(banType)
+			, m_BanExpiry(banExpiry)
 		{}
 
 		inline bool operator==(const Banned_t& other) const
@@ -27,6 +35,8 @@ public:
 
 		NucleusID_t m_NucleusID;
 		CUtlString m_Address;
+		BanType_e m_BanType;
+		CUtlString m_BanExpiry;
 	};
 
 	typedef CUtlVector<Banned_t> BannedList_t;

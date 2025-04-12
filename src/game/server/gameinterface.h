@@ -9,17 +9,27 @@
 #include "public/eiface.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 
+inline ConVar sv_commsBannedClientsCanRecieveComms("sv_commsBannedClientsCanRecieveComms", "0", FCVAR_RELEASE, "Enabling this will allow players who are communication banned to recieve communication from other players", false, 0.f, true, 1.f);
+
 //-----------------------------------------------------------------------------
 // Forward declarations
 //-----------------------------------------------------------------------------
 class ServerClass;
 class CPlayer;
-
+class IRecipientFilter;
 //-----------------------------------------------------------------------------
 // Utilities
 //-----------------------------------------------------------------------------
 int UTIL_GetCommandClientIndex(void);
 CPlayer* UTIL_GetCommandClient(void);
+
+//-----------------------------------------------------------------------------
+// User Message
+//-----------------------------------------------------------------------------
+void MessageEnd(void);
+void MessageWriteByte(int iValue);
+void MessageWriteString(const char* pszString);
+void MessageWriteBool(bool bValue);
 
 //-----------------------------------------------------------------------------
 // 
@@ -121,8 +131,10 @@ inline void(*CServerGameClients__ProcessUserCmds)(CServerGameClients* thisp, edi
 
 inline void(*v_DispatchFrameServerJob)(double flFrameTime, bool bRunOverlays, bool bUniformUpdate);
 inline void(*v_ExecuteFrameServerJob)(double flFrameTime, bool bRunOverlays, bool bUniformUpdate);
+inline void(*v_UserMessageBegin)(IRecipientFilter* filter, const char* pszMessageName, int messageIndex);
 
 inline float* g_pflServerFrameTimeBase = nullptr;
+inline bf_write** g_ppUsrMessageBuffer = nullptr;
 
 extern CServerGameDLL* g_pServerGameDLL;
 extern CServerGameClients* g_pServerGameClients;
@@ -142,6 +154,7 @@ class VServerGameDLL : public IDetour
 		LogFunAdr("CServerGameClients::ProcessUserCmds", CServerGameClients__ProcessUserCmds);
 		LogFunAdr("DispatchFrameServerJob", v_DispatchFrameServerJob);
 		LogFunAdr("ExecuteFrameServerJob", v_ExecuteFrameServerJob);
+		LogFunAdr("UserMessageBegin", v_UserMessageBegin);
 		LogVarAdr("g_flServerFrameTimeBase", g_pflServerFrameTimeBase);
 		LogVarAdr("g_pServerGameDLL", g_pServerGameDLL);
 		LogVarAdr("g_pServerGameClients", g_pServerGameClients);
@@ -157,11 +170,13 @@ class VServerGameDLL : public IDetour
 
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 57 48 83 EC 30 0F 29 74 24 ?? 48 8D 0D ?? ?? ?? ??").GetPtr(v_DispatchFrameServerJob);
 		Module_FindPattern(g_GameDll, "48 89 6C 24 ?? 56 41 54 41 56").GetPtr(v_ExecuteFrameServerJob);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 41 56 48 83 EC 40 41 8B E8").GetPtr(v_UserMessageBegin);
 	}
 	virtual void GetVar(void) const
 	{
 		g_pflServerFrameTimeBase = CMemory(CServerGameDLL__GameInit).FindPatternSelf("F3 0F 11 0D").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
 		g_randomStream = CMemory(CServerGameDLL__DLLInit).OffsetSelf(0x130).FindPatternSelf("48 8B").ResolveRelativeAddressSelf(0x3, 0x7).RCast<CServerRandomStream*>();
+		CMemory(v_UserMessageBegin).OffsetSelf(0xB1).FindPatternSelf("48 89").ResolveRelativeAddressSelf(0x3, 0x7).GetPtr(g_ppUsrMessageBuffer);
 	}
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const;

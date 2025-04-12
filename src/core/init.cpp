@@ -149,6 +149,7 @@
 #include "game/server/vscript_server.h"
 #include "game/server/entitylist.h"
 #include "game/server/baseentity.h"
+#include "game/server/recipientfilter.h"
 #endif // !CLIENT_DLL
 #ifndef DEDICATED
 #include "game/client/viewrender.h"
@@ -712,6 +713,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	REGISTER(VCBaseEntity);
 
 	REGISTER(V_UTIL_Server);
+	REGISTER(VRecipientFilter);
 
 #endif // !CLIENT_DLL
 

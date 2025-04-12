@@ -15,6 +15,60 @@
 #include "server.h"
 #include "game/server/gameinterface.h"
 
+static ConVar sv_applyGlobalCommsBans("sv_applyGlobalCommsBans", "3", FCVAR_RELEASE, "Determines whether or not to use the global chat ban list, 0 = None, 1 = Text, 2 = Voice, 3 = Both.", false, 0.f, true, 3.f);
+static ConVar sv_commsBansAreGameBans("sv_commsBansAreGameBans", "0", FCVAR_RELEASE, "If set chat bans will be applied as game bans", false, 0.f, true, 1.f);
+
+bool SV_ShouldApplyTextChatGlobalMutes()
+{
+	const int globalBanSetting = sv_applyGlobalCommsBans.GetInt();
+	if (globalBanSetting == 1 || globalBanSetting == 3)
+		return true;
+	return false;
+}
+
+bool SV_ShouldApplyVoiceChatGlobalMutes()
+{
+	const int globalBanSetting = sv_applyGlobalCommsBans.GetInt();
+	if (globalBanSetting >= 2)
+		return true;
+	return false;
+}
+
+static bool SV_GlobalCommsBansEnabled()
+{
+	if (sv_applyGlobalCommsBans.GetInt() != 0)
+		return true;
+	return false;
+}
+
+static void SV_HandleConnectBan(CClient* const pClient, const char* const pszReason, const char* const pszIpStr, const int nPort, const NucleusID_t nNucleusID)
+{
+	pClient->Disconnect(Reputation_t::REP_MARK_BAD, "%s", pszReason);
+	Warning(eDLL_T::SERVER, "Removed client '[%s]:%i' from slot #%i ('%llu' is banned globally!)\n",
+		pszIpStr, nPort, pClient->GetUserID(), nNucleusID);
+}
+
+static void SV_HandleCommunicationBan(CClient* const pClient, const char* const pszReason, const char* const pszExpiry, const char* const pszIpStr, const int nPort, const NucleusID_t nNucleusID)
+{
+	const int nUserId = pClient->GetUserID();
+	CClientExtended* const pClientExtended = pClient->GetClientExtended();
+
+	if (sv_commsBansAreGameBans.GetBool())
+	{
+		pClient->Disconnect(Reputation_t::REP_MARK_BAD, "%s", pszReason);
+		Warning(eDLL_T::SERVER, "Removed client '[%s]:%i' from slot #%i ('%llu' is communication banned and communication bans are treated as game bans!)\n",
+			pszIpStr, nPort, nUserId, nNucleusID);
+	}
+	else
+	{
+		DevMsg(eDLL_T::SERVER, "Muting client '[%s]:%i' from slot #%i ('%llu' is communication banned)\n",
+			pszIpStr, nPort, nUserId, nNucleusID);
+	}
+
+	pClientExtended->SetClientIsCommsBanned(true);
+	pClientExtended->SetCommsBanInfo(pszReason, pszExpiry);
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: checks if particular client is banned on the comp server
 //-----------------------------------------------------------------------------
@@ -24,11 +78,14 @@ void SV_CheckForBanAndDisconnect(CClient* const pClient, const string& svIPAddr,
 	Assert(pClient != nullptr);
 
 	string svError;
-	const bool bCompBanned = g_MasterServer.CheckForBan(svIPAddr, nNucleusID, svPersonaName, svError);
+	string expiry;
+	CBanSystem::Banned_t::BanType_e banType = CBanSystem::Banned_t::CONNECT;
+	
+	const bool bCompBanned = g_MasterServer.CheckForBan(svIPAddr, nNucleusID, svPersonaName, svError, banType, expiry);
 
 	if (bCompBanned)
 	{
-		g_TaskQueue.Dispatch([pClient, svError, svIPAddr, nNucleusID, nPort]
+		g_TaskQueue.Dispatch([pClient, svError, svIPAddr, nNucleusID, nPort, banType, expiry]
 			{
 				// Make sure client isn't already disconnected,
 				// and that if there is a valid netchannel, that
@@ -37,11 +94,22 @@ void SV_CheckForBanAndDisconnect(CClient* const pClient, const string& svIPAddr,
 				const CNetChan* const pChan = pClient->GetNetChan();
 				if (pChan && pClient->GetNucleusID() == nNucleusID)
 				{
-					const int nUserID = pClient->GetUserID();
-
-					pClient->Disconnect(Reputation_t::REP_MARK_BAD, "%s", svError.c_str());
-					Warning(eDLL_T::SERVER, "Removed client '[%s]:%i' from slot #%i ('%llu' is banned globally!)\n",
-						svIPAddr.c_str(), nPort, nUserID, nNucleusID);
+					switch (banType)
+					{
+					case CBanSystem::Banned_t::CONNECT:
+					{
+						SV_HandleConnectBan(pClient, svError.c_str(), svIPAddr.c_str(), nPort, nNucleusID);
+						break;
+					}
+					case CBanSystem::Banned_t::COMMUNICATION:
+					{
+						if(SV_GlobalCommsBansEnabled())
+							SV_HandleCommunicationBan(pClient, svError.c_str(), expiry.c_str(), svIPAddr.c_str(), nPort, nNucleusID);
+						break;
+					default:
+						break;
+					}
+					}
 				}
 			}, 0);
 	}
@@ -106,15 +174,34 @@ void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec /*= 
 			{
 				const CBanSystem::Banned_t& banned = (*pBannedVec)[i];
 
-				if (banned.m_NucleusID == pClient->GetNucleusID())
-				{
-					const int nUserID = pClient->GetUserID();
-					const int nPort = pNetChan->GetPort();
+				//If this ban isnt for this client then we check the next
+				if (banned.m_NucleusID != pClient->GetNucleusID())
+					continue;
 
-					pClient->Disconnect(Reputation_t::REP_MARK_BAD, "%s", banned.m_Address.String());
-					Warning(eDLL_T::SERVER, "Removed client '[%s]:%i' from slot #%i ('%llu' is banned globally!)\n",
-						szIPAddr, nPort, nUserID, nNucleusID);
+				const int nPort = pNetChan->GetPort();
+
+				//What ban type do we have for this client
+				switch (banned.m_BanType)
+				{
+				case CBanSystem::Banned_t::CONNECT:
+				{
+					SV_HandleConnectBan(pClient, banned.m_Address.String(), szIPAddr, nPort, nNucleusID);
+					break;
 				}
+				case CBanSystem::Banned_t::COMMUNICATION:
+				{
+					//Does the host have the comms ban system on and is our client already banned, no point rebanning them if they are
+					if (SV_GlobalCommsBansEnabled() && !pClient->GetClientExtended()->IsClientCommsBanned())
+						SV_HandleCommunicationBan(pClient, banned.m_Address.String(), banned.m_BanExpiry.Get(), szIPAddr, nPort, nNucleusID);
+					break;
+				}
+				//Unknown ban type
+				default:
+					break;
+				}
+
+				//Since we have handled this client we can move onto the next one
+				break;
 			}
 		}
 	}
@@ -189,6 +276,9 @@ void SV_BroadcastVoiceData(CClient* const cl, const int nBytes, char* const data
 	if (!SV_CanBroadcastVoice())
 		return;
 
+	const bool bShouldApplyGlobalMutes = SV_ShouldApplyVoiceChatGlobalMutes();
+	const bool bBannedClientsCanHearOtherClients = sv_commsBannedClientsCanRecieveComms.GetBool();
+
 	SVC_VoiceData voiceData(cl->GetUserID(), nBytes, data);
 
 	for (int i = 0; i < gpGlobals->maxClients; i++)
@@ -197,6 +287,10 @@ void SV_BroadcastVoiceData(CClient* const cl, const int nBytes, char* const data
 
 		// is this client fully connected
 		if (pClient->GetSignonState() != SIGNONSTATE::SIGNONSTATE_FULL)
+			continue;
+
+		//If the client is communication banned and the server has decidecd that players who are comms banned cant hear other players, skip broadcasting to them
+		if (!bBannedClientsCanHearOtherClients && bShouldApplyGlobalMutes &&  pClient->GetClientExtended()->IsClientCommsBanned())
 			continue;
 
 		// is this client the sender
@@ -233,6 +327,9 @@ void SV_BroadcastDurangoVoiceData(CClient* const cl, const int nBytes, char* con
 	if (!SV_CanBroadcastVoice())
 		return;
 
+	const bool bShouldApplyGlobalMutes = SV_ShouldApplyVoiceChatGlobalMutes();
+	const bool bBannedClientsCanHearOtherClients = sv_commsBannedClientsCanRecieveComms.GetBool();
+
 	SVC_DurangoVoiceData voiceData(cl->GetUserID(), nBytes, data, unknown, useVoiceStream);
 
 	for (int i = 0; i < gpGlobals->maxClients; i++)
@@ -241,6 +338,10 @@ void SV_BroadcastDurangoVoiceData(CClient* const cl, const int nBytes, char* con
 
 		// is this client fully connected
 		if (pClient->GetSignonState() != SIGNONSTATE::SIGNONSTATE_FULL)
+			continue;
+
+		//If the client is communication banned and the server has decidecd that players who are comms banned cant other players, skip broadcasting to them
+		if (!bBannedClientsCanHearOtherClients && bShouldApplyGlobalMutes && pClient->GetClientExtended()->IsClientCommsBanned())
 			continue;
 
 		// is this client the sender

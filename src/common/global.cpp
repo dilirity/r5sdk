@@ -106,6 +106,8 @@ ConVar* player_userCmdsQueueWarning        = nullptr;
 ConVar* player_disallow_negative_frametime = nullptr;
 
 ConVar* script_server_fps                  = nullptr;
+
+ConVar* hudchat_dead_can_only_talk_to_other_dead = nullptr;
 #endif // !CLIENT_DLL
 ConVar* sv_cheats                          = nullptr;
 ConVar* sv_visualizetraces                 = nullptr;
@@ -262,6 +264,7 @@ void ConVar_InitShipped(void)
 	player_disallow_negative_frametime = g_pCVar->FindVar("player_disallow_negative_frametime");
 
 	script_server_fps = g_pCVar->FindVar("script_server_fps");
+	hudchat_dead_can_only_talk_to_other_dead = g_pCVar->FindVar("hudchat_dead_can_only_talk_to_other_dead");
 
 	sv_updaterate_sp->RemoveFlags(FCVAR_DEVELOPMENTONLY);
 	sv_updaterate_mp->RemoveFlags(FCVAR_DEVELOPMENTONLY);

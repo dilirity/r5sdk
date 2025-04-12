@@ -254,6 +254,10 @@ public:
 		m_nStringCommandQuotaCount = NULL;
 		m_flMovementTimeForUserCmdProcessingRemaining = 0.0f;
 		m_bInitialConVarsSet = false;
+
+		m_bIsCommsBanned = false;
+		m_bHasBeenPromptedAboutBanFromSpeaking = false;
+		m_MuteDisplayPrompt.Purge();
 	}
 
 public: // Inlines:
@@ -276,7 +280,18 @@ public: // Inlines:
 	void InitializeMovementTimeForUserCmdProcessing(const int numUserCmdProcessTicksMax, const float tickInterval);
 	float ConsumeMovementTimeForUserCmdProcessing(const float flTimeNeeded);
 
+	void SetClientIsCommsBanned(bool bBanned) { m_bIsCommsBanned = bBanned; }
+	bool IsClientCommsBanned() const { return m_bIsCommsBanned; }
+
+	void SetCommsBanInfo(const char* const pszReason, const char* const pszExpiryTime) { BuildCommsBanDisplayMessage(pszReason, pszExpiryTime); }
+
+	void SetHasBeenPromptedFromVoiceAboutBan(bool bPrompted) { m_bHasBeenPromptedAboutBanFromSpeaking = bPrompted; }
+	bool HasBeenPromptedFromVoiceAboutBan() const { return m_bHasBeenPromptedAboutBanFromSpeaking; }
+
+	const char* const GetCommsMuteDisplayMessage() const { return m_MuteDisplayPrompt.Get(); }
 private:
+	void BuildCommsBanDisplayMessage(const char* pszReasonStr, const char* const pszExpiryDateTime);
+
 	// Measure how long this client's packets took to process.
 	double m_flNetProcessingTimeMsecs;
 	double m_flNetProcessTimeBase;
@@ -289,6 +304,10 @@ private:
 	float m_flMovementTimeForUserCmdProcessingRemaining;
 
 	bool m_bInitialConVarsSet; // Whether or not the initial ConVar KV's are set
+
+	bool m_bIsCommsBanned;
+	bool m_bHasBeenPromptedAboutBanFromSpeaking;
+	CUtlString m_MuteDisplayPrompt;
 };
 
 /* ==== CBASECLIENT ===================================================================================================================================================== */

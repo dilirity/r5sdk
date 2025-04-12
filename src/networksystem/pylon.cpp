@@ -288,7 +288,14 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
         NucleusID_t nuc = NULL;
         JSON_GetValue(obj, "id", nuc);
 
-        CBanSystem::Banned_t banned(reason ? reason : "#DISCONNECT_BANNED", nuc);
+        //Default to a connection ban
+        CBanSystem::Banned_t::BanType_e banType = CBanSystem::Banned_t::CONNECT;
+        JSON_GetValue(obj, "banType", (uint32_t&)banType);
+
+        const char* pszExpiryTimestamp = nullptr;
+        JSON_GetValue(obj, "banExpires", pszExpiryTimestamp);
+
+        CBanSystem::Banned_t banned(reason ? reason : "#DISCONNECT_BANNED", nuc, banType, pszExpiryTimestamp);
         (*outBannedVec)->AddToTail(banned);
     }
 
@@ -303,7 +310,7 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
 //			&outReason - <- contains banned reason if any.
 // Output : True if banned, false if not banned.
 //-----------------------------------------------------------------------------
-bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, const string& personaName, string& outReason) const
+bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, const string& personaName, string& outReason, CBanSystem::Banned_t::BanType_e& outBanType, string& outExpiryTimestamp) const
 {
     if (!IsEnabled())
     {
@@ -341,6 +348,17 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
                 ? reason
                 : "#DISCONNECT_BANNED";
 
+            //Default to a connection ban
+            CBanSystem::Banned_t::BanType_e banType = CBanSystem::Banned_t::CONNECT;
+            JSON_GetValue(responseJson, "banType", (uint32_t&)banType);
+
+            const char* expiry = nullptr;
+            if (JSON_GetValue(responseJson, "banExpires", expiry))
+            {
+                outExpiryTimestamp = expiry;
+            }
+
+            outBanType = banType;
             return true;
         }
     }

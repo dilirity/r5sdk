@@ -193,6 +193,7 @@ public:
 
 	void PlayerRunCommand(CUserCmd* pUserCmd, IMoveHelper* pMover);
 	void SetLastUserCommand(CUserCmd* pUserCmd);
+	void UpdateLastActiveTime(float flTime) { m_lastActiveTime = fmaxf(m_lastActiveTime, flTime); }
 
 	inline bool	IsConnected() const { return m_iConnected != PlayerDisconnected; }
 	inline bool	IsDisconnecting() const { return m_iConnected == PlayerDisconnecting; }
@@ -204,6 +205,8 @@ public:
 	inline const char* GetNetName() const { return m_szNetname; }
 	inline bool IsZooming() { return m_bZooming; }
 
+	char			GetLifeState(void) const { return m_lifeState; }
+	int            GetTeamNum(void) const { return m_iTeamNum; }
 private:
 	char m_szNetname[256];
 	bool m_zoomViewdriftDebounceEnabled;
