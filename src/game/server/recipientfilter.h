@@ -39,7 +39,7 @@ public:
 	virtual int		GetRecipientCount( void ) const;
 	virtual int		GetRecipientIndex( int nSlot ) const;
 
-	virtual bool	IsIgnored( int nSlot ) const;
+	virtual bool	IsLocalPlayer( int nSlot ) const;
 	virtual int		DistTo( int nSlot, const Vector3D& pos ) const;
 
 	void			    Reset( void );

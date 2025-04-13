@@ -65,7 +65,7 @@ int	CRecipientFilter::FindSlotForIndex( int nIndex ) const
 	return m_Recipients.InvalidIndex();
 }
 
-bool CRecipientFilter::IsIgnored( int nSlot ) const
+bool CRecipientFilter::IsLocalPlayer( int nSlot ) const
 {
 	Assert( nSlot >= 0 && nSlot < GetRecipientCount() );
 	return m_Recipients[nSlot].m_bIsLocalPlayer;

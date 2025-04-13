@@ -24,7 +24,7 @@ public:
 	virtual int		GetRecipientCount(void) const = 0;
 	virtual int		GetRecipientIndex(int nSlot) const = 0;
 
-	virtual bool	IsIgnored(int nSlot) const = 0;
+	virtual bool	IsLocalPlayer(int nSlot) const = 0;
 	virtual int		DistTo(int nSlot, const Vector3D& pos) const = 0;
 };
 
