@@ -123,6 +123,10 @@ ServerClass* CServerGameDLL::GetAllServerClasses(void)
 }
 
 static ConVar chat_debug("chat_debug", "0", FCVAR_RELEASE, "Enables chat-related debug printing.");
+static ConVar sv_overrideTeamChatRestriction("sv_overrideTeamChatRestriction", "0", FCVAR_RELEASE,
+	"When enabled this allows sv_forceChatToTeamOnly to take control of the team chat restriction.",
+	"0: Default, 1: Forces the value from sv_forceChatToTeamOnly."
+);
 
 void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int senderId, const char* text, bool isTeamChat)
 {
@@ -132,7 +136,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 	if (!pSenderPlayer || !pSenderClient ||  !pSenderPlayer->IsConnected())
 		return;
 
-	const bool bTeamChatOnly =  sv_forceChatToTeamOnly->GetBool() ? true : isTeamChat;
+	const bool bIsTeamChat = sv_overrideTeamChatRestriction.GetBool() ? sv_forceChatToTeamOnly->GetBool()  : isTeamChat;
 	const int nMaxClients = gpGlobals->maxClients;
 	const bool bShouldApplyGlobalCommsMutes = SV_ShouldApplyTextChatGlobalMutes();
 
@@ -153,7 +157,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 
 		MessageWriteByte(pSenderPlayer->GetEdict());
 		MessageWriteString(pSenderClient->GetClientExtended()->GetCommsMuteDisplayMessage());
-		MessageWriteBool(bTeamChatOnly);
+		MessageWriteBool(bIsTeamChat);
 
 		MessageEnd();
 		return;
@@ -198,7 +202,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 		//If we arent the recipient
 		if (pRecipientPlayer != pSenderPlayer &&
 			//If the chat is limited to one team we must check the sender and recipient are on the same team
-			bTeamChatOnly && pSenderPlayer->GetTeamNum() != pRecipientPlayer->GetTeamNum()
+			bIsTeamChat && pSenderPlayer->GetTeamNum() != pRecipientPlayer->GetTeamNum()
 		)
 			continue;
 
@@ -209,7 +213,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 
 		MessageWriteByte(pSenderPlayer->GetEdict());
 		MessageWriteString(text);
-		MessageWriteBool(bTeamChatOnly);
+		MessageWriteBool(bIsTeamChat);
 
 		MessageEnd();
 	}
