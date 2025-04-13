@@ -191,7 +191,7 @@ void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec /*= 
 				case CBanSystem::Banned_t::COMMUNICATION:
 				{
 					//Does the host have the comms ban system on and is our client already banned, no point rebanning them if they are
-					if (SV_GlobalCommsBansEnabled() && !pClient->GetClientExtended()->IsClientCommsBanned())
+					if (SV_GlobalCommsBansEnabled() && (!pClient->GetClientExtended()->IsClientCommsBanned() || sv_commsBansAreGameBans.GetBool()))
 						SV_HandleCommunicationBan(pClient, banned.m_Address.String(), banned.m_BanExpiry.Get(), szIPAddr, nPort, nNucleusID);
 					break;
 				}
