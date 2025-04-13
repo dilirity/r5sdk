@@ -79,6 +79,10 @@ static bool Detour_IsGoalPolyReachable(dtNavMesh* const nav, const dtPolyRef fro
 static dtStatus Detour_AddTile(dtNavMesh* nav, void* unused, unsigned char* data,
     int dataSize, int flags, dtTileRef lastRef)
 {
+    //There are no statically allocated tiles passed through this function as it is all read from the nav files on disk
+    //Set the free data flag here to avoid leaking memory when we come to destroy the tile
+    flags |= DT_TILE_FREE_DATA;
+
     // note(kawe): replaced with SDK's variant for easier debugging.
     return nav->addTile(data, dataSize, flags, lastRef, nullptr);
 }
