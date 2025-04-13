@@ -682,7 +682,10 @@ bool CClient::VProcessDurangoVoiceData(CClient* pClient, CLC_DurangoVoiceData* p
 	{
 		//Should we apply the communication ban based on what the host has decided
 		if (SV_ShouldApplyVoiceChatGlobalMutes())
+		{
+			InformClientAboutCommsBanTriggeredByVoice(pAdj);
 			return true;
+		}
 	}
 
 	SV_BroadcastDurangoVoiceData(pAdj, Bits2Bytes(bitsRead), voiceDataBuffer,
