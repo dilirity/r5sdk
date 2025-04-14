@@ -37,7 +37,11 @@ bool Crypto_GenerateIV(CryptoContext_s& ctx, const unsigned char* const data, co
 	mbedtls_ctr_drbg_context drbg;
 	mbedtls_ctr_drbg_init(&drbg);
 
-	const int seedRet = mbedtls_ctr_drbg_seed(&drbg, mbedtls_entropy_func, &entropy, data, size);
+	//mbedtls_ctr_drbg_seed will only accept a maximum of MBEDTLS_CTR_DRBG_MAX_SEED_INPUT - MBEDTLS_CTR_DRBG_ENTROPY_LEN as custom data for seed generation
+	//make sure to clamp the number of bytes we ask it to read
+	const size_t customDataLen = min(size, MBEDTLS_CTR_DRBG_MAX_SEED_INPUT - MBEDTLS_CTR_DRBG_ENTROPY_LEN);
+
+	const int seedRet = mbedtls_ctr_drbg_seed(&drbg, mbedtls_entropy_func, &entropy, data, customDataLen);
 	int randRet = MBEDTLS_ERR_ERROR_GENERIC_ERROR;
 
 	if (seedRet == 0)
