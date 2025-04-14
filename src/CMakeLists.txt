@@ -44,6 +44,7 @@ set( FOLDER_CONTEXT "Thirdparty/Multimedia" )
 add_subdirectory( thirdparty/sdl )
 add_subdirectory( thirdparty/imgui )
 add_subdirectory( thirdparty/cppnet )
+add_subdirectory( thirdparty/miles )
 
 set( FOLDER_CONTEXT "Thirdparty/Networking" )
 add_subdirectory( thirdparty/protobuf )
