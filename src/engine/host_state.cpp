@@ -42,6 +42,7 @@
 #ifndef DEDICATED
 #include "vgui/vgui_baseui_interface.h"
 #include "client/vengineclient_impl.h"
+#include "client/cdll_engine_int.h"
 #include "gameui/imgui_system.h"
 #endif // DEDICATED
 #include "networksystem/pylon.h"
@@ -287,6 +288,11 @@ void CHostState::Init(void)
 		}
 		else
 		{
+#ifndef DEDICATED
+			if (g_pHLClient)
+				g_pHLClient->SetSoundState(0);
+#endif // !DEDICATED
+
 			m_iCurrentState = HostStates_t::HS_RUN;
 			if (m_iNextState != HostStates_t::HS_SHUTDOWN || !single_frame_shutdown_for_reload->GetInt())
 				m_iNextState = HostStates_t::HS_RUN;
