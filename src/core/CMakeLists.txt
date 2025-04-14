@@ -105,6 +105,8 @@ target_link_libraries( ${PROJECT_NAME} PRIVATE
 if( NOT ${PROJECT_NAME} STREQUAL "dedicated" )
 target_link_libraries( ${PROJECT_NAME} PRIVATE
     "libimgui"
+
+    "milessdk"
     "codecs"
 
     "inputsystem"
