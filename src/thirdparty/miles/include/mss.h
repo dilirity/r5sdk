@@ -57,4 +57,13 @@ struct MilesAsyncRead
 	S32 volatile Status;
 };
 
+struct MilesSubFileInfo_s
+{
+	char const* filename;
+	size_t size;
+	size_t start;
+};
+
+void MilesGetSubFileInfo(char* const buf, char const* const filename, MilesSubFileInfo_s* const sfi);
+
 #endif // MSS_H
