@@ -21,6 +21,7 @@
 #include "game/shared/usercmd.h"
 #include "game/server/util_server.h"
 #include "pluginsystem/pluginsystem.h"
+#include "game/server/recipientfilter.h"
 
 //-----------------------------------------------------------------------------
 // Purpose: retrieves the index of the client that issued the last command
@@ -122,40 +123,100 @@ ServerClass* CServerGameDLL::GetAllServerClasses(void)
 }
 
 static ConVar chat_debug("chat_debug", "0", FCVAR_RELEASE, "Enables chat-related debug printing.");
+static ConVar sv_overrideTeamChatRestriction("sv_overrideTeamChatRestriction", "0", FCVAR_RELEASE,
+	"When enabled this allows sv_forceChatToTeamOnly to take control of the team chat restriction.",
+	"0: Default, 1: Forces the value from sv_forceChatToTeamOnly."
+);
 
 void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int senderId, const char* text, bool isTeamChat)
 {
-	if (senderId > 0)
+	CPlayer* const pSenderPlayer = UTIL_PlayerByIndex(senderId);
+	CClient* const pSenderClient = g_pServer->GetClient(senderId - 1);
+
+	if (!pSenderPlayer || !pSenderClient ||  !pSenderPlayer->IsConnected())
+		return;
+
+	const bool bIsTeamChat = sv_overrideTeamChatRestriction.GetBool() ? sv_forceChatToTeamOnly->GetBool()  : isTeamChat;
+	const int nMaxClients = gpGlobals->maxClients;
+	const bool bShouldApplyGlobalCommsMutes = SV_ShouldApplyTextChatGlobalMutes();
+
+	pSenderPlayer->UpdateLastActiveTime(gpGlobals->curTime);
+	
+	const bool bSenderIsCommsBanned = pSenderClient->GetClientExtended()->IsClientCommsBanned();
+
+	if (bShouldApplyGlobalCommsMutes && bSenderIsCommsBanned)
 	{
-		if (senderId <= gpGlobals->maxPlayers && senderId != 0xFFFF)
+		if (chat_debug.GetBool())
+			Msg(eDLL_T::SERVER, "Dropping chat message from '%s' (%llu) User is globally muted", 
+				pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId());
+
+		CSingleUserRecipientFilter filter(pSenderPlayer);
+		filter.MakeReliable();
+
+		v_UserMessageBegin(&filter, "SayText", 2);
+
+		MessageWriteByte(pSenderPlayer->GetEdict());
+		MessageWriteString(pSenderClient->GetClientExtended()->GetCommsMuteDisplayMessage());
+		MessageWriteBool(bIsTeamChat);
+
+		MessageEnd();
+		return;
+	}
+
+	for (auto& cb : !g_PluginSystem.GetChatMessageCallbacks())
+	{
+		if (!cb.Function()(pSenderPlayer, text, sv_forceChatToTeamOnly->GetBool()))
 		{
-			CPlayer* player = reinterpret_cast<CPlayer*>(gpGlobals->m_pEdicts[senderId + 30728]);
-
-			if (player && player->IsConnected())
+			if (chat_debug.GetBool())
 			{
-				for (auto& cb : !g_PluginSystem.GetChatMessageCallbacks())
-				{
-					if (!cb.Function()(player, text, sv_forceChatToTeamOnly->GetBool()))
-					{
-						if (chat_debug.GetBool())
-						{
-							char moduleName[MAX_PATH] = {};
+				char moduleName[MAX_PATH] = {};
 
-							V_UnicodeToUTF8(V_UnqualifiedFileName(cb.ModuleName()), moduleName, MAX_PATH);
+				V_UnicodeToUTF8(V_UnqualifiedFileName(cb.ModuleName()), moduleName, MAX_PATH);
 
-							Msg(eDLL_T::SERVER, "[%s] Plugin blocked chat message from '%s' (%llu): \"%s\"\n", moduleName, player->GetNetName(), player->GetPlatformUserId(), text);
-						}
-
-						return;
-					}
-				}
+				Msg(eDLL_T::SERVER, "[%s] Plugin blocked chat message from '%s' (%llu): \"%s\"\n", moduleName, pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId(), text);
 			}
+
+			return;
 		}
 	}
 
-	// set isTeamChat to false so that we can let the convar sv_forceChatToTeamOnly decide whether team chat should be enforced
-	// this isn't a great way of doing it but it works so meh
-	CServerGameDLL__OnReceivedSayTextMessage(thisptr, senderId, text, false);
+	const bool bSenderDeadAndCanOnlyTalkToDead = hudchat_dead_can_only_talk_to_other_dead->GetBool() && pSenderPlayer->GetLifeState();
+
+	for (int nRecipientIndex = 1; nRecipientIndex <= nMaxClients; nRecipientIndex++)
+	{
+		const CPlayer* const pRecipientPlayer = UTIL_PlayerByIndex(nRecipientIndex);
+		const CClient* const pRecipientClient = g_pServer->GetClient(nRecipientIndex - 1);
+
+		//Are we all there
+		if (!pRecipientPlayer || !pRecipientClient || !pRecipientPlayer->IsConnected())
+			continue;
+
+		//If our recipient is banned and the host doesnt want banned people to see others chat skip them
+		if (bShouldApplyGlobalCommsMutes && pRecipientClient->GetClientExtended()->IsClientCommsBanned() && !sv_commsBannedClientsCanRecieveComms.GetBool())
+			continue;
+
+		//If we are only allowed to talk to the dead make sure the recipient is dead
+		if (bSenderDeadAndCanOnlyTalkToDead == !pRecipientPlayer->GetLifeState())
+			continue;
+
+		//If we arent the recipient
+		if (pRecipientPlayer != pSenderPlayer &&
+			//If the chat is limited to one team we must check the sender and recipient are on the same team
+			bIsTeamChat && pSenderPlayer->GetTeamNum() != pRecipientPlayer->GetTeamNum()
+		)
+			continue;
+
+		CSingleUserRecipientFilter filter(pRecipientPlayer);
+		filter.MakeReliable();
+
+		v_UserMessageBegin(&filter, "SayText", 2);
+
+		MessageWriteByte(pSenderPlayer->GetEdict());
+		MessageWriteString(text);
+		MessageWriteBool(bIsTeamChat);
+
+		MessageEnd();
+	}
 }
 
 static void DrawServerHitbox(int iEntity)
@@ -286,6 +347,39 @@ static void ExecuteFrameServerJob(double flFrameTime, bool bRunOverlays, bool bU
 
 	LiveAPISystem()->RunFrame();
 	DrawAllDebugOverlays();
+}
+
+void MessageEnd(void)
+{
+	Assert(*g_ppUsrMessageBuffer);
+
+	g_pEngineServer->MessageEnd();
+
+	(*g_ppUsrMessageBuffer) = nullptr;
+}
+
+void MessageWriteByte(int iValue)
+{
+	if (!*g_ppUsrMessageBuffer)
+		Error(eDLL_T::ENGINE, EXIT_FAILURE, "WRITE_BYTE called with no active message\n");
+
+	(*g_ppUsrMessageBuffer)->WriteByte(iValue);
+}
+
+void MessageWriteString(const char* pszString)
+{
+	if (!*g_ppUsrMessageBuffer)
+		Error(eDLL_T::ENGINE, EXIT_FAILURE, "WriteString called with no active message\n");
+
+	(*g_ppUsrMessageBuffer)->WriteString(pszString);
+}
+
+void MessageWriteBool(bool bValue)
+{
+	if (!*g_ppUsrMessageBuffer)
+		Error(eDLL_T::ENGINE, EXIT_FAILURE, "WriteBool called with no active message\n");
+
+	(*g_ppUsrMessageBuffer)->WriteOneBit(static_cast<int>(bValue));
 }
 
 void VServerGameDLL::Detour(const bool bAttach) const

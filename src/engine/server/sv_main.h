@@ -67,6 +67,9 @@ void SV_BroadcastVoiceData(CClient* const cl, const int nBytes, char* const data
 void SV_BroadcastDurangoVoiceData(CClient* const cl, const int nBytes, char* const data, const int nXid, const int unknown, const bool useVoiceStream, const bool skipXidCheck);
 void SV_CheckForBanAndDisconnect(CClient* const pClient, const string& svIPAddr, const NucleusID_t nNucleusID, const string& svPersonaName, const int nPort);
 void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec = nullptr);
+bool SV_ShouldApplyTextChatGlobalMutes();
+bool SV_ShouldApplyVoiceChatGlobalMutes();
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
