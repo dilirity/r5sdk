@@ -3,6 +3,11 @@ add_module( "lib" "rtech_game" "vpc" ${FOLDER_CONTEXT} TRUE TRUE )
 
 start_sources()
 
+add_sources( SOURCE_GROUP "Core"
+   "core/strutils.cpp"
+   "core/strutils.h"
+)
+
 add_sources( SOURCE_GROUP "Async"
    "async/asyncio.cpp"
    "async/asyncio.h"
