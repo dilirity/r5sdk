@@ -6,7 +6,7 @@
 struct AsyncHandleTracker_s
 {
 	int slot;
-	int state;
+	int refCount;
 	HANDLE handle;
 };
 

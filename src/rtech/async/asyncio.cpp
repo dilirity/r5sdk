@@ -53,7 +53,7 @@ int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* c
 
     tracker.slot = fileIdx;
     tracker.handle = hFile;
-    tracker.state = 1;
+    tracker.refCount = 1;
 
     s_fileHandleLogChannelIDs[slotNum] = logChannel;
     const int selectedLogChannel = async_debugchannel.GetInt();
@@ -72,7 +72,7 @@ void FS_CloseAsyncFile(const int fileHandle)
     const int slotNum = fileHandle & ASYNC_MAX_FILE_HANDLES_MASK;
     AsyncHandleTracker_s& tracker = g_pAsyncFileSlots[slotNum];
 
-    if (ThreadInterlockedExchangeAdd(&tracker.state, -1) <= 1)
+    if (ThreadInterlockedExchangeAdd(&tracker.refCount, -1) <= 1)
     {
         CloseHandle(tracker.handle);
         tracker.handle = INVALID_HANDLE_VALUE;
