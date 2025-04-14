@@ -114,12 +114,11 @@ struct PakLoadFuncs_s
 	// open a specific file for asynchronous read, and return the file handle
 	int (*OpenAsyncFile)(const char* const fileName, const int logChannel, size_t* const outFileSize);
 
-	// close an opened file by its handle
+	// atomically decrements the async file's ref count, if its 1 or lower, the file gets closed.
 	void (*CloseAsyncFile)(const int fileHandle);
 
-	// atomically increments AsyncFileHandleTracker_s::state; some refcounting? see [r5apex.exe+438831h]
-	// for atomic exchange before unload. needs more reversing work
-	void* Func24;
+	// atomically increments the async file's ref count.
+	void (*IncrementAsyncFileRefCount)(const int fileHandle);
 
 	// always set to nullptr
 	void* Func25;
@@ -154,8 +153,8 @@ struct PakLoadFuncs_s
 	// cancel an async read request and release the handle
 	void (*CancelAsyncRequestAndRelease)(const int fileSlot);
 
-	// cancel an async pak read request and release the handle
-	void (*CancelLoadRequest)(const int fileSlot);
+	// cancel an async file read request and release the handle
+	void (*CancelAsyncRequest)(const int fileSlot);
 
 	// get the main async io worked thread
 	void (*GetAsyncIOWorkerThread)(HANDLE* const outThreadHandle);
