@@ -612,7 +612,7 @@ void CClientExtended::BuildCommsBanDisplayMessage(const char* pszReasonStr, cons
 		}
 	}
 
-	fmt.Format("You have an active %s  communications ban.\nReason: %s\n", 
+	fmt.Format("You have an active %s communications ban.\nReason: %s\n", 
 		pszExpiryTimestamp ? "temporary" : "permanent",
 		pszReasonStr ? pszReasonStr : "None"
 	);

@@ -61,7 +61,7 @@ static void SV_HandleCommunicationBan(CClient* const pClient, const char* const 
 	}
 	else
 	{
-		DevMsg(eDLL_T::SERVER, "Muting client '[%s]:%i' from slot #%i ('%llu' is communication banned)\n",
+		DevMsg(eDLL_T::SERVER, "Muting client '[%s]:%i' from slot #%i ('%llu' is communication banned!)\n",
 			pszIpStr, nPort, nUserId, nNucleusID);
 	}
 
@@ -277,7 +277,7 @@ void SV_BroadcastVoiceData(CClient* const cl, const int nBytes, char* const data
 		return;
 
 	const bool bShouldApplyGlobalMutes = SV_ShouldApplyVoiceChatGlobalMutes();
-	const bool bBannedClientsCanHearOtherClients = sv_commsBannedClientsCanRecieveComms.GetBool();
+	const bool bBannedClientsCanHearOtherClients = sv_commsBannedClientsCanReceiveComms.GetBool();
 
 	SVC_VoiceData voiceData(cl->GetUserID(), nBytes, data);
 
@@ -328,7 +328,7 @@ void SV_BroadcastDurangoVoiceData(CClient* const cl, const int nBytes, char* con
 		return;
 
 	const bool bShouldApplyGlobalMutes = SV_ShouldApplyVoiceChatGlobalMutes();
-	const bool bBannedClientsCanHearOtherClients = sv_commsBannedClientsCanRecieveComms.GetBool();
+	const bool bBannedClientsCanHearOtherClients = sv_commsBannedClientsCanReceiveComms.GetBool();
 
 	SVC_DurangoVoiceData voiceData(cl->GetUserID(), nBytes, data, unknown, useVoiceStream);
 

@@ -192,7 +192,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 			continue;
 
 		//If our recipient is banned and the host doesnt want banned people to see others chat skip them
-		if (bShouldApplyGlobalCommsMutes && pRecipientClient->GetClientExtended()->IsClientCommsBanned() && !sv_commsBannedClientsCanRecieveComms.GetBool())
+		if (bShouldApplyGlobalCommsMutes && pRecipientClient->GetClientExtended()->IsClientCommsBanned() && !sv_commsBannedClientsCanReceiveComms.GetBool())
 			continue;
 
 		//If we are only allowed to talk to the dead make sure the recipient is dead

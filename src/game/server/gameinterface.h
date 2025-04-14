@@ -9,7 +9,7 @@
 #include "public/eiface.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 
-inline ConVar sv_commsBannedClientsCanRecieveComms("sv_commsBannedClientsCanRecieveComms", "0", FCVAR_RELEASE, "Enabling this will allow players who are communication banned to recieve communication from other players", false, 0.f, true, 1.f);
+inline ConVar sv_commsBannedClientsCanReceiveComms("sv_commsBannedClientsCanReceiveComms", "0", FCVAR_RELEASE, "Enabling this will allow players who are communication banned to receive communication from other players", false, 0.f, true, 1.f);
 
 //-----------------------------------------------------------------------------
 // Forward declarations
