@@ -639,15 +639,13 @@ static bool Pak_ZStdStreamDecode(PakDecoder_s* const decoder, const PakRingBuffe
 	decoder->outBufBytePos += outBuffer.pos;
 	decoder->inBufBytePos += inBuffer.pos;
 
-	// on the next call, we need at least this amount of data streamed in order
-	// to decode the rest of the pak file, as this is where reading has stopped
-	// this value may equal the currently streamed input size, as its possible
-	// this function is getting called to flush the remainder decoded data into
-	// the out buffer which got truncated off on the call prior due to wrapping
-	//
-	// if the input stream has fully decoded, this should equal the size of the
-	// encoded pak file
-	decoder->bufferSizeNeeded = decoder->inBufBytePos + ZSTD_nextSrcSizeToDecompress(dctx);
+	// NOTE: if inBuffer.pos < inBuffer.size, we made full use of the output
+	// buffer and couldn't decode any more data into it. the decoded data needs
+	// to be copied out to the destination so we can reuse the ring buffer and
+	// process the remainder of this frame. in these cases we do not update the
+	// bufferSizeNeeded objective below as we still have data left to process.
+	if (inBuffer.pos == inBuffer.size)
+		decoder->bufferSizeNeeded = decoder->inBufBytePos + 1;
 
 	const bool decoded = ret == NULL;
 
