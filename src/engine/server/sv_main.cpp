@@ -14,6 +14,7 @@
 #include "engine/client/client.h"
 #include "server.h"
 #include "game/server/gameinterface.h"
+#include "game/server/util_server.h"
 
 static ConVar sv_applyGlobalCommsBans("sv_applyGlobalCommsBans", "3", FCVAR_RELEASE, "Determines whether or not to use the global chat ban list, 0 = None, 1 = Text, 2 = Voice, 3 = Both.", false, 0.f, true, 3.f);
 static ConVar sv_commsBansAreGameBans("sv_commsBansAreGameBans", "0", FCVAR_RELEASE, "If set chat bans will be applied as game bans", false, 0.f, true, 1.f);
@@ -156,6 +157,13 @@ void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec /*= 
 			continue;
 
 		if (pNetChan->GetRemoteAddress().IsLoopback())
+			continue;
+
+		CPlayer* const pPlayer = UTIL_PlayerByIndex(pClient->GetHandle());
+
+		// Bots shouldn't be checked for bans because these are added by the
+		// server host.
+		if (pPlayer->IsBot())
 			continue;
 
 		const char* const szIPAddr = pNetChan->GetAddress(true);
