@@ -36,6 +36,13 @@ void CClient::Clear(void)
 	GetClientExtended()->Reset(); // Reset extended data.
 #endif // !CLIENT_DLL
 	CClient__Clear(this);
+
+	// CClient::Clear() doesn't null this for some reason so we have to do it here,
+	// else when fake clients (bots) get created, they will reuse the last nucleus
+	// id that was assigned to this CClient instance. This happens because CClient
+	// instances are persistent as they originate from a static array within a
+	// static object of type CServer.
+	m_nNucleusID = 0;
 }
 
 //---------------------------------------------------------------------------------
