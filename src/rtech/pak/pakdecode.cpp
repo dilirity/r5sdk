@@ -137,10 +137,13 @@ static const unsigned char /*141313180*/ s_defaultDecoderLUT[] =
 //-----------------------------------------------------------------------------
 static bool Pak_HasEnoughDecodeBufferAvailable(PakDecoder_s* const decoder, const size_t outLen)
 {
+	// align to nearest multiple of buffer size
+	const uint64_t bufPosAligned = (decoder->outBufBytePos & ~decoder->outputInvMask);
+	const uint64_t threshold = decoder->outputInvMask + bufPosAligned + 1;
+
 	// make sure caller has copied all data out the ring buffer first before
 	// overwriting it with new decoded data
-	const uint64_t bytesWritten = (decoder->outBufBytePos & ~decoder->outputInvMask);
-	return (outLen >= decoder->outputInvMask + (bytesWritten +1) || outLen >= decoder->decompSize);
+	return (outLen >= threshold || outLen >= decoder->decompSize);
 }
 
 //-----------------------------------------------------------------------------
@@ -738,8 +741,8 @@ bool Pak_StreamToBufferDecode(PakDecoder_s* const decoder, const size_t inLen, c
 	// this position in code
 	assert(decoder->zstreamContext && decoder->inBufBytePos <= inLen);
 
-	const PakRingBufferFrame_s outFrame = Pak_DetermineRingBufferFrame(decoder->outputMask, decoder->outBufBytePos , outLen);
-	const PakRingBufferFrame_s inFrame  = Pak_DetermineRingBufferFrame(decoder->inputMask, decoder->inBufBytePos, inLen);
+	const PakRingBufferFrame_s inFrame = Pak_DetermineRingBufferFrame(decoder->inputMask, decoder->inBufBytePos, inLen);
+	const PakRingBufferFrame_s outFrame = Pak_DetermineRingBufferFrame(decoder->outputMask, decoder->outBufBytePos, outLen);
 
 	return Pak_ZStdStreamDecode(decoder, outFrame, inFrame);
 }
