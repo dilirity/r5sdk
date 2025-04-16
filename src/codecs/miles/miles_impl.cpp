@@ -432,4 +432,18 @@ void MilesCore::Detour(const bool bAttach) const
 	DetourSetup(&v_CSOM_MilesAsync_FileStatus, &CSOM_MilesAsync_FileStatus, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileCancel, &CSOM_MilesAsync_FileCancel, bAttach);
 	DetourSetup(&v_CSOM_AddEventToQueue, &CSOM_AddEventToQueue, bAttach);
+
+	if (bAttach)
+	{
+		CMemory mem(v_CSOM_RunFrame);
+
+		// Between Miles version 10.0.48 and 10.0.50, they swapped locations of
+		// 2 members in a struct returned by MilesEventInfoQueueEnum on type 4.
+		// This change breaks closed captions (sub-titles). The fix is to apply
+		// the swap in the assembly code as well so the engine retrieves the
+		// values correctly from the new locations again. The structure layout
+		// on all other enums are still identical and do not need to be fixes.
+		mem.Offset(0x762).Patch({ 0x4 });
+		mem.Offset(0x78B).Patch({ 0xC });
+	}
 }

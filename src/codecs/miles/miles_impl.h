@@ -14,6 +14,8 @@ inline unsigned int (*v_MilesEventGetDetails)(__int64 a1, __int64 a2, __int64 a3
 
 inline bool(*v_CSOM_Initialize)();
 inline void(*v_CSOM_LogFunc)(int64_t nLogLevel, const char* pszMessage);
+inline void(*v_CSOM_RunFrame)(char a1, char a2, float a3, float a4);
+
 inline s32(*v_CSOM_MilesAsync_FileRead)(MilesAsyncRead* const request);
 inline s32(*v_CSOM_MilesAsync_FileStatus)(MilesAsyncRead* const request, const u32 i_MS);
 inline s32(*v_CSOM_MilesAsync_FileCancel)(MilesAsyncRead* const request);
@@ -82,6 +84,7 @@ class MilesCore : public IDetour
 		LogFunAdr("MilesEventGetDetails", v_MilesEventGetDetails);
 		LogFunAdr("CSOM_Initialize", v_CSOM_Initialize);
 		LogFunAdr("CSOM_LogFunc", v_CSOM_LogFunc);
+		LogFunAdr("CSOM_RunFrame", v_CSOM_RunFrame);
 		LogFunAdr("CSOM_MilesAsync_FileRead", v_CSOM_MilesAsync_FileRead);
 		LogFunAdr("CSOM_MilesAsync_FileStatus", v_CSOM_MilesAsync_FileStatus);
 		LogFunAdr("CSOM_MilesAsync_FileCancel", v_CSOM_MilesAsync_FileCancel);
@@ -92,6 +95,7 @@ class MilesCore : public IDetour
 	{
 		Module_FindPattern(g_GameDll, "40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC ?? ?? ?? ?? 80 3D ?? ?? ?? ?? ??").GetPtr(v_CSOM_Initialize);
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC 20 48 8B DA 48 8D 15 ?? ?? ?? ??").GetPtr(v_CSOM_LogFunc);
+		Module_FindPattern(g_GameDll, "48 8B C4 F3 0F 11 50 ?? 88 50").GetPtr(v_CSOM_RunFrame);
 		Module_FindPattern(g_GameDll, "4C 8B DC 53 55 56 57 48 81 EC").GetPtr(v_CSOM_MilesAsync_FileRead);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 57 48 83 EC ?? 8B B9 ?? ?? ?? ?? 48 8B D9 83 FF").GetPtr(v_CSOM_MilesAsync_FileStatus);
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 8B 81 ?? ?? ?? ?? 48 8B D9 83 F8 ?? 75 ?? B8").GetPtr(v_CSOM_MilesAsync_FileCancel);
