@@ -44,8 +44,8 @@ bool CNetAdr::CompareAdr(const CNetAdr& other) const
 //////////////////////////////////////////////////////////////////////
 const char* CNetAdr::ToString(bool bOnlyBase) const
 {
-	// Main thread only due to use of static buffers.
-	//Assert(ThreadInMainThread());
+	// Main or server frame thread only due to use of static buffers.
+	Assert(ThreadInMainOrServerFrameThread());
 
 	// Select a static buffer.
 	static char s[4][128];
