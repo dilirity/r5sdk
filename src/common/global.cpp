@@ -120,6 +120,8 @@ ConVar* cl_updaterate_mp                   = nullptr;
 
 ConVar* cl_threaded_bone_setup             = nullptr;
 
+ConVar* pvs_frustumCullOnly                = nullptr;
+
 ConVar* origin_disconnectWhenOffline       = nullptr;
 ConVar* discord_updatePresence = nullptr;
 
@@ -182,6 +184,7 @@ void ConVar_InitShipped(void)
 	name_cvar                        = g_pCVar->FindVar("name");
 	cl_updaterate_mp                 = g_pCVar->FindVar("cl_updaterate_mp");
 	cl_threaded_bone_setup           = g_pCVar->FindVar("cl_threaded_bone_setup");
+	pvs_frustumCullOnly              = g_pCVar->FindVar("pvs_frustumCullOnly");
 #endif // !DEDICATED
 	single_frame_shutdown_for_reload = g_pCVar->FindVar("single_frame_shutdown_for_reload");
 	enable_debug_overlays            = g_pCVar->FindVar("enable_debug_overlays");
@@ -287,6 +290,17 @@ void ConVar_InitShipped(void)
 	bhit_enable->SetValue(0);
 #endif // !CLIENT_DLL
 #ifndef DEDICATED
+	// This was originally 1, which enables frustum culling only (on
+	// by script). This creates a MAJOR performance impact however..
+	// setting this to 0 significantly reduces CPU and GPU load.
+	// This also fixes a long-time issue where large amounts of
+	// props of the map disappear at very specific locations and
+	// angles. After this was found, I did some additional research
+	// after newer versions of the game and it was determined that
+	// this was forced to 0 on newer versions of the game as well.
+	// Now forced to 0 here to make full use of the PVS system.
+	pvs_frustumCullOnly->SetValue(0);
+
 	cl_updaterate_mp->RemoveFlags(FCVAR_DEVELOPMENTONLY);
 
 	cl_threaded_bone_setup->RemoveFlags(FCVAR_DEVELOPMENTONLY);

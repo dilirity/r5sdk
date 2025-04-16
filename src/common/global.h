@@ -105,6 +105,8 @@ extern ConVar* bhit_enable;
 #ifndef DEDICATED
 extern ConVar* cl_threaded_bone_setup;
 
+extern ConVar* pvs_frustumCullOnly;
+
 extern ConVar* origin_disconnectWhenOffline;
 extern ConVar* discord_updatePresence;
 
