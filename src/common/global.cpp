@@ -282,6 +282,8 @@ void ConVar_InitShipped(void)
 	// and code doesn't check for it either.
 	script_server_fps->SetMin(0.0001f);
 
+	// This is debugging code and enabled by default.disabled here to
+	// save on bandwidth.
 	bhit_enable->SetValue(0);
 #endif // !CLIENT_DLL
 #ifndef DEDICATED
