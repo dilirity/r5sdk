@@ -88,7 +88,7 @@ inline bool(*JT_HelpWithJobTypes)(JobHelpCallback_t, JobUserData_t userData, __i
 inline __int64(*JT_HelpWithJobTypesOrSleep)(JobHelpCallback_t, JobUserData_t userData, __int64 a3, __int64 a4, volatile signed __int64* a5, char a6);
 inline __int64(*JT_WaitForJobAndOnlyHelpWithJobTypes)(JobID_t, uint64_t unkMask1, uint64_t unkMask2);
 
-inline bool(*JT_AcquireFifoLockOrHelp)(struct JobFifoLock_s* pFifo);
+inline bool(*JT_AcquireFifoLock)(struct JobFifoLock_s* pFifo);
 inline void(*JT_ReleaseFifoLock)(struct JobFifoLock_s* pFifo);
 
 inline JobID_t(*JT_BeginJobGroup)(const JobID_t jobId);
@@ -109,7 +109,7 @@ class VJobThread : public IDetour
 		LogFunAdr("JT_HelpWithJobTypesOrSleep", JT_HelpWithJobTypesOrSleep);
 		LogFunAdr("JT_WaitForJobAndOnlyHelpWithJobTypes", JT_WaitForJobAndOnlyHelpWithJobTypes);
 
-		LogFunAdr("JT_AcquireFifoLockOrHelp", JT_AcquireFifoLockOrHelp);
+		LogFunAdr("JT_AcquireFifoLock", JT_AcquireFifoLock);
 		LogFunAdr("JT_ReleaseFifoLock", JT_ReleaseFifoLock);
 
 		LogFunAdr("JT_BeginJobGroup", JT_BeginJobGroup);
@@ -126,7 +126,7 @@ class VJobThread : public IDetour
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 4C 89 4C 24 ?? 4C 89 44 24 ?? 55 56 57 41 54 41 55 41 56 41 57 48 83 EC 60").GetPtr(JT_HelpWithJobTypes);
 		Module_FindPattern(g_GameDll, "4C 89 4C 24 ?? 4C 89 44 24 ?? 48 89 54 24 ?? 48 89 4C 24 ?? 55 53 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ??").GetPtr(JT_HelpWithJobTypesOrSleep);
 		Module_FindPattern(g_GameDll, "48 89 6C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 41 56 48 83 EC 30 8B F9").GetPtr(JT_WaitForJobAndOnlyHelpWithJobTypes);
-		Module_FindPattern(g_GameDll, "48 83 EC 08 65 48 8B 04 25 ?? ?? ?? ?? 4C 8B C1").GetPtr(JT_AcquireFifoLockOrHelp);
+		Module_FindPattern(g_GameDll, "48 83 EC 08 65 48 8B 04 25 ?? ?? ?? ?? 4C 8B C1").GetPtr(JT_AcquireFifoLock);
 		Module_FindPattern(g_GameDll, "48 83 EC 28 44 8B 11").GetPtr(JT_ReleaseFifoLock);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 41 56 48 83 EC 30 65 48 8B 04 25 ?? ?? ?? ?? BA ?? ?? ?? ??").GetPtr(JT_AllocateJob);
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 8B D9 E8 ?? ?? ?? ?? 44 8B C0").GetPtr(JT_BeginJobGroup);

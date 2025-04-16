@@ -495,7 +495,7 @@ static void Mod_QueuedPakCacheFrame()
 
                         if (g_pakGlobals->hasPendingUnloadJobs || g_pakGlobals->loadedPakCount != g_pakGlobals->requestedPakCount)
                         {
-                            if (!JT_AcquireFifoLockOrHelp(pakFifoLock)
+                            if (!JT_AcquireFifoLock(pakFifoLock)
                                 && !JT_HelpWithJobTypes(g_pPakFifoLockWrapper, pakFifoLock, -1i64, 0i64))
                             {
                                 JT_HelpWithJobTypesOrSleep(g_pPakFifoLockWrapper, pakFifoLock, -1i64, 0i64, 0i64, 1);
