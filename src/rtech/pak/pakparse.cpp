@@ -222,6 +222,25 @@ static void Pak_UnloadAsync(const PakHandle_t handle)
 
 #define CMD_INVALID -1
 
+struct ZSTDPakDecoder_s
+{
+    ZSTDPakDecoder_s()
+    {
+        dctx = ZSTD_createDCtx();
+    }
+    ~ZSTDPakDecoder_s()
+    {
+        ZSTD_freeDCtx(dctx);
+        dctx = nullptr;
+    }
+
+    ZSTD_DCtx* dctx;
+};
+
+// paks get decoded one at a time, even for patches. therefore we can just use
+// a single context for all paks and save a bunch of runtime overhead
+static ZSTDPakDecoder_s s_zstdPakDecoder;
+
 // only patch cmds 4,5,6 use this array to determine their data size
 static const int s_patchCmdToBytesToProcess[] = { CMD_INVALID, CMD_INVALID, CMD_INVALID, CMD_INVALID, 3, 7, 6, 0 };
 #undef CMD_INVALID
@@ -233,7 +252,7 @@ static bool Pak_ProcessPakFile(PakFile_s* const pak)
     PakFileStream_s* const fileStream = &pak->fileStream;
     PakMemoryData_s* const memoryData = &pak->memoryData;
 
-    // first request is always just the header?
+    // first request is always just the header.
     size_t readStart = sizeof(PakFileHeader_s);
 
     if (fileStream->numDataChunks > 0)
@@ -306,6 +325,9 @@ static bool Pak_ProcessPakFile(PakFile_s* const pak)
 
             if (pak->isCompressed)
             {
+                if (streamDesc->compressionMode == PakDecodeMode_e::MODE_ZSTD)
+                    pak->pakDecoder.zstreamContext = s_zstdPakDecoder.dctx;
+
                 const size_t decompressedSize = Pak_InitDecoder(&pak->pakDecoder,
                     fileStream->buffer, pak->decompBuffer,
                     PAK_DECODE_IN_RING_BUFFER_MASK, PAK_DECODE_OUT_RING_BUFFER_MASK,
@@ -335,7 +357,10 @@ static bool Pak_ProcessPakFile(PakFile_s* const pak)
                 pak->inputBytePos = pak->pakDecoder.inBufBytePos;
 
                 if (didDecode)
+                {
                     DevMsg(eDLL_T::RTECH, "%s: pak '%s' decoded successfully\n", __FUNCTION__, pak->GetName());
+                    pak->pakDecoder.zstreamContext = nullptr;
+                }
             }
         }
         else

@@ -576,22 +576,11 @@ LABEL_69:
 static size_t Pak_ZStdDecoderInit(PakDecoder_s* const decoder, const uint8_t* frameHeader,
 	const size_t dataSize, const size_t headerSize)
 {
-	ZSTD_DStream* const dctx = ZSTD_createDStream();
+	ZSTD_DStream* const dctx = decoder->zstreamContext;
 	assert(dctx);
 
-	// failure
-	if (!dctx)
-		return NULL;
-
-	decoder->zstreamContext = dctx;
-
 	if (ZSTD_getFrameHeader(&dctx->fParams, frameHeader, dataSize) != 0)
-	{
-		ZSTD_freeDStream(decoder->zstreamContext);
-		decoder->zstreamContext = nullptr;
-
 		return NULL; // content size error
-	}
 
 	// ideally the frame header of the block gets parsed first, the length
 	// thereof is returned by initDStream and thus being processed first
@@ -668,16 +657,7 @@ static bool Pak_ZStdStreamDecode(PakDecoder_s* const decoder, const PakRingBuffe
 	if (inBuffer.pos == inBuffer.size)
 		decoder->bufferSizeNeeded = Pak_ZStdCalcNextStreamObjective(decoder);
 
-	const bool decoded = ret == NULL;
-
-	// zstd decoder no longer necessary at this point, deallocate
-	if (decoded)
-	{
-		ZSTD_freeDStream(dctx);
-		decoder->zstreamContext = nullptr;
-	}
-
-	return decoded;
+	return ret == NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -777,14 +757,24 @@ bool Pak_BufferToBufferDecode(uint8_t* const inBuf, uint8_t* const outBuf, const
 	assert(decodeMode != PakDecodeMode_e::MODE_DISABLED);
 
 	PakDecoder_s decoder{};
-	const size_t decompressedSize = Pak_InitDecoder(&decoder, inBuf, outBuf, UINT64_MAX, UINT64_MAX, pakSize, NULL, sizeof(PakFileHeader_s), decodeMode);
+	ZSTD_DCtx* dctx = nullptr;
 
+	if (decodeMode == PakDecodeMode_e::MODE_ZSTD)
+	{
+		dctx = ZSTD_createDCtx();
+		decoder.zstreamContext = dctx;
+	}
+
+	const size_t decompressedSize = Pak_InitDecoder(&decoder, inBuf, outBuf, UINT64_MAX, UINT64_MAX, pakSize, NULL, sizeof(PakFileHeader_s), decodeMode);
 	PakFileHeader_s* const inHeader = reinterpret_cast<PakFileHeader_s*>(inBuf);
 
 	if (decompressedSize != inHeader->decompressedSize)
 	{
 		Error(eDLL_T::RTECH, NO_ERROR, "%s: decompressed size: '%zu' expected: '%zu'!\n",
 			__FUNCTION__, decompressedSize, inHeader->decompressedSize);
+
+		if (dctx)
+			ZSTD_freeDCtx(dctx);
 
 		return false;
 	}
@@ -794,6 +784,9 @@ bool Pak_BufferToBufferDecode(uint8_t* const inBuf, uint8_t* const outBuf, const
 	{
 		Error(eDLL_T::RTECH, NO_ERROR, "%s: decompression failed!\n",
 			__FUNCTION__);
+
+		if (dctx)
+			ZSTD_freeDCtx(dctx);
 
 		return false;
 	}
@@ -809,6 +802,9 @@ bool Pak_BufferToBufferDecode(uint8_t* const inBuf, uint8_t* const outBuf, const
 
 	// equal compressed size with decompressed
 	outHeader->compressedSize = outHeader->decompressedSize;
+
+	if (dctx)
+		ZSTD_freeDCtx(dctx);
 
 	return true;
 }
