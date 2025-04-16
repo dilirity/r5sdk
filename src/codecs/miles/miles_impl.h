@@ -6,14 +6,14 @@
 #define CSOM_MAX_ASYNC_FILE_HANDLES_MASK (CSOM_MAX_ASYNC_FILE_HANDLES-1)
 
 /* ==== WASAPI THREAD SERVICE =========================================================================================================================================== */
-inline void(*v_AIL_LogFunc)(int64_t nLogLevel, const char* pszMessage);
-inline bool(*v_Miles_Initialize)();
 inline void*(*v_MilesAllocEx)(const size_t size, const u8 flags, void* const driver, const char* const allocSrcFileName, const int allocSrcFileLine);
 inline void(*v_MilesQueueEventRun)(Miles::Queue*, const char*);
 inline void(*v_MilesBankPatch)(Miles::Bank*, char*, char*);
 inline unsigned int (*v_MilesSampleSetSourceRaw)(__int64 a1, __int64 a2, unsigned int a3, int a4, unsigned __int16 a5, bool a6);
 inline unsigned int (*v_MilesEventGetDetails)(__int64 a1, __int64 a2, __int64 a3, __int64 a4, __int64 a5, __int64 a6, void* const releaseList);
 
+inline bool(*v_CSOM_Initialize)();
+inline void(*v_CSOM_LogFunc)(int64_t nLogLevel, const char* pszMessage);
 inline s32(*v_CSOM_MilesAsync_FileRead)(MilesAsyncRead* const request);
 inline s32(*v_CSOM_MilesAsync_FileStatus)(MilesAsyncRead* const request, const u32 i_MS);
 inline s32(*v_CSOM_MilesAsync_FileCancel)(MilesAsyncRead* const request);
@@ -30,13 +30,13 @@ struct CSOM_AsyncFile_s
 	size_t fileSize;
 };
 
-struct MilesBankList_t
+struct CSOM_BankList_s
 {
 	char banks[64][16];
 	int bankCount;
 };
 
-struct MilesGlobalState_t
+struct CSOM_GlobalState_s
 {
 	char gap0[24];
 	bool mismatchedBuildTag;
@@ -54,7 +54,7 @@ struct MilesGlobalState_t
 	void* driver;
 	void* queue;
 	char gap100[40];
-	MilesBankList_t bankList;
+	CSOM_BankList_s bankList;
 	char gap52c[4];
 	void* loadedBanks[16];
 	char gap5b0[273016];
@@ -68,20 +68,20 @@ struct MilesGlobalState_t
 	char unk[96];
 };
 
-inline MilesGlobalState_t* g_milesGlobals;
+inline CSOM_GlobalState_s* g_milesGlobals;
 
 ///////////////////////////////////////////////////////////////////////////////
 class MilesCore : public IDetour
 {
 	virtual void GetAdr(void) const
 	{
-		LogFunAdr("AIL_LogFunc", v_AIL_LogFunc);
-		LogFunAdr("Miles_Initialize", v_Miles_Initialize);
 		LogFunAdr("MilesAllocEx", v_MilesAllocEx);
 		LogFunAdr("MilesQueueEventRun", v_MilesQueueEventRun);
 		LogFunAdr("MilesBankPatch", v_MilesBankPatch);
 		LogFunAdr("MilesSampleSetSourceRaw", v_MilesSampleSetSourceRaw);
 		LogFunAdr("MilesEventGetDetails", v_MilesEventGetDetails);
+		LogFunAdr("CSOM_Initialize", v_CSOM_Initialize);
+		LogFunAdr("CSOM_LogFunc", v_CSOM_LogFunc);
 		LogFunAdr("CSOM_MilesAsync_FileRead", v_CSOM_MilesAsync_FileRead);
 		LogFunAdr("CSOM_MilesAsync_FileStatus", v_CSOM_MilesAsync_FileStatus);
 		LogFunAdr("CSOM_MilesAsync_FileCancel", v_CSOM_MilesAsync_FileCancel);
@@ -90,24 +90,23 @@ class MilesCore : public IDetour
 	}
 	virtual void GetFun(void) const
 	{
-		Module_FindPattern(g_GameDll, "40 53 48 83 EC 20 48 8B DA 48 8D 15 ?? ?? ?? ??").GetPtr(v_AIL_LogFunc);
+		Module_FindPattern(g_GameDll, "40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC ?? ?? ?? ?? 80 3D ?? ?? ?? ?? ??").GetPtr(v_CSOM_Initialize);
+		Module_FindPattern(g_GameDll, "40 53 48 83 EC 20 48 8B DA 48 8D 15 ?? ?? ?? ??").GetPtr(v_CSOM_LogFunc);
 		Module_FindPattern(g_GameDll, "4C 8B DC 53 55 56 57 48 81 EC").GetPtr(v_CSOM_MilesAsync_FileRead);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 57 48 83 EC ?? 8B B9 ?? ?? ?? ?? 48 8B D9 83 FF").GetPtr(v_CSOM_MilesAsync_FileStatus);
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 8B 81 ?? ?? ?? ?? 48 8B D9 83 F8 ?? 75 ?? B8").GetPtr(v_CSOM_MilesAsync_FileCancel);
 		Module_FindPattern(g_GameDll, "0F B6 11 4C 8B C1").GetPtr(v_CSOM_AddEventToQueue);
 		
-		CMemory milesInitializeFunc = Module_FindPattern(g_GameDll, "40 53 56 57 41 54 41 55 41 56 41 57 48 81 EC ?? ?? ?? ?? 80 3D ?? ?? ?? ?? ??");
-		milesInitializeFunc.GetPtr(v_Miles_Initialize);
-
-		g_milesGlobals = milesInitializeFunc.FindPatternSelf("48 8D", CMemory::Direction::DOWN, 0x50).ResolveRelativeAddressSelf(0x3, 0x7).RCast<MilesGlobalState_t*>();
-
 		g_RadAudioSystemDll.GetExportedSymbol("MilesAllocEx").GetPtr(v_MilesAllocEx);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesQueueEventRun").GetPtr(v_MilesQueueEventRun);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesBankPatch").GetPtr(v_MilesBankPatch);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSetSourceRaw").GetPtr(v_MilesSampleSetSourceRaw);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesEventGetDetails").GetPtr(v_MilesEventGetDetails);
 	}
-	virtual void GetVar(void) const { }
+	virtual void GetVar(void) const
+	{
+		g_milesGlobals = CMemory(v_CSOM_Initialize).FindPatternSelf("48 8D", CMemory::Direction::DOWN, 0x50).ResolveRelativeAddressSelf(0x3, 0x7).RCast<CSOM_GlobalState_s*>();
+	}
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const;
 };

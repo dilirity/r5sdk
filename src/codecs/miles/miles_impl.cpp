@@ -18,17 +18,17 @@ static ConVar miles_warnings("miles_warnings", "0", FCVAR_RELEASE, "Enables warn
 // Input  : nLogLevel - 
 //          pszMessage - 
 //-----------------------------------------------------------------------------
-void AIL_LogFunc(int64_t nLogLevel, const char* pszMessage)
+static void CSON_LogFunc(int64_t nLogLevel, const char* pszMessage)
 {
 	Msg(eDLL_T::AUDIO, "%s\n", pszMessage);
-	v_AIL_LogFunc(nLogLevel, pszMessage);
+	v_CSOM_LogFunc(nLogLevel, pszMessage);
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: initializes the miles sound system
 // Output : true on success, false otherwise
 //-----------------------------------------------------------------------------
-bool Miles_Initialize()
+static bool CSOM_Initialize()
 {
 	const char* pszLanguage = HEbisuSDK_GetLanguage();
 	const bool isDefaultLanguage = _stricmp(pszLanguage, MILES_DEFAULT_LANGUAGE) == 0;
@@ -56,7 +56,7 @@ bool Miles_Initialize()
 	CFastTimer initTimer;
 
 	initTimer.Start();
-	const bool bResult = v_Miles_Initialize();
+	const bool bResult = v_CSOM_Initialize();
 	initTimer.End();
 
 	Msg(eDLL_T::AUDIO, "%s: %s ('%f' seconds)\n", __FUNCTION__, bResult ? "success" : "failure", initTimer.GetDuration().GetSeconds());
@@ -97,7 +97,7 @@ void MilesBankPatch(Miles::Bank* bank, char* streamPatch, char* localizedStreamP
 	v_MilesBankPatch(bank, streamPatch, localizedStreamPatch);
 }
 
-void CSOM_AddEventToQueue(const char* eventName)
+static void CSOM_AddEventToQueue(const char* eventName)
 {
 	if (miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
@@ -424,10 +424,10 @@ static s32 CSOM_MilesAsync_FileCancel(MilesAsyncRead* const request)
 ///////////////////////////////////////////////////////////////////////////////
 void MilesCore::Detour(const bool bAttach) const
 {
-	DetourSetup(&v_AIL_LogFunc, &AIL_LogFunc, bAttach);
-	DetourSetup(&v_Miles_Initialize, &Miles_Initialize, bAttach);
 	DetourSetup(&v_MilesQueueEventRun, &MilesQueueEventRun, bAttach);
 	//DetourSetup(&v_MilesBankPatch, &MilesBankPatch, bAttach);
+	DetourSetup(&v_CSOM_Initialize, &CSOM_Initialize, bAttach);
+	DetourSetup(&v_CSOM_LogFunc, &CSON_LogFunc, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileRead, &CSOM_MilesAsync_FileRead, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileStatus, &CSOM_MilesAsync_FileStatus, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileCancel, &CSOM_MilesAsync_FileCancel, bAttach);
