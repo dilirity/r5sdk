@@ -760,7 +760,11 @@ bool Pak_StreamToBufferDecode(PakDecoder_s* const decoder, const size_t inLen, c
 	assert(decoder->zstreamContext && decoder->inBufBytePos <= inLen);
 
 	const PakRingBufferFrame_s inFrame = Pak_DetermineRingBufferFrame(decoder->inputMask, decoder->inBufBytePos, inLen);
-	const PakRingBufferFrame_s outFrame = Pak_DetermineRingBufferFrame(decoder->outputMask, decoder->outBufBytePos, outLen);
+	// if the file size is smaller than the provided output length, clamp it.
+	// this happens when the buffer is smaller than the default buffer size
+	// defined by 'PAK_DECODE_OUT_RING_BUFFER_SIZE'. just like how the rtech
+	// decoder clamps it internally, we should do it here to avoid an overflow.
+	const PakRingBufferFrame_s outFrame = Pak_DetermineRingBufferFrame(decoder->outputMask, decoder->outBufBytePos, Min(decoder->decompSize, outLen));
 
 	return Pak_ZStdStreamDecode(decoder, outFrame, inFrame);
 }
