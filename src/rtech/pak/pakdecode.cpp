@@ -601,13 +601,13 @@ static size_t Pak_ZStdDecoderInit(PakDecoder_s* const decoder, const uint8_t* fr
 //-----------------------------------------------------------------------------
 static size_t Pak_ZStdCalcNextStreamObjective(PakDecoder_s* const decoder)
 {
+	// absoluteWindowRemainder is in new frame when it equals decoder->inputMask + 1.
 	const size_t absoluteWindowRemainder = (decoder->inputMask + 1) - (decoder->inBufBytePos & decoder->inputMask);
 	const size_t idealStreamObjective = ZSTD_DStreamInSize();
 
 	assert(idealStreamObjective < PAK_READ_DATA_CHUNK_SIZE);
-	const bool newFrame = absoluteWindowRemainder == (decoder->inputMask + 1);
 
-	const size_t nextObjective = newFrame ? idealStreamObjective : Min(idealStreamObjective, absoluteWindowRemainder);
+	const size_t nextObjective = Min(idealStreamObjective, absoluteWindowRemainder);
 	const size_t remainingFileBytes = decoder->decompSize - decoder->inBufBytePos;
 
 	// Make sure we never request more than remainder of either window or file.
