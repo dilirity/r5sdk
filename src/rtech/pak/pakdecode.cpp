@@ -608,6 +608,24 @@ static size_t Pak_ZStdDecoderInit(PakDecoder_s* const decoder, const uint8_t* fr
 }
 
 //-----------------------------------------------------------------------------
+// determines how many bytes of data we should stream for the next decode round
+//-----------------------------------------------------------------------------
+static size_t Pak_ZStdCalcNextStreamObjective(PakDecoder_s* const decoder)
+{
+	const size_t absoluteWindowRemainder = (decoder->inputMask + 1) - (decoder->inBufBytePos & decoder->inputMask);
+	const size_t idealStreamObjective = ZSTD_DStreamInSize();
+
+	assert(idealStreamObjective < PAK_READ_DATA_CHUNK_SIZE);
+	const bool newFrame = absoluteWindowRemainder == (decoder->inputMask + 1);
+
+	const size_t nextObjective = newFrame ? idealStreamObjective : Min(idealStreamObjective, absoluteWindowRemainder);
+	const size_t remainingFileBytes = decoder->decompSize - decoder->inBufBytePos;
+
+	// Make sure we never request more than remainder of either window or file.
+	return decoder->inBufBytePos + Min(nextObjective, remainingFileBytes);
+}
+
+//-----------------------------------------------------------------------------
 // decodes the ZStd data stream up to available buffer or data, whichever ends
 // first
 //-----------------------------------------------------------------------------
@@ -648,7 +666,7 @@ static bool Pak_ZStdStreamDecode(PakDecoder_s* const decoder, const PakRingBuffe
 	// process the remainder of this frame. in these cases we do not update the
 	// bufferSizeNeeded objective below as we still have data left to process.
 	if (inBuffer.pos == inBuffer.size)
-		decoder->bufferSizeNeeded = decoder->inBufBytePos + 1;
+		decoder->bufferSizeNeeded = Pak_ZStdCalcNextStreamObjective(decoder);
 
 	const bool decoded = ret == NULL;
 
