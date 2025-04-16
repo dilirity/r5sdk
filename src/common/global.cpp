@@ -120,6 +120,7 @@ ConVar* cl_updaterate_mp                   = nullptr;
 
 ConVar* cl_threaded_bone_setup             = nullptr;
 
+ConVar* pvs_start_early                    = nullptr;
 ConVar* pvs_frustumCullOnly                = nullptr;
 
 ConVar* origin_disconnectWhenOffline       = nullptr;
@@ -184,6 +185,7 @@ void ConVar_InitShipped(void)
 	name_cvar                        = g_pCVar->FindVar("name");
 	cl_updaterate_mp                 = g_pCVar->FindVar("cl_updaterate_mp");
 	cl_threaded_bone_setup           = g_pCVar->FindVar("cl_threaded_bone_setup");
+	pvs_start_early                  = g_pCVar->FindVar("pvs_start_early");
 	pvs_frustumCullOnly              = g_pCVar->FindVar("pvs_frustumCullOnly");
 #endif // !DEDICATED
 	single_frame_shutdown_for_reload = g_pCVar->FindVar("single_frame_shutdown_for_reload");

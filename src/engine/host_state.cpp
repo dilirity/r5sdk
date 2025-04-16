@@ -341,6 +341,14 @@ void CHostState::Setup(void)
 	{
 		cl_threaded_bone_setup->SetValue(false);
 	}
+
+	// Check if 'pvs_start_early' is set to run after threaded bone setup,
+	// because threaded bone setup isn't supported on the listen server.
+	// In this case we need to set to run after view setup (1).
+	if (pvs_start_early->GetInt() == 2)
+	{
+		pvs_start_early->SetValue(1);
+	}
 #endif // !DEDICATED && !CLIENT_DLL
 
 	ResetLevelName();
