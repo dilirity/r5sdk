@@ -3,6 +3,8 @@
 // Purpose: pak file loading and unloading
 //
 //=============================================================================//
+#include "tier2/zstdutils.h"
+
 #include "rtech/ipakfile.h"
 #include "rtech/async/asyncio.h"
 
@@ -220,26 +222,11 @@ static void Pak_UnloadAsync(const PakHandle_t handle)
     v_Pak_UnloadAsync(handle);
 }
 
-#define CMD_INVALID -1
-
-struct ZSTDPakDecoder_s
-{
-    ZSTDPakDecoder_s()
-    {
-        dctx = ZSTD_createDCtx();
-    }
-    ~ZSTDPakDecoder_s()
-    {
-        ZSTD_freeDCtx(dctx);
-        dctx = nullptr;
-    }
-
-    ZSTD_DCtx* dctx;
-};
-
 // paks get decoded one at a time, even for patches. therefore we can just use
 // a single context for all paks and save a bunch of runtime overhead
-static ZSTDPakDecoder_s s_zstdPakDecoder;
+static ZSTDDecoder_s s_zstdPakDecoder;
+
+#define CMD_INVALID -1
 
 // only patch cmds 4,5,6 use this array to determine their data size
 static const int s_patchCmdToBytesToProcess[] = { CMD_INVALID, CMD_INVALID, CMD_INVALID, CMD_INVALID, 3, 7, 6, 0 };
@@ -326,7 +313,7 @@ static bool Pak_ProcessPakFile(PakFile_s* const pak)
             if (pak->isCompressed)
             {
                 if (streamDesc->compressionMode == PakDecodeMode_e::MODE_ZSTD)
-                    pak->pakDecoder.zstreamContext = s_zstdPakDecoder.dctx;
+                    pak->pakDecoder.zstreamContext = &s_zstdPakDecoder.dctx;
 
                 const size_t decompressedSize = Pak_InitDecoder(&pak->pakDecoder,
                     fileStream->buffer, pak->decompBuffer,
