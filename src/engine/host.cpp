@@ -73,7 +73,7 @@ void _Host_RunFrame(void* unused, const float deltaTime)
 		}), g_TaskQueueList.end());
 
 #ifndef DEDICATED
-	g_TextOverlay.ShouldDraw(time);
+	g_TextOverlay.ShouldDraw(deltaTime);
 #endif // !DEDICATED
 
 #ifdef DEDICATED
