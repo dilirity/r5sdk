@@ -597,24 +597,6 @@ static size_t Pak_ZStdDecoderInit(PakDecoder_s* const decoder, const uint8_t* fr
 }
 
 //-----------------------------------------------------------------------------
-// determines how many bytes of data we should stream for the next decode round
-//-----------------------------------------------------------------------------
-static size_t Pak_ZStdCalcNextStreamObjective(PakDecoder_s* const decoder)
-{
-	// absoluteWindowRemainder is in new frame when it equals decoder->inputMask + 1.
-	const size_t absoluteWindowRemainder = (decoder->inputMask + 1) - (decoder->inBufBytePos & decoder->inputMask);
-	const size_t idealStreamObjective = ZSTD_DStreamInSize();
-
-	assert(idealStreamObjective < PAK_READ_DATA_CHUNK_SIZE);
-
-	const size_t nextObjective = Min(idealStreamObjective, absoluteWindowRemainder);
-	const size_t remainingFileBytes = decoder->decompSize - decoder->inBufBytePos;
-
-	// Make sure we never request more than remainder of either window or file.
-	return decoder->inBufBytePos + Min(nextObjective, remainingFileBytes);
-}
-
-//-----------------------------------------------------------------------------
 // decodes the ZStd data stream up to available buffer or data, whichever ends
 // first
 //-----------------------------------------------------------------------------
@@ -655,7 +637,7 @@ static bool Pak_ZStdStreamDecode(PakDecoder_s* const decoder, const PakRingBuffe
 	// process the remainder of this frame. in these cases we do not update the
 	// bufferSizeNeeded objective below as we still have data left to process.
 	if (inBuffer.pos == inBuffer.size)
-		decoder->bufferSizeNeeded = Pak_ZStdCalcNextStreamObjective(decoder);
+		decoder->bufferSizeNeeded = decoder->inBufBytePos + ZSTD_DStreamInSize();
 
 	return ret == NULL;
 }
@@ -724,7 +706,13 @@ size_t Pak_InitDecoder(PakDecoder_s* const decoder, const uint8_t* const inputBu
 bool Pak_StreamToBufferDecode(PakDecoder_s* const decoder, const size_t inLen, const size_t outLen, const PakDecodeMode_e decodeMode)
 {
 	if (!Pak_HasEnoughStreamedDataForDecode(decoder, inLen))
-		return false;
+	{
+		if (decodeMode != PakDecodeMode_e::MODE_ZSTD)
+			return false;
+
+		if (!decoder->allChunksStreamed)
+			return false; // This only applies to ZStd!
+	}
 
 	if (!Pak_HasEnoughDecodeBufferAvailable(decoder, outLen))
 		return false;

@@ -337,6 +337,9 @@ static bool Pak_ProcessPakFile(PakFile_s* const pak)
 
             if (currentOutBytePos != pak->pakDecoder.decompSize)
             {
+                if (streamDesc->compressionMode == PakDecodeMode_e::MODE_ZSTD)
+                    pak->pakDecoder.allChunksStreamed = fileStream->numDataChunksProcessed == fileStream->numDataChunks;
+
                 const bool didDecode = Pak_StreamToBufferDecode(&pak->pakDecoder, 
                     fileStream->bytesStreamed, (memoryData->processedPatchedDataSize + PAK_DECODE_OUT_RING_BUFFER_SIZE), streamDesc->compressionMode);
 

@@ -561,7 +561,23 @@ struct PakDecoder_s
 	uint32_t currentBit;
 
 	uint32_t dword6C;
-	uint64_t qword70;
+
+	union
+	{
+		uint64_t qword70;
+
+		// set when all chunks have been streamed in. for ZStd compressed
+		// paks, we might end up with less data than requested in which
+		// case we must just process what we got currently. ZStd has a
+		// different stream size requirement than the RTech decoder; it
+		// has a fixed 'recommended' to-stream input size (using the API
+		// `ZSTD_DStreamInSize`. in the RTech decoder, the recommended
+		// to-stream input for the next decode round appears baked into
+		// the frame header of the encoded block data in the RPak files.
+		// So for ZStd, we need to handle corner-case desyncs to avoid a
+		// dead-lock in the runtime.
+		bool allChunksStreamed;
+	};
 
 	union
 	{
