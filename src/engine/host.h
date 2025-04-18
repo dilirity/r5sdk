@@ -9,11 +9,21 @@ inline void(*v_Host_Error)(const char* error, ...);
 //inline void(*v_VCR_EnterPausedState)(void);
 
 inline bool* g_bAbortServerSet = nullptr;
+inline bool* g_bDedicatedServerBenchmarkMode = nullptr;
 
 inline jmp_buf* host_abortserver = nullptr;
 inline bool* host_initialized = nullptr;
+inline float* host_remainder = nullptr;
+inline float* host_frametime = nullptr;
 inline float* host_frametime_unbounded = nullptr;
+inline float* host_frametime_unscaled = nullptr;
 inline float* host_frametime_stddeviation = nullptr;
+
+// PERFORMANCE INFO
+#define MIN_FPS         0.1f         // Host minimum fps value for maxfps.
+#define MAX_FPS         300.0f       // Upper limit for maxfps.
+#define MIN_FRAMETIME   0.001
+#define MAX_FRAMETIME   0.1
 
 void Host_Error(const char* const error, ...);
 
@@ -55,9 +65,13 @@ class VHost : public IDetour
 		//LogFunAdr("VCR_EnterPausedState", v_VCR_EnterPausedState);
 		LogVarAdr("g_CommonHostState", g_pCommonHostState);
 		LogVarAdr("g_bAbortServerSet", g_bAbortServerSet);
+		LogVarAdr("g_bDedicatedServerBenchmarkMode", g_bDedicatedServerBenchmarkMode);
 		LogVarAdr("host_abortserver", host_abortserver);
 		LogVarAdr("host_initialized", host_initialized);
+		LogVarAdr("host_remainder", host_remainder);
+		LogVarAdr("host_frametime", host_frametime);
 		LogVarAdr("host_frametime_unbounded", host_frametime_unbounded);
+		LogVarAdr("host_frametime_unscaled", host_frametime_unscaled);
 		LogVarAdr("host_frametime_stddeviation", host_frametime_stddeviation);
 	}
 	virtual void GetFun(void) const
@@ -79,15 +93,15 @@ class VHost : public IDetour
 		g_bAbortServerSet = hostErrorBase.FindPattern("40 38 3D", CMemory::Direction::DOWN, 512, 4).ResolveRelativeAddress(3, 7).RCast<bool*>();
 		host_abortserver = hostErrorBase.FindPattern("48 8D 0D", CMemory::Direction::DOWN, 512, 5).ResolveRelativeAddress(3, 7).RCast<jmp_buf*>();
 
-		static const int n_host_initialized_search_offset = 0x500;
-		static const int n_host_frametime_unbounded_search_offset = 0x330;
-		static const int n_host_frametime_stddeviation_search_offset = 0xFAA;
-
 		const CMemory hostRunFrameBase(v_Host_RunFrame);
 
-		host_initialized = hostRunFrameBase.Offset(n_host_initialized_search_offset).FindPatternSelf("44 38").ResolveRelativeAddressSelf(0x3, 0x7).RCast<bool*>();
-		host_frametime_unbounded = hostRunFrameBase.Offset(n_host_frametime_unbounded_search_offset).FindPatternSelf("F3 0F 11").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
-		host_frametime_stddeviation = hostRunFrameBase.Offset(n_host_frametime_stddeviation_search_offset).FindPatternSelf("F3 0F 11").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
+		host_initialized = hostRunFrameBase.Offset(0x500).FindPatternSelf("44 38").ResolveRelativeAddressSelf(0x3, 0x7).RCast<bool*>();
+		host_remainder = hostRunFrameBase.Offset(0x33F).FindPatternSelf("F3 0F 10").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
+		host_frametime = hostRunFrameBase.Offset(0x1F4).FindPatternSelf("F3 0F 11").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
+		host_frametime_unbounded = hostRunFrameBase.Offset(0x330).FindPatternSelf("F3 0F 11").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
+		host_frametime_unscaled = hostRunFrameBase.Offset(0x2F4).FindPatternSelf("F3 0F 11").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
+		host_frametime_stddeviation = hostRunFrameBase.Offset(0xFAA).FindPatternSelf("F3 0F 11").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
+		g_bDedicatedServerBenchmarkMode = hostRunFrameBase.Offset(0x1C4).FindPatternSelf("38 05").ResolveRelativeAddressSelf(0x2, 0x6).RCast<bool*>();
 	}
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const;
