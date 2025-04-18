@@ -13,6 +13,7 @@ add_sources( SOURCE_GROUP "Utility"
     "renderutils.cpp"
     "socketcreator.cpp"
     "websocket.cpp"
+    "zstdutils.cpp"
 )
 
 file( GLOB TIER2_PUBLIC_HEADERS
