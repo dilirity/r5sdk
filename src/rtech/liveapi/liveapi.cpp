@@ -30,6 +30,14 @@ static void LiveAPI_AddressChangedCallback(IConVar* var, const char* pOldValue, 
 {
 	LiveAPISystem()->RebootWebSocket();
 }
+static void LiveAPI_PrintEnabledChangedCallback(IConVar* var, const char* pOldValue, float flOldValue, ChangeUserData_t pUserData)
+{
+	if (ConVar* const cvarRef = g_pCVar->FindVar(var->GetName()))
+	{
+		if (!cvarRef->GetBool())
+			LiveAPISystem()->DestroyLogger();
+	}
+}
 
 //-----------------------------------------------------------------------------
 // console variables
@@ -52,7 +60,7 @@ static ConVar liveapi_keepalive("liveapi_keepalive", "30", FCVAR_RELEASE | FCVAR
 static ConVar liveapi_lax_ssl("liveapi_lax_ssl", "1", FCVAR_RELEASE | FCVAR_SERVER_FRAME_THREAD, "Skip SSL certificate validation for all WSS connections (allows the use of self-signed certificates)", &LiveAPI_ParamsChangedCallback);
 
 // Print core
-static ConVar liveapi_print_enabled("liveapi_print_enabled", "0", FCVAR_RELEASE | FCVAR_SERVER_FRAME_THREAD, "Whether to enable the printing of all events to a LiveAPI JSON file");
+static ConVar liveapi_print_enabled("liveapi_print_enabled", "0", FCVAR_RELEASE | FCVAR_SERVER_FRAME_THREAD, "Whether to enable the printing of all events to a LiveAPI JSON file", &LiveAPI_PrintEnabledChangedCallback);
 
 // Print parameters
 static ConVar liveapi_print_pretty("liveapi_print_pretty", "0", FCVAR_RELEASE | FCVAR_SERVER_FRAME_THREAD, "Whether to print events in a formatted manner to the LiveAPI JSON file");
@@ -209,11 +217,10 @@ void LiveAPI::CreateLogger()
 //-----------------------------------------------------------------------------
 void LiveAPI::DestroyLogger()
 {
-	if (initialLog)
-		initialLog = false;
-
 	if (!matchLogger)
 		return; // Nothing to drop
+
+	initialLog = false;
 
 	matchLogger.get()->info("\n]\n");
 	matchLogger.reset();
@@ -247,13 +254,11 @@ void LiveAPI::LogEvent(const google::protobuf::Message* const toTransmit, const 
 		webSocketSystem.SendData(data.c_str(), (int)data.size());
 	}
 
-	// NOTE: we don't check on the cvar 'liveapi_print_enabled' here because if
-	// this cvar gets disabled on the fly and we check it here, the output will
-	// be truncated and thus invalid! Log for as long as the SpdLog instance is
-	// valid.
 	if (matchLogger)
 	{
 		std::string jsonStr(initialLog ? ",\n" : "");
+		initialLog = true;
+
 		google::protobuf::util::JsonPrintOptions options;
 
 		options.add_whitespace = liveapi_print_pretty.GetBool();
@@ -266,9 +271,6 @@ void LiveAPI::LogEvent(const google::protobuf::Message* const toTransmit, const 
 			jsonStr.pop_back();
 
 		matchLogger.get()->info(jsonStr);
-
-		if (!initialLog)
-			initialLog = true;
 	}
 }
 
