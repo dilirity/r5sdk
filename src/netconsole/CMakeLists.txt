@@ -54,6 +54,7 @@ target_link_libraries( ${PROJECT_NAME} PRIVATE
     "libmbedx509"
     "NetCon_Pb"
     "Rpcrt4.lib"
+    "Winmm.lib"
     "ws2_32.lib"
     "bcrypt.lib"
     "crypt32.lib"

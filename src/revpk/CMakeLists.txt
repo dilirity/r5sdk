@@ -31,6 +31,8 @@ target_compile_definitions( ${PROJECT_NAME} PRIVATE
 
 target_link_libraries( ${PROJECT_NAME} PRIVATE
     "Rpcrt4.lib"
+    "Winmm.lib"
+
     "boost_regex"
 
     "vpc"

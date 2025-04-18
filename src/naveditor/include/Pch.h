@@ -1,6 +1,10 @@
 #ifndef NAVEDITORPCH_H
 #define NAVEDITORPCH_H
 
+#ifdef WIN32
+#include <windows.h>
+#endif // Windows
+
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <cmath>

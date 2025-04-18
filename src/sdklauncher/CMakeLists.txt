@@ -57,6 +57,8 @@ target_precompile_headers( ${PROJECT_NAME} PRIVATE
 target_link_options( ${PROJECT_NAME} PRIVATE "/SUBSYSTEM:WINDOWS" )
 target_link_libraries( ${PROJECT_NAME} PRIVATE
     "Rpcrt4.lib"
+    "Winmm.lib"
+
     "boost_regex"
 
     "tier0"
