@@ -45,6 +45,13 @@
 // pak uses more than one set, this number would be used per set
 #define PAK_MAX_STREAMING_FILE_HANDLES_PER_SET 4
 
+// max amount to read per async fs read request
+#define PAK_READ_DATA_CHUNK_SIZE (1ull << 19)
+
+// max amount of data chunks per pak stream instance
+#define PAK_MAX_DATA_CHUNKS_PER_STREAM 32
+#define PAK_MAX_DATA_CHUNKS_PER_STREAM_MASK (PAK_MAX_DATA_CHUNKS_PER_STREAM-1)
+
 // max amount of paks that could be loaded at runtime
 #define PAK_MAX_LOADED_PAKS 512
 #define PAK_MAX_LOADED_PAKS_MASK (PAK_MAX_LOADED_PAKS-1)
@@ -66,20 +73,13 @@
 #define PAK_DECODE_IN_RING_BUFFER_SMALL_MASK (PAK_DECODE_IN_RING_BUFFER_SMALL_SIZE-1)
 
 // the input stream ring buffer size for pak decoder before wrapping around
-#define PAK_DECODE_IN_RING_BUFFER_SIZE 0x1000000
+#define PAK_DECODE_IN_RING_BUFFER_SIZE (PAK_READ_DATA_CHUNK_SIZE * PAK_MAX_DATA_CHUNKS_PER_STREAM)
 #define PAK_DECODE_IN_RING_BUFFER_MASK (PAK_DECODE_IN_RING_BUFFER_SIZE-1)
 
 // the output stream ring buffer size in which input buffer gets decoded to, we
 // can only decode up to this many bytes before we have to wrap around
 #define PAK_DECODE_OUT_RING_BUFFER_SIZE 0x400000
 #define PAK_DECODE_OUT_RING_BUFFER_MASK (PAK_DECODE_OUT_RING_BUFFER_SIZE-1)
-
-// max amount to read per async fs read request
-#define PAK_READ_DATA_CHUNK_SIZE (1ull << 19)
-
-// max amount of data chunks per pak stream instance
-#define PAK_MAX_DATA_CHUNKS_PER_STREAM 32
-#define PAK_MAX_DATA_CHUNKS_PER_STREAM_MASK (PAK_MAX_DATA_CHUNKS_PER_STREAM-1)
 
 // base pak directory containing paks sorted in platform specific subdirectories
 #define PAK_BASE_PATH "paks\\"
@@ -547,11 +547,7 @@ struct PakDecoder_s
 	// this field was unused, it now contains the decoder mode
 	PakDecodeMode_e decodeMode;
 
-	// NOTE: unless you are in the RTech decoder, use the getter if you need to
-	// get the current pos!!!
 	uint64_t inBufBytePos;
-	// NOTE: unless you are in the RTech decoder, use the getter if you need to
-	// get the current pos!!!
 	uint64_t outBufBytePos;
 
 	size_t bufferSizeNeeded;
