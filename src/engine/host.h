@@ -52,6 +52,9 @@ public:
 
 extern CCommonHostState* g_pCommonHostState;
 
+#define HOST_TIME_TO_TICKS( dt )		( (int)( 0.5f + (float)(dt) / g_pCommonHostState->interval_per_tick ) )
+#define HOST_TICKS_TO_TIME( dt )		( g_pCommonHostState->interval_per_tick * (float)(dt) )
+
 ///////////////////////////////////////////////////////////////////////////////
 class VHost : public IDetour
 {
