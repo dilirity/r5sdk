@@ -60,7 +60,7 @@ _Host_RunFrame
 Runs all active servers
 ==================
 */
-void _Host_RunFrame(void* unused, float time)
+void _Host_RunFrame(void* unused, const float deltaTime)
 {
 	for (IFrameTask* const& task : g_TaskQueueList)
 	{
@@ -80,7 +80,7 @@ void _Host_RunFrame(void* unused, float time)
 	DebugOverlay_HandleDecayed();
 #endif // DEDICATED
 
-	v_Host_RunFrame(unused, time);
+	v_Host_RunFrame(unused, deltaTime);
 }
 
 void Host_Error(const char* const error, ...)
