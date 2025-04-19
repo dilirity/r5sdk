@@ -26,14 +26,17 @@ void CPluginSystem::Init()
 	for (int i = 0; i < pluginPaths.Count(); ++i)
 	{
 		CUtlString& path = pluginPaths[i];
-
 		bool addInstance = true;
+
 		FOR_EACH_VEC(m_Instances, j)
 		{
 			const PluginInstance_t& instance = m_Instances[j];
 
 			if (instance.m_Path.IsEqual_CaseInsensitive(path.String()) == 0)
-				addInstance = false;
+			{
+				addInstance = false; // Already exists.
+				break;
+			}
 		}
 
 		if (addInstance)
