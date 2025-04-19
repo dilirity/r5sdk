@@ -273,7 +273,7 @@ void CSquirrelVM::CompileModScripts()
 				"%s: Failed to load RSON file '%s'\n", 
 				__FUNCTION__, mod->GetScriptCompileListPath().Get());
 
-		const char* scriptPathArray[MAX_PRECOMPILED_SCRIPTS];
+		char* scriptPathArray[MAX_PRECOMPILED_SCRIPTS];
 		int scriptCount = 0;
 
 		SetAsCompiler(rson);
@@ -282,10 +282,9 @@ void CSquirrelVM::CompileModScripts()
 			GetContext(),
 			mod->GetScriptCompileListPath().Get(),
 			rson,
-			(char**)scriptPathArray, &scriptCount,
+			scriptPathArray, &scriptCount,
 			nullptr, 0))
 		{
-			std::vector<char*> newScriptPaths;
 			for (int j = 0; j < scriptCount; ++j)
 			{
 				// add "::MOD::" to the start of the script path so it can be
@@ -298,34 +297,29 @@ void CSquirrelVM::CompileModScripts()
 					MOD_SCRIPT_PATH_IDENTIFIER, mod->GetBasePath().Get(),
 					GAME_SCRIPT_PATH, scriptPathArray[j]);
 
-				char* pszScriptPath = _strdup(scriptPath.Get());
-
-				// normalise slash direction
-				V_FixSlashes(pszScriptPath);
-
-				newScriptPaths.emplace_back(pszScriptPath);
-				scriptPathArray[j] = pszScriptPath;
+				scriptPath.FixSlashes(); // normalise slash direction
+				scriptPathArray[j] = V_strdup(scriptPath.Get());
 			}
 
 			switch (GetContext())
 			{
 			case SQCONTEXT::SERVER:
 			{
-				CSquirrelVM__PrecompileServerScripts(this, GetContext(), (char**)scriptPathArray, scriptCount);
+				CSquirrelVM__PrecompileServerScripts(this, GetContext(), scriptPathArray, scriptCount);
 				break;
 			}
 			case SQCONTEXT::CLIENT:
 			case SQCONTEXT::UI:
 			{
-				CSquirrelVM__PrecompileClientScripts(this, GetContext(), (char**)scriptPathArray, scriptCount);
+				CSquirrelVM__PrecompileClientScripts(this, GetContext(), scriptPathArray, scriptCount);
 				break;
 			}
 			}
 
 			// clean up our allocated script paths
-			for (char* path : newScriptPaths)
+			for (int j = 0; j < scriptCount; ++j)
 			{
-				free(path);
+				free(scriptPathArray[j]);
 			}
 		}
 
