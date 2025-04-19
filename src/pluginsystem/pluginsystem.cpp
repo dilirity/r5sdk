@@ -71,7 +71,7 @@ bool CPluginSystem::LoadInstance(PluginInstance_t& pluginInst)
 
 	Assert(onLoadFn);
 
-	if (!onLoadFn(pluginInst.m_Name.String(), g_SDKDll.GetModuleName().c_str()))
+	if (!onLoadFn || !onLoadFn(pluginInst.m_Name.String(), g_SDKDll.GetModuleName().c_str()))
 	{
 		FreeLibrary(loadedPlugin);
 		return false;
