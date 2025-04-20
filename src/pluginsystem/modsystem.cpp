@@ -282,67 +282,67 @@ void CModSystem::ModInstance_t::ParseConVars()
 	Assert(m_SettingsKV);
 	const KeyValues* pConVars = m_SettingsKV->FindKey("ConVars");
 
-	if (pConVars)
+	if (!pConVars)
+		return;
+
+	for (KeyValues* pSubKey = pConVars->GetFirstSubKey();
+		pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
 	{
-		for (KeyValues* pSubKey = pConVars->GetFirstSubKey();
-			pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
+		const char* pszName = pSubKey->GetName();
+		const char* pszFlagsString = pSubKey->GetString("flags", "NONE");
+		const char* pszHelpString = pSubKey->GetString("helpText");
+		const char* pszUsageString = pSubKey->GetString("usageText");
+
+		KeyValues* pValues = pSubKey->FindKey("Values");
+
+		const char* pszDefaultValue = "0";
+		bool bMin = false;
+		bool bMax = false;
+		float fMin = 0.f;
+		float fMax = 0.f;
+
+		if (pValues)
 		{
-			const char* pszName = pSubKey->GetName();
-			const char* pszFlagsString = pSubKey->GetString("flags", "NONE");
-			const char* pszHelpString = pSubKey->GetString("helpText");
-			const char* pszUsageString = pSubKey->GetString("usageText");
+			pszDefaultValue = pValues->GetString("default", "0");
 
-			KeyValues* pValues = pSubKey->FindKey("Values");
-
-			const char* pszDefaultValue = "0";
-			bool bMin = false;
-			bool bMax = false;
-			float fMin = 0.f;
-			float fMax = 0.f;
-
-			if (pValues)
+			// minimum cvar value
+			if (pValues->FindKey("min"))
 			{
-				pszDefaultValue = pValues->GetString("default", "0");
-
-				// minimum cvar value
-				if (pValues->FindKey("min"))
-				{
-					bMin = true; // has min value
-					fMin = pValues->GetFloat("min", 0.f);
-				}
-
-				// maximum cvar value
-				if (pValues->FindKey("max"))
-				{
-					bMax = true; // has max value
-					fMax = pValues->GetFloat("max", 1.f);
-				}
+				bMin = true; // has min value
+				fMin = pValues->GetFloat("min", 0.f);
 			}
 
-			int flags;
-			if (ConVar_ParseFlagString(pszFlagsString, flags, pszName))
+			// maximum cvar value
+			if (pValues->FindKey("max"))
 			{
-				if (g_pCVar->FindCommandBase(pszName) != nullptr)
-				{
-					Warning(eDLL_T::ENGINE, "Failed to register ConVar '%s' for mod '%s' ('%s'); already registered.\n",
-						pszName, m_Name.String(), m_ModID.String());
-
-					continue;
-				}
-
-				ConVar* cvar = new ConVar(pszName, pszDefaultValue, flags, pszHelpString, bMin, fMin, bMax, fMax, nullptr, pszUsageString);
-
-				if (!cvar)
-				{
-					// Quit as we ran out of memory.
-					Error(eDLL_T::ENGINE, EXIT_FAILURE, "Failed to register ConVar '%s' for mod '%s' ('%s'); allocation failure.\n",
-						pszName, m_Name.String(), m_ModID.String());
-
-					return;
-				}
-
-				m_ConVars.AddToTail(cvar);
+				bMax = true; // has max value
+				fMax = pValues->GetFloat("max", 1.f);
 			}
+		}
+
+		int flags;
+		if (ConVar_ParseFlagString(pszFlagsString, flags, pszName))
+		{
+			if (g_pCVar->FindCommandBase(pszName) != nullptr)
+			{
+				Warning(eDLL_T::ENGINE, "Failed to register ConVar '%s' for mod '%s' ('%s'); already registered.\n",
+					pszName, m_Name.String(), m_ModID.String());
+
+				continue;
+			}
+
+			ConVar* cvar = new ConVar(pszName, pszDefaultValue, flags, pszHelpString, bMin, fMin, bMax, fMax, nullptr, pszUsageString);
+
+			if (!cvar)
+			{
+				// Quit as we ran out of memory.
+				Error(eDLL_T::ENGINE, EXIT_FAILURE, "Failed to register ConVar '%s' for mod '%s' ('%s'); allocation failure.\n",
+					pszName, m_Name.String(), m_ModID.String());
+
+				return;
+			}
+
+			m_ConVars.AddToTail(cvar);
 		}
 	}
 }
@@ -353,16 +353,15 @@ void CModSystem::ModInstance_t::ParseConVars()
 void CModSystem::ModInstance_t::ParseLocalizationFiles()
 {
 	Assert(m_SettingsKV);
-
 	const KeyValues* pLocalizationFiles = m_SettingsKV->FindKey("LocalizationFiles");
 
-	if (pLocalizationFiles)
+	if (!pLocalizationFiles)
+		return;
+
+	for (KeyValues* pSubKey = pLocalizationFiles->GetFirstSubKey();
+		pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
 	{
-		for (KeyValues* pSubKey = pLocalizationFiles->GetFirstSubKey();
-			pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
-		{
-			m_LocalizationFiles.AddToTail(m_BasePath + pSubKey->GetName());
-		}
+		m_LocalizationFiles.AddToTail(m_BasePath + pSubKey->GetName());
 	}
 }
 
