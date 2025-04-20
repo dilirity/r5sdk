@@ -25,8 +25,7 @@ static ConVar modsystem_debug("modsystem_debug", "0", FCVAR_RELEASE, "Debug the 
 //-----------------------------------------------------------------------------
 CModSystem::~CModSystem()
 {
-	// clear all allocated mod instances.
-	m_ModList.PurgeAndDeleteElements();
+	Shutdown();
 }
 
 //-----------------------------------------------------------------------------
@@ -41,6 +40,12 @@ void CModSystem::Init()
 	// no mods installed, no point in initializing.
 	if (!FileSystem()->IsDirectory(MOD_BASE_DIRECTORY, "PLATFORM"))
 		return;
+
+	// The RTech API doesn't know the concept of search paths and path
+	// id's, set the path from which the MOD_BASE_DIRECTORY resides in
+	// here so it can retrieve it from the mod system without having
+	// to hardcode it all over the place.
+	m_InstallPath = "platform/";
 
 	// mod system initializes before the first Cbuf_Execute call, which
 	// executes commands/convars over the command line. we check for an
@@ -73,6 +78,24 @@ void CModSystem::Init()
 	}
 
 	UpdateModStatusList();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: shutdown the mod system
+// Input  :
+//-----------------------------------------------------------------------------
+void CModSystem::Shutdown()
+{
+	// clear all allocated mod instances.
+	m_ModList.PurgeAndDeleteElements();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: returns whether the mod system is enabled
+//-----------------------------------------------------------------------------
+bool CModSystem::IsEnabled() const
+{
+	return modsystem_enable.GetBool();
 }
 
 //-----------------------------------------------------------------------------
