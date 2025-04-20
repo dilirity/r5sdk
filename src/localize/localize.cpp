@@ -7,23 +7,26 @@ bool Localize_LoadLocalizationFileLists(CLocalize* thisptr)
 {
 	CLocalize__LoadLocalizationFileLists(thisptr);
 
-	const CUtlVector<CModSystem::ModInstance_t*>&
-		modList = ModSystem()->GetModList();
-
-	FOR_EACH_VEC(modList, i)
+	if (ModSystem()->IsEnabled())
 	{
-		const CModSystem::ModInstance_t* mod =
-			modList.Element(i);
+		const CUtlVector<CModSystem::ModInstance_t*>&
+			modList = ModSystem()->GetModList();
 
-		if (!mod->IsEnabled())
-			continue;
-
-		FOR_EACH_VEC(mod->m_LocalizationFiles, j)
+		FOR_EACH_VEC(modList, i)
 		{
-			const char* localizationFile = mod->m_LocalizationFiles.Element(j).Get();
+			const CModSystem::ModInstance_t* mod =
+				modList.Element(i);
 
-			if (!CLocalize__AddFile(thisptr, localizationFile, "PLATFORM"))
-				Warning(eDLL_T::ENGINE, "Failed to add localization file '%s'\n", localizationFile);
+			if (!mod->IsEnabled())
+				continue;
+
+			FOR_EACH_VEC(mod->m_LocalizationFiles, j)
+			{
+				const char* localizationFile = mod->m_LocalizationFiles.Element(j).Get();
+
+				if (!CLocalize__AddFile(thisptr, localizationFile, "PLATFORM"))
+					Warning(eDLL_T::ENGINE, "Failed to add localization file '%s'\n", localizationFile);
+			}
 		}
 	}
 
