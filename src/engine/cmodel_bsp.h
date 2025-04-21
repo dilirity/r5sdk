@@ -1,6 +1,7 @@
 #pragma once
 #include "tier0/jobthread.h"
 #include "rtech/ipakfile.h"
+#include "vpklib/packedstore.h"
 
 //-----------------------------------------------------------------------------
 // Forward declarations
@@ -40,17 +41,17 @@ struct CommonPakData_s
 	void Reset()
 	{
 		pakId = PAK_INVALID_HANDLE;
-		keepLoaded = false;
+		isUnloading = false;
 		basePakName = nullptr;
 
 		memset(pakName, '\0', sizeof(pakName));
 	}
 
 	PakHandle_t pakId;
-	bool keepLoaded;
+	bool isUnloading;
 
 	// the pak name that's being requested to be loaded for this particular slot
-	char pakName[MAX_PATH];
+	char pakName[MAX_OSPATH];
 
 	// the actual base pak name, like "common_pve.rpak" as set when this array is
 	// being initialized
@@ -104,14 +105,14 @@ struct CustomPakData_s
 	PakHandle_t LoadAndAddPak(const char* const pakFile);
 	PakHandle_t PreloadAndAddPak(const char* const pakFile);
 
-	void UnloadAndRemoveNonPreloaded();
-	void UnloadAndRemovePreloaded();
+	bool UnloadAndRemoveNonPreloaded();
+	bool UnloadAndRemovePreloaded();
 
 	PakHandle_t LoadBasePak(const char* const pakFile, const PakType_e type);
-	void UnloadBasePak(const PakType_e type);
+	bool UnloadBasePak(const PakType_e type);
 
 private:
-	void UnloadAndRemovePak(const int index);
+	bool UnloadAndRemovePak(const int index);
 
 public:
 	// Pak handles that have been loaded with the level
@@ -130,54 +131,61 @@ public:
 // array size = CommonPakData_t::PAK_TYPE_COUNT
 inline CommonPakData_s* g_commonPakData;
 
-inline void(*v_Mod_LoadPakForMap)(const char* szLevelName);
-inline void(*v_Mod_QueuedPakCacheFrame)(void);
+inline void(*v_Mod_RunPakJobFrame)(void);
+inline void(*v_Mod_LoadLoadscreenPakForLevel)(const char* levelName);
 
 inline int32_t * g_pNumPrecacheItemsMTVTF;
 inline bool* g_pPakPrecacheJobFinished;
 
-inline void(*Mod_UnloadPendingAndPrecacheRequestedPaks)(void);
+inline void(*v_Mod_UnloadPendingAndPrecacheRequestedPaks)(void);
+
+inline void* (*v_Mod_UnloadCurrentLevelVPK)(void);
+
+inline CPackedStore** g_currentLevelVPK = nullptr;
+inline char* g_currentLevelVPKName = nullptr;
 
 extern CUtlVector<CUtlString> g_InstalledMaps;
 extern CThreadMutex g_InstalledMapsMutex;
 
-void Mod_PreloadPaks();
-void Mod_UnloadPreloadedPaks();
-
-bool Mod_LevelHasChanged(const char* pszLevelName);
 void Mod_GetAllInstalledMaps();
-KeyValues* Mod_GetLevelSettings(const char* pszLevelName);
-void Mod_LoadLevelPaks(const char* pszLevelName);
-void Mod_UnloadLevelPaks(void);
-
+KeyValues* Mod_GetCoreLevelSettings(const char* pszLevelName);
 
 ///////////////////////////////////////////////////////////////////////////////
 class VModel_BSP : public IDetour
 {
 	virtual void GetAdr(void) const
 	{
-		LogFunAdr("Mod_LoadPakForMap", v_Mod_LoadPakForMap);
-		LogFunAdr("Mod_QueuedPakCacheFrame", v_Mod_QueuedPakCacheFrame);
+		LogFunAdr("Mod_RunPakJobFrame", v_Mod_RunPakJobFrame);
+		LogFunAdr("Mod_LoadLoadscreenPakForMap", v_Mod_LoadLoadscreenPakForLevel);
 
-		LogFunAdr("Mod_UnloadPendingAndPrecacheRequestedPaks", Mod_UnloadPendingAndPrecacheRequestedPaks);
+		LogFunAdr("Mod_UnloadPendingAndPrecacheRequestedPaks", v_Mod_UnloadPendingAndPrecacheRequestedPaks);
+
+		LogFunAdr("Mod_UnloadCurrentLevelVPK", v_Mod_UnloadCurrentLevelVPK);
 
 		LogVarAdr("g_numPrecacheItemsMTVTF", g_pNumPrecacheItemsMTVTF);
 		LogVarAdr("g_pakPrecacheJobFinished", g_pPakPrecacheJobFinished);
+
+		LogVarAdr("g_currentLevelVPK", g_currentLevelVPK);
+		LogVarAdr("g_currentLevelVPKName", g_currentLevelVPKName);
 
 		LogVarAdr("g_commonPakData", g_commonPakData);
 	}
 	virtual void GetFun(void) const
 	{
-		Module_FindPattern(g_GameDll, "48 81 EC ?? ?? ?? ?? 0F B6 05 ?? ?? ?? ?? 4C 8D 05 ?? ?? ?? ?? 84 C0").GetPtr(v_Mod_LoadPakForMap);
-		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? F3 0F 10 05 ?? ?? ?? ?? 32 DB").GetPtr(v_Mod_QueuedPakCacheFrame);
-		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 33 ED 48 8D 35 ?? ?? ?? ?? 48 39 2D ?? ?? ?? ??").GetPtr(Mod_UnloadPendingAndPrecacheRequestedPaks);
+		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? F3 0F 10 05 ?? ?? ?? ?? 32 DB").GetPtr(v_Mod_RunPakJobFrame);
+		Module_FindPattern(g_GameDll, "48 81 EC ?? ?? ?? ?? 0F B6 05 ?? ?? ?? ?? 4C 8D 05 ?? ?? ?? ?? 84 C0").GetPtr(v_Mod_LoadLoadscreenPakForLevel);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 33 ED 48 8D 35 ?? ?? ?? ?? 48 39 2D ?? ?? ?? ??").GetPtr(v_Mod_UnloadPendingAndPrecacheRequestedPaks);
+		Module_FindPattern(g_GameDll, "48 83 EC 28 48 8B 15 ?? ?? ?? ?? 48 85 D2 0F 84 ?? ?? ?? ?? 48 8B 0D ?? ?? ?? ?? 48 8B 01 FF 90 ?? ?? ?? ?? 33 C9 E8 ?? ?? ?? ?? 0F 28 05 ?? ?? ?? ?? 0F 28 0D ?? ?? ?? ?? 0F 11 05 ?? ?? ?? ?? 0F 28 05 ?? ?? ?? ?? 0F 11 0D ?? ?? ?? ?? 0F 28 0D ?? ?? ?? ?? 0F 11 05 ?? ?? ?? ?? 0F 11 0D ?? ?? ?? ?? 48 C7 05 ?? ?? ?? ?? ?? ?? ?? ?? FF 15 ?? ?? ?? ??").GetPtr(v_Mod_UnloadCurrentLevelVPK);
 	}
 	virtual void GetVar(void) const
 	{
-		g_pNumPrecacheItemsMTVTF = CMemory(v_Mod_QueuedPakCacheFrame).FindPattern("8B 05").ResolveRelativeAddressSelf(0x2, 0x6).RCast<int32_t*>();
-		g_pPakPrecacheJobFinished = CMemory(v_Mod_QueuedPakCacheFrame).Offset(0x20).FindPatternSelf("88 1D").ResolveRelativeAddressSelf(0x2, 0x6).RCast<bool*>();
+		g_pNumPrecacheItemsMTVTF = CMemory(v_Mod_RunPakJobFrame).FindPattern("8B 05").ResolveRelativeAddressSelf(0x2, 0x6).RCast<int32_t*>();
+		g_pPakPrecacheJobFinished = CMemory(v_Mod_RunPakJobFrame).Offset(0x20).FindPatternSelf("88 1D").ResolveRelativeAddressSelf(0x2, 0x6).RCast<bool*>();
 
-		CMemory(v_Mod_QueuedPakCacheFrame).Offset(0xA0).FindPatternSelf("48 8D 2D").ResolveRelativeAddressSelf(0x3, 0x7).GetPtr(g_commonPakData);
+		g_currentLevelVPK = CMemory(v_Mod_UnloadCurrentLevelVPK).FindPattern("48 8B", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x3, 0x7).RCast<CPackedStore**>();
+		g_currentLevelVPKName = CMemory(v_Mod_UnloadCurrentLevelVPK).FindPattern("C6 05", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x2, 0x7).RCast<char*>();
+
+		CMemory(v_Mod_RunPakJobFrame).Offset(0xA0).FindPatternSelf("48 8D 2D").ResolveRelativeAddressSelf(0x3, 0x7).GetPtr(g_commonPakData);
 	}
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const;

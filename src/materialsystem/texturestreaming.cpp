@@ -9,7 +9,7 @@
 //---------------------------------------------------------------------------------
 static void StreamDB_Init(const char* const pszLevelName)
 {
-	KeyValues* const pSettingsKV = Mod_GetLevelSettings(pszLevelName);
+	KeyValues* const pSettingsKV = Mod_GetCoreLevelSettings(pszLevelName);
 	const char* targetStreamDB = pszLevelName;
 
 	if (pSettingsKV)

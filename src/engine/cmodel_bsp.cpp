@@ -24,6 +24,7 @@
 #include "vpklib/packedstore.h"
 #include "datacache/mdlcache.h"
 #include "filesystem/filesystem.h"
+#include "pluginsystem/modsystem.h"
 #ifndef DEDICATED
 #include "client/clientstate.h"
 #endif // !DEDICATED
@@ -36,6 +37,8 @@ static KeyValues* s_pLevelSetKV = nullptr;
 
 //-----------------------------------------------------------------------------
 // Purpose: load a custom pak and add it to the list
+// Input  : *pakFile - 
+// Output : pak handle, PAK_INVALID_HANDLE on failure
 //-----------------------------------------------------------------------------
 PakHandle_t CustomPakData_s::LoadAndAddPak(const char* const pakFile)
 {
@@ -56,24 +59,40 @@ PakHandle_t CustomPakData_s::LoadAndAddPak(const char* const pakFile)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: unload a custom pak
-// NOTE   : the array must be kept contiguous; this means that the last pak in
-//          the array should always be unloaded fist!
+// Purpose: unload the SDK pak file by index
+// Input  : index - index into `handles`
+// Output : true if the given pak is unloaded
 //-----------------------------------------------------------------------------
-void CustomPakData_s::UnloadAndRemovePak(const int index)
+bool CustomPakData_s::UnloadAndRemovePak(const int index)
 {
     const PakHandle_t pakId = handles[index];
-    assert(pakId != PAK_INVALID_HANDLE); // invalid handles should not be inserted
 
-    g_pakLoadApi->UnloadAsync(pakId);
+    // Only unload if it was actually successfully loaded
+    if (pakId == PAK_INVALID_HANDLE)
+        return true;
+
+    const PakLoadedInfo_s* const pakInfo = Pak_GetPakInfo(pakId);
+
+    if (pakInfo->status == PAK_STATUS_LOADED)
+        g_pakLoadApi->UnloadAsync(pakId);
+
+    if (pakInfo->status != PAK_STATUS_FREED &&
+        pakInfo->status != PAK_STATUS_ERROR &&
+        pakInfo->status != PAK_STATUS_INVALID_PAKHANDLE)
+    {
+        // Unload is still pending.
+        return false;
+    }
+
+    // Pak is unloaded, clear and return.
     handles[index] = PAK_INVALID_HANDLE;
-
-    numHandles--;
+    return true;
 }
-
 //-----------------------------------------------------------------------------
 // Purpose: preload a custom pak; this keeps it available throughout the
 //          duration of the process, unless manually removed by user.
+// Input  : *pakFile - 
+// Output : pak handle, PAK_INVALID_HANDLE on failure
 //-----------------------------------------------------------------------------
 PakHandle_t CustomPakData_s::PreloadAndAddPak(const char* const pakFile)
 {
@@ -91,35 +110,52 @@ PakHandle_t CustomPakData_s::PreloadAndAddPak(const char* const pakFile)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: unloads all non-preloaded custom pak handles
+// Purpose: unloads all non-preloaded custom pak handles, keep calling this
+//          over time until it returns true
+// Output : true if the non-preloaded paks are unloaded
 //-----------------------------------------------------------------------------
-void CustomPakData_s::UnloadAndRemoveNonPreloaded()
+bool CustomPakData_s::UnloadAndRemoveNonPreloaded()
 {
     // Preloaded paks should not be unloaded here, but only right before sdk /
     // engine paks are unloaded. Only unload user requested and level settings
     // paks from here. Unload them in reverse order, the last pak loaded should
     // be the first one to be unloaded.
-    for (int n = numHandles-1; n >= CustomPakData_s::PAK_TYPE_COUNT + numPreload; n--)
+    for (int n = (numHandles-1); n >= CustomPakData_s::PAK_TYPE_COUNT + numPreload; n--)
     {
-        UnloadAndRemovePak(n);
+        if (!UnloadAndRemovePak(n))
+            return false;
+
+        numHandles--;
     }
+
+    return true;
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: unloads all preloaded custom pak handles
+// Purpose: unloads all preloaded custom pak handles, keep calling this
+//          over time until it returns true
+// Output : true if the preloaded paks are unloaded
 //-----------------------------------------------------------------------------
-void CustomPakData_s::UnloadAndRemovePreloaded()
+bool CustomPakData_s::UnloadAndRemovePreloaded()
 {
     // Unload them in reverse order, the last pak loaded should be the first
     // one to be unloaded.
     for (; numPreload > 0; numPreload--)
     {
-        UnloadAndRemovePak(CustomPakData_s::PAK_TYPE_COUNT + (numPreload-1));
+        if (!UnloadAndRemovePak(CustomPakData_s::PAK_TYPE_COUNT + (numPreload-1)))
+            return false;
+
+        numHandles--;
     }
+
+    return true;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: loads the base SDK pak file by type
+// Input  : *pakFile - 
+//          type     - 
+// Output : pak handle, PAK_INVALID_HANDLE on failure
 //-----------------------------------------------------------------------------
 PakHandle_t CustomPakData_s::LoadBasePak(const char* const pakFile, const PakType_e type)
 {
@@ -133,28 +169,24 @@ PakHandle_t CustomPakData_s::LoadBasePak(const char* const pakFile, const PakTyp
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: unload the SDK base pak file by type
+// Purpose: unload the SDK base pak file by type, keep calling this
+//          over time until it returns true
+// Input  : type - 
+// Output : true if the given pak is unloaded
 //-----------------------------------------------------------------------------
-void CustomPakData_s::UnloadBasePak(const PakType_e type)
+bool CustomPakData_s::UnloadBasePak(const PakType_e type)
 {
-    const PakHandle_t pakId = handles[type];
-
-    // only unload if it was actually successfully loaded
-    if (pakId != PAK_INVALID_HANDLE)
-    {
-        g_pakLoadApi->UnloadAsync(pakId);
-        handles[type] = PAK_INVALID_HANDLE;
-    }
+    return UnloadAndRemovePak(type);
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: checks if level has changed
-// Input  : *pszLevelName - 
+// Input  : *levelName - 
 // Output : true if level name deviates from previous level
 //-----------------------------------------------------------------------------
-bool Mod_LevelHasChanged(const char* const pszLevelName)
+static bool Mod_LevelHasChanged(const char* const levelName)
 {
-    return (V_strcmp(pszLevelName, s_CurrentLevelName.String()) != NULL);
+    return (V_strcmp(levelName, s_CurrentLevelName.String()) != NULL);
 }
 
 //-----------------------------------------------------------------------------
@@ -237,6 +269,8 @@ void Mod_GetAllInstalledMaps()
 
 //-----------------------------------------------------------------------------
 // Purpose: returns whether the load job for given pak id is finished
+// Input  : pakId - 
+// Output : true if the load job is finished
 //-----------------------------------------------------------------------------
 static bool Mod_IsPakLoadFinished(const PakHandle_t pakId)
 {
@@ -297,303 +331,68 @@ static bool CustomPakData_IsPakLoadFinished(const CommonPakData_s::PakType_e com
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: processes queued pak files
+// Purpose: formats the path to a file residing inside the paks directory
+// Input  : (&pOut)   - 
+//          *rootPath - 
+//          *fileName - 
 //-----------------------------------------------------------------------------
-static void Mod_QueuedPakCacheFrame()
+template <typename T, int N>
+static void Mod_FormatPakPath(T(&pOut)[N], const char* const rootPath, const char* const fileName)
 {
-#ifndef DEDICATED
-    bool bUnconnected = !(*g_pClientState_Shifted)->IsConnected();
-#else // !DEDICATED
-    bool bUnconnected = true; // Always true for dedicated.
-#endif
+    const int ret = V_snprintf(pOut, N, "%s%s%s", rootPath, Pak_GetBaseLoadPath(), fileName);
 
-    bool startFromFirst = false;
-
-    if (Pak_StreamingDownloadFinished() && Pak_GetNumStreamableAssets() && bUnconnected)
-    {
-        *g_pPakPrecacheJobFinished = false;
-        startFromFirst = true;
-    }
-    else if (*g_pPakPrecacheJobFinished)
-    {
-        return;
-    }
-
-    if (!FileSystem()->ResetItemCache() || *g_pNumPrecacheItemsMTVTF)
-    {
-        return;
-    }
-
-    const char** pPakName = &g_commonPakData[0].basePakName;
-    int i;
-
-    for (i = 0; i < 5; ++i)
-    {
-        if (*((_BYTE*)pPakName - 268))
-            break;
-
-        const char* pakName = g_commonPakData[i].pakName;
-        const int64_t v4 = *pPakName - pakName;
-
-        int v5;
-        int v6;
-
-        do
-        {
-            v5 = (unsigned __int8)pakName[v4];
-            v6 = (unsigned __int8)*pakName - v5;
-            if (v6)
-                break;
-
-            ++pakName;
-        } while (v5);
-
-        if (v6)
-            break;
-
-        pPakName += 35;
-    }
-
-    int startIndex = 0;
-
-    if (!startFromFirst)
-        startIndex = i; // start from last pre-cached
-
-    const int numToProcess = startIndex;
-
-    if (startIndex < CommonPakData_s::PAK_TYPE_COUNT)
-    {
-        bool keepLoaded = false;
-        int numLeftToProcess = 4;
-        CommonPakData_s* data = &g_commonPakData[4];
-
-        do
-        {
-            if (*data->pakName)
-            {
-                PakLoadedInfo_s* const pakInfo = Pak_GetPakInfo(data->pakId);
-                PakStatus_e status;
-
-                data->keepLoaded = true;
-
-                if (pakInfo->handle == data->pakId)
-                {
-                    status = pakInfo->status;
-                    keepLoaded = data->keepLoaded;
-                }
-                else
-                {
-                    status = PAK_STATUS_INVALID_PAKHANDLE;
-                    keepLoaded = true;
-                }
-
-                if (!keepLoaded || status == PAK_STATUS_LOADED)
-                {
-                    // SDK pak files must be unloaded before the engine pak files,
-                    // as we use assets within engine pak files.
-                    switch (numLeftToProcess)
-                    {
-#ifndef DEDICATED
-                    case CommonPakData_s::PakType_e::PAK_TYPE_UI_GM:
-                        s_customPakData.UnloadBasePak(CustomPakData_s::PakType_e::PAK_TYPE_UI_SDK);
-                        break;
-#endif // !DEDICATED
-
-                    case CommonPakData_s::PakType_e::PAK_TYPE_COMMON:
-                        g_StudioMdlFallbackHandler.Clear();
-                        break;
-
-                    case CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM:
-                        s_customPakData.UnloadBasePak(CustomPakData_s::PakType_e::PAK_TYPE_COMMON_SDK);
-                        break;
-
-                    default:
-                        break;
-                    }
-
-                    if (numLeftToProcess == CommonPakData_s::PakType_e::PAK_TYPE_LEVEL)
-                    {
-                        Mod_UnloadLevelPaks(); // Unload mod pak files.
-
-                        if (s_pLevelSetKV)
-                        {
-                            // Delete current level settings if we drop all paks..
-                            s_pLevelSetKV->DeleteThis();
-                            s_pLevelSetKV = nullptr;
-                        }
-                    }
-
-                    g_pakLoadApi->UnloadAsync(data->pakId);
-
-                    if (numLeftToProcess == CommonPakData_s::PakType_e::PAK_TYPE_LOBBY)
-                    {
-                        Mod_UnloadPreloadedPaks();
-                        s_customPakData.basePaksLoaded = false;
-                    }
-                }
-
-                if (status && (unsigned int)(status - 13) > 1)
-                    return;
-
-                data->keepLoaded = false;
-                data->pakName[0] = '\0';
-
-                data->pakId = PAK_INVALID_HANDLE;
-            }
-            --numLeftToProcess;
-            --data;
-        } while (numLeftToProcess >= numToProcess);
-    }
-
-    *g_pPakPrecacheJobFinished = true;
-    CommonPakData_s* commonData = g_commonPakData;
-
-    int it = 0;
-
-    char* name;
-    char* nameIt;
-
-    while (true)
-    {
-        name = g_commonPakData[it].pakName;
-        nameIt = name;
-        char c;
-        int v20;
-        do
-        {
-            c = (unsigned __int8)nameIt[(unsigned __int64)(commonData->basePakName - (const char*)name)];
-            v20 = (unsigned __int8)*nameIt - c;
-            if (v20)
-                break;
-
-            ++nameIt;
-        } while (c);
-
-        if (!v20)
-            goto CHECK_LOAD_STATUS;
-
-        V_strncpy(name, commonData->basePakName, MAX_PATH);
-
-        if (*commonData->pakName)
-            break;
-
-        commonData->pakId = PAK_INVALID_HANDLE;
-    LOOP_AGAIN_OR_FINISH:
-
-        ++it;
-        ++commonData;
-        if (it >= 5)
-        {
-            if (*g_pPakPrecacheJobFinished)
-            {
-                __int64 pMTVFTaskItem = *g_pMTVFTaskItem;
-                if (pMTVFTaskItem)
-                {
-                    if (!*(_BYTE*)(pMTVFTaskItem + 4))
-                    {
-                        JobFifoLock_s* const pakFifoLock = &g_pakGlobals->fifoLock;
-
-                        if (g_pakGlobals->hasPendingUnloadJobs || g_pakGlobals->loadedPakCount != g_pakGlobals->requestedPakCount)
-                        {
-                            if (!JT_AcquireFifoLock(pakFifoLock)
-                                && !JT_HelpWithJobTypes(g_pPakFifoLockWrapper, pakFifoLock, -1i64, 0i64))
-                            {
-                                JT_HelpWithJobTypesOrSleep(g_pPakFifoLockWrapper, pakFifoLock, -1i64, 0i64, 0i64, 1);
-                            }
-
-                            Mod_UnloadPendingAndPrecacheRequestedPaks();
-
-                            if (ThreadInMainThread())
-                            {
-                                if (*g_bPakFifoLockAcquiredInMainThread)
-                                {
-                                    *g_bPakFifoLockAcquiredInMainThread = false;
-                                    JT_ReleaseFifoLock(pakFifoLock);
-                                }
-                            }
-
-                            JT_ReleaseFifoLock(pakFifoLock);
-
-                            pMTVFTaskItem = *g_pMTVFTaskItem;
-                        }
-
-                        FileSystem()->ResetItemCacheSize(256);
-                        FileSystem()->PrecacheTaskItem(pMTVFTaskItem);
-                    }
-                }
-            }
-            return;
-        }
-    }
-
-    if (it == CommonPakData_s::PakType_e::PAK_TYPE_LOBBY)
-    {
-        Mod_PreloadPaks();
-        s_customPakData.basePaksLoaded = true;
-    }
-
-    commonData->pakId = g_pakLoadApi->LoadAsync(name, AlignedMemAlloc(), 4, 0);
-
-    if (it == CommonPakData_s::PakType_e::PAK_TYPE_LEVEL)
-    {
-        Mod_LoadLevelPaks(s_CurrentLevelName.String());
-        s_customPakData.levelResourcesLoaded = true;
-    }
-
-#ifndef DEDICATED
-    if (it == CommonPakData_s::PakType_e::PAK_TYPE_UI_GM)
-        s_customPakData.LoadBasePak("ui_sdk.rpak", CustomPakData_s::PakType_e::PAK_TYPE_UI_SDK);
-    else
-#endif // !DEDICATED
-    if (it == CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM)
-        s_customPakData.LoadBasePak("common_sdk.rpak", CustomPakData_s::PakType_e::PAK_TYPE_COMMON_SDK);
-
-CHECK_LOAD_STATUS:
-
-    if (!Mod_IsPakLoadFinished(commonData->pakId) || !CustomPakData_IsPakLoadFinished(CommonPakData_s::PakType_e(it)))
-        *g_pPakPrecacheJobFinished = false;
-
-    goto LOOP_AGAIN_OR_FINISH;
+    if (ret < 0 || ret >= N)
+        Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: failure encoding path for file \"%s\" in root \"%s\"\n", __FUNCTION__, fileName, rootPath);
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: preload paks in list and keeps them active throughout level changes
 //-----------------------------------------------------------------------------
-void Mod_PreloadPaks()
+static void Mod_PreloadPaks(const char* const rootPath)
 {
-    char preloadFilePath[MAX_OSPATH];
-    snprintf(preloadFilePath, sizeof(preloadFilePath), "%s%s", Pak_GetBaseLoadPath(), "preload.rson");
+    char preloadFileBuf[MAX_OSPATH];
+    Mod_FormatPakPath(preloadFileBuf, rootPath, "preload.rson");
 
     bool parseFailure = false;
-    RSON::Node_t* const rson = RSON::LoadFromFile(preloadFilePath, "GAME", &parseFailure);
+    RSON::Node_t* const rson = RSON::LoadFromFile(preloadFileBuf, nullptr, &parseFailure);
 
     if (!rson)
     {
         if (parseFailure)
-            Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: failure parsing file '%s'\n", __FUNCTION__, preloadFilePath);
-        else
-        {
-            Warning(eDLL_T::ENGINE, "%s: could not load file '%s'\n", __FUNCTION__, preloadFilePath);
-            return; // No preload file, thus no error. Warn and return out.
-        }
+            Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: failure parsing file \"%s\"\n", __FUNCTION__, preloadFileBuf);
+
+        return; // No pak preload file, just return out.
     }
 
     static const char* const arrayName = "Paks";
     const RSON::Field_t* const key = rson->FindKey(arrayName);
 
     if (!key)
-        Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: missing array key \"%s\" in file '%s'\n", __FUNCTION__, arrayName, preloadFilePath);
+        Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: missing array key \"%s\" in file \"%s\"\n", __FUNCTION__, arrayName, preloadFileBuf);
 
     if ((key->m_Node.m_Type != (RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_STRING)) &&
         (key->m_Node.m_Type != (RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_VALUE)))
     {
-        Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: expected an array of strings in file '%s'\n", __FUNCTION__, preloadFilePath);
+        Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: expected an array of strings in file \"%s\"\n", __FUNCTION__, preloadFileBuf);
     }
 
     for (int i = 0; i < key->m_Node.m_nValueCount; i++)
     {
         const RSON::Value_t* const value = key->m_Node.GetArrayValue(i);
-        s_customPakData.PreloadAndAddPak(value->pszString);
+        const char* pakPath;
+
+        if (*rootPath)
+        {
+            Mod_FormatPakPath(preloadFileBuf, rootPath, value->pszString);
+            pakPath = preloadFileBuf;
+        }
+        else
+        {
+            // For core paks, we shouldn't prepend the path.
+            pakPath = value->pszString;
+        }
+
+        s_customPakData.PreloadAndAddPak(pakPath);
     }
 
     RSON_Free(rson, AlignedMemAlloc());
@@ -601,37 +400,98 @@ void Mod_PreloadPaks()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: unloads all preloaded paks
+// Purpose: formats the mod path using mod system install location to allow
+//          the file system of the RTech API to load files from mod paths
+// Input  : *mod - 
+//          &out - 
 //-----------------------------------------------------------------------------
-void Mod_UnloadPreloadedPaks()
+static void Mod_GetModPathForRTechAPI(const CModSystem::ModInstance_t* const mod, CUtlString& out)
 {
-    s_customPakData.UnloadAndRemovePreloaded();
+    out = ModSystem()->GetInstallPath() + mod->GetBasePath();
+    out.FixSlashes(); // RTech API expects platform separator.
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: load assets for level with fifolock.
-// Input  : *szLevelName - 
-// Output : true on success, false on failure
+// Purpose: preloads all mod pak files
 //-----------------------------------------------------------------------------
-void Mod_LoadPakForMap(const char* const pszLevelName)
+static void Mod_PreloadAllPaks()
 {
-	if (Mod_LevelHasChanged(pszLevelName))
+    // Preload core paks.
+    Mod_PreloadPaks("");
+
+    if (ModSystem()->IsEnabled())
+    {
+        // Preload mod paks.
+        FOR_EACH_VEC(ModSystem()->GetModList(), i)
+        {
+            const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+
+            if (!mod->IsEnabled())
+                continue;
+
+            CUtlString lookupPath;
+
+            Mod_GetModPathForRTechAPI(mod, lookupPath);
+            Mod_PreloadPaks(lookupPath.String());
+        }
+    }
+
+    s_customPakData.basePaksLoaded = true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: unloads all preloaded paks
+// Output : true if the preloaded paks are unloaded
+//-----------------------------------------------------------------------------
+static bool Mod_UnloadPreloadedPaks()
+{
+    if (!s_customPakData.UnloadAndRemovePreloaded())
+        return false;
+
+    s_customPakData.basePaksLoaded = false;
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: handles the level change, update's SDK's internal state and loads
+//          the level's load screen
+// Input  : *levelName - 
+//-----------------------------------------------------------------------------
+static void Mod_HandleLevelChanged(const char* const levelName)
+{
+    if (Mod_LevelHasChanged(levelName))
         s_customPakData.levelResourcesLoaded = false;
 
-	s_CurrentLevelName = pszLevelName;
+    s_CurrentLevelName = levelName;
 
-	// Dedicated should not load loadscreens.
+    // Dedicated should not load loadscreens.
 #ifndef DEDICATED
-	v_Mod_LoadPakForMap(pszLevelName);
+    v_Mod_LoadLoadscreenPakForLevel(levelName);
 #endif // !DEDICATED
+}
+
+#define MOD_LEVEL_SETTINGS_PATH "scripts/levels/settings/"
+
+//-----------------------------------------------------------------------------
+// Purpose: loads the level settings file relative from provided root
+// Input  : *levelName - 
+//          *rootPath - 
+// Output : KeyValues*, nullptr on failure
+//-----------------------------------------------------------------------------
+static KeyValues* Mod_GetLevelSettings(const char* const levelName, const char* const rootPath)
+{
+    char pathBuf[MAX_OSPATH];
+    snprintf(pathBuf, sizeof(pathBuf), "%s%s%s.kv", rootPath, MOD_LEVEL_SETTINGS_PATH, levelName);
+
+    return FileSystem()->LoadKeyValues(IFileSystem::TYPE_LEVELSETTINGS, pathBuf, "GAME");
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: loads the level settings file, returns current if level hasn't changed.
-// Input  : *pszLevelName - 
-// Output : KeyValues*
+// Input  : *levelName - 
+// Output : KeyValues*, nullptr on failure
 //-----------------------------------------------------------------------------
-KeyValues* Mod_GetLevelSettings(const char* const pszLevelName)
+KeyValues* Mod_GetCoreLevelSettings(const char* const levelName)
 {
     if (s_pLevelSetKV)
     {
@@ -642,50 +502,94 @@ KeyValues* Mod_GetLevelSettings(const char* const pszLevelName)
         s_pLevelSetKV->DeleteThis();
     }
 
-    char szPathBuffer[MAX_PATH];
-    snprintf(szPathBuffer, sizeof(szPathBuffer), "scripts/levels/settings/%s.kv", pszLevelName);
-
-    s_pLevelSetKV = FileSystem()->LoadKeyValues(IFileSystem::TYPE_LEVELSETTINGS, szPathBuffer, "GAME");
+    s_pLevelSetKV = Mod_GetLevelSettings(levelName, "");
     return s_pLevelSetKV;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: loads paks specified inside the level settings file
-// Input  : *pszLevelName - 
+// Input  : *settingsKV - 
+//          *rootPath   - 
 //-----------------------------------------------------------------------------
-void Mod_LoadLevelPaks(const char* const pszLevelName)
+static void Mod_LoadLevelPaks(KeyValues* const settingsKV, const char* const rootPath)
 {
-    KeyValues* const pSettingsKV = Mod_GetLevelSettings(pszLevelName);
+    Assert(settingsKV);
+    KeyValues* const pakListKV = settingsKV->FindKey("PakList");
 
-    if (!pSettingsKV)
+    if (!pakListKV)
         return;
 
-    KeyValues* const pPakListKV = pSettingsKV->FindKey("PakList");
+    char pathBuf[MAX_OSPATH];
 
-    if (!pPakListKV)
-        return;
-
-    char szPathBuffer[MAX_PATH];
-
-    for (KeyValues* pSubKey = pPakListKV->GetFirstSubKey(); pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
+    for (KeyValues* subKey = pakListKV->GetFirstSubKey(); subKey != nullptr; subKey = subKey->GetNextKey())
     {
-        if (!pSubKey->GetBool())
+        if (!subKey->GetBool())
             continue;
 
-        snprintf(szPathBuffer, sizeof(szPathBuffer), "%s.rpak", pSubKey->GetName());
-        const PakHandle_t nPakId = s_customPakData.LoadAndAddPak(szPathBuffer);
+        const char* pakToLoad;
 
-        if (nPakId == PAK_INVALID_HANDLE)
-            Error(eDLL_T::ENGINE, NO_ERROR, "%s: unable to load pak '%s' results '%d'\n", __FUNCTION__, szPathBuffer, nPakId);
+        if (*rootPath)
+        {
+            Mod_FormatPakPath(pathBuf, rootPath, subKey->GetName());
+            pakToLoad = pathBuf;
+        }
+        else
+            pakToLoad = subKey->GetName();
+
+        const PakHandle_t pakId = s_customPakData.LoadAndAddPak(pakToLoad);
+
+        if (pakId == PAK_INVALID_HANDLE)
+            Error(eDLL_T::ENGINE, NO_ERROR, "%s: unable to load pak '%s'\n", __FUNCTION__, pathBuf);
     }
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: load all mod paks for this level
+// Input  : *levelName - 
+//-----------------------------------------------------------------------------
+static void Mod_LoadAllLevelPaks(const char* const levelName)
+{
+    KeyValues* const coreSettingsKV = Mod_GetCoreLevelSettings(levelName);
+
+    // Load core level paks.
+    if (coreSettingsKV)
+        Mod_LoadLevelPaks(coreSettingsKV, "");
+
+    // Load mod level paks.
+    if (ModSystem()->IsEnabled())
+    {
+        FOR_EACH_VEC(ModSystem()->GetModList(), i)
+        {
+            const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+
+            if (!mod->IsEnabled())
+                continue;
+
+            const char* const rootPath = mod->GetBasePath().String();
+            KeyValues* const modSettingsKV = Mod_GetLevelSettings(levelName, rootPath);
+
+            if (modSettingsKV)
+            {
+                CUtlString lookupPath;
+
+                Mod_GetModPathForRTechAPI(mod, lookupPath);
+                Mod_LoadLevelPaks(modSettingsKV, lookupPath.String());
+            }
+        }
+    }
+
+    s_customPakData.levelResourcesLoaded = true;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: unloads all paks loaded by the level settings file
 //-----------------------------------------------------------------------------
-void Mod_UnloadLevelPaks()
+static bool Mod_UnloadLevelPaks()
 {
-    s_customPakData.UnloadAndRemoveNonPreloaded();
+    if (!s_customPakData.UnloadAndRemoveNonPreloaded())
+        return false;
+
+    s_customPakData.levelResourcesLoaded = false;
 
     g_StudioMdlFallbackHandler.ClearBadModelHandleCache();
     g_StudioMdlFallbackHandler.ClearSuppresionList();
@@ -700,10 +604,289 @@ void Mod_UnloadLevelPaks()
     // studio hardware data on bad mdl handles. See
     // 'GatherStaticPropsSecondPass_PreInit()' for details.
     g_StudioMdlFallbackHandler.DisableLegacyGatherProps();
+    return true;
 }
 
+//-----------------------------------------------------------------------------
+// Purpuse: scans the list of loaded common paks and returns the type we should
+//          unload; all paks starting from the tail until (and including) the
+//          returned type should be unloaded.
+// Output : int, maps to CommonPakData_s::PakType_e
+//-----------------------------------------------------------------------------
+static int Mod_GetTargetPakToUnloadType()
+{
+    int endIndex;
+    for (endIndex = 0; endIndex < CommonPakData_s::PAK_TYPE_COUNT; ++endIndex)
+    {
+        const CommonPakData_s& cpd = g_commonPakData[endIndex];
+
+        if (cpd.isUnloading)
+            break; // This pak is unloading, break and return idx.
+
+        if (V_strcmp(cpd.pakName, cpd.basePakName))
+            break; // Different pak pending to load, break and return idx.
+    }
+
+    return endIndex;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: handles custom pak unload for type
+// Output : true if the custom pak(s) unload jobs are finished
+//-----------------------------------------------------------------------------
+static bool Mod_HandleCustomPakUnloadForType(const int type)
+{
+    // SDK pak files must be unloaded before the engine pak files,
+    // as we use assets within engine pak files.
+    switch (type)
+    {
+#ifndef DEDICATED
+    case CommonPakData_s::PakType_e::PAK_TYPE_UI_GM:
+    {
+        if (!s_customPakData.UnloadBasePak(CustomPakData_s::PakType_e::PAK_TYPE_UI_SDK))
+            return false;
+
+        break;
+    }
+#endif // !DEDICATED
+    case CommonPakData_s::PakType_e::PAK_TYPE_COMMON:
+    {
+        g_StudioMdlFallbackHandler.Clear();
+        break;
+    }
+    case CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM:
+    {
+        if (!s_customPakData.UnloadBasePak(CustomPakData_s::PakType_e::PAK_TYPE_COMMON_SDK))
+            return false;
+
+        break;
+    }
+    case CommonPakData_s::PakType_e::PAK_TYPE_LOBBY:
+    {
+        if (!Mod_UnloadPreloadedPaks())
+            return false;
+
+        break;
+    }
+    case CommonPakData_s::PakType_e::PAK_TYPE_LEVEL:
+    {
+        if (!Mod_UnloadLevelPaks()) // Unload mod pak files.
+            return false;
+
+        if (s_pLevelSetKV)
+        {
+            // Delete current level settings if we drop all paks..
+            s_pLevelSetKV->DeleteThis();
+            s_pLevelSetKV = nullptr;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: unloads all paks until and including the given pak type
+// Input  : pakType - maps to CommonPakData_s::PakType_e
+// Output : true if all paks have been successfully loaded, false otherwise
+//-----------------------------------------------------------------------------
+static bool Mod_UnloadPaksUntilType(const int pakType)
+{
+    for (int i = (CommonPakData_s::PAK_TYPE_COUNT-1); i >= pakType; --i)
+    {
+        CommonPakData_s& cpd = g_commonPakData[i];
+
+        if (!cpd.pakName[0])
+            continue;
+
+        PakLoadedInfo_s* const pakInfo = Pak_GetPakInfo(cpd.pakId);
+        PakStatus_e status = PAK_STATUS_INVALID_PAKHANDLE;
+
+        if (pakInfo->handle == cpd.pakId)
+            status = pakInfo->status;
+
+        if (!cpd.isUnloading || status == PAK_STATUS_LOADED)
+        {
+            cpd.isUnloading = true;
+
+            if (!Mod_HandleCustomPakUnloadForType(i))
+                return false;
+
+            g_pakLoadApi->UnloadAsync(cpd.pakId);
+        }
+
+        if (status != PAK_STATUS_FREED &&
+            status != PAK_STATUS_ERROR &&
+            status != PAK_STATUS_INVALID_PAKHANDLE)
+        {
+            // Unload is still pending.
+            return false;
+        }
+
+        cpd.isUnloading = false;
+        cpd.pakName[0] = '\0';
+
+        cpd.pakId = PAK_INVALID_HANDLE;
+    }
+
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: loads and unloads pending paks with fifo lock
+//-----------------------------------------------------------------------------
+static void Mod_LoadAndUnloadPaksWithLock()
+{
+    if (!*g_pPakPrecacheJobFinished)
+        return; // Not finished yet.
+
+    const CPackedStore* const vpk = *g_currentLevelVPK;
+
+    if (!vpk) // VPK not loaded yet.
+        return;
+
+    if (vpk->GetStatus() != 0)
+        return;
+
+    JobFifoLock_s* const pakFifoLock = &g_pakGlobals->fifoLock;
+
+    if (g_pakGlobals->hasPendingUnloadJobs || g_pakGlobals->loadedPakCount != g_pakGlobals->requestedPakCount)
+    {
+        if (!JT_AcquireFifoLock(pakFifoLock)
+            && !JT_HelpWithJobTypes(g_pPakFifoLockWrapper, pakFifoLock, -1, 0))
+        {
+            // Help with other jobs until we can acquire the lock.
+            JT_HelpWithJobTypesOrSleep(g_pPakFifoLockWrapper, pakFifoLock, -1, 0, 0, 1);
+        }
+
+        v_Mod_UnloadPendingAndPrecacheRequestedPaks();
+
+        if (ThreadInMainThread() && (*g_bPakFifoLockAcquiredInMainThread))
+        {
+            *g_bPakFifoLockAcquiredInMainThread = false;
+            JT_ReleaseFifoLock(pakFifoLock);
+        }
+
+        JT_ReleaseFifoLock(pakFifoLock);
+    }
+
+    FileSystem()->ResetItemCacheSize(256);
+    FileSystem()->PrecacheTaskItem((void*)vpk);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: handle load of custom paks based on current common pak
+// Input  : type - maps to CommonPakData_s::PakType_e
+//-----------------------------------------------------------------------------
+static void Mod_HandleCustomPakLoadForType(const int type)
+{
+    switch (type)
+    {
+#ifndef DEDICATED
+    case CommonPakData_s::PakType_e::PAK_TYPE_UI_GM:
+    {
+        s_customPakData.LoadBasePak("ui_sdk.rpak", CustomPakData_s::PakType_e::PAK_TYPE_UI_SDK);
+        break;
+    }
+#endif // !DEDICATED
+    case CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM:
+    {
+        s_customPakData.LoadBasePak("common_sdk.rpak", CustomPakData_s::PakType_e::PAK_TYPE_COMMON_SDK);
+        break;
+    }
+    case CommonPakData_s::PakType_e::PAK_TYPE_LOBBY:
+    {
+        Mod_PreloadAllPaks();
+        break;
+    }
+    case CommonPakData_s::PakType_e::PAK_TYPE_LEVEL:
+    {
+        Mod_LoadAllLevelPaks(s_CurrentLevelName.String());
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: checks if all pending pak load jobs have finished and forces the
+//          global state to unfinished if its still in progress
+// Input  : &cpd - 
+//          index - 
+//-----------------------------------------------------------------------------
+static void Mod_UpdateLoadJobState(const CommonPakData_s& cpd, const int index)
+{
+    if (!Mod_IsPakLoadFinished(cpd.pakId) || !CustomPakData_IsPakLoadFinished(CommonPakData_s::PakType_e(index)))
+        *g_pPakPrecacheJobFinished = false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: pak loading and unloading state machine
+//-----------------------------------------------------------------------------
+static void Mod_RunPakJobFrame()
+{
+    bool unloadAll = false;
+
+#ifndef DEDICATED
+    // Reload all paks if all optional streaming files are finished downloading
+    // and we are no longer connected to a server.
+    if (Pak_StreamingDownloadFinished() && Pak_GetNumStreamableAssets() && !g_pClientState->IsConnected())
+    {
+        *g_pPakPrecacheJobFinished = false;
+        unloadAll = true;
+    }
+    else 
+#endif // !DEDICATED
+    if (*g_pPakPrecacheJobFinished)
+    {
+        return;
+    }
+
+    if (!FileSystem()->ResetItemCache() || *g_pNumPrecacheItemsMTVTF)
+    {
+        return;
+    }
+
+    // Check if we have a pak with a different name now, if so,
+    // drop any pak from the tail until and including this pak
+    // and load them. Paks are always loaded in order; if we
+    // drop pak of type 2, then type 3 needs to unload as well
+    // because type 3 can have assets that rely on type 2.
+    const int endIndex = unloadAll ? 0 : Mod_GetTargetPakToUnloadType();
+
+    if (!Mod_UnloadPaksUntilType(endIndex))
+        return;
+
+    *g_pPakPrecacheJobFinished = true;
+
+    for (int i = 0; i < CommonPakData_s::PAK_TYPE_COUNT; i++)
+    {
+        CommonPakData_s& cpd = g_commonPakData[i];
+
+        if (V_strcmp(cpd.pakName, cpd.basePakName) == 0)
+        {
+            Mod_UpdateLoadJobState(cpd, i);
+            continue; // Pak file didn't change, no mutation needed.
+        }
+
+        // Copy the new name over and load the pak.
+        V_strncpy(cpd.pakName, cpd.basePakName, MAX_OSPATH);
+        cpd.pakId = g_pakLoadApi->LoadAsync(cpd.pakName, AlignedMemAlloc(), 4, 0);
+
+        Mod_HandleCustomPakLoadForType(i);
+        Mod_UpdateLoadJobState(cpd, i);
+    }
+
+    Mod_LoadAndUnloadPaksWithLock();
+}
+
+///////////////////////////////////////////////////////////////////////////////
 void VModel_BSP::Detour(const bool bAttach) const
 {
-	DetourSetup(&v_Mod_LoadPakForMap, &Mod_LoadPakForMap, bAttach);
-	DetourSetup(&v_Mod_QueuedPakCacheFrame, &Mod_QueuedPakCacheFrame, bAttach);
+	DetourSetup(&v_Mod_LoadLoadscreenPakForLevel, &Mod_HandleLevelChanged, bAttach);
+	DetourSetup(&v_Mod_RunPakJobFrame, &Mod_RunPakJobFrame, bAttach);
 }

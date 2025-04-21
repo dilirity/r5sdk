@@ -46,13 +46,10 @@ inline bool(*CEngineAPI__OnStartup)(CEngineAPI* pEngineAPI, void* pInstance, con
 inline bool(*CEngineAPI__MainLoop)(void);
 inline void(*CEngineAPI__PumpMessages)(void);
 inline void(*CEngineAPI__SetStartupInfo)(CEngineAPI* pEngineAPI, StartupInfo_t* pStartupInfo);
-inline void*(*v_ResetMTVFTaskItem)(void);
 inline void(*v_PakFile_Init)(char* buffer, char* source, char vpk_file);
 
 inline bool* g_bStartupInfoSet = nullptr;
 inline char* g_szBaseDir = nullptr; // static size = MAX_OSPATH
-inline int64_t* g_pMTVFTaskItem = nullptr; // struct.
-inline char* g_szMTVFItemName = nullptr;
 
 ///////////////////////////////////////////////////////////////////////////////
 class VSys_Dll2 : public IDetour
@@ -67,12 +64,9 @@ class VSys_Dll2 : public IDetour
 		LogFunAdr("CEngineAPI::MainLoop", CEngineAPI__MainLoop);
 		LogFunAdr("CEngineAPI::PumpMessages", CEngineAPI__PumpMessages);
 		LogFunAdr("CEngineAPI::SetStartupInfo", CEngineAPI__SetStartupInfo);
-		LogFunAdr("ResetMTVFTaskItem", v_ResetMTVFTaskItem);
 		LogFunAdr("PakFile_Init", v_PakFile_Init);
 		LogVarAdr("g_bStartupInfoSet", g_bStartupInfoSet);
 		LogVarAdr("g_szBaseDir", g_szBaseDir);
-		LogVarAdr("g_pMTVFTaskItem", g_pMTVFTaskItem);
-		LogVarAdr("g_szMTVFItemName", g_szMTVFItemName);
 	}
 	virtual void GetFun(void) const
 	{
@@ -85,15 +79,11 @@ class VSys_Dll2 : public IDetour
 		Module_FindPattern(g_GameDll, "44 88 44 24 ?? 53 55 56 57").GetPtr(v_PakFile_Init);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 55 48 81 EC ?? ?? ?? ?? 45 33 C9").GetPtr(CEngineAPI__PumpMessages);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? ?? 48 81 EC ?? ?? ?? ?? 80 3D ?? ?? ?? ?? ?? 48 8B DA").GetPtr(CEngineAPI__SetStartupInfo);
-		Module_FindPattern(g_GameDll, "48 83 EC 28 48 8B 15 ?? ?? ?? ?? 48 85 D2 0F 84 ?? ?? ?? ?? 48 8B 0D ?? ?? ?? ?? 48 8B 01 FF 90 ?? ?? ?? ?? 33 C9 E8 ?? ?? ?? ?? 0F 28 05 ?? ?? ?? ?? 0F 28 0D ?? ?? ?? ?? 0F 11 05 ?? ?? ?? ?? 0F 28 05 ?? ?? ?? ?? 0F 11 0D ?? ?? ?? ?? 0F 28 0D ?? ?? ?? ?? 0F 11 05 ?? ?? ?? ?? 0F 11 0D ?? ?? ?? ?? 48 C7 05 ?? ?? ?? ?? ?? ?? ?? ?? FF 15 ?? ?? ?? ??").GetPtr(v_ResetMTVFTaskItem);
 	}
 	virtual void GetVar(void) const
 	{
 		g_bStartupInfoSet = CMemory(CEngineAPI__SetStartupInfo).FindPattern("80 3D", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x2, 0x7).RCast<bool*>();
 		g_szBaseDir = CMemory(CEngineAPI__SetStartupInfo).FindPattern("48 8D", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x3, 0x7).RCast<char*>();
-
-		g_pMTVFTaskItem = CMemory(v_ResetMTVFTaskItem).FindPattern("48 8B", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x3, 0x7).RCast<int64_t*>();
-		g_szMTVFItemName = CMemory(v_ResetMTVFTaskItem).FindPattern("C6 05", CMemory::Direction::DOWN, 250).ResolveRelativeAddressSelf(0x2, 0x7).RCast<char*>();
 	}
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const;

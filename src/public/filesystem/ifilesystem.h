@@ -432,7 +432,7 @@ public:
 	virtual void SetVPKCacheModeServer() = 0; // g_nVPKCacheMode = 2;
 	virtual bool IsVPKCacheEnabled() = 0;     // g_nVPKCacheMode != 0;
 
-	virtual __int64 __fastcall PrecacheTaskItem(__int64 a1) = 0;
+	virtual __int64 __fastcall PrecacheTaskItem(void* a1) = 0;
 
 	virtual void ResetItemCacheSize(int edx) = 0;
 	virtual void __fastcall sub_140380100(__int64 a1) = 0;
