@@ -101,13 +101,13 @@ struct PakLoadFuncs_s
 	// the mandatory streaming set while having it disabled for the optional set
 	bool (*IsStreamingDisabledForSet)(const PakHandle_t handle, const PakStreamSet_e set);
 
-	// atomically increment/decrement total streaming asset count shared across
+	// atomically increment/decrement total non-fully installed asset count shared across
 	// all loaded pakfiles
-	void (*IncrementStreamingAssetCount);
-	void (*DecrementStreamingAssetCount);
+	void (*IncrementNonFullyInstalledAssetsCount);
+	void (*DecrementNonFullyInstalledAssetsCount);
 
-	// returns whether the runtime has optional streaming assets loaded
-	bool (*HasOptionalStreamingAssetsLoaded)();
+	// returns whether the runtime has non-fully installed assets loaded
+	bool (*HasNonFullyInstalledAssetsLoaded)();
 
 	char unused3[48];
 

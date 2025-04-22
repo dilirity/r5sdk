@@ -840,7 +840,7 @@ static void Mod_RunPakJobFrame()
 #ifndef DEDICATED
     // Reload all paks if all optional streaming files are finished downloading
     // and we are no longer connected to a server.
-    if (Pak_StreamingDownloadFinished() && Pak_GetNumStreamableAssets() && !g_pClientState->IsConnected())
+    if (Pak_StreamingDownloadFinished() && Pak_HasNonFullyInstalledAssetsLoaded() && !g_pClientState->IsConnected())
     {
         *g_pPakPrecacheJobFinished = false;
         unloadAll = true;

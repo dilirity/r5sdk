@@ -352,8 +352,8 @@ struct PakGlobalState_s
 	b64 emulateStreamingInstallInit;
 	b64 emulateStreamingInstall;
 
-	// mounted # optional streamable assets (globally across all paks)
-	int64_t numOptStreamableAssets;
+	// mounted # non-fully installed assets (globally across all paks)
+	int64_t numAssetsWithDiscardedStreamableAssets;
 	b64 hasPendingUnloadJobs;
 
 	// paks that contain tracked assets

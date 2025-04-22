@@ -13,10 +13,11 @@ extern void Pak_LoadStreamingData(PakLoadedInfo_s* const loadedInfo);
 inline float* g_pStreamingDownloadProgress = nullptr;
 
 // NOTE: must use these when incrementing asset counts !!!
-inline void Pak_IncrementStreamingAssetCount() { ThreadInterlockedIncrement64(&g_pakGlobals->numOptStreamableAssets); }
-inline void Pak_DecrementStreamingAssetCount() { ThreadInterlockedDecrement64(&g_pakGlobals->numOptStreamableAssets); }
+inline void Pak_IncrementNonFullyInstalledAssetsCount() { ThreadInterlockedIncrement64(&g_pakGlobals->numAssetsWithDiscardedStreamableAssets); }
+inline void Pak_DecrementNonFullyInstalledAssetsCount() { ThreadInterlockedDecrement64(&g_pakGlobals->numAssetsWithDiscardedStreamableAssets); }
 
-inline int64_t Pak_GetNumStreamableAssets() { return g_pakGlobals->numOptStreamableAssets; }
+inline int64_t Pak_GetNonFullyInstalledAssetsLoadedCount() { return g_pakGlobals->numAssetsWithDiscardedStreamableAssets; }
+inline bool Pak_HasNonFullyInstalledAssetsLoaded() { return Pak_GetNonFullyInstalledAssetsLoadedCount() != 0; }
 
 inline float Pak_GetStreamingDownloadProgress() { return *g_pStreamingDownloadProgress; }
 inline bool Pak_StreamingDownloadFinished()     { return Pak_GetStreamingDownloadProgress() == 1.0f; }
