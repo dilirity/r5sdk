@@ -141,6 +141,19 @@
 0x6FD0EE: "nop (x4)" // Nop 'minss   xmm0, xmm6' (extraneous clamp).
 0x6FD114: "nop (x3)" // Nop 'movaps  xmm6, xmm0' (extraneous move operation).
 
+// If we have a partial install and are still downloading optional streaming files, the game would unload the current level VPK
+// and reload all RPak files once we have fully downloaded all the optional files and disconnected from the server. However, on
+// listen server builds, the unloading of the VPK and RPak's happen too early; it will unload the files while the server is still
+// active. We should check on CHostState::m_bActiveGame and only unload the current level VPK and RPak's if this is false. The
+// RPak reloading logic has been fixed in `Mod_RunPakJobFrame`, however the VPK code is inline and the check has to be embedded
+// in the assembly here.
+0x2969B7: jmp 0x00000001412951A8                      // jump to code cave.
+0x12945A8: cmp byte ptr ds:[0x0000000141736384], 0x0  // Check if g_HostState.m_bActiveGame is false.
+0x12945AF: jne 0x00000001402975C5                     // Jump to `Mod_RunPakJobFrame` call if condition isn't met, this new check skips `Mod_UnloadCurrentLevelVPK` as its still being used.
+// Below the reconstruction of overwritten bytes caused by the long jump to code cave.
+0x12945B5: cmp dword ptr ds:[0x000000014180A128], 0x2 // Checks if client signon is SIGNONSTATE_CONNECTED.
+0x12945BC: jmp 0x00000001402975BE                     // jump back to original code (handles the SIGNONSTATE_CONNECTED check).
+
 /////////////////////////////
 /////////////////////////////
 //// Exploitable defects ////

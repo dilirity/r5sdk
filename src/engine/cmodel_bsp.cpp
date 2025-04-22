@@ -13,6 +13,7 @@
 #include "tier2/fileutils.h"
 #include "engine/sys_dll2.h"
 #include "engine/host_cmd.h"
+#include "engine/host_state.h"
 #include "engine/cmodel_bsp.h"
 
 #include "rtech/rson.h"
@@ -839,8 +840,12 @@ static void Mod_RunPakJobFrame()
 
 #ifndef DEDICATED
     // Reload all paks if all optional streaming files are finished downloading
-    // and we are no longer connected to a server.
-    if (Pak_StreamingDownloadFinished() && Pak_HasNonFullyInstalledAssetsLoaded() && !g_pClientState->IsConnected())
+    // and we are no longer connected to a server. They need to be reloaded as
+    // the stream file handles are only opened during the load of a given rpak.
+    // For host, we also need to check if the game is active and only continue
+    // if it isn't because the assets are otherwise still in use by the server.
+    if (Pak_StreamingDownloadFinished() && Pak_HasNonFullyInstalledAssetsLoaded()
+        && !g_pHostState->IsActiveGame() && !g_pClientState->IsConnected())
     {
         *g_pPakPrecacheJobFinished = false;
         unloadAll = true;
