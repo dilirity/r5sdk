@@ -272,9 +272,13 @@ void CSquirrelVM::CompileModScripts()
 		RSON::Node_t* rson = mod->LoadScriptCompileList();
 
 		if (!rson)
-			Error(GetNativeContext(), NO_ERROR, 
-				"%s: Failed to load RSON file '%s'\n", 
+		{
+			Error(GetNativeContext(), NO_ERROR,
+				"%s: Failed to load RSON file '%s'\n",
 				__FUNCTION__, mod->GetScriptCompileListPath().Get());
+
+			continue;
+		}
 
 		char* scriptPathArray[MAX_PRECOMPILED_SCRIPTS];
 		int scriptCount = 0;
