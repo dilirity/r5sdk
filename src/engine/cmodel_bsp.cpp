@@ -817,11 +817,17 @@ static void Mod_HandleCustomPakLoadForType(const int type)
 //          global state to unfinished if its still in progress
 // Input  : &cpd - 
 //          index - 
+// Output : true if all load jobs have finished, false otherwise
 //-----------------------------------------------------------------------------
-static void Mod_UpdateLoadJobState(const CommonPakData_s& cpd, const int index)
+static bool Mod_UpdateLoadJobState(const CommonPakData_s& cpd, const int index)
 {
     if (!Mod_IsPakLoadFinished(cpd.pakId) || !CustomPakData_IsPakLoadFinished(CommonPakData_s::PakType_e(index)))
+    {
         *g_pPakPrecacheJobFinished = false;
+        return false;
+    }
+
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -842,14 +848,10 @@ static void Mod_RunPakJobFrame()
     else 
 #endif // !DEDICATED
     if (*g_pPakPrecacheJobFinished)
-    {
         return;
-    }
 
     if (!FileSystem()->ResetItemCache() || *g_pNumPrecacheItemsMTVTF)
-    {
         return;
-    }
 
     // Check if we have a pak with a different name now, if so,
     // drop any pak from the tail until and including this pak
@@ -869,7 +871,9 @@ static void Mod_RunPakJobFrame()
 
         if (V_strcmp(cpd.pakName, cpd.basePakName) == 0)
         {
-            Mod_UpdateLoadJobState(cpd, i);
+            if (!Mod_UpdateLoadJobState(cpd, i))
+                return; // Current pak hasn't finished loading yet.
+
             continue; // Pak file didn't change, no mutation needed.
         }
 
@@ -878,7 +882,9 @@ static void Mod_RunPakJobFrame()
         cpd.pakId = g_pakLoadApi->LoadAsync(cpd.pakName, AlignedMemAlloc(), 4, 0);
 
         Mod_HandleCustomPakLoadForType(i);
-        Mod_UpdateLoadJobState(cpd, i);
+
+        if (!Mod_UpdateLoadJobState(cpd, i))
+            return; // Current pak hasn't finished loading yet.
     }
 
     Mod_LoadAndUnloadPaksWithLock();
