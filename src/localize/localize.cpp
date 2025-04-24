@@ -24,7 +24,7 @@ bool Localize_LoadLocalizationFileLists(CLocalize* thisptr)
 			{
 				const char* localizationFile = mod->m_LocalizationFiles.Element(j).Get();
 
-				if (!CLocalize__AddFile(thisptr, localizationFile, "PLATFORM"))
+				if (!CLocalize__AddFile(thisptr, localizationFile, "GAME"))
 					Warning(eDLL_T::ENGINE, "Failed to add localization file '%s'\n", localizationFile);
 			}
 		}

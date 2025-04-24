@@ -44,7 +44,7 @@ public:
 
 		inline RSON::Node_t* LoadScriptCompileList() const
 		{
-			return RSON::LoadFromFile(GetScriptCompileListPath().Get(), "PLATFORM");
+			return RSON::LoadFromFile(GetScriptCompileListPath().Get(), "GAME");
 		};
 
 		KeyValues* m_SettingsKV;

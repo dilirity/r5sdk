@@ -38,14 +38,8 @@ void CModSystem::Init()
 		return;
 
 	// no mods installed, no point in initializing.
-	if (!FileSystem()->IsDirectory(MOD_BASE_DIRECTORY, "PLATFORM"))
+	if (!FileSystem()->IsDirectory(MOD_BASE_DIRECTORY, "GAME"))
 		return;
-
-	// The RTech API doesn't know the concept of search paths and path
-	// id's, set the path from which the MOD_BASE_DIRECTORY resides in
-	// here so it can retrieve it from the mod system without having
-	// to hardcode it all over the place.
-	m_InstallPath = "platform/";
 
 	// mod system initializes before the first Cbuf_Execute call, which
 	// executes commands/convars over the command line. we check for an
@@ -55,7 +49,7 @@ void CModSystem::Init()
 
 	CUtlVector<CUtlString> modFileList;
 	RecursiveFindFilesMatchingName(modFileList,
-		MOD_BASE_DIRECTORY, MOD_SETTINGS_FILE, "PLATFORM", '/');
+		MOD_BASE_DIRECTORY, MOD_SETTINGS_FILE, "GAME", '/');
 
 	FOR_EACH_VEC(modFileList, i)
 	{
@@ -140,11 +134,11 @@ void CModSystem::UpdateModStatusList()
 //-----------------------------------------------------------------------------
 void CModSystem::LoadModStatusList(CUtlMap<CUtlString, bool>& enabledList)
 {
-	if (!FileSystem()->FileExists(MOD_STATUS_LIST_FILE, "PLATFORM"))
+	if (!FileSystem()->FileExists(MOD_STATUS_LIST_FILE, "GAME"))
 		return;
 
 	const KeyValues* pModList = FileSystem()->LoadKeyValues(
-		IFileSystem::TYPE_COMMON, MOD_STATUS_LIST_FILE, "PLATFORM");
+		IFileSystem::TYPE_COMMON, MOD_STATUS_LIST_FILE, "GAME");
 
 	for (KeyValues* pSubKey = pModList->GetFirstSubKey();
 		pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
@@ -174,7 +168,7 @@ void CModSystem::WriteModStatusList()
 	CUtlBuffer buf = CUtlBuffer(ssize_t(0), 0, CUtlBuffer::TEXT_BUFFER);
 	kv.RecursiveSaveToFile(buf, 0);
 
-	if (!FileSystem()->WriteFile(MOD_STATUS_LIST_FILE, "PLATFORM", buf))
+	if (!FileSystem()->WriteFile(MOD_STATUS_LIST_FILE, "GAME", buf))
 		Error(eDLL_T::ENGINE, NO_ERROR, "Failed to write mod status list '%s'.\n", MOD_STATUS_LIST_FILE);
 }
 
@@ -211,11 +205,11 @@ CModSystem::ModInstance_t::ModInstance_t(const CUtlString& basePath)
 	// [amos]: it might be better to pack core files into the VPK, and disable
 	//         the filesystem cache to disk reroute to avoid the file name
 	//         clashing problems, research required.
-	FileSystem()->AddSearchPath(m_BasePath.Get(), "PLATFORM", SearchPathAdd_t::PATH_ADD_TO_TAIL);
+	FileSystem()->AddSearchPath(m_BasePath.Get(), "GAME", SearchPathAdd_t::PATH_ADD_TO_TAIL);
 
 	const CUtlString scriptsRsonPath = m_BasePath + GAME_SCRIPT_COMPILELIST;
 
-	if (FileSystem()->FileExists(scriptsRsonPath.Get(), "PLATFORM"))
+	if (FileSystem()->FileExists(scriptsRsonPath.Get(), "GAME"))
 		m_bHasScriptCompileList = true;
 
 	SetState(eModState::LOADED);
@@ -260,7 +254,7 @@ bool CModSystem::ModInstance_t::ParseSettings()
 	const char* pSettingsPath = settingsPath.Get();
 
 	m_SettingsKV = FileSystem()->LoadKeyValues(
-		IFileSystem::TYPE_COMMON, pSettingsPath, "PLATFORM");
+		IFileSystem::TYPE_COMMON, pSettingsPath, "GAME");
 
 	if (!m_SettingsKV)
 	{
