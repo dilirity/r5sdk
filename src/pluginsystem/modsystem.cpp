@@ -163,8 +163,10 @@ void CModSystem::UpdateModStatusList()
 		if (!enabledList.HasElement(mod->m_ModID))
 		{
 			if (modsystem_debug.GetBool())
-				Msg(eDLL_T::ENGINE, "Mod '%s' does not exist in '%s'; enabling...\n",
-					mod->m_ModID.Get(), MOD_STATUS_LIST_FILE);
+			{
+				Msg(eDLL_T::ENGINE, "Mod '%s'(\"%s\") does not exist in '%s'; enabling...\n",
+					mod->m_Name.String(), mod->m_ModID.String(), MOD_STATUS_LIST_FILE);
+			}
 
 			mod->SetState(eModState::ENABLED);
 		}
@@ -174,8 +176,10 @@ void CModSystem::UpdateModStatusList()
 			mod->SetState(bEnable ? eModState::ENABLED : eModState::DISABLED);
 
 			if (modsystem_debug.GetBool())
-				Msg(eDLL_T::ENGINE, "Mod '%s' exists in '%s' and is %s.\n",
-					mod->m_ModID.Get(), MOD_STATUS_LIST_FILE, bEnable ? "enabled" : "disabled");
+			{
+				Msg(eDLL_T::ENGINE, "Mod '%s'(\"%s\") exists in '%s' and is %s.\n",
+					mod->m_Name.String(), mod->m_ModID.String(), MOD_STATUS_LIST_FILE, bEnable ? "enabled" : "disabled");
+			}
 		}
 	}
 
@@ -337,7 +341,7 @@ KeyValues* CModSystem::ModInstance_t::GetRequiredSettingsKey(
 	KeyValues* pKeyValue = m_SettingsKV->FindKey(key);
 	if (!pKeyValue)
 		Error(eDLL_T::ENGINE, NO_ERROR,
-			"Mod settings '%s' has missing or invalid '%s' field; skipping...\n",
+			"Mod settings \"%s\" has missing or invalid \"%s\" field; skipping...\n",
 			settingsPath, key);
 
 	return pKeyValue;
@@ -358,12 +362,11 @@ bool CModSystem::ModInstance_t::ParseSettings()
 	if (!m_SettingsKV)
 	{
 		Error(eDLL_T::ENGINE, NO_ERROR,
-			"Failed to parse mod settings '%s'; skipping...\n", m_BasePath.Get());
+			"Failed to parse mod settings \"%s\"; skipping...\n", pSettingsPath);
 		return false;
 	}
 
 	// "name" "An R5Reloaded Mod"
-	// [rexx]: could be optional and have id as fallback
 	KeyValues* pName = GetRequiredSettingsKey(pSettingsPath, "name");
 	if (!pName)
 		return false;
@@ -441,7 +444,7 @@ void CModSystem::ModInstance_t::ParseConVars()
 		{
 			if (g_pCVar->FindCommandBase(pszName) != nullptr)
 			{
-				Warning(eDLL_T::ENGINE, "Failed to register ConVar '%s' for mod '%s' ('%s'); already registered.\n",
+				Warning(eDLL_T::ENGINE, "Failed to register ConVar \"%s\" for mod '%s'(\"%s\"); already registered.\n",
 					pszName, m_Name.String(), m_ModID.String());
 
 				continue;
@@ -452,7 +455,7 @@ void CModSystem::ModInstance_t::ParseConVars()
 			if (!cvar)
 			{
 				// Quit as we ran out of memory.
-				Error(eDLL_T::ENGINE, EXIT_FAILURE, "Failed to register ConVar '%s' for mod '%s' ('%s'); allocation failure.\n",
+				Error(eDLL_T::ENGINE, EXIT_FAILURE, "Failed to register ConVar \"%s\" for mod '%s'(\"%s\"); allocation failure.\n",
 					pszName, m_Name.String(), m_ModID.String());
 
 				return;
