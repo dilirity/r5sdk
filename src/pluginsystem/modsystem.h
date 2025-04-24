@@ -8,6 +8,7 @@
 #define MOD_BASE_DIRECTORY "mods"
 #define MOD_STATUS_LIST_FILE MOD_BASE_DIRECTORY"/mods.vdf"
 #define MOD_SETTINGS_FILE "mod.vdf"
+#define MAX_MODS_TO_LOAD 1024
 
 class CModAppSystemGroup;
 

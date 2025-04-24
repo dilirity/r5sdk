@@ -77,6 +77,13 @@ void CModSystem::Init()
 
 	FOR_EACH_VEC(modFileList, i)
 	{
+		if (i == MAX_MODS_TO_LOAD)
+		{
+			Error(eDLL_T::ENGINE, NO_ERROR, "Exceeded MAX_MODS_TO_LOAD; only %d out of %d mods will be loaded.\n",
+				MAX_MODS_TO_LOAD, modFileList.Count());
+			break;
+		}
+
 		// allocate dynamically, so less memory/resources are required when
 		// the vector has to grow and reallocate everything. we also got
 		// a vector member in the modinstance struct, which would ultimately
