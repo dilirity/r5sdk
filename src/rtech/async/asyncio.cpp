@@ -6,10 +6,20 @@
 #include "rtech/ipakfile.h"
 #include "rtech/pak/pakstate.h"
 #include "rtech/pak/paktools.h"
+#include "pluginsystem/modsystem.h"
 #include "asyncio.h"
 
 static ConVar async_debugchannel("async_debugchannel", "0", FCVAR_DEVELOPMENTONLY | FCVAR_ACCESSIBLE_FROM_THREADS, "Log async read handles created or destroyed with this channel ID", false, 0.f, false, 0.f, "0 = disabled, -1 = all");
 static int s_fileHandleLogChannelIDs[ASYNC_MAX_FILE_HANDLES];
+
+//----------------------------------------------------------------------------------
+// helper for opening files
+//----------------------------------------------------------------------------------
+static HANDLE FS_Internal_OpenFile(const char* const fileToOpen)
+{
+    return CreateFileA(fileToOpen, GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_DELETE, 0, OPEN_EXISTING, FILE_SUPPORTS_GHOSTING, 0);
+}
 
 //----------------------------------------------------------------------------------
 // open a file and add it to the async file handle array
@@ -31,11 +41,41 @@ int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* c
         }
     }
 
-    const HANDLE hFile = CreateFileA(fileToLoad, GENERIC_READ,
-        FILE_SHARE_READ | FILE_SHARE_DELETE, 0, OPEN_EXISTING, FILE_SUPPORTS_GHOSTING, 0);
+    HANDLE hFile = FS_Internal_OpenFile(fileToLoad);
+    CUtlString modLookupPath;
 
     if (hFile == INVALID_HANDLE_VALUE)
-        return FS_ASYNC_FILE_INVALID;
+    {
+        if (!fileToLoad || !*fileToLoad)
+            return FS_ASYNC_FILE_INVALID;
+
+        ModSystem()->LockModList();
+        bool found = false;
+
+        // Look for the file in our mods and obtain the first one we find.
+        FOR_EACH_VEC(ModSystem()->GetModList(), i)
+        {
+            const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+
+            modLookupPath = mod->GetBasePath() + fileToLoad;
+            const char* const pModLookupPath = modLookupPath.String();
+
+            hFile = FS_Internal_OpenFile(pModLookupPath);
+
+            if (hFile != INVALID_HANDLE_VALUE)
+            {
+                fileToLoad = pModLookupPath;
+                found = true;
+
+                break;
+            }
+        }
+
+        ModSystem()->UnlockModList();
+
+        if (!found)
+            return FS_ASYNC_FILE_INVALID;
+    }
 
     if (fileSizeOut)
     {
