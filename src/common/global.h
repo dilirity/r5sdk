@@ -111,6 +111,8 @@ extern ConVar* pvs_frustumCullOnly;
 extern ConVar* origin_disconnectWhenOffline;
 extern ConVar* discord_updatePresence;
 
+extern ConVar* match_playlist;
+
 extern ConVar* gamepad_custom_enabled;
 extern ConVar* gamepad_custom_assist_on;
 extern ConVar* gamepad_look_curve;
