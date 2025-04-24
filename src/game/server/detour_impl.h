@@ -30,7 +30,7 @@ inline dtStatus(*dtNavMeshQuery__moveAlongSurface)(dtNavMeshQuery* const query, 
 inline dtStatus(*dtNavMeshQuery__raycast)(dtNavMeshQuery* query, const dtPolyRef startRef, const rdVec3D* startPos, const rdVec3D* endPos,
 	const dtQueryFilter* filter, dtRaycastHit* hit);
 
-inline dtStatus(*dtNavMeshQuery__closestPointOnPoly)(dtNavMeshQuery* query, const dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist);
+inline bool(*dtNavMeshQuery__closestPointOnPoly)(dtNavMeshQuery* query, const dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist);
 inline dtStatus(*dtNavMeshQuery__closestPointOnPolyBoundary)(dtNavMeshQuery* query, const dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, float* dist);
 inline dtStatus(*dtNavMeshQuery__getPolyHeight)(dtNavMeshQuery* query, const dtPolyRef ref, const rdVec3D* pos, float* height, rdVec3D* normal);
 

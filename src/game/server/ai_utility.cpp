@@ -193,14 +193,14 @@ static dtStatus Detour_Raycast(dtNavMeshQuery* const query, const dtPolyRef star
 // Purpose: finds the closest point on the specified polygon.
 // Output : the status flags for the query.
 //-----------------------------------------------------------------------------
-static dtStatus Detour_ClosestPointOnPoly(dtNavMeshQuery* query, const dtPolyRef ref,
+static bool Detour_ClosestPointOnPoly(dtNavMeshQuery* query, const dtPolyRef ref,
     const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist)
 {
     // note(kawe): function has been replaced with the SDK's variant due to:
     // https://github.com/recastnavigation/recastnavigation/issues/556
     // 
     // This API is also a lot more robust than the game's implementation.
-    return query->closestPointOnPoly(ref, pos, closest, posOverPoly, dist, nullptr);
+    return dtStatusSucceed(query->closestPointOnPoly(ref, pos, closest, posOverPoly, dist, nullptr));
 }
 
 //-----------------------------------------------------------------------------
