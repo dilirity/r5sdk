@@ -52,6 +52,7 @@ public:
 		KeyValues* m_SettingsKV;
 		eModState m_iState = eModState::UNLOADED;
 		bool m_bHasScriptCompileList; // if this mod has a scripts.rson file that exists
+		bool m_bHasSearchPath;
 
 		CUtlVector<CUtlString> m_LocalizationFiles;
 		CUtlVector<ConVar*> m_ConVars;

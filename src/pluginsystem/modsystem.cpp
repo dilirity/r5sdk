@@ -188,7 +188,9 @@ void CModSystem::WriteModStatusList()
 CModSystem::ModInstance_t::ModInstance_t(const CUtlString& basePath)
 {
 	m_SettingsKV = nullptr;
+
 	m_bHasScriptCompileList = false;
+	m_bHasSearchPath = false;
 
 	m_BasePath = basePath;
 	m_BasePath.AppendSlash('/');
@@ -215,6 +217,7 @@ CModSystem::ModInstance_t::ModInstance_t(const CUtlString& basePath)
 	//         the filesystem cache to disk reroute to avoid the file name
 	//         clashing problems, research required.
 	FileSystem()->AddSearchPath(m_BasePath.Get(), "GAME", SearchPathAdd_t::PATH_ADD_TO_TAIL);
+	m_bHasSearchPath = true;
 
 	const CUtlString scriptsRsonPath = m_BasePath + GAME_SCRIPT_COMPILELIST;
 
@@ -232,7 +235,16 @@ CModSystem::ModInstance_t::~ModInstance_t()
 	if (m_SettingsKV)
 		delete m_SettingsKV;
 
-	m_ConVars.PurgeAndDeleteElements();
+	if (m_bHasSearchPath)
+		FileSystem()->RemoveSearchPath(m_BasePath.Get(), "GAME");
+
+	FOR_EACH_VEC(m_ConVars, i)
+	{
+		ConVar* const cvar = m_ConVars.Element(i);
+		cvar->Shutdown(); // Removes it from the linked list.
+
+		delete cvar;
+	}
 }
 
 //-----------------------------------------------------------------------------
