@@ -37,6 +37,8 @@ public:
 		inline bool IsLoaded() const { return m_iState == eModState::LOADED; };
 		inline bool IsEnabled() const { return m_iState == eModState::ENABLED; };
 
+		bool ShouldLoadPaks(const char* const targetPlaylist) const;
+
 		inline const CUtlString& GetBasePath() const { return m_BasePath; };
 		inline CUtlString GetScriptCompileListPath() const { return m_BasePath + GAME_SCRIPT_COMPILELIST; };
 

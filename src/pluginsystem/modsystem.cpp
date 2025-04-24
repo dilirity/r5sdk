@@ -227,6 +227,35 @@ CModSystem::ModInstance_t::~ModInstance_t()
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: returns whether pak loading should happen for current playlist
+// Input  : *targetPlaylist - 
+// Output : true if we should load, false otherwise
+//-----------------------------------------------------------------------------
+bool CModSystem::ModInstance_t::ShouldLoadPaks(const char* const targetPlaylist) const
+{
+	Assert(m_SettingsKV);
+	const KeyValues* const playlistsKV = m_SettingsKV->FindKey("PakLoadOnPlaylists");
+
+	// If the pak load filter is empty or absent, return true as that means no
+	// filter should be applied here.
+	if (!playlistsKV || !playlistsKV->GetFirstSubKey())
+		return true;
+
+	for (KeyValues* subKey = playlistsKV->GetFirstSubKey();
+		subKey != nullptr; subKey = subKey->GetNextKey())
+	{
+		if (!subKey->GetBool())
+			continue; // Pak load is disabled on this mode.
+
+		if (V_strcmp(subKey->GetName(), targetPlaylist) == 0)
+			return true;
+	}
+
+	// Current playlist not found in filter, paks shouldn't be loaded.
+	return false;
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: gets a keyvalue from settings KV, and logs an error on failure
 // Input  : *settingsPath - 
 //          *key          - 
