@@ -83,6 +83,7 @@
 #include "engine/client/cl_main.h"
 #include "engine/client/cl_rcon.h"
 #include "engine/client/cl_splitscreen.h"
+#include "engine/client/community_party.h"
 #endif // !DEDICATED
 #include "engine/client/client.h"
 #ifndef DEDICATED
@@ -610,6 +611,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	REGISTER(VClientState);
 	REGISTER(VCL_Main);
 	REGISTER(VSplitScreen);
+	REGISTER(VCommunityParty);
 #endif // !DEDICATED
 
 	// RTech
