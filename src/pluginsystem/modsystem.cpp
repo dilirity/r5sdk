@@ -20,6 +20,28 @@
 static ConVar modsystem_enable("modsystem_enable", "1", FCVAR_RELEASE, "Enable the modsystem");
 static ConVar modsystem_debug("modsystem_debug", "0", FCVAR_RELEASE, "Debug the modsystem");
 
+void ModSystem_Reload_f()
+{
+	g_ModSystem.Shutdown();
+	g_ModSystem.Init();
+}
+
+//-----------------------------------------------------------------------------
+// Console commands
+//-----------------------------------------------------------------------------
+
+// development only; if the convars are used by VGUI (i.e. attached to a slider
+// or button), then it will most likely crash the game. We might want to fix
+// this in the future by making sure the handles are always updated.
+static ConCommand modsystem_reload("modsystem_reload", ModSystem_Reload_f, "Reload the modsystem", FCVAR_DEVELOPMENTONLY);
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+CModSystem::CModSystem()
+{
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------

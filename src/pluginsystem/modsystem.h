@@ -65,6 +65,7 @@ public:
 		CUtlString m_BasePath;
 	};
 
+	CModSystem();
 	~CModSystem();
 
 	void Init();
