@@ -1,3 +1,8 @@
+//===============================================================================//
+//
+// Purpose: Client Sound Miles implementation
+//
+//===============================================================================//
 #include "core/stdafx.h"
 #include "tier0/fasttimer.h"
 #include "tier0/commandline.h"
@@ -10,19 +15,11 @@
 #include "miles_impl.h"
 #include "miles/src/sdk/shared/rrthreads2.h"
 
+//-----------------------------------------------------------------------------
+// Console variables
+//-----------------------------------------------------------------------------
 static ConVar miles_debug("miles_debug", "0", FCVAR_DEVELOPMENTONLY, "Enables debug prints for the Miles Sound System", "1 = print; 0 (zero) = no print");
 static ConVar miles_warnings("miles_warnings", "0", FCVAR_RELEASE, "Enables warning prints for the Miles Sound System", "1 = print; 0 (zero) = no print");
-
-//-----------------------------------------------------------------------------
-// Purpose: logs debug output emitted from the Miles Sound System
-// Input  : nLogLevel - 
-//          pszMessage - 
-//-----------------------------------------------------------------------------
-static void CSON_LogFunc(int64_t nLogLevel, const char* pszMessage)
-{
-	Msg(eDLL_T::AUDIO, "%s\n", pszMessage);
-	v_CSOM_LogFunc(nLogLevel, pszMessage);
-}
 
 //-----------------------------------------------------------------------------
 // Purpose: initializes the miles sound system
@@ -63,6 +60,20 @@ static bool CSOM_Initialize()
 	return bResult;
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: logs debug output emitted from the Miles Sound System
+// Input  : nLogLevel - 
+//          pszMessage - 
+//-----------------------------------------------------------------------------
+static void CSOM_LogFunc(int64_t nLogLevel, const char* pszMessage)
+{
+	Msg(eDLL_T::AUDIO, "%s\n", pszMessage);
+	v_CSOM_LogFunc(nLogLevel, pszMessage);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: runs the event queue
+//-----------------------------------------------------------------------------
 void MilesQueueEventRun(Miles::Queue* queue, const char* eventName)
 {
 	if(miles_debug.GetBool())
@@ -71,6 +82,9 @@ void MilesQueueEventRun(Miles::Queue* queue, const char* eventName)
 	v_MilesQueueEventRun(queue, eventName);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: patches miles banks
+//-----------------------------------------------------------------------------
 void MilesBankPatch(Miles::Bank* bank, char* streamPatch, char* localizedStreamPatch)
 {
 	if (miles_debug.GetBool())
@@ -97,6 +111,9 @@ void MilesBankPatch(Miles::Bank* bank, char* streamPatch, char* localizedStreamP
 	v_MilesBankPatch(bank, streamPatch, localizedStreamPatch);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: adds an audio event to the queue
+//-----------------------------------------------------------------------------
 static void CSOM_AddEventToQueue(const char* eventName)
 {
 	if (miles_debug.GetBool())
@@ -427,7 +444,7 @@ void MilesCore::Detour(const bool bAttach) const
 	DetourSetup(&v_MilesQueueEventRun, &MilesQueueEventRun, bAttach);
 	//DetourSetup(&v_MilesBankPatch, &MilesBankPatch, bAttach);
 	DetourSetup(&v_CSOM_Initialize, &CSOM_Initialize, bAttach);
-	DetourSetup(&v_CSOM_LogFunc, &CSON_LogFunc, bAttach);
+	DetourSetup(&v_CSOM_LogFunc, &CSOM_LogFunc, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileRead, &CSOM_MilesAsync_FileRead, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileStatus, &CSOM_MilesAsync_FileStatus, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileCancel, &CSOM_MilesAsync_FileCancel, bAttach);
