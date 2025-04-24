@@ -516,7 +516,9 @@ dtStatus dtNavMeshQuery::closestPointOnPoly(dtPolyRef ref, const rdVec3D* pos, r
 		return DT_FAILURE | DT_INVALID_PARAM;
 	}
 
-	m_nav->closestPointOnPoly(ref, pos, closest, posOverPoly, dist, normal);
+	if (!m_nav->closestPointOnPoly(ref, pos, closest, posOverPoly, dist, normal))
+		return DT_FAILURE;
+
 	return DT_SUCCESS;
 }
 
@@ -658,7 +660,9 @@ public:
 			bool posOverPoly = false;
 			float d;
 
-			m_query->closestPointOnPoly(ref, m_center, &closestPtPoly, &posOverPoly);
+			if (dtStatusFailed(m_query->closestPointOnPoly(ref, m_center, &closestPtPoly, &posOverPoly)))
+				continue; // Degenerate poly.
+
 			rdVsub(&diff, m_center, &closestPtPoly);
 
 			// Make sure the point resides within our query box.

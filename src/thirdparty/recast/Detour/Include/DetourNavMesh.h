@@ -1133,7 +1133,7 @@ private:
 	/// Returns whether position is over the poly and the height at the position if so.
 	bool getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const rdVec3D* pos, float* height, rdVec3D* normal = 0) const;
 	/// Returns closest point on polygon.
-	void closestPointOnPoly(dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist = 0, rdVec3D* normal = 0) const;
+	bool closestPointOnPoly(dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist = 0, rdVec3D* normal = 0) const;
 
 	dtMeshTile** m_posLookup;			///< Tile hash lookup.
 	dtMeshTile* m_nextFree;				///< Freelist of tiles.

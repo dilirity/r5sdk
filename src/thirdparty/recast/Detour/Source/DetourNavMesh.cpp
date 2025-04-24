@@ -1228,7 +1228,7 @@ dtStatus dtNavMesh::connectTraverseLinks(const dtTileRef tileRef, const dtTraver
 namespace
 {
 	template<bool onlyBoundary>
-	void closestPointOnDetailEdges(const dtMeshTile* tile, const dtPoly* poly, const rdVec3D* pos, rdVec3D* closest, float* dist, rdVec3D* normal)
+	bool closestPointOnDetailEdges(const dtMeshTile* tile, const dtPoly* poly, const rdVec3D* pos, rdVec3D* closest, float* dist, rdVec3D* normal)
 	{
 		const unsigned int ip = (unsigned int)(poly - tile->polys);
 		const dtPolyDetail* pd = &tile->detailMeshes[ip];
@@ -1238,6 +1238,7 @@ namespace
 		const rdVec3D* pmin = nullptr;
 		const rdVec3D* pmax = nullptr;
 		const rdVec3D* pv[3] = { nullptr, nullptr, nullptr };
+		bool found = false;
 
 		for (int i = 0; i < pd->triCount; i++)
 		{
@@ -1283,8 +1284,19 @@ namespace
 						pv[1] = v[1];
 						pv[2] = v[2];
 					}
+
+					found = true;
 				}
 			}
+		}
+
+		// This happens when `onlyBoundary` is false and we encountered a
+		// degenerate polygon with no detail boundary edges. Catch these here
+		// and avoid crashing the runtime as `pmin` and `pmax` will be NULL.
+		if (!found)
+		{
+			rdAssert(0);
+			return false;
 		}
 
 		rdVlerp(closest, pmin, pmax, tmin);
@@ -1294,6 +1306,8 @@ namespace
 
 		if (normal)
 			rdTriNormal(pv[0], pv[1], pv[2], normal);
+
+		return true;
 	}
 }
 
@@ -1348,7 +1362,8 @@ bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const 
 	// closest. This should almost never happen so the extra iteration here is
 	// ok.
 	rdVec3D closest;
-	closestPointOnDetailEdges<false>(tile, poly, pos, &closest, nullptr, normal);
+	if (!closestPointOnDetailEdges<false>(tile, poly, pos, &closest, nullptr, normal))
+		return false;
 
 	if (height)
 		*height = closest.z;
@@ -1356,7 +1371,7 @@ bool dtNavMesh::getPolyHeight(const dtMeshTile* tile, const dtPoly* poly, const 
 	return true;
 }
 
-void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist, rdVec3D* normal) const
+bool dtNavMesh::closestPointOnPoly(dtPolyRef ref, const rdVec3D* pos, rdVec3D* closest, bool* posOverPoly, float* dist, rdVec3D* normal) const
 {
 	const dtMeshTile* tile = 0;
 	const dtPoly* poly = 0;
@@ -1371,7 +1386,7 @@ void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const rdVec3D* pos, rdVec3D* c
 		if (dist)
 			*dist = 0.f;
 
-		return;
+		return true;
 	}
 
 	if (posOverPoly)
@@ -1389,11 +1404,11 @@ void dtNavMesh::closestPointOnPoly(dtPolyRef ref, const rdVec3D* pos, rdVec3D* c
 		if (dist)
 			*dist = rdVdist(pos, closest);
 
-		return;
+		return true;
 	}
 
 	// Outside poly that is not an off-mesh connection.
-	closestPointOnDetailEdges<true>(tile, poly, pos, closest, dist, normal);
+	return closestPointOnDetailEdges<true>(tile, poly, pos, closest, dist, normal);
 }
 
 dtPolyRef dtNavMesh::findNearestPolyInTile(const dtMeshTile* tile,
@@ -1418,7 +1433,9 @@ dtPolyRef dtNavMesh::findNearestPolyInTile(const dtMeshTile* tile,
 		rdVec3D diff;
 		bool posOverPoly = false;
 		float d;
-		closestPointOnPoly(ref, center, &closestPtPoly, &posOverPoly);
+
+		if (!closestPointOnPoly(ref, center, &closestPtPoly, &posOverPoly))
+			continue; // Degenerate poly.
 
 		// If a point is directly over a polygon and closer than
 		// climb height, favor that instead of straight line nearest point.
