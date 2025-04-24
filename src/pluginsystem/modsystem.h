@@ -77,9 +77,12 @@ public:
 	bool IsEnabled() const;
 
 	const inline CUtlVector<ModInstance_t*>& GetModList() { return m_ModList; };
+	const void LockModList() { m_ModListMutex.Lock(); }
+	const void UnlockModList() { m_ModListMutex.Unlock(); }
 
 private:
 	CUtlVector<ModInstance_t*> m_ModList;
+	CThreadMutex m_ModListMutex;
 };
 
 extern CModSystem g_ModSystem;

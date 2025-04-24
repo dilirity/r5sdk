@@ -431,6 +431,7 @@ static void Mod_PreloadAllPaks()
 {
     // Preload core paks.
     Mod_PreloadPaks("");
+    ModSystem()->LockModList();
 
     if (ModSystem()->IsEnabled())
     {
@@ -445,6 +446,8 @@ static void Mod_PreloadAllPaks()
             Mod_PreloadPaks(mod->GetBasePath().String());
         }
     }
+
+    ModSystem()->UnlockModList();
 }
 
 //-----------------------------------------------------------------------------
@@ -652,6 +655,8 @@ static void Mod_LoadLevelModPaks(const char* const levelName)
     if (!*targetPlaylist)
         return;
 
+    ModSystem()->LockModList();
+
     FOR_EACH_VEC(ModSystem()->GetModList(), i)
     {
         const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
@@ -671,6 +676,8 @@ static void Mod_LoadLevelModPaks(const char* const levelName)
             modSettingsKV->DeleteThis();
         }
     }
+
+    ModSystem()->UnlockModList();
 }
 
 //-----------------------------------------------------------------------------

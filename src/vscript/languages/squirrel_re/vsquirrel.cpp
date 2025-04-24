@@ -258,6 +258,8 @@ void CSquirrelVM::CompileModScripts()
 	if (!ModSystem()->IsEnabled())
 		return;
 
+	ModSystem()->LockModList();
+
 	FOR_EACH_VEC(ModSystem()->GetModList(), i)
 	{
 		const CModSystem::ModInstance_t* mod = ModSystem()->GetModList()[i];
@@ -333,6 +335,8 @@ void CSquirrelVM::CompileModScripts()
 		RSON_Free(rson, AlignedMemAlloc());
 		AlignedMemAlloc()->Free(rson);
 	}
+
+	ModSystem()->UnlockModList();
 }
 
 //---------------------------------------------------------------------------------

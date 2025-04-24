@@ -9,6 +9,8 @@ bool Localize_LoadLocalizationFileLists(CLocalize* thisptr)
 
 	if (ModSystem()->IsEnabled())
 	{
+		ModSystem()->LockModList();
+
 		const CUtlVector<CModSystem::ModInstance_t*>&
 			modList = ModSystem()->GetModList();
 
@@ -28,6 +30,8 @@ bool Localize_LoadLocalizationFileLists(CLocalize* thisptr)
 					Warning(eDLL_T::ENGINE, "Failed to add localization file '%s'\n", localizationFile);
 			}
 		}
+
+		ModSystem()->UnlockModList();
 	}
 
 	return true;

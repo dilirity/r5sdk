@@ -51,6 +51,8 @@ void CModSystem::Init()
 	RecursiveFindFilesMatchingName(modFileList,
 		MOD_BASE_DIRECTORY, MOD_SETTINGS_FILE, "GAME", '/');
 
+	LockModList();
+
 	FOR_EACH_VEC(modFileList, i)
 	{
 		// allocate dynamically, so less memory/resources are required when
@@ -72,6 +74,7 @@ void CModSystem::Init()
 	}
 
 	UpdateModStatusList();
+	UnlockModList(); // Unlock after to make sure nothing uses it during init.
 }
 
 //-----------------------------------------------------------------------------
@@ -80,8 +83,8 @@ void CModSystem::Init()
 //-----------------------------------------------------------------------------
 void CModSystem::Shutdown()
 {
-	// clear all allocated mod instances.
-	m_ModList.PurgeAndDeleteElements();
+	AUTO_LOCK(m_ModListMutex);
+	m_ModList.PurgeAndDeleteElements(); // clear all allocated mod instances.
 }
 
 //-----------------------------------------------------------------------------
@@ -100,6 +103,8 @@ void CModSystem::UpdateModStatusList()
 	CUtlMap<CUtlString, bool> enabledList(UtlStringLessFunc);
 	LoadModStatusList(enabledList);
 	
+	LockModList();
+
 	// from here, we determine whether or not to enable the loaded mod.
 	FOR_EACH_VEC(m_ModList, i)
 	{
@@ -126,6 +131,7 @@ void CModSystem::UpdateModStatusList()
 	}
 
 	WriteModStatusList();
+	UnlockModList(); // Unlock after to make sure nothing uses it during init.
 }
 
 //-----------------------------------------------------------------------------
@@ -153,6 +159,7 @@ void CModSystem::LoadModStatusList(CUtlMap<CUtlString, bool>& enabledList)
 void CModSystem::WriteModStatusList()
 {
 	KeyValues kv("ModList");
+	LockModList();
 
 	FOR_EACH_VEC(m_ModList, i)
 	{
@@ -164,6 +171,8 @@ void CModSystem::WriteModStatusList()
 
 		kv.SetBool(mod->m_ModID.Get(), enabled);
 	}
+
+	UnlockModList();
 
 	CUtlBuffer buf = CUtlBuffer(ssize_t(0), 0, CUtlBuffer::TEXT_BUFFER);
 	kv.RecursiveSaveToFile(buf, 0);
