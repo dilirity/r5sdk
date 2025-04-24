@@ -35,10 +35,16 @@ void ModSystem_Reload_f()
 // this in the future by making sure the handles are always updated.
 static ConCommand modsystem_reload("modsystem_reload", ModSystem_Reload_f, "Reload the modsystem", FCVAR_DEVELOPMENTONLY);
 
+static unsigned int ModSystem_HashModId(const CUtlString& s)
+{
+	return HashStringCaseless(s.String());
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
 CModSystem::CModSystem()
+	: m_ModIdHashMap(MAX_MODS_TO_LOAD, 0, 0, UtlStringCompareFunc, ModSystem_HashModId)
 {
 }
 
@@ -99,6 +105,19 @@ void CModSystem::Init()
 			continue;
 		}
 
+		bool didInsert; // Mod ID's must be unique!
+		m_ModIdHashMap.Insert(mod->m_ModID, &didInsert);
+
+		if (!didInsert)
+		{
+			Error(eDLL_T::ENGINE, NO_ERROR,
+				"Mod \"%s\" has ID \"%s\" that was already used by another mod; skipping...\n",
+				mod->m_Name.String(), mod->m_ModID.String());
+
+			delete mod;
+			continue;
+		}
+
 		m_ModList.AddToTail(mod);
 	}
 
@@ -114,6 +133,7 @@ void CModSystem::Shutdown()
 {
 	AUTO_LOCK(m_ModListMutex);
 	m_ModList.PurgeAndDeleteElements(); // clear all allocated mod instances.
+	m_ModIdHashMap.Purge();
 }
 
 //-----------------------------------------------------------------------------

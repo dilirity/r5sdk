@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tier1/utlhash.h"
 #include "tier1/keyvalues.h"
 #include "rtech/rson.h"
 #include "filesystem/filesystem.h"
@@ -85,6 +86,7 @@ public:
 
 private:
 	CUtlVector<ModInstance_t*> m_ModList;
+	CUtlHash<CUtlString> m_ModIdHashMap;
 	CThreadMutex m_ModListMutex;
 };
 
