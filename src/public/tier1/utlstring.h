@@ -1506,4 +1506,12 @@ inline bool UtlStringLessFunc(const CUtlString& lhs, const CUtlString& rhs)
 	return (Q_stricmp(lhs, rhs) < 0);
 }
 
+//-----------------------------------------------------------------------------
+// Compare function for use with CUtlHash keys
+//-----------------------------------------------------------------------------
+inline bool UtlStringCompareFunc(const CUtlString& lhs, const CUtlString& rhs)
+{
+	return (Q_stricmp(lhs, rhs) == 0);
+}
+
 #endif // UTLSTRING_H
