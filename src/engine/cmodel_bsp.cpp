@@ -21,6 +21,7 @@
 #include "rtech/pak/pakparse.h"
 #include "rtech/pak/paktools.h"
 #include "rtech/pak/pakstream.h"
+#include "rtech/playlists/playlists.h"
 
 #include "vpklib/packedstore.h"
 #include "datacache/mdlcache.h"
@@ -28,20 +29,18 @@
 #include "pluginsystem/modsystem.h"
 #ifndef DEDICATED
 #include "client/clientstate.h"
+#include "client/community_party.h"
 #endif // !DEDICATED
 
 CUtlVector<CUtlString> g_InstalledMaps;
-CFmtStrN<MAX_MAP_NAME> s_CurrentLevelName;
-
 static CustomPakData_s s_customPakData;
-static KeyValues* s_pLevelSetKV = nullptr;
 
 //-----------------------------------------------------------------------------
 // Purpose: load a custom pak and add it to the list
 // Input  : *pakFile - 
 // Output : pak handle, PAK_INVALID_HANDLE on failure
 //-----------------------------------------------------------------------------
-PakHandle_t CustomPakData_s::LoadAndAddPak(const char* const pakFile)
+PakHandle_t CustomPakData_s::LoadAndAddPak(const char* const pakFile, const bool isMod)
 {
     if (numHandles >= MAX_CUSTOM_PAKS)
     {
@@ -56,6 +55,10 @@ PakHandle_t CustomPakData_s::LoadAndAddPak(const char* const pakFile)
         return pakId;
 
     handles[numHandles++] = pakId;
+
+    if (isMod)
+        numMods++;
+
     return pakId;
 }
 
@@ -102,7 +105,7 @@ PakHandle_t CustomPakData_s::PreloadAndAddPak(const char* const pakFile)
     // due to the unload order: user-requested -> preloaded -> sdk -> core.
     assert(handles[CustomPakData_s::PAK_TYPE_COUNT+numPreload] == PAK_INVALID_HANDLE);
 
-    const PakHandle_t pakId = LoadAndAddPak(pakFile);
+    const PakHandle_t pakId = LoadAndAddPak(pakFile, false);
 
     if (pakId != PAK_INVALID_HANDLE)
         numPreload++;
@@ -115,8 +118,11 @@ PakHandle_t CustomPakData_s::PreloadAndAddPak(const char* const pakFile)
 //          over time until it returns true
 // Output : true if the non-preloaded paks are unloaded
 //-----------------------------------------------------------------------------
-bool CustomPakData_s::UnloadAndRemoveNonPreloaded()
+bool CustomPakData_s::UnloadAndRemoveNonPreloaded(const bool modsOnly)
 {
+    if (modsOnly && numMods == 0)
+        return true;
+
     // Preloaded paks should not be unloaded here, but only right before sdk /
     // engine paks are unloaded. Only unload user requested and level settings
     // paks from here. Unload them in reverse order, the last pak loaded should
@@ -127,6 +133,14 @@ bool CustomPakData_s::UnloadAndRemoveNonPreloaded()
             return false;
 
         numHandles--;
+
+        if (numMods > 0)
+        {
+            numMods--;
+
+            if (modsOnly && numMods == 0)
+                return true;
+        }
     }
 
     return true;
@@ -187,7 +201,17 @@ bool CustomPakData_s::UnloadBasePak(const PakType_e type)
 //-----------------------------------------------------------------------------
 static bool Mod_LevelHasChanged(const char* const levelName)
 {
-    return (V_strcmp(levelName, s_CurrentLevelName.String()) != NULL);
+    return (V_strcmp(levelName, s_customPakData.lastPrecachedLevel) != NULL);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: checks if playlist has changed
+// Input  : *playlistName - 
+// Output : true if playlist name deviates from previous playlist
+//-----------------------------------------------------------------------------
+static bool Mod_PlaylistHasChanged(const char* const playlistName)
+{
+    return (V_strcmp(playlistName, s_customPakData.lastPlaylistUsedForPrecache) != NULL);
 }
 
 //-----------------------------------------------------------------------------
@@ -296,7 +320,7 @@ static bool Mod_IsPakLoadFinished(const PakHandle_t pakId)
 // Purpose: returns whether the load job for custom pak batch for given common
 //          pak is finished
 //-----------------------------------------------------------------------------
-static bool CustomPakData_IsPakLoadFinished(const CommonPakData_s::PakType_e commonType)
+static bool Mod_IsCustomPakLoadFinished(const int commonType)
 {
     switch (commonType)
     {
@@ -401,18 +425,6 @@ static void Mod_PreloadPaks(const char* const rootPath)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: formats the mod path using mod system install location to allow
-//          the file system of the RTech API to load files from mod paths
-// Input  : *mod - 
-//          &out - 
-//-----------------------------------------------------------------------------
-static void Mod_GetModPathForRTechAPI(const CModSystem::ModInstance_t* const mod, CUtlString& out)
-{
-    out = ModSystem()->GetInstallPath() + mod->GetBasePath();
-    out.FixSlashes(); // RTech API expects platform separator.
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: preloads all mod pak files
 //-----------------------------------------------------------------------------
 static void Mod_PreloadAllPaks()
@@ -430,14 +442,9 @@ static void Mod_PreloadAllPaks()
             if (!mod->IsEnabled())
                 continue;
 
-            CUtlString lookupPath;
-
-            Mod_GetModPathForRTechAPI(mod, lookupPath);
-            Mod_PreloadPaks(lookupPath.String());
+            Mod_PreloadPaks(mod->GetBasePath().String());
         }
     }
-
-    s_customPakData.basePaksLoaded = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -449,8 +456,52 @@ static bool Mod_UnloadPreloadedPaks()
     if (!s_customPakData.UnloadAndRemovePreloaded())
         return false;
 
-    s_customPakData.basePaksLoaded = false;
     return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: initiates the reprocess of all user level mod paks, call this when
+//          the playlist changes as we need to re-evaluate which paks need to
+//          be unloaded and loaded as some mod paks are necessary on certain
+//          playlists while others aren't
+//-----------------------------------------------------------------------------
+static void Mod_InitiateUserLevelModPaksReprocess()
+{
+    s_customPakData.reprocessUserLevelPaks = true;
+    s_customPakData.reprocessUserLevelPaksUnloadFinished = false;
+    s_customPakData.reprocessUserLevelPaksLoadCalled = false;
+
+    *g_pPakPrecacheJobFinished = false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: cancel the user level mod paks reprocess request
+//-----------------------------------------------------------------------------
+static void Mod_CancelUserLevelModPaksReprocess()
+{
+    s_customPakData.reprocessUserLevelPaks = false;
+    s_customPakData.reprocessUserLevelPaksUnloadFinished = true;
+    s_customPakData.reprocessUserLevelPaksLoadCalled = true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the playlist we are currently looking for
+//-----------------------------------------------------------------------------
+static const char* Mod_GetTargetPlaylistForPreload()
+{
+#ifndef DEDICATED
+    // For client builds, we need to be aware of our party because the engine
+    // uses this to precache level assets; it calls Party_GetTargetMap() which
+    // internally does the same thing as Party_GetTargetPlaylist(), except it
+    // retrieves the target map from the given 'target' playlist. We need to
+    // resolve the playlist that was used to retrieve the target level so we
+    // can load the correct level mod paks.
+    return Party_GetTargetPlaylist();
+#else
+    // For server builds, life's a lot easier; we just take whatever our
+    // current playlist is and return that.
+    return v_Playlists_GetCurrent();
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -460,15 +511,47 @@ static bool Mod_UnloadPreloadedPaks()
 //-----------------------------------------------------------------------------
 static void Mod_HandleLevelChanged(const char* const levelName)
 {
-    if (Mod_LevelHasChanged(levelName))
-        s_customPakData.levelResourcesLoaded = false;
+    const bool levelChanged = Mod_LevelHasChanged(levelName);
 
-    s_CurrentLevelName = levelName;
+    if (levelChanged)
+    {
+        // Lobby should be handled specially, as changing level to lobby will
+        // retain all currently loaded paks as an optimization since its likely
+        // that we will be loading the previous level again. However we still
+        // want to load/unload our level mod paks based on the map and mode we
+        // are on. Detect the changing to/from lobby level here and handle it.
+        s_customPakData.inLobby = V_strcmp(levelName, "mp_lobby") == NULL;
 
-    // Dedicated should not load loadscreens.
-#ifndef DEDICATED
-    v_Mod_LoadLoadscreenPakForLevel(levelName);
-#endif // !DEDICATED
+        // note(kawe): corner case; if we are remounting paks (either through
+        // the concommand `pak_emulateremount` or an actual scenario, and we
+        // load the lobby directly after while its still reloading the paks,
+        // the system will call `Mod_LoadAllLevelPaks` while we are loading the
+        // lobby. We should retain the last precached level here and not update
+        // it when we go into the lobby to account for this scenario. This is
+        // technically also the correct behavior since the lobby isn't a level
+        // in the context of this system (lobby has its own slot in the main
+        // `CommonPakData_s` structure, with a higher priority than the level
+        // paks. The lobby paks are also always loaded and persistent accross
+        // all level changes).
+        if (!s_customPakData.inLobby)
+            s_customPakData.lastPrecachedLevel = levelName;
+    }
+
+    // We should retain all paks in lobby, do not initiate a reprocess unless
+    // we are precaching assets for a new level. (this is for SetLevelNameForLoading,
+    // and possibly PreCacheLevelDuringVideo, test it for this script func). If we
+    // precache, `inLobby` will be set to false in `Mod_SetPrecacheLevelName` and
+    // `Mod_SetPrecachePlaylistName`.
+    if (!s_customPakData.inLobby)
+    {
+        const char* const playlistName = Mod_GetTargetPlaylistForPreload();
+
+        if (Mod_PlaylistHasChanged(playlistName))
+        {
+            Mod_InitiateUserLevelModPaksReprocess();
+            s_customPakData.lastPlaylistUsedForPrecache = playlistName;
+        }
+    }
 }
 
 #define MOD_LEVEL_SETTINGS_PATH "scripts/levels/settings/"
@@ -488,23 +571,13 @@ static KeyValues* Mod_GetLevelSettings(const char* const levelName, const char* 
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: loads the level settings file, returns current if level hasn't changed.
+// Purpose: loads the level core settings file.
 // Input  : *levelName - 
 // Output : KeyValues*, nullptr on failure
 //-----------------------------------------------------------------------------
-KeyValues* Mod_GetCoreLevelSettings(const char* const levelName)
+KeyValues* Mod_GetLevelCoreSettings(const char* const levelName)
 {
-    if (s_pLevelSetKV)
-    {
-        // If we didn't change the level, return the current one
-        if (s_customPakData.levelResourcesLoaded)
-            return s_pLevelSetKV;
-
-        s_pLevelSetKV->DeleteThis();
-    }
-
-    s_pLevelSetKV = Mod_GetLevelSettings(levelName, "");
-    return s_pLevelSetKV;
+    return Mod_GetLevelSettings(levelName, "");
 }
 
 //-----------------------------------------------------------------------------
@@ -528,16 +601,22 @@ static void Mod_LoadLevelPaks(KeyValues* const settingsKV, const char* const roo
             continue;
 
         const char* pakToLoad;
+        bool isMod;
 
         if (*rootPath)
         {
             Mod_FormatPakPath(pathBuf, rootPath, subKey->GetName());
+
             pakToLoad = pathBuf;
+            isMod = true;
         }
         else
+        {
             pakToLoad = subKey->GetName();
+            isMod = false;
+        }
 
-        const PakHandle_t pakId = s_customPakData.LoadAndAddPak(pakToLoad);
+        const PakHandle_t pakId = s_customPakData.LoadAndAddPak(pakToLoad, isMod);
 
         if (pakId == PAK_INVALID_HANDLE)
             Error(eDLL_T::ENGINE, NO_ERROR, "%s: unable to load pak '%s'\n", __FUNCTION__, pathBuf);
@@ -545,66 +624,98 @@ static void Mod_LoadLevelPaks(KeyValues* const settingsKV, const char* const roo
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: load all mod paks for this level
+// Purpose: load core mod paks for this level
 // Input  : *levelName - 
 //-----------------------------------------------------------------------------
-static void Mod_LoadAllLevelPaks(const char* const levelName)
+static void Mod_LoadLevelCorePaks(const char* const levelName)
 {
-    KeyValues* const coreSettingsKV = Mod_GetCoreLevelSettings(levelName);
+    KeyValues* const coreSettingsKV = Mod_GetLevelCoreSettings(levelName);
 
-    // Load core level paks.
     if (coreSettingsKV)
-        Mod_LoadLevelPaks(coreSettingsKV, "");
-
-    // Load mod level paks.
-    if (ModSystem()->IsEnabled())
     {
-        FOR_EACH_VEC(ModSystem()->GetModList(), i)
+        Mod_LoadLevelPaks(coreSettingsKV, "");
+        coreSettingsKV->DeleteThis();
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: load user mod paks for this level
+// Input  : *levelName - 
+//-----------------------------------------------------------------------------
+static void Mod_LoadLevelModPaks(const char* const levelName)
+{
+    if (!ModSystem()->IsEnabled())
+        return;
+
+    const char* const targetPlaylist = s_customPakData.lastPlaylistUsedForPrecache;
+
+    if (!*targetPlaylist)
+        return;
+
+    FOR_EACH_VEC(ModSystem()->GetModList(), i)
+    {
+        const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+
+        if (!mod->IsEnabled())
+            continue;
+
+        if (!mod->ShouldLoadPaks(targetPlaylist))
+            continue;
+
+        const char* const rootPath = mod->GetBasePath().String();
+        KeyValues* const modSettingsKV = Mod_GetLevelSettings(levelName, rootPath);
+
+        if (modSettingsKV)
         {
-            const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
-
-            if (!mod->IsEnabled())
-                continue;
-
-            const char* const rootPath = mod->GetBasePath().String();
-            KeyValues* const modSettingsKV = Mod_GetLevelSettings(levelName, rootPath);
-
-            if (modSettingsKV)
-            {
-                CUtlString lookupPath;
-
-                Mod_GetModPathForRTechAPI(mod, lookupPath);
-                Mod_LoadLevelPaks(modSettingsKV, lookupPath.String());
-            }
+            Mod_LoadLevelPaks(modSettingsKV, rootPath);
+            modSettingsKV->DeleteThis();
         }
     }
+}
 
-    s_customPakData.levelResourcesLoaded = true;
+//-----------------------------------------------------------------------------
+// Purpose: load all mod paks for this level
+// Input  : modsOnly - 
+//-----------------------------------------------------------------------------
+static void Mod_LoadAllLevelPaks(const bool modsOnly)
+{
+    const char* const levelToUse = s_customPakData.lastPrecachedLevel;
+
+    if (!modsOnly)
+        Mod_LoadLevelCorePaks(levelToUse); // Load level core paks.
+
+    Mod_LoadLevelModPaks(levelToUse); // Load level mod paks.
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: unloads all paks loaded by the level settings file
+// Input  : modsOnly - 
 //-----------------------------------------------------------------------------
-static bool Mod_UnloadLevelPaks()
+static bool Mod_UnloadLevelPaks(const bool modsOnly)
 {
-    if (!s_customPakData.UnloadAndRemoveNonPreloaded())
+    if (!s_customPakData.UnloadAndRemoveNonPreloaded(modsOnly))
         return false;
 
-    s_customPakData.levelResourcesLoaded = false;
+    // NOTE: if we only unload level mod paks, we shouldn't
+    // clear the bad model handles because the actual level
+    // resources are still loaded, just mods that are gone.
+    if (!modsOnly)
+    {
+        g_StudioMdlFallbackHandler.ClearBadModelHandleCache();
+        g_StudioMdlFallbackHandler.ClearSuppresionList();
 
-    g_StudioMdlFallbackHandler.ClearBadModelHandleCache();
-    g_StudioMdlFallbackHandler.ClearSuppresionList();
+        // The old gather props is set if a model couldn't be
+        // loaded properly. If we unload level assets, we just
+        // enable the new implementation again and re-evaluate
+        // on the next level load. If we load a missing/bad
+        // model again, we toggle the old implementation as
+        // otherwise the fallback models won't render; the new
+        // gather props solution does not attempt to obtain
+        // studio hardware data on bad mdl handles. See
+        // 'GatherStaticPropsSecondPass_PreInit()' for details.
+        g_StudioMdlFallbackHandler.DisableLegacyGatherProps();
+    }
 
-    // The old gather props is set if a model couldn't be
-    // loaded properly. If we unload level assets, we just
-    // enable the new implementation again and re-evaluate
-    // on the next level load. If we load a missing/bad
-    // model again, we toggle the old implementation as
-    // otherwise the fallback models won't render; the new
-    // gather props solution does not attempt to obtain
-    // studio hardware data on bad mdl handles. See
-    // 'GatherStaticPropsSecondPass_PreInit()' for details.
-    g_StudioMdlFallbackHandler.DisableLegacyGatherProps();
     return true;
 }
 
@@ -622,7 +733,7 @@ static int Mod_GetTargetPakToUnloadType()
         const CommonPakData_s& cpd = g_commonPakData[endIndex];
 
         if (cpd.isUnloading)
-            break; // This pak is unloading, break and return idx.
+            break; // This pak is currently unloading, break and return idx.
 
         if (V_strcmp(cpd.pakName, cpd.basePakName))
             break; // Different pak pending to load, break and return idx.
@@ -671,15 +782,13 @@ static bool Mod_HandleCustomPakUnloadForType(const int type)
     }
     case CommonPakData_s::PakType_e::PAK_TYPE_LEVEL:
     {
-        if (!Mod_UnloadLevelPaks()) // Unload mod pak files.
+        if (!Mod_UnloadLevelPaks(false)) // Unload extra level pak files.
             return false;
 
-        if (s_pLevelSetKV)
-        {
-            // Delete current level settings if we drop all paks..
-            s_pLevelSetKV->DeleteThis();
-            s_pLevelSetKV = nullptr;
-        }
+        // If this was initiated, cancel it because they will be re-initiated
+        // when we load our level paks again. Else we will end up loading them
+        // up twice again.
+        Mod_CancelUserLevelModPaksReprocess();
         break;
     }
     default:
@@ -701,7 +810,7 @@ static bool Mod_UnloadPaksUntilType(const int pakType)
         CommonPakData_s& cpd = g_commonPakData[i];
 
         if (!cpd.pakName[0])
-            continue;
+            continue; // Already unloaded.
 
         PakLoadedInfo_s* const pakInfo = Pak_GetPakInfo(cpd.pakId);
         PakStatus_e status = PAK_STATUS_INVALID_PAKHANDLE;
@@ -713,8 +822,14 @@ static bool Mod_UnloadPaksUntilType(const int pakType)
         {
             cpd.isUnloading = true;
 
-            if (!Mod_HandleCustomPakUnloadForType(i))
-                return false;
+            if (cpd.isCustomPakLoaded)
+            {
+                // Make sure the custom pak is unloaded first.
+                if (!Mod_HandleCustomPakUnloadForType(i))
+                    return false;
+
+                cpd.isCustomPakLoaded = false;
+            }
 
             g_pakLoadApi->UnloadAsync(cpd.pakId);
         }
@@ -750,12 +865,12 @@ static void Mod_LoadAndUnloadPaksWithLock()
         return;
 
     if (vpk->GetStatus() != 0)
-        return;
-
-    JobFifoLock_s* const pakFifoLock = &g_pakGlobals->fifoLock;
+        return; // VPK not ready yet.
 
     if (g_pakGlobals->hasPendingUnloadJobs || g_pakGlobals->loadedPakCount != g_pakGlobals->requestedPakCount)
     {
+        JobFifoLock_s* const pakFifoLock = &g_pakGlobals->fifoLock;
+
         if (!JT_AcquireFifoLock(pakFifoLock)
             && !JT_HelpWithJobTypes(g_pPakFifoLockWrapper, pakFifoLock, -1, 0))
         {
@@ -805,7 +920,10 @@ static void Mod_HandleCustomPakLoadForType(const int type)
     }
     case CommonPakData_s::PakType_e::PAK_TYPE_LEVEL:
     {
-        Mod_LoadAllLevelPaks(s_CurrentLevelName.String());
+        Mod_LoadAllLevelPaks(false);
+        // If this was initiated, cancel it because they have already been
+        // reprocessed at this point.
+        Mod_CancelUserLevelModPaksReprocess();
         break;
     }
     default:
@@ -814,15 +932,30 @@ static void Mod_HandleCustomPakLoadForType(const int type)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: checks if all pending pak load jobs have finished and forces the
-//          global state to unfinished if its still in progress
+// Purpose: loads the main pak and forces the global state to unfinished and
+//          returns false if its still in progress. If the main pak finished
+//          loading, the custom pak linked to this pak will start loading and
+//          code will force the global state to unfinished and return false
+//          for this pak as well if its still in progress.
 // Input  : &cpd - 
 //          index - 
 // Output : true if all load jobs have finished, false otherwise
 //-----------------------------------------------------------------------------
-static bool Mod_UpdateLoadJobState(const CommonPakData_s& cpd, const int index)
+static bool Mod_HandlePakLoadJobStateUpdate(CommonPakData_s& cpd, const int index)
 {
-    if (!Mod_IsPakLoadFinished(cpd.pakId) || !CustomPakData_IsPakLoadFinished(CommonPakData_s::PakType_e(index)))
+    if (!Mod_IsPakLoadFinished(cpd.pakId))
+    {
+        *g_pPakPrecacheJobFinished = false;
+        return false;
+    }
+
+    if (!cpd.isCustomPakLoaded && cpd.pakId != PAK_INVALID_HANDLE)
+    {
+        Mod_HandleCustomPakLoadForType(index);
+        cpd.isCustomPakLoaded = true;
+    }
+
+    if (!Mod_IsCustomPakLoadFinished(index))
     {
         *g_pPakPrecacheJobFinished = false;
         return false;
@@ -830,6 +963,97 @@ static bool Mod_UpdateLoadJobState(const CommonPakData_s& cpd, const int index)
 
     return true;
 }
+
+//-----------------------------------------------------------------------------
+// Purpose: handles the unload of user level mod paks if the reprocess flag is
+//          set, this will be set if we change the playlist
+//-----------------------------------------------------------------------------
+static bool Mod_HandleUserLevelModPaksUnload()
+{
+    if (s_customPakData.reprocessUserLevelPaks && !s_customPakData.reprocessUserLevelPaksUnloadFinished)
+    {
+        // note(kawe): unlike engine and sdk paks (which follow a fixed loading
+        // and unloading order) we couldn't reliably unload disabled mod paks
+        // and keep enabled mod paks loaded, because if we happen to unload a
+        // pak that another one that we keep relies on, we will have dangling
+        // references which will yield undefined behavior (typically crashes).
+        // We have to bite the bullet and reload all level mod paks to avoid
+        // this behavior which instead will show the mod author an actual asset
+        // dependency error may they happen to load their linked mod paks in
+        // the wrong order, or unload a pak while loading a pak that relies on
+        // the now unloaded pak.
+        if (!Mod_UnloadLevelPaks(true))
+            return false;
+
+        s_customPakData.reprocessUserLevelPaksUnloadFinished = true;
+    }
+
+    return true;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: handles the load of user level mod paks if the reprocess flag is
+//          set, this will be set if we change the playlist
+//-----------------------------------------------------------------------------
+static void Mod_HandleUserLevelModPaksLoad()
+{
+    if (!s_customPakData.reprocessUserLevelPaks)
+        return; // Nothing to reprocess.
+
+    if (IsDebug())
+    {
+        // If we launch directly into the lobby, and this code is fired, then
+        // there is a code bug somewhere! This should never be called before
+        // the lobby pak is loaded, this should also never be called when
+        // loading into the lobby.
+        CommonPakData_s& cpd = g_commonPakData[CommonPakData_s::PAK_TYPE_LOBBY];
+
+        if (cpd.pakId == PAK_INVALID_HANDLE)
+        {
+            Assert(0, "Loaded level mod paks while the lobby paks weren't loaded yet!");
+            return;
+        }
+    }
+
+    if (!s_customPakData.reprocessUserLevelPaksLoadCalled)
+    {
+        // Only mods, we only reload level core paks if we actually change
+        // levels, in that case this code shouldn't be fired.
+        Mod_LoadAllLevelPaks(true);
+        s_customPakData.reprocessUserLevelPaksLoadCalled = true;
+    }
+
+    if (!Mod_IsCustomPakLoadFinished(CommonPakData_s::PAK_TYPE_LEVEL))
+        *g_pPakPrecacheJobFinished = false;
+
+    if (*g_pPakPrecacheJobFinished)
+        s_customPakData.reprocessUserLevelPaks = false;
+}
+
+// Streaming data is client only, remounting does not apply for the dedicated
+// server.
+#ifndef DEDICATED
+static bool s_emulatePakRemount = false;
+
+static void Pak_EmulateRemount_f(const CCommand& args)
+{
+    NOTE_UNUSED(args);
+    s_emulatePakRemount = true;
+}
+
+static ConCommand pak_emulateremount("pak_emulateremount", Pak_EmulateRemount_f,
+    "Remount all paks once we are disconnected and no longer active, as if we had assets with discarded streaming data loaded.", FCVAR_DEVELOPMENTONLY);
+
+//-----------------------------------------------------------------------------
+// Purpose: returns whether we should remount all paks, for example, when we
+//          have assets loaded with discarded streaming data.
+//-----------------------------------------------------------------------------
+static bool Mod_ShouldRemountPaks()
+{
+    return s_emulatePakRemount || // Emulation override for debugging.
+        (Pak_StreamingDownloadFinished() && Pak_HasNonFullyInstalledAssetsLoaded());
+}
+#endif // !DEDICATED
 
 //-----------------------------------------------------------------------------
 // Purpose: pak loading and unloading state machine
@@ -844,8 +1068,7 @@ static void Mod_RunPakJobFrame()
     // the stream file handles are only opened during the load of a given rpak.
     // For host, we also need to check if the game is active and only continue
     // if it isn't because the assets are otherwise still in use by the server.
-    if (Pak_StreamingDownloadFinished() && Pak_HasNonFullyInstalledAssetsLoaded()
-        && !g_pHostState->IsActiveGame() && !g_pClientState->IsConnected())
+    if (Mod_ShouldRemountPaks() && !g_pHostState->IsActiveGame() && !g_pClientState->IsConnected())
     {
         *g_pPakPrecacheJobFinished = false;
         unloadAll = true;
@@ -866,7 +1089,23 @@ static void Mod_RunPakJobFrame()
     const int endIndex = unloadAll ? 0 : Mod_GetTargetPakToUnloadType();
 
     if (!Mod_UnloadPaksUntilType(endIndex))
-        return;
+        return; // Not finished unloading yet.
+
+#ifndef DEDICATED
+    s_emulatePakRemount = false;
+#endif // !DEDICATED
+
+    // If we change to the lobby, we should retain all the currently loaded
+    // paks, including mod paks as its likely we will be going back to the
+    // same level and same playlist again. If we do actually change to a
+    // different level than the previous one from the lobby, the paks will
+    // all be unloaded in the above `Mod_UnloadPaksUntilType` call and all
+    // the level mod paks will be re-evaluated anyways.
+    if (!s_customPakData.inLobby)
+    {
+        if (!Mod_HandleUserLevelModPaksUnload())
+            return;
+    }
 
     *g_pPakPrecacheJobFinished = true;
 
@@ -876,7 +1115,7 @@ static void Mod_RunPakJobFrame()
 
         if (V_strcmp(cpd.pakName, cpd.basePakName) == 0)
         {
-            if (!Mod_UpdateLoadJobState(cpd, i))
+            if (!Mod_HandlePakLoadJobStateUpdate(cpd, i))
                 return; // Current pak hasn't finished loading yet.
 
             continue; // Pak file didn't change, no mutation needed.
@@ -886,18 +1125,57 @@ static void Mod_RunPakJobFrame()
         V_strncpy(cpd.pakName, cpd.basePakName, MAX_OSPATH);
         cpd.pakId = g_pakLoadApi->LoadAsync(cpd.pakName, AlignedMemAlloc(), 4, 0);
 
-        Mod_HandleCustomPakLoadForType(i);
-
-        if (!Mod_UpdateLoadJobState(cpd, i))
+        if (!Mod_HandlePakLoadJobStateUpdate(cpd, i))
             return; // Current pak hasn't finished loading yet.
     }
 
+    // See comment on the `Mod_HandleUserLevelModPaksUnload` guard above.
+    if (!s_customPakData.inLobby)
+        Mod_HandleUserLevelModPaksLoad();
+
     Mod_LoadAndUnloadPaksWithLock();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: initiates asset precache for the given level
+// Input  : *fullLevelFileName - is vpk/<target>_<levelName>.bsp, so it can be:
+//                               vpk/server_mp_lobby.bsp
+//          *levelName         - is mp_lobby, mp_rr_box, or whatever map we are
+//                               precaching. However, if the to-precache VPK 
+//                               doesn't have a map by design, such as the VPK
+//                               vpk/client_mp_common.bsp for example, then the
+//                               levelName parameter will be nullptr!
+//          allowVpkLoadFail   - whether to error or not when the VPK for the
+//                               given level failed to load. NOTE that we will
+//                               always error when a VPK without a BSP level,
+//                               such as vpk/client_frontend.bsp, fails to load
+//-----------------------------------------------------------------------------
+static void Mod_PrecacheLevelAssets(const char* const fullLevelFileName, const char* const levelName, const bool allowVpkLoadFail)
+{
+    if (levelName)
+        Mod_HandleLevelChanged(levelName);
+
+    v_Mod_PrecacheLevelAssets(fullLevelFileName, levelName, allowVpkLoadFail);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: loads the load screen pak for the given level
+// Input  : *levelName
+//-----------------------------------------------------------------------------
+static void Mod_LoadLoadscreenPakForLevel(const char* const levelName)
+{
+    // On the dedicated server, we should do nothing here since load screens
+    // are not used and shipped on dedicated servers for good reasons! These
+    // are client-only.
+#ifndef DEDICATED
+    v_Mod_LoadLoadscreenPakForLevel(levelName);
+#endif // !DEDICATED
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 void VModel_BSP::Detour(const bool bAttach) const
 {
-	DetourSetup(&v_Mod_LoadLoadscreenPakForLevel, &Mod_HandleLevelChanged, bAttach);
 	DetourSetup(&v_Mod_RunPakJobFrame, &Mod_RunPakJobFrame, bAttach);
+	DetourSetup(&v_Mod_PrecacheLevelAssets, &Mod_PrecacheLevelAssets, bAttach);
+	DetourSetup(&v_Mod_LoadLoadscreenPakForLevel, &Mod_LoadLoadscreenPakForLevel, bAttach);
 }

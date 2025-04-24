@@ -9,7 +9,7 @@
 //---------------------------------------------------------------------------------
 static void StreamDB_Init(const char* const pszLevelName)
 {
-	KeyValues* const pSettingsKV = Mod_GetCoreLevelSettings(pszLevelName);
+	KeyValues* const pSettingsKV = Mod_GetLevelCoreSettings(pszLevelName);
 	const char* targetStreamDB = pszLevelName;
 
 	if (pSettingsKV)
@@ -18,6 +18,8 @@ static void StreamDB_Init(const char* const pszLevelName)
 
 		if (pStreamKV)
 			targetStreamDB = pStreamKV->GetString();
+
+		pSettingsKV->DeleteThis();
 	}
 
 	v_StreamDB_Init(targetStreamDB);

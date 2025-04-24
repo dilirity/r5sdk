@@ -1,5 +1,6 @@
 #pragma once
 #include "tier0/jobthread.h"
+#include "tier1/fmtstr.h"
 #include "rtech/ipakfile.h"
 #include "vpklib/packedstore.h"
 
@@ -35,13 +36,9 @@ struct CommonPakData_s
 
 	CommonPakData_s()
 	{
-		Reset();
-	}
-
-	void Reset()
-	{
 		pakId = PAK_INVALID_HANDLE;
 		isUnloading = false;
+		isCustomPakLoaded = false;
 		basePakName = nullptr;
 
 		memset(pakName, '\0', sizeof(pakName));
@@ -52,6 +49,15 @@ struct CommonPakData_s
 
 	// the pak name that's being requested to be loaded for this particular slot
 	char pakName[MAX_OSPATH];
+
+	/*-------------------
+	 | 7 pad bytes here |
+	 -------------------*/
+
+	// NEW: true if we loaded the custom pak that is linked to this base pak
+	// so we can initiate the LoadAsync call on the custom pak (paks from
+	// CustomPakData_s). This new member uses the pad bytes.
+	bool isCustomPakLoaded;
 
 	// the actual base pak name, like "common_pve.rpak" as set when this array is
 	// being initialized
@@ -97,15 +103,18 @@ struct CustomPakData_s
 		// the first # handles are reserved for base SDK paks
 		numHandles = PAK_TYPE_COUNT;
 		numPreload = 0;
+		numMods = 0;
 
-		levelResourcesLoaded = false;
-		basePaksLoaded = false;
+		inLobby = false;
+		reprocessUserLevelPaks = false;
+		reprocessUserLevelPaksUnloadFinished = false;
+		reprocessUserLevelPaksLoadCalled = false;
 	}
 
-	PakHandle_t LoadAndAddPak(const char* const pakFile);
+	PakHandle_t LoadAndAddPak(const char* const pakFile, const bool isMod);
 	PakHandle_t PreloadAndAddPak(const char* const pakFile);
 
-	bool UnloadAndRemoveNonPreloaded();
+	bool UnloadAndRemoveNonPreloaded(const bool modsOnly);
 	bool UnloadAndRemovePreloaded();
 
 	PakHandle_t LoadBasePak(const char* const pakFile, const PakType_e type);
@@ -121,25 +130,34 @@ public:
 	// each pak listed in this vector gets unloaded.
 	PakHandle_t handles[MAX_CUSTOM_PAKS];
 
-	int numHandles;
-	int numPreload;
+	int numHandles; // Total number of loaded non-base SDK paks.
+	int numPreload; // preloaded paks come after base SDK paks.
+	int numMods;    // level mod paks come after level core and base SDK paks.
 
-	bool levelResourcesLoaded;
-	bool basePaksLoaded;
+	// True if we are currently in the lobby map.
+	bool inLobby;
+	bool reprocessUserLevelPaks;
+	bool reprocessUserLevelPaksUnloadFinished;
+	bool reprocessUserLevelPaksLoadCalled;
+
+	CFmtStrN<MAX_MAP_NAME> lastPrecachedLevel;
+	CFmtStrN<MAX_PLAYLIST_NAME> lastPlaylistUsedForPrecache;
 };
 
 // array size = CommonPakData_t::PAK_TYPE_COUNT
 inline CommonPakData_s* g_commonPakData;
 
+inline void(*v_Mod_PrecacheLevelAssets)(const char* const fullLevelFileName, const char* const levelName, const bool allowVpkLoadFail);
+
 inline void(*v_Mod_RunPakJobFrame)(void);
-inline void(*v_Mod_LoadLoadscreenPakForLevel)(const char* levelName);
+inline void(*v_Mod_LoadLoadscreenPakForLevel)(const char* const levelName);
 
 inline int32_t * g_pNumPrecacheItemsMTVTF;
 inline bool* g_pPakPrecacheJobFinished;
 
 inline void(*v_Mod_UnloadPendingAndPrecacheRequestedPaks)(void);
 
-inline void* (*v_Mod_UnloadCurrentLevelVPK)(void);
+inline void(*v_Mod_UnloadCurrentLevelVPK)(void);
 
 inline CPackedStore** g_currentLevelVPK = nullptr;
 inline char* g_currentLevelVPKName = nullptr;
@@ -147,14 +165,18 @@ inline char* g_currentLevelVPKName = nullptr;
 extern CUtlVector<CUtlString> g_InstalledMaps;
 extern CThreadMutex g_InstalledMapsMutex;
 
-void Mod_GetAllInstalledMaps();
-KeyValues* Mod_GetCoreLevelSettings(const char* pszLevelName);
+extern void Mod_GetAllInstalledMaps();
+extern void Mod_SetPrecacheLevelName(const char* const levelName);
+extern void Mod_SetPrecachePlaylistName(const char* const playlistName);
+extern KeyValues* Mod_GetLevelCoreSettings(const char* pszLevelName);
 
 ///////////////////////////////////////////////////////////////////////////////
 class VModel_BSP : public IDetour
 {
 	virtual void GetAdr(void) const
 	{
+		LogFunAdr("Mod_PrecacheLevelAssets", v_Mod_PrecacheLevelAssets);
+
 		LogFunAdr("Mod_RunPakJobFrame", v_Mod_RunPakJobFrame);
 		LogFunAdr("Mod_LoadLoadscreenPakForMap", v_Mod_LoadLoadscreenPakForLevel);
 
@@ -172,6 +194,7 @@ class VModel_BSP : public IDetour
 	}
 	virtual void GetFun(void) const
 	{
+		Module_FindPattern(g_GameDll, "44 88 44 24 ?? 53 55 56 57").GetPtr(v_Mod_PrecacheLevelAssets);
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? F3 0F 10 05 ?? ?? ?? ?? 32 DB").GetPtr(v_Mod_RunPakJobFrame);
 		Module_FindPattern(g_GameDll, "48 81 EC ?? ?? ?? ?? 0F B6 05 ?? ?? ?? ?? 4C 8D 05 ?? ?? ?? ?? 84 C0").GetPtr(v_Mod_LoadLoadscreenPakForLevel);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 33 ED 48 8D 35 ?? ?? ?? ?? 48 39 2D ?? ?? ?? ??").GetPtr(v_Mod_UnloadPendingAndPrecacheRequestedPaks);

@@ -77,11 +77,9 @@ public:
 	bool IsEnabled() const;
 
 	const inline CUtlVector<ModInstance_t*>& GetModList() { return m_ModList; };
-	const inline CUtlString& GetInstallPath() { return m_InstallPath; }
 
 private:
 	CUtlVector<ModInstance_t*> m_ModList;
-	CUtlString m_InstallPath;
 };
 
 extern CModSystem g_ModSystem;
