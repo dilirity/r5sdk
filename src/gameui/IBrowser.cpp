@@ -59,7 +59,7 @@ CBrowser::CBrowser(void)
     memset(m_serverNetKeyTextBuf, '\0', sizeof(m_serverNetKeyTextBuf));
 
     m_levelName = "mp_lobby";
-    m_gameMode = "dev_default";
+    m_modeName = "dev_default";
 }
 
 //-----------------------------------------------------------------------------
@@ -539,14 +539,14 @@ void CBrowser::HandleInvalidFields(const bool offline)
         m_hostMessage = "Server name is required.";
         m_hostMessageColor = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
     }
-    else if (m_gameMode.empty())
-    {
-        m_hostMessage = "Game mode is required.";
-        m_hostMessageColor = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
-    }
     else if (m_levelName.empty())
     {
         m_hostMessage = "Level name is required.";
+        m_hostMessageColor = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+    }
+    else if (m_modeName.empty())
+    {
+        m_hostMessage = "Mode name is required.";
         m_hostMessageColor = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
     }
 }
@@ -570,22 +570,6 @@ void CBrowser::DrawHostPanel(void)
     ImGui::Spacing();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f, 4.0f)); // Make drop down borders consistent.
 
-    if (ImGui::BeginCombo("Mode", m_gameMode.c_str()))
-    {
-        for (const CUtlString& playlist : g_vecAllPlaylists)
-        {
-            const char* const cachedPlaylists = playlist.String();
-
-            if (ImGui::Selectable(cachedPlaylists, 
-                playlist.IsEqual_CaseInsensitive(m_gameMode.c_str())))
-            {
-                m_gameMode = cachedPlaylists;
-            }
-        }
-
-        ImGui::EndCombo();
-    }
-
     if (ImGui::BeginCombo("Map", m_levelName.c_str()))
     {
         g_InstalledMapsMutex.Lock();
@@ -602,6 +586,22 @@ void CBrowser::DrawHostPanel(void)
         }
 
         g_InstalledMapsMutex.Unlock();
+        ImGui::EndCombo();
+    }
+
+    if (ImGui::BeginCombo("Mode", m_modeName.c_str()))
+    {
+        for (const CUtlString& playlist : g_vecAllPlaylists)
+        {
+            const char* const cachedPlaylists = playlist.String();
+
+            if (ImGui::Selectable(cachedPlaylists,
+                playlist.IsEqual_CaseInsensitive(m_modeName.c_str())))
+            {
+                m_modeName = cachedPlaylists;
+            }
+        }
+
         ImGui::EndCombo();
     }
 
@@ -650,9 +650,9 @@ void CBrowser::DrawHostPanel(void)
         {
             m_hostMessage.clear();
 
-            if (hasName && !m_levelName.empty() && !m_gameMode.empty())
+            if (hasName && !m_levelName.empty() && !m_modeName.empty())
             {
-                g_ServerHostManager.LaunchServer(m_levelName.c_str(), m_gameMode.c_str()); // Launch server.
+                g_ServerHostManager.LaunchServer(m_levelName.c_str(), m_modeName.c_str()); // Launch server.
             }
             else
             {
@@ -681,9 +681,9 @@ void CBrowser::DrawHostPanel(void)
 
         if (ImGui::Button("Change level", ImVec2(contentRegionMax.x, 32)))
         {
-            if (!m_levelName.empty() && !m_gameMode.empty())
+            if (!m_levelName.empty() && !m_modeName.empty())
             {
-                g_ServerHostManager.ChangeLevel(m_levelName.c_str(), m_gameMode.c_str());
+                g_ServerHostManager.ChangeLevel(m_levelName.c_str(), m_modeName.c_str());
             }
             else
             {

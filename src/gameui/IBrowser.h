@@ -79,7 +79,7 @@ private:
     string m_serverDescription;
 
     string m_levelName;
-    string m_gameMode;
+    string m_modeName;
 };
 
 extern CBrowser g_Browser;
