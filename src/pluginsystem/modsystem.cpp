@@ -72,6 +72,7 @@ static void ModSystem_List_f()
 	{
 		const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
 
+		Msg(eDLL_T::ENGINE, "author: %s\n", mod->m_Author.String());
 		Msg(eDLL_T::ENGINE, "name: %s\n", mod->m_Name.String());
 		Msg(eDLL_T::ENGINE, "id: %s\n", mod->m_ModID.String());
 		Msg(eDLL_T::ENGINE, "description: %s\n", mod->m_Description.String());
@@ -425,19 +426,19 @@ bool CModSystem::ModInstance_t::ParseSettings()
 		return false;
 	}
 
+	// "author" "MyName"
+	KeyValues* const pAuthor = GetSettingsKey(pSettingsPath, "author", true);
+	if (!pAuthor)
+		return false;
+	
+	m_Author = pAuthor->GetString();
+
 	// "name" "An R5Reloaded Mod"
 	KeyValues* const pName = GetSettingsKey(pSettingsPath, "name", true);
 	if (!pName)
 		return false;
 
 	m_Name = pName->GetString();
-
-	// "version" "1.0.0"
-	KeyValues* const pVersion = GetSettingsKey(pSettingsPath, "version", true);
-	if (!pVersion)
-		return false;
-
-	m_Version = pVersion->GetString();
 
 	// "id" "r5reloaded.TestMod"
 	KeyValues* const pId = GetSettingsKey(pSettingsPath, "id", true);
@@ -446,10 +447,19 @@ bool CModSystem::ModInstance_t::ParseSettings()
 
 	m_ModID = pId->GetString();
 
-	// optional mod description field
-	KeyValues* const pDesc = GetSettingsKey(pSettingsPath, "description", false);
-	if (pDesc)
-		m_Description = pDesc->GetString();
+	// "description" "This mod does X and Y using Z"
+	KeyValues* const pDesc = GetSettingsKey(pSettingsPath, "description", true);
+	if (!pDesc)
+		return false;
+
+	m_Description = pDesc->GetString();
+
+	// "version" "1.0.0"
+	KeyValues* const pVersion = GetSettingsKey(pSettingsPath, "version", true);
+	if (!pVersion)
+		return false;
+
+	m_Version = pVersion->GetString();
 
 	return true;
 }

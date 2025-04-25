@@ -59,6 +59,7 @@ public:
 		CUtlVector<CUtlString> m_LocalizationFiles;
 		CUtlVector<ConVar*> m_ConVars;
 
+		CUtlString m_Author;
 		CUtlString m_Name;
 		CUtlString m_ModID;
 		CUtlString m_Description;
