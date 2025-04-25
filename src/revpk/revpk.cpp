@@ -136,6 +136,7 @@ static void ReVPK_WriteEnableFile(const char* containingPath)
         return;
     }
 
+    FileSystem()->CreateDirHierarchy(containingPath, "PLATFORM");
     FileHandle_t enableTxt = FileSystem()->Open(textFileName.String(), "wb", "PLATFORM");
 
     if (enableTxt)
