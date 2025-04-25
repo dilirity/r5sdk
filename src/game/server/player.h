@@ -185,6 +185,8 @@ public:
 	QAngle* EyeAngles(QAngle* pAngles);
 
 	void SetTimeBase(float flTimeBase);
+	float GetTimeBase() const;
+
 	void SetLastUCmdSimulationRemainderTime(float fRemainderTime);
 	void SetTotalExtraClientCmdTimeAttempted(float flAttemptedTime);
 

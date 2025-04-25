@@ -68,6 +68,14 @@ inline void CPlayer::SetTimeBase(float flTimeBase)
 }
 
 //------------------------------------------------------------------------------
+// Purpose: gets the time base for this player
+//------------------------------------------------------------------------------
+float CPlayer::GetTimeBase() const
+{
+	return TICKS_TO_TIME(m_lastUCmdSimulationTicks) + m_lastUCmdSimulationRemainderTime;
+}
+
+//------------------------------------------------------------------------------
 // Purpose: sets the last user cmd simulation remainder time
 // Input  : nRemainderTime - 
 //------------------------------------------------------------------------------
