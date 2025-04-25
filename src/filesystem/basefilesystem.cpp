@@ -162,7 +162,7 @@ CPackedStore* CBaseFileSystem::VMountVPKFile(CBaseFileSystem* pFileSystem, const
 	CUtlString modLookupPath;
 	const char* fileToLoad = pszVpkPath;
 
-	if (!pPakData)
+	if (!pPakData && ModSystem()->IsEnabled())
 	{
 		ModSystem()->LockModList();
 
