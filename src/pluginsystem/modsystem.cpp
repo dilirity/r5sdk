@@ -14,26 +14,81 @@
 #include "localize/localize.h"
 #include "modsystem.h"
 
+// NOTE: code using this should be development only; if the convars are used by
+// VGUI (i.e. attached to a slider or button), then it will most likely crash
+// the game. We might want to fix this in the future by making sure the handles
+// are always updated in the VGui system, however more reverse engineering is
+// required to make that work.
+static void ModSystem_Reload_f()
+{
+	ModSystem()->Shutdown();
+	ModSystem()->Init();
+}
+
+static void ModSystem_EnableChanged_f(IConVar* var, const char* pOldValue, float flOldValue, ChangeUserData_t pUserData)
+{
+	NOTE_UNUSED(var);
+	NOTE_UNUSED(pOldValue);
+	NOTE_UNUSED(flOldValue);
+	NOTE_UNUSED(pUserData);
+	ModSystem_Reload_f();
+}
+
 //-----------------------------------------------------------------------------
 // Console variables
 //-----------------------------------------------------------------------------
-static ConVar modsystem_enable("modsystem_enable", "1", FCVAR_RELEASE, "Enable the modsystem");
+static ConVar modsystem_enable("modsystem_enable", "1", FCVAR_DEVELOPMENTONLY, "Enable the modsystem", ModSystem_EnableChanged_f);
 static ConVar modsystem_debug("modsystem_debug", "0", FCVAR_RELEASE, "Debug the modsystem");
 
-void ModSystem_Reload_f()
+//-----------------------------------------------------------------------------
+// Purpose: returns the mod state as string
+//-----------------------------------------------------------------------------
+static const char* ModSystem_StateToString(const CModSystem::eModState state)
 {
-	g_ModSystem.Shutdown();
-	g_ModSystem.Init();
+	switch (state)
+	{
+	case CModSystem::eModState::UNLOADED: return "unloaded";
+	case CModSystem::eModState::LOADING: return "loading";
+	case CModSystem::eModState::LOADED: return "loaded";
+	case CModSystem::eModState::DISABLED: return "disabled";
+	case CModSystem::eModState::ENABLED: return "enabled";
+	default: Assert(0); return "unknown";
+	}
+}
+
+static void ModSystem_List_f()
+{
+	if (!ModSystem()->IsEnabled())
+	{
+		Msg(eDLL_T::ENGINE, "*** modsystem is disabled ***\n");
+		return;
+	}
+
+	Msg(eDLL_T::ENGINE, "*** loaded mods ***\n");
+	Msg(eDLL_T::ENGINE, "-------------------------------------------------------------------------------\n");
+	ModSystem()->LockModList();
+
+	FOR_EACH_VEC(ModSystem()->GetModList(), i)
+	{
+		const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+
+		Msg(eDLL_T::ENGINE, "name: %s\n", mod->m_Name.String());
+		Msg(eDLL_T::ENGINE, "id: %s\n", mod->m_ModID.String());
+		Msg(eDLL_T::ENGINE, "description: %s\n", mod->m_Description.String());
+		Msg(eDLL_T::ENGINE, "version: %s\n", mod->m_Version.String());
+		Msg(eDLL_T::ENGINE, "path: %s\n", mod->m_BasePath.String());
+		Msg(eDLL_T::ENGINE, "state: %s\n", ModSystem_StateToString(mod->m_iState));
+		Msg(eDLL_T::ENGINE, "-------------------------------------------------------------------------------\n");
+	}
+
+	ModSystem()->UnlockModList();
 }
 
 //-----------------------------------------------------------------------------
 // Console commands
 //-----------------------------------------------------------------------------
-
-// development only; if the convars are used by VGUI (i.e. attached to a slider
-// or button), then it will most likely crash the game. We might want to fix
-// this in the future by making sure the handles are always updated.
 static ConCommand modsystem_reload("modsystem_reload", ModSystem_Reload_f, "Reload the modsystem", FCVAR_DEVELOPMENTONLY);
+static ConCommand modsystem_list("modsystem_list", ModSystem_List_f, "Show list of mods", FCVAR_RELEASE);
 
 static unsigned int ModSystem_HashModId(const CUtlString& s)
 {
@@ -62,6 +117,9 @@ CModSystem::~CModSystem()
 //-----------------------------------------------------------------------------
 void CModSystem::Init()
 {
+	if (CommandLine()->CheckParm("-modsystem_disable"))
+		return;
+
 	if (!modsystem_enable.GetBool())
 		return;
 
@@ -178,7 +236,7 @@ void CModSystem::UpdateModStatusList()
 			if (modsystem_debug.GetBool())
 			{
 				Msg(eDLL_T::ENGINE, "Mod '%s'(\"%s\") exists in '%s' and is %s.\n",
-					mod->m_Name.String(), mod->m_ModID.String(), MOD_STATUS_LIST_FILE, bEnable ? "enabled" : "disabled");
+					mod->m_Name.String(), mod->m_ModID.String(), MOD_STATUS_LIST_FILE, ModSystem_StateToString(mod->m_iState));
 			}
 		}
 	}
