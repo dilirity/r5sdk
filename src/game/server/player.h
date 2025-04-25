@@ -185,7 +185,7 @@ public:
 	QAngle* EyeAngles(QAngle* pAngles);
 
 	void SetTimeBase(float flTimeBase);
-	void SetLastUCmdSimulationRemainderTime(int nRemainderTime);
+	void SetLastUCmdSimulationRemainderTime(float fRemainderTime);
 	void SetTotalExtraClientCmdTimeAttempted(float flAttemptedTime);
 
 	void ProcessUserCmds(CUserCmd* cmds, int numCmds, int totalCmds,
@@ -531,7 +531,7 @@ private:
 	float m_totalFrameTime;
 	float m_joinFrameTime;
 	int m_lastUCmdSimulationTicks;
-	int m_lastUCmdSimulationRemainderTime; // Originally float???
+	float m_lastUCmdSimulationRemainderTime;
 	float m_totalExtraClientCmdTimeAttempted;
 	bool m_atLeastOneCommandRunThisServerFrame;
 	bool m_bGamePaused;
