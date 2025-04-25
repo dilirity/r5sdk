@@ -1035,9 +1035,8 @@ static void Mod_HandleUserLevelModPaksLoad()
 #ifndef DEDICATED
 static bool s_emulatePakRemount = false;
 
-static void Pak_EmulateRemount_f(const CCommand& args)
+static void Pak_EmulateRemount_f()
 {
-    NOTE_UNUSED(args);
     s_emulatePakRemount = true;
 }
 
