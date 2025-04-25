@@ -230,6 +230,7 @@ bool PackedStore_GetDirNameParts(const CUtlString& dirFileName, const int nCaptu
 class CPackedStore
 {
 public:
+	inline int GetPackFileID() const { return m_PackFileID; }
 	inline uint8_t GetStatus() const { return m_Status; }
 
 private:
