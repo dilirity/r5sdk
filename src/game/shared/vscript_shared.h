@@ -16,9 +16,9 @@ inline uint32_t* g_nClientRemoteChecksum = nullptr;
 void Script_RegisterCommonAbstractions(CSquirrelVM* s);
 void Script_RegisterListenServerConstants(CSquirrelVM* s);
 
-#define DEFINE_SHARED_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...)          \
-	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(SHARED_SCRIPT( Script_##functionName )), \
-	helpString, returnType, parameters, SharedScript_##functionName, __VA_ARGS__)                 \
+#define DEFINE_SHARED_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, isVariadic, ...) \
+	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(SHARED_SCRIPT( Script_##functionName )),    \
+	helpString, returnType, parameters, isVariadic, SharedScript_##functionName, __VA_ARGS__)                \
 
 inline Color Script_VectorToColor(const SQVector3D* const vec, const SQFloat alpha)
 {

@@ -9,9 +9,9 @@ void Script_RegisterAdminServerFunctions(CSquirrelVM* s);
 
 void Script_RegisterServerEnums(CSquirrelVM* const s);
 
-#define DEFINE_SERVER_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...) \
+#define DEFINE_SERVER_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, isVariadic, ...) \
 	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(Server_Script_##functionName),  \
-	helpString, returnType, parameters, ServerScript_##functionName, __VA_ARGS__)        \
+	helpString, returnType, parameters, isVariadic, ServerScript_##functionName, __VA_ARGS__)        \
 
 inline SQRESULT (*v_ServerScript_DebugScreenText)(HSQUIRRELVM v);
 inline SQRESULT (*v_ServerScript_DebugScreenTextWithColor)(HSQUIRRELVM v);

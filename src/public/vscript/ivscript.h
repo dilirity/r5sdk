@@ -102,11 +102,12 @@ struct ScriptFunctionBinding_t
 	void Init(
 		const SQChar* scriptName, const SQChar* nativeName,
 		const SQChar* helpString, const SQChar* returnType,
-		const SQChar* parameters, const ScriptFunctionBindingStorageType_t function)
+		const SQChar* parameters, const bool isVariadic,
+		const ScriptFunctionBindingStorageType_t function)
 	{
 		m_Descriptor.Init(scriptName, nativeName, helpString, returnType, parameters);
 		m_bCheckParams = false;
-		m_bHasVariadicArgs = false;
+		m_bHasVariadicArgs = isVariadic;
 
 		m_nDevLevel = 0;
 		m_pszCodeHook = nullptr;
@@ -258,10 +259,11 @@ struct ScriptClassDescriptor_t
 {
 	void AddFunction(const SQChar* scriptName, const SQChar* nativeName,
 		const SQChar* helpString, const SQChar* returnType,
-		const SQChar* parameters, const ScriptFunctionBindingStorageType_t function)
+		const SQChar* parameters, const bool isVariadic,
+		const ScriptFunctionBindingStorageType_t function)
 	{
 		ScriptFunctionBinding_t* const binding = m_StrTypedFunctions.AddToTailGetPtr();
-		binding->Init(scriptName, nativeName, helpString, returnType, parameters, function);
+		binding->Init(scriptName, nativeName, helpString, returnType, parameters, isVariadic, function);
 	}
 
 	const char* m_ScriptName;

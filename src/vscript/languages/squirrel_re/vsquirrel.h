@@ -130,10 +130,11 @@ FORCEINLINE void Script_RegisterEnumTable(CSquirrelVM* const s, const SQChar* co
 template<typename... Args>
 FORCEINLINE void Script_RegisterFuncNamed(CSquirrelVM* const s, 
 	const SQChar* const scriptName, const SQChar* const nativeName, const SQChar* const helpString,
-	const SQChar* const returnType, const SQChar* const parameters, const ScriptFunctionBindingStorageType_t function, const Args... fieldTypes)
+	const SQChar* const returnType, const SQChar* const parameters, const bool isVariadic,
+	const ScriptFunctionBindingStorageType_t function, const Args... fieldTypes)
 {
 	static ScriptFunctionBinding_t binding;
-	binding.Init(scriptName, nativeName, helpString, returnType, parameters, function);
+	binding.Init(scriptName, nativeName, helpString, returnType, parameters, isVariadic, function);
 
 	const int fieldCount = sizeof...(Args);
 

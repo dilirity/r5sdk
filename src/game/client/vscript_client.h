@@ -6,13 +6,13 @@ void Script_RegisterUIFunctions(CSquirrelVM* s);
 void Script_RegisterUIServerFunctions(CSquirrelVM* s);
 void Script_RegisterCoreClientFunctions(CSquirrelVM* s);
 
-#define DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...) \
-	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(Client_Script_##functionName),  \
-	helpString, returnType, parameters, ClientScript_##functionName, __VA_ARGS__)        \
+#define DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, isVariadic, ...) \
+	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(Client_Script_##functionName),              \
+	helpString, returnType, parameters, isVariadic, ClientScript_##functionName, __VA_ARGS__)                \
 
-#define DEFINE_UI_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, ...)     \
-	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(UI_Script_##functionName),      \
-	helpString, returnType, parameters, UIScript_##functionName, __VA_ARGS__)            \
+#define DEFINE_UI_SCRIPTFUNC_NAMED(s, functionName, helpString, returnType, parameters, isVariadic, ...) \
+	Script_RegisterFuncNamed(s, MKSTRING(functionName), MKSTRING(UI_Script_##functionName),              \
+	helpString, returnType, parameters, isVariadic, UIScript_##functionName, __VA_ARGS__)                \
 
 inline SQRESULT(*v_ClientScript_DebugScreenText)(HSQUIRRELVM v);
 inline SQRESULT(*v_ClientScript_DebugScreenTextWithColor)(HSQUIRRELVM v);
