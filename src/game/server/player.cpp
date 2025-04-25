@@ -124,7 +124,7 @@ void CPlayer::SetTotalExtraClientCmdTimeAttempted(float flAttemptedTime)
 // TODO: this code is experimental and has reported problems from players with
 // high latency, needs to be debugged or a different approach needs to be taken!
 // Defaulted to OFF for now
-static ConVar sv_unlag_clamp("sv_unlag_clamp", "0", FCVAR_RELEASE, "Clamp the difference between the current time and received command time to sv_maxunlag.");
+static ConVar sv_unlag_clamp("sv_unlag_clamp", "1", FCVAR_RELEASE, "Clamp the difference between player's time base and received command time to sv_maxunlag.");
 
 void CPlayer::ProcessUserCmds(CUserCmd* cmds, int numCmds, int totalCmds,
 	int droppedPackets, bool paused)
@@ -133,9 +133,8 @@ void CPlayer::ProcessUserCmds(CUserCmd* cmds, int numCmds, int totalCmds,
 		return;
 
 	CUserCmd* lastCmd = &m_Commands[MAX_QUEUED_COMMANDS_PROCESS];
-
 	const float maxUnlag = sv_maxunlag->GetFloat();
-	const float currTime = gpGlobals->curTime;
+	const float timeBase = GetTimeBase();
 
 	for (int i = totalCmds - 1; i >= 0; i--)
 	{
@@ -166,7 +165,7 @@ void CPlayer::ProcessUserCmds(CUserCmd* cmds, int numCmds, int totalCmds,
 		// bunch still in the padded bytes, possibly one of them is what we could
 		// and should actually use to get the remote client time since ucmd was sent.
 		if (sv_unlag_clamp.GetBool())
-			cmd->command_time = Min(Max(cmd->command_time, Max(currTime - maxUnlag, 0.0f)), currTime + maxUnlag);
+			cmd->command_time = Min(Max(cmd->command_time, Max(timeBase - maxUnlag, 0.0f)), timeBase + maxUnlag);
 
 		CUserCmd* queuedCmd = &m_Commands[lastCommandNumber];
 		queuedCmd->Copy(cmd);
