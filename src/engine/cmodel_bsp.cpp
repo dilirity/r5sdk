@@ -378,7 +378,7 @@ static void Mod_PreloadPaks(const char* const rootPath)
     char preloadFileBuf[MAX_OSPATH];
     Mod_FormatPakPath(preloadFileBuf, rootPath, "preload.rson");
 
-    bool parseFailure = false;
+    bool parseFailure;
     RSON::Node_t* const rson = RSON::LoadFromFile(preloadFileBuf, nullptr, &parseFailure);
 
     if (!rson)

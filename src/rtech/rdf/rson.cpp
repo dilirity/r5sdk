@@ -24,6 +24,9 @@ RSON::Node_t* RSON::LoadFromBuffer(const char* pszBufferName, char* pBuffer, RSO
 //-----------------------------------------------------------------------------
 RSON::Node_t* RSON::LoadFromFile(const char* pszFilePath, const char* pPathID, bool* parseFailure)
 {
+	if (parseFailure)
+		*parseFailure = false;
+
 	FileHandle_t file = FileSystem()->Open(pszFilePath, "rt", pPathID);
 
 	if (!file)
