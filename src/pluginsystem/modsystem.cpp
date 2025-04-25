@@ -392,19 +392,53 @@ bool CModSystem::ModInstance_t::ShouldLoadPaks(const char* const targetPlaylist)
 // Purpose: gets a keyvalue from settings KV, and logs an error on failure
 // Input  : *settingsPath - 
 //          *key          - 
-//          required      - 
 // Output : pointer to KeyValues object
 //-----------------------------------------------------------------------------
-KeyValues* CModSystem::ModInstance_t::GetSettingsKey(
-	const char* settingsPath, const char* key, const bool required) const
+KeyValues* CModSystem::ModInstance_t::GetSettingsKeyRequired(
+	const char* settingsPath, const char* key) const
 {
-	KeyValues* pKeyValue = m_SettingsKV->FindKey(key);
-	if (!pKeyValue && required)
+	KeyValues* const pKeyValue = m_SettingsKV->FindKey(key);
+
+	if (!pKeyValue)
+	{
 		Error(eDLL_T::ENGINE, NO_ERROR,
-			"Mod settings \"%s\" has missing or invalid \"%s\" field; skipping...\n",
+			"Mod settings \"%s\" is missing key \"%s\" which is required; skipping...\n",
 			settingsPath, key);
 
+		return nullptr;
+	}
+
 	return pKeyValue;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets a string value from settings KV, and logs an error on failure
+// Input  : *mod          - 
+//          *settingsPath - 
+//          *key          - 
+//          &out          - 
+// Output : true on success, false otherwise
+//-----------------------------------------------------------------------------
+static bool ModSystem_GetSettingsKeyValueString(CModSystem::ModInstance_t* const mod, const char* settingsPath, const char* const key, CUtlString& out)
+{
+	KeyValues* const keyvalue = mod->GetSettingsKeyRequired(settingsPath, key);
+
+	if (!keyvalue)
+		return false;
+
+	const char* const value = keyvalue->GetString();
+
+	if (!value[0])
+	{
+		Error(eDLL_T::ENGINE, NO_ERROR,
+			"Mod settings \"%s\" contains key \"%s\" with no value; skipping...\n",
+			settingsPath, key);
+
+		return false;
+	}
+
+	out = value;
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -427,39 +461,24 @@ bool CModSystem::ModInstance_t::ParseSettings()
 	}
 
 	// "author" "MyName"
-	KeyValues* const pAuthor = GetSettingsKey(pSettingsPath, "author", true);
-	if (!pAuthor)
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "author", m_Author))
 		return false;
-	
-	m_Author = pAuthor->GetString();
 
 	// "name" "An R5Reloaded Mod"
-	KeyValues* const pName = GetSettingsKey(pSettingsPath, "name", true);
-	if (!pName)
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "name", m_Name))
 		return false;
-
-	m_Name = pName->GetString();
 
 	// "id" "r5reloaded.TestMod"
-	KeyValues* const pId = GetSettingsKey(pSettingsPath, "id", true);
-	if (!pId)
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "id", m_ModID))
 		return false;
-
-	m_ModID = pId->GetString();
 
 	// "description" "This mod does X and Y using Z"
-	KeyValues* const pDesc = GetSettingsKey(pSettingsPath, "description", true);
-	if (!pDesc)
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "description", m_Description))
 		return false;
-
-	m_Description = pDesc->GetString();
 
 	// "version" "1.0.0"
-	KeyValues* const pVersion = GetSettingsKey(pSettingsPath, "version", true);
-	if (!pVersion)
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "version", m_Version))
 		return false;
-
-	m_Version = pVersion->GetString();
 
 	return true;
 }

@@ -44,7 +44,7 @@ public:
 		inline const CUtlString& GetBasePath() const { return m_BasePath; };
 		inline CUtlString GetScriptCompileListPath() const { return m_BasePath + GAME_SCRIPT_COMPILELIST; };
 
-		KeyValues* GetSettingsKey(const char* settingsPath, const char* key, const bool required) const;
+		KeyValues* GetSettingsKeyRequired(const char* settingsPath, const char* key) const;
 
 		inline RSON::Node_t* LoadScriptCompileList() const
 		{
