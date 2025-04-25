@@ -144,7 +144,7 @@ void CModSystem::Init()
 	{
 		if (i == MAX_MODS_TO_LOAD)
 		{
-			Error(eDLL_T::ENGINE, NO_ERROR, "Exceeded MAX_MODS_TO_LOAD; only %d out of %d mods will be loaded.\n",
+			Error(eDLL_T::ENGINE, NO_ERROR, "Exceeded MAX_MODS_TO_LOAD; only %d out of %d mods are loaded.\n",
 				MAX_MODS_TO_LOAD, modFileList.Count());
 			break;
 		}
