@@ -333,13 +333,14 @@ bool CModSystem::ModInstance_t::ShouldLoadPaks(const char* const targetPlaylist)
 // Purpose: gets a keyvalue from settings KV, and logs an error on failure
 // Input  : *settingsPath - 
 //          *key          - 
+//          required      - 
 // Output : pointer to KeyValues object
 //-----------------------------------------------------------------------------
-KeyValues* CModSystem::ModInstance_t::GetRequiredSettingsKey(
-	const char* settingsPath, const char* key) const
+KeyValues* CModSystem::ModInstance_t::GetSettingsKey(
+	const char* settingsPath, const char* key, const bool required) const
 {
 	KeyValues* pKeyValue = m_SettingsKV->FindKey(key);
-	if (!pKeyValue)
+	if (!pKeyValue && required)
 		Error(eDLL_T::ENGINE, NO_ERROR,
 			"Mod settings \"%s\" has missing or invalid \"%s\" field; skipping...\n",
 			settingsPath, key);
@@ -354,7 +355,7 @@ KeyValues* CModSystem::ModInstance_t::GetRequiredSettingsKey(
 bool CModSystem::ModInstance_t::ParseSettings()
 {
 	const CUtlString settingsPath = m_BasePath + MOD_SETTINGS_FILE;
-	const char* pSettingsPath = settingsPath.Get();
+	const char* const pSettingsPath = settingsPath.Get();
 
 	m_SettingsKV = FileSystem()->LoadKeyValues(
 		IFileSystem::TYPE_COMMON, pSettingsPath, "GAME");
@@ -367,28 +368,30 @@ bool CModSystem::ModInstance_t::ParseSettings()
 	}
 
 	// "name" "An R5Reloaded Mod"
-	KeyValues* pName = GetRequiredSettingsKey(pSettingsPath, "name");
+	KeyValues* const pName = GetSettingsKey(pSettingsPath, "name", true);
 	if (!pName)
 		return false;
 
 	m_Name = pName->GetString();
 
 	// "version" "1.0.0"
-	KeyValues* pVersion = GetRequiredSettingsKey(pSettingsPath, "version");
+	KeyValues* const pVersion = GetSettingsKey(pSettingsPath, "version", true);
 	if (!pVersion)
 		return false;
 
 	m_Version = pVersion->GetString();
 
 	// "id" "r5reloaded.TestMod"
-	KeyValues* pId = GetRequiredSettingsKey(pSettingsPath, "id");
+	KeyValues* const pId = GetSettingsKey(pSettingsPath, "id", true);
 	if (!pId)
 		return false;
 
 	m_ModID = pId->GetString();
 
 	// optional mod description field
-	m_Description = m_SettingsKV->GetString(pSettingsPath, "description");
+	KeyValues* const pDesc = GetSettingsKey(pSettingsPath, "description", false);
+	if (pDesc)
+		m_Description = pDesc->GetString();
 
 	return true;
 }
