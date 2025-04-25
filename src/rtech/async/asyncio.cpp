@@ -46,6 +46,9 @@ int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* c
 
     if (hFile == INVALID_HANDLE_VALUE)
     {
+        if (!ModSystem()->IsEnabled())
+            return FS_ASYNC_FILE_INVALID;
+
         if (!fileToLoad || !*fileToLoad)
             return FS_ASYNC_FILE_INVALID;
 
