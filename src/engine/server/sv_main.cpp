@@ -163,7 +163,7 @@ void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec /*= 
 
 		// Bots shouldn't be checked for bans because these are added by the
 		// server host.
-		if (pPlayer->IsBot())
+		if (pPlayer && pPlayer->IsBot())
 			continue;
 
 		const char* const szIPAddr = pNetChan->GetAddress(true);
