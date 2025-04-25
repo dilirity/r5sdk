@@ -1007,20 +1007,13 @@ static void Mod_HandleUserLevelModPaksLoad()
     if (!s_customPakData.reprocessUserLevelPaks)
         return; // Nothing to reprocess.
 
-    if (IsDebug())
-    {
-        // If we launch directly into the lobby, and this code is fired, then
-        // there is a code bug somewhere! This should never be called before
-        // the lobby pak is loaded, this should also never be called when
-        // loading into the lobby.
-        CommonPakData_s& cpd = g_commonPakData[CommonPakData_s::PAK_TYPE_LOBBY];
+    CommonPakData_s& cpd = g_commonPakData[CommonPakData_s::PAK_TYPE_LEVEL];
 
-        if (cpd.pakId == PAK_INVALID_HANDLE)
-        {
-            Assert(0, "Loaded level mod paks while the lobby paks weren't loaded yet!");
-            return;
-        }
-    }
+    // If we launch a level and the vpk couldn't be loaded, we will be hitting
+    // this code. Make sure our level paks are loaded, else defer loading our
+    // custom paks.
+    if (cpd.pakId == PAK_INVALID_HANDLE)
+        return;
 
     if (!s_customPakData.reprocessUserLevelPaksLoadCalled)
     {
