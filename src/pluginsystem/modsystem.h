@@ -46,14 +46,13 @@ public:
 
 		KeyValues* GetSettingsKeyRequired(const char* settingsPath, const char* key) const;
 
-		inline RSON::Node_t* LoadScriptCompileList() const
+		inline RSON::Node_t* LoadScriptCompileList(bool* const parseFailure) const
 		{
-			return RSON::LoadFromFile(GetScriptCompileListPath().Get(), "GAME");
+			return RSON::LoadFromFile(GetScriptCompileListPath().Get(), "GAME", parseFailure);
 		};
 
 		KeyValues* m_SettingsKV;
 		eModState m_iState = eModState::UNLOADED;
-		bool m_bHasScriptCompileList; // if this mod has a scripts.rson file that exists
 		bool m_bHasSearchPath;
 
 		CUtlVector<CUtlString> m_LocalizationFiles;

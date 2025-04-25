@@ -300,8 +300,6 @@ void CModSystem::WriteModStatusList()
 CModSystem::ModInstance_t::ModInstance_t(const CUtlString& basePath)
 {
 	m_SettingsKV = nullptr;
-
-	m_bHasScriptCompileList = false;
 	m_bHasSearchPath = false;
 
 	m_BasePath = basePath;
@@ -332,10 +330,6 @@ CModSystem::ModInstance_t::ModInstance_t(const CUtlString& basePath)
 	m_bHasSearchPath = true;
 
 	const CUtlString scriptsRsonPath = m_BasePath + GAME_SCRIPT_COMPILELIST;
-
-	if (FileSystem()->FileExists(scriptsRsonPath.Get(), "GAME"))
-		m_bHasScriptCompileList = true;
-
 	SetState(eModState::LOADED);
 }
 

@@ -267,18 +267,20 @@ void CSquirrelVM::CompileModScripts()
 		if (!mod->IsEnabled())
 			continue;
 
-		if (!mod->m_bHasScriptCompileList)
-			continue;
-
 		// allocs parsed rson buffer
-		RSON::Node_t* rson = mod->LoadScriptCompileList();
+		bool parseFailure;
+		RSON::Node_t* rson = mod->LoadScriptCompileList(&parseFailure);
 
 		if (!rson)
 		{
-			Error(GetNativeContext(), NO_ERROR,
-				"%s: Failed to load RSON file '%s'\n",
-				__FUNCTION__, mod->GetScriptCompileListPath().Get());
+			if (parseFailure)
+			{
+				Error(GetNativeContext(), NO_ERROR,
+					"%s: Failed to parse RSON file '%s'\n",
+					__FUNCTION__, mod->GetScriptCompileListPath().Get());
+			}
 
+			// else just continue, this mod doesn't contain a compile list.
 			continue;
 		}
 
