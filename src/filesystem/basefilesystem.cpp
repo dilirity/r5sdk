@@ -2,7 +2,7 @@
 #include "tier1/cvar.h"
 #include "filesystem/basefilesystem.h"
 #include "filesystem/filesystem.h"
-
+#include "vpklib/packedstore.h"
 #include "bspfile.h"
 #include "engine/modelloader.h"
 
@@ -142,16 +142,16 @@ void CBaseFileSystem::VAddMapPackFile(CBaseFileSystem* pFileSystem, const char* 
 //			*pszVpkPath - 
 // Output : pointer to VPK on success, NULL on failure
 //---------------------------------------------------------------------------------
-VPKData_t* CBaseFileSystem::VMountVPKFile(CBaseFileSystem* pFileSystem, const char* pszVpkPath)
+CPackedStore* CBaseFileSystem::VMountVPKFile(CBaseFileSystem* pFileSystem, const char* pszVpkPath)
 {
 	int nHandle = CBaseFileSystem__GetMountedVPKHandle(pFileSystem, pszVpkPath);
-	VPKData_t* pPakData = CBaseFileSystem__MountVPKFile(pFileSystem, pszVpkPath);
+	CPackedStore* pPakData = CBaseFileSystem__MountVPKFile(pFileSystem, pszVpkPath);
 
 	if (pPakData)
 	{
 		if (nHandle < 0) // Only log if VPK hasn't been mounted yet.
 		{
-			::Msg(eDLL_T::FS, "Mounted vpk file: '%s' with handle: '%i'\n", pszVpkPath, pPakData->m_nHandle);
+			::Msg(eDLL_T::FS, "Mounted vpk file: '%s' with handle: '%i'\n", pszVpkPath, pPakData->GetPackFileID());
 		}
 	}
 	else // VPK failed to load or does not exist...

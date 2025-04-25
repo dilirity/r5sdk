@@ -205,7 +205,7 @@ public:
 	virtual const char** __fastcall sub_140383760(unsigned int a1) { return nullptr; };
 	virtual __int64 __fastcall sub_140383A20(const char* a1) { return NULL; };
 
-	virtual VPKData_t* MountVPKFile(const char* pVpkPath) { return nullptr; };
+	virtual CPackedStore* MountVPKFile(const char* pVpkPath) { return nullptr; };
 	virtual const char* UnmountVPKFile(const char* pBasename) { return nullptr; };
 
 	virtual void __fastcall sub_140383370() {};

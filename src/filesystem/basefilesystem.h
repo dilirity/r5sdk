@@ -12,7 +12,7 @@ public:
 	static FileHandle_t VReadFromVPK(CBaseFileSystem* pFileSystem, FileHandle_t pResults, const char* pszFilePath);
 	static bool VReadFromCache(CBaseFileSystem* pFileSystem, const char* pszFilePath, FileSystemCache* pCache);
 	static void VAddMapPackFile(CBaseFileSystem* pFileSystem, const char* pPath, const char* pPathID, SearchPathAdd_t addType);
-	static VPKData_t* VMountVPKFile(CBaseFileSystem* pFileSystem, const char* pszVpkPath);
+	static CPackedStore* VMountVPKFile(CBaseFileSystem* pFileSystem, const char* pszVpkPath);
 	static const char* VUnmountVPKFile(CBaseFileSystem* pFileSystem, const char* pszVpkPath);
 
 	CUtlString ReadString(FileHandle_t pFile);
@@ -47,7 +47,7 @@ inline void(*CBaseFileSystem__Warning)(CBaseFileSystem* pFileSystem, FileWarning
 inline FileHandle_t(*CBaseFileSystem__LoadFromVPK)(CBaseFileSystem* pFileSystem, FileHandle_t pResults, const char* pszAssetName);
 inline bool(*CBaseFileSystem__LoadFromCache)(CBaseFileSystem* pFileSystem, const char* pszAssetName, FileSystemCache* pCache);
 inline void(*CBaseFileSystem__AddMapPackFile)(CBaseFileSystem* pFileSystem, const char* pPath, const char* pPathID, SearchPathAdd_t addType);
-inline VPKData_t*(*CBaseFileSystem__MountVPKFile)(CBaseFileSystem* pFileSystem, const char* pszVpkPath);
+inline CPackedStore*(*CBaseFileSystem__MountVPKFile)(CBaseFileSystem* pFileSystem, const char* pszVpkPath);
 inline const char* (*CBaseFileSystem__UnmountVPKFile)(CBaseFileSystem* pFileSystem, const char* pszVpkPath);
 inline int(*CBaseFileSystem__GetMountedVPKHandle)(CBaseFileSystem* pFileSystem, const char* pszVpkPath);
 

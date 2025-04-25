@@ -23,6 +23,7 @@ typedef void* FileFindHandle_t;
 //---------------------------------------------------------------------------------
 class KeyValues;
 class CUtlBuffer;
+class CPackedStore;
 
 //-----------------------------------------------------------------------------
 // Structures used by the interface
@@ -445,7 +446,7 @@ public:
 	virtual const char** __fastcall sub_140383760(unsigned int a1) = 0;
 	virtual __int64 __fastcall sub_140383A20(const char* a1) = 0;
 
-	virtual VPKData_t* MountVPKFile(const char* pVpkPath) = 0;
+	virtual CPackedStore* MountVPKFile(const char* pVpkPath) = 0;
 	virtual const char* UnmountVPKFile(const char* pBasename) = 0;
 
 	virtual void __fastcall sub_140383370() = 0;
