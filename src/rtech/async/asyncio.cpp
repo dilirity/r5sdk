@@ -57,6 +57,9 @@ int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* c
         {
             const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
 
+            if (!mod->IsEnabled())
+                continue;
+
             modLookupPath = mod->GetBasePath() + fileToLoad;
             const char* const pModLookupPath = modLookupPath.String();
 
