@@ -604,8 +604,7 @@ static bool LiveAPI_SetLoadoutConfiguration(HSQUIRRELVM const v, rtech::liveapi:
 		if (sq_isnull(node.key))
 			continue;
 
-		if (!ranOuterLoop)
-			ranOuterLoop = true;
+		ranOuterLoop = true;
 
 		if (!LiveAPI_CheckSwitchType(v, node.key))
 			return false;
@@ -641,8 +640,7 @@ static bool LiveAPI_SetLoadoutConfiguration(HSQUIRRELVM const v, rtech::liveapi:
 			if (sq_isnull(fieldObj))
 				continue;
 
-			if (!ranInnerLoop)
-				ranInnerLoop = true;
+			ranInnerLoop = true;
 
 			LIVEAPI_ENSURE_TYPE(v, fieldObj, OT_TABLE, msg, fieldNum);
 
