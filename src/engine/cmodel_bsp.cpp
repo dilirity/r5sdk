@@ -431,10 +431,11 @@ static void Mod_PreloadAllPaks()
 {
     // Preload core paks.
     Mod_PreloadPaks("");
-    ModSystem()->LockModList();
 
     if (ModSystem()->IsEnabled())
     {
+        ModSystem()->LockModList();
+
         // Preload mod paks.
         FOR_EACH_VEC(ModSystem()->GetModList(), i)
         {
@@ -445,9 +446,9 @@ static void Mod_PreloadAllPaks()
 
             Mod_PreloadPaks(mod->GetBasePath().String());
         }
-    }
 
-    ModSystem()->UnlockModList();
+        ModSystem()->UnlockModList();
+    }
 }
 
 //-----------------------------------------------------------------------------
