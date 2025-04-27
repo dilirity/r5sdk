@@ -123,9 +123,9 @@ bool CParticleOverlay::DrawSurface(void)
 		return false;
 	}
 
-	ImGui::Checkbox("Freeze##ParticleReport", &m_freezeCapture);
+	ImGui::Checkbox("Freeze##ParticleOverlay_ParticleReport", &m_freezeCapture);
 
-	if (ImGui::BeginChild("##ParticleReport", ImVec2(-1, -1), ImGuiChildFlags_Border, ImGuiWindowFlags_HorizontalScrollbar))
+	if (ImGui::BeginChild("##ParticleOverlay_ParticleReport", ImVec2(-1, -1), ImGuiChildFlags_Border, ImGuiWindowFlags_HorizontalScrollbar))
 	{
 		ImGui::TextUnformatted(m_scratchBuffer, &m_scratchBuffer[m_bufferCursor]);
 	}

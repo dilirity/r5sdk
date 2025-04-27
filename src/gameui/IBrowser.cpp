@@ -202,15 +202,15 @@ bool CBrowser::DrawSurface(void)
         return false;
     }
 
-    if (ImGui::BeginTabBar("CompMenu"))
+    if (ImGui::BeginTabBar("CompMenu##ServerBrowser_DrawSurface"))
     {
-        if (ImGui::BeginTabItem("Browsing"))
+        if (ImGui::BeginTabItem("Browsing##ServerBrowser_DrawSurface"))
         {
             DrawBrowserPanel();
             ImGui::EndTabItem();
         }
 #ifndef CLIENT_DLL
-        if (ImGui::BeginTabItem("Hosting"))
+        if (ImGui::BeginTabItem("Hosting##ServerBrowser_DrawSurface"))
         {
             DrawHostPanel();
             ImGui::EndTabItem();
@@ -234,7 +234,7 @@ void CBrowser::DrawBrowserPanel(void)
     m_serverBrowserTextFilter.Draw();
     ImGui::SameLine();
 
-    if (ImGui::Button("Refresh"))
+    if (ImGui::Button("Refresh##ServerBrowser_DrawBrowserPanel"))
     {
         m_serverListMessage.clear();
         RefreshServerList();
@@ -249,7 +249,7 @@ void CBrowser::DrawBrowserPanel(void)
 
     const float fFooterHeight = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
 
-    if (ImGui::BeginTable("##ServerBrowser_ServerListTable", 6, ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY, { 0, -fFooterHeight }))
+    if (ImGui::BeginTable("##ServerBrowser_DrawBrowserPanel_ServerListTable", 6, ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY, { 0, -fFooterHeight }))
     {
         if (m_surfaceStyle == ImGuiStyle_t::MODERN)
         {
@@ -330,7 +330,7 @@ void CBrowser::DrawBrowserPanel(void)
                 ImGui::TableNextColumn();
                 ImGui::PushID(i);
 
-                if (ImGui::Button("Connect##ServerBrowser_ServerListTable"))
+                if (ImGui::Button("Connect"))
                 {
                     g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey);
                 }
@@ -362,13 +362,13 @@ void CBrowser::DrawBrowserPanel(void)
 
     ImGui::PushItemWidth(itemWidth);
     {
-        ImGui::InputTextWithHint("##ServerBrowser_ServerCon", "Server address and port", m_serverAddressTextBuf, sizeof(m_serverAddressTextBuf));
+        ImGui::InputTextWithHint("##ServerBrowser_DrawBrowserPanel_ServerAddress", "Server address and port", m_serverAddressTextBuf, sizeof(m_serverAddressTextBuf));
 
         ImGui::SameLine();
-        ImGui::InputTextWithHint("##ServerBrowser_ServerKey", "Encryption key", m_serverNetKeyTextBuf, sizeof(m_serverNetKeyTextBuf));
+        ImGui::InputTextWithHint("##ServerBrowser_DrawBrowserPanel_ServerKey", "Encryption key", m_serverNetKeyTextBuf, sizeof(m_serverNetKeyTextBuf));
 
         ImGui::SameLine();
-        if (ImGui::Button("Connect##ServerBrowser_ServerConnect", ImVec2(itemWidth, ImGui::GetFrameHeight())))
+        if (ImGui::Button("Connect##ServerBrowser_DrawBrowserPanel_ServerConnect", ImVec2(itemWidth, ImGui::GetFrameHeight())))
         {
             if (m_serverAddressTextBuf[0])
             {
@@ -381,9 +381,9 @@ void CBrowser::DrawBrowserPanel(void)
         // NOTE: -9 to prevent the last button from clipping/colliding with the
         // window drag handle! -9 makes the distance between the handle and the
         // last button equal as that of the developer console.
-        if (ImGui::Button("Private servers", ImVec2(itemWidth - 9, ImGui::GetFrameHeight())))
+        if (ImGui::Button("Private servers##ServerBrowser_DrawBrowserPanel", ImVec2(itemWidth - 9, ImGui::GetFrameHeight())))
         {
-            ImGui::OpenPopup("Private Server");
+            ImGui::OpenPopup("Private Server##ServerBrowser_HiddenServersModal");
         }
 
         HiddenServersModal();
@@ -439,12 +439,12 @@ void CBrowser::HiddenServersModal(void)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2(408.f, modalWindowHeight));    modalStyleVars++;
 
     bool isModalStillOpen = true;
-    if (ImGui::BeginPopupModal("Private Server", &isModalStillOpen, ImGuiWindowFlags_NoResize))
+    if (ImGui::BeginPopupModal("Private Server##ServerBrowser_HiddenServersModal", &isModalStillOpen, ImGuiWindowFlags_NoResize))
     {
         ImGui::SetWindowSize(ImVec2(408.f, modalWindowHeight), ImGuiCond_Always);
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.00f, 0.00f, 0.00f, 0.00f)); // Override the style color for child bg.
 
-        ImGui::BeginChild("##HiddenServersConnectModal_IconParent", ImVec2(float(m_lockedIconDataResource.m_nWidth), float(m_lockedIconDataResource.m_nHeight)));
+        ImGui::BeginChild("##ServerBrowser_HiddenServersModal_IconParent", ImVec2(float(m_lockedIconDataResource.m_nWidth), float(m_lockedIconDataResource.m_nHeight)));
         ImGui::Image((ImTextureID)(intptr_t)m_lockedIconShaderResource, ImVec2(float(m_lockedIconDataResource.m_nWidth), float(m_lockedIconDataResource.m_nHeight))); // Display texture.
         ImGui::EndChild();
 
@@ -456,7 +456,7 @@ void CBrowser::HiddenServersModal(void)
         const ImVec2 contentRegionMax = ImGui::GetContentRegionAvail();
         ImGui::PushItemWidth(contentRegionMax.x); // Override item width.
 
-        const bool hitEnter = ImGui::InputTextWithHint("##HiddenServersConnectModal_TokenInput", "Token (required)", 
+        const bool hitEnter = ImGui::InputTextWithHint("##ServerBrowser_HiddenServersModal_TokenInput", "Token (required)", 
             m_serverTokenTextBuf, sizeof(m_serverTokenTextBuf), ImGuiInputTextFlags_EnterReturnsTrue);
 
         ImGui::PopItemWidth();
@@ -472,7 +472,7 @@ void CBrowser::HiddenServersModal(void)
         ImGui::TextColored(m_hiddenServerMessageColor, "%s", m_hiddenServerRequestMessage.c_str());
         ImGui::Separator();
 
-        if (ImGui::Button("Connect", ImVec2(contentRegionMax.x, 24)) || hitEnter)
+        if (ImGui::Button("Connect##ServerBrowser_HiddenServersModal", ImVec2(contentRegionMax.x, 24)) || hitEnter)
         {
             m_hiddenServerRequestMessage.clear();
             m_reclaimFocusOnTokenField = true;
@@ -509,7 +509,7 @@ void CBrowser::HiddenServersModal(void)
             }
         }
 
-        if (ImGui::Button("Close", ImVec2(contentRegionMax.x, 24)))
+        if (ImGui::Button("Close##ServerBrowser_HiddenServersModal", ImVec2(contentRegionMax.x, 24)))
         {
             m_hiddenServerRequestMessage.clear();
             m_reclaimFocusOnTokenField = true;
@@ -558,12 +558,12 @@ void CBrowser::HandleInvalidFields(const bool offline)
 void CBrowser::DrawHostPanel(void)
 {
 #ifndef CLIENT_DLL
-    if (ImGui::InputTextWithHint("##ServerHost_ServerName", "Server name (required)", &m_serverName))
+    if (ImGui::InputTextWithHint("##ServerBrowser_DrawHostPanel_ServerName", "Server name (required)", &m_serverName))
     {
         hostname->SetValue(m_serverName.c_str());
     }
     
-    if (ImGui::InputTextWithHint("##ServerHost_ServerDesc", "Server description (optional)", &m_serverDescription))
+    if (ImGui::InputTextWithHint("##ServerBrowser_DrawHostPanel_ServerDescription", "Server description (optional)", &m_serverDescription))
     {
         hostdesc.SetValue(m_serverDescription.c_str());
     }
@@ -571,7 +571,7 @@ void CBrowser::DrawHostPanel(void)
     ImGui::Spacing();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f, 4.0f)); // Make drop down borders consistent.
 
-    if (ImGui::BeginCombo("Map", m_levelName.c_str()))
+    if (ImGui::BeginCombo("Map##ServerBrowser_DrawHostPanel", m_levelName.c_str()))
     {
         g_InstalledMapsMutex.Lock();
 
@@ -590,7 +590,7 @@ void CBrowser::DrawHostPanel(void)
         ImGui::EndCombo();
     }
 
-    if (ImGui::BeginCombo("Mode", m_modeName.c_str()))
+    if (ImGui::BeginCombo("Mode##ServerBrowser_DrawHostPanel", m_modeName.c_str()))
     {
         for (const CUtlString& playlist : g_vecAllPlaylists)
         {
@@ -609,22 +609,22 @@ void CBrowser::DrawHostPanel(void)
     ImGui::PopStyleVar();
 
     m_queryGlobalBanList = sv_globalBanlist.GetBool(); // Sync toggle with 'sv_globalBanlist'.
-    if (ImGui::Checkbox("Load global banned list", &m_queryGlobalBanList))
+    if (ImGui::Checkbox("Load global banned list##ServerBrowser_DrawHostPanel", &m_queryGlobalBanList))
     {
         sv_globalBanlist.SetValue(m_queryGlobalBanList);
     }
 
     ImGui::Text("Server visibility");
 
-    if (ImGui::SameLine(); ImGui::RadioButton("offline", pylon_host_visibility.GetInt() == ServerVisibility_e::OFFLINE))
+    if (ImGui::SameLine(); ImGui::RadioButton("offline##ServerBrowser_DrawHostPanel", pylon_host_visibility.GetInt() == ServerVisibility_e::OFFLINE))
     {
         pylon_host_visibility.SetValue(ServerVisibility_e::OFFLINE);
     }
-    if (ImGui::SameLine(); ImGui::RadioButton("hidden", pylon_host_visibility.GetInt() == ServerVisibility_e::HIDDEN))
+    if (ImGui::SameLine(); ImGui::RadioButton("hidden##ServerBrowser_DrawHostPanel", pylon_host_visibility.GetInt() == ServerVisibility_e::HIDDEN))
     {
         pylon_host_visibility.SetValue(ServerVisibility_e::HIDDEN);
     }
-    if (ImGui::SameLine(); ImGui::RadioButton("public", pylon_host_visibility.GetInt() == ServerVisibility_e::PUBLIC))
+    if (ImGui::SameLine(); ImGui::RadioButton("public##ServerBrowser_DrawHostPanel", pylon_host_visibility.GetInt() == ServerVisibility_e::PUBLIC))
     {
         pylon_host_visibility.SetValue(ServerVisibility_e::PUBLIC);
     }
@@ -632,7 +632,7 @@ void CBrowser::DrawHostPanel(void)
     ImGui::TextColored(m_hostMessageColor, "%s", m_hostMessage.c_str());
     if (!m_hostToken.empty())
     {
-        ImGui::InputText("##ServerHost_HostToken", &m_hostToken, ImGuiInputTextFlags_ReadOnly);
+        ImGui::InputText("##ServerBrowser_DrawHostPanel_HostToken", &m_hostToken, ImGuiInputTextFlags_ReadOnly);
     }
 
     ImGui::Spacing();
@@ -647,7 +647,7 @@ void CBrowser::DrawHostPanel(void)
 
     if (!g_pHostState->m_bActiveGame)
     {
-        if (ImGui::Button("Start server", ImVec2(contentRegionMax.x, 32)))
+        if (ImGui::Button("Start server##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
         {
             m_hostMessage.clear();
 
@@ -661,26 +661,26 @@ void CBrowser::DrawHostPanel(void)
             }
         }
 
-        if (ImGui::Button("Reload playlist", ImVec2(contentRegionMax.x, 32)))
+        if (ImGui::Button("Reload playlist##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
         {
             v_Playlists_Download_f();
             Playlists_SDKInit(); // Re-Init playlist.
         }
 
-        if (ImGui::Button("Reload banlist", ImVec2(contentRegionMax.x, 32)))
+        if (ImGui::Button("Reload banlist##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
         {
             g_BanSystem.LoadList();
         }
     }
     else
     {
-        if (ImGui::Button("Stop server", ImVec2(contentRegionMax.x, 32)))
+        if (ImGui::Button("Stop server##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
         {
             ProcessCommand("LeaveMatch"); // TODO: use script callback instead.
             g_pHostState->m_iNextState = HostStates_t::HS_GAME_SHUTDOWN;
         }
 
-        if (ImGui::Button("Change level", ImVec2(contentRegionMax.x, 32)))
+        if (ImGui::Button("Change level##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
         {
             if (!m_levelName.empty() && !m_modeName.empty())
             {
@@ -701,12 +701,12 @@ void CBrowser::DrawHostPanel(void)
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (ImGui::Button("Rebuild AI network", ImVec2(contentRegionMax.x, 32)))
+            if (ImGui::Button("Rebuild AI network##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
             {
                 ProcessCommand("BuildAINFile");
             }
 
-            if (ImGui::Button("Reload NavMesh", ImVec2(contentRegionMax.x, 32)))
+            if (ImGui::Button("Reload NavMesh##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
             {
                 ProcessCommand("navmesh_hotswap");
             }
@@ -715,7 +715,7 @@ void CBrowser::DrawHostPanel(void)
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (ImGui::Button("Reparse AI settings", ImVec2(contentRegionMax.x, 32)))
+            if (ImGui::Button("Reparse AI settings##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
             {
                 Msg(eDLL_T::ENGINE, "Reparsing AI data on %s\n", clientActive ? "server and client" : "server");
                 ProcessCommand("aisettings_reparse");
@@ -726,7 +726,7 @@ void CBrowser::DrawHostPanel(void)
                 }
             }
 
-            if (ImGui::Button("Reparse Weapon settings", ImVec2(contentRegionMax.x, 32)))
+            if (ImGui::Button("Reparse Weapon settings##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
             {
                 Msg(eDLL_T::ENGINE, "Reparsing weapon data on %s\n", clientActive ? "server and client" : "server");
                 ProcessCommand("weapon_reparse");
@@ -738,7 +738,7 @@ void CBrowser::DrawHostPanel(void)
     ImGui::Separator();
     ImGui::Spacing();
 
-    if (ImGui::Button("Reparse all scripts", ImVec2(contentRegionMax.x, 32)))
+    if (ImGui::Button("Reparse all scripts##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
     {
         Msg(eDLL_T::ENGINE, "Reparsing all scripts on %s\n", "server and client");
 
