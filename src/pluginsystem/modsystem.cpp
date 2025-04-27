@@ -77,13 +77,13 @@ static void ModSystem_List_f()
 	{
 		const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
 
-		Msg(eDLL_T::ENGINE, "author: %s\n", mod->m_Author.String());
-		Msg(eDLL_T::ENGINE, "name: %s\n", mod->m_Name.String());
-		Msg(eDLL_T::ENGINE, "id: %s\n", mod->m_ModID.String());
-		Msg(eDLL_T::ENGINE, "description: %s\n", mod->m_Description.String());
-		Msg(eDLL_T::ENGINE, "version: %s\n", mod->m_Version.String());
-		Msg(eDLL_T::ENGINE, "path: %s\n", mod->m_BasePath.String());
-		Msg(eDLL_T::ENGINE, "state: %s\n", ModSystem_StateToString(mod->m_iState));
+		Msg(eDLL_T::ENGINE, "author: %s\n", mod->author.String());
+		Msg(eDLL_T::ENGINE, "name: %s\n", mod->name.String());
+		Msg(eDLL_T::ENGINE, "id: %s\n", mod->id.String());
+		Msg(eDLL_T::ENGINE, "description: %s\n", mod->description.String());
+		Msg(eDLL_T::ENGINE, "version: %s\n", mod->version.String());
+		Msg(eDLL_T::ENGINE, "path: %s\n", mod->basePath.String());
+		Msg(eDLL_T::ENGINE, "state: %s\n", ModSystem_StateToString(mod->state));
 		Msg(eDLL_T::ENGINE, "-------------------------------------------------------------------------------\n");
 	}
 
@@ -170,13 +170,13 @@ void CModSystem::Init()
 		}
 
 		bool didInsert; // Mod ID's must be unique!
-		m_ModIdHashMap.Insert(mod->m_ModID, &didInsert);
+		m_ModIdHashMap.Insert(mod->id, &didInsert);
 
 		if (!didInsert)
 		{
 			Error(eDLL_T::ENGINE, NO_ERROR,
 				"Mod \"%s\" has ID \"%s\" that was already used by another mod; skipping...\n",
-				mod->m_Name.String(), mod->m_ModID.String());
+				mod->name.String(), mod->id.String());
 
 			delete mod;
 			continue;
@@ -224,25 +224,25 @@ void CModSystem::UpdateModStatusList()
 		ModInstance_t* mod = m_ModList[i];
 		Assert(mod->IsLoaded());
 
-		if (!enabledList.HasElement(mod->m_ModID))
+		if (!enabledList.HasElement(mod->id))
 		{
 			if (modsystem_debug.GetBool())
 			{
 				Msg(eDLL_T::ENGINE, "Mod '%s'(\"%s\") does not exist in '%s'; enabling...\n",
-					mod->m_Name.String(), mod->m_ModID.String(), MOD_STATUS_LIST_FILE);
+					mod->name.String(), mod->id.String(), MOD_STATUS_LIST_FILE);
 			}
 
 			mod->SetState(eModState::ENABLED);
 		}
 		else
 		{
-			const bool bEnable = enabledList.FindElement(mod->m_ModID, false);
+			const bool bEnable = enabledList.FindElement(mod->id, false);
 			mod->SetState(bEnable ? eModState::ENABLED : eModState::DISABLED);
 
 			if (modsystem_debug.GetBool())
 			{
 				Msg(eDLL_T::ENGINE, "Mod '%s'(\"%s\") exists in '%s' and is %s.\n",
-					mod->m_Name.String(), mod->m_ModID.String(), MOD_STATUS_LIST_FILE, ModSystem_StateToString(mod->m_iState));
+					mod->name.String(), mod->id.String(), MOD_STATUS_LIST_FILE, ModSystem_StateToString(mod->state));
 			}
 		}
 	}
@@ -283,10 +283,10 @@ void CModSystem::WriteModStatusList()
 		const ModInstance_t* mod = m_ModList[i];
 		bool enabled = false;
 
-		if (mod->m_iState == eModState::ENABLED)
+		if (mod->state == eModState::ENABLED)
 			enabled = true;
 
-		kv.SetBool(mod->m_ModID.Get(), enabled);
+		kv.SetBool(mod->id.Get(), enabled);
 	}
 
 	UnlockModList();
@@ -300,15 +300,15 @@ void CModSystem::WriteModStatusList()
 
 //-----------------------------------------------------------------------------
 // Purpose: 
-// Input  : &basePath - 
+// Input  : &_basePath - 
 //-----------------------------------------------------------------------------
-CModSystem::ModInstance_t::ModInstance_t(const CUtlString& basePath)
+CModSystem::ModInstance_t::ModInstance_t(const CUtlString& _basePath)
 {
-	m_SettingsKV = nullptr;
-	m_bHasSearchPath = false;
+	settingsKV = nullptr;
+	hasSearchPath = false;
 
-	m_BasePath = basePath;
-	m_BasePath.AppendSlash('/');
+	basePath = _basePath;
+	basePath.AppendSlash('/');
 
 	SetState(eModState::LOADING);
 
@@ -331,10 +331,10 @@ CModSystem::ModInstance_t::ModInstance_t(const CUtlString& basePath)
 	// [amos]: it might be better to pack core files into the VPK, and disable
 	//         the filesystem cache to disk reroute to avoid the file name
 	//         clashing problems, research required.
-	FileSystem()->AddSearchPath(m_BasePath.Get(), "GAME", SearchPathAdd_t::PATH_ADD_TO_TAIL);
-	m_bHasSearchPath = true;
+	FileSystem()->AddSearchPath(basePath.Get(), "GAME", SearchPathAdd_t::PATH_ADD_TO_TAIL);
+	hasSearchPath = true;
 
-	const CUtlString scriptsRsonPath = m_BasePath + GAME_SCRIPT_COMPILELIST;
+	const CUtlString scriptsRsonPath = basePath + GAME_SCRIPT_COMPILELIST;
 	SetState(eModState::LOADED);
 }
 
@@ -343,15 +343,15 @@ CModSystem::ModInstance_t::ModInstance_t(const CUtlString& basePath)
 //-----------------------------------------------------------------------------
 CModSystem::ModInstance_t::~ModInstance_t()
 {
-	if (m_SettingsKV)
-		delete m_SettingsKV;
+	if (settingsKV)
+		delete settingsKV;
 
-	if (m_bHasSearchPath)
-		FileSystem()->RemoveSearchPath(m_BasePath.Get(), "GAME");
+	if (hasSearchPath)
+		FileSystem()->RemoveSearchPath(basePath.Get(), "GAME");
 
-	FOR_EACH_VEC(m_ConVars, i)
+	FOR_EACH_VEC(conVars, i)
 	{
-		ConVar* const cvar = m_ConVars.Element(i);
+		ConVar* const cvar = conVars.Element(i);
 		cvar->Shutdown(); // Removes it from the linked list.
 
 		delete cvar;
@@ -365,21 +365,21 @@ CModSystem::ModInstance_t::~ModInstance_t()
 //-----------------------------------------------------------------------------
 bool CModSystem::ModInstance_t::ShouldLoadPaks(const char* const targetPlaylist) const
 {
-	Assert(m_SettingsKV);
-	const KeyValues* const playlistsKV = m_SettingsKV->FindKey("PakLoadOnPlaylists");
+	Assert(settingsKV);
+	const KeyValues* const pPlaylistsKV = settingsKV->FindKey("PakLoadOnPlaylists");
 
 	// If the pak load filter is empty or absent, return true as that means no
 	// filter should be applied here.
-	if (!playlistsKV || !playlistsKV->GetFirstSubKey())
+	if (!pPlaylistsKV || !pPlaylistsKV->GetFirstSubKey())
 		return true;
 
-	for (KeyValues* subKey = playlistsKV->GetFirstSubKey();
-		subKey != nullptr; subKey = subKey->GetNextKey())
+	for (KeyValues* pSubKey = pPlaylistsKV->GetFirstSubKey();
+		pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
 	{
-		if (!subKey->GetBool())
+		if (!pSubKey->GetBool())
 			continue; // Pak load is disabled on this mode.
 
-		if (V_strcmp(subKey->GetName(), targetPlaylist) == 0)
+		if (V_strcmp(pSubKey->GetName(), targetPlaylist) == 0)
 			return true;
 	}
 
@@ -396,7 +396,7 @@ bool CModSystem::ModInstance_t::ShouldLoadPaks(const char* const targetPlaylist)
 KeyValues* CModSystem::ModInstance_t::GetSettingsKeyRequired(
 	const char* settingsPath, const char* key) const
 {
-	KeyValues* const pKeyValue = m_SettingsKV->FindKey(key);
+	KeyValues* const pKeyValue = settingsKV->FindKey(key);
 
 	if (!pKeyValue)
 	{
@@ -420,12 +420,12 @@ KeyValues* CModSystem::ModInstance_t::GetSettingsKeyRequired(
 //-----------------------------------------------------------------------------
 static bool ModSystem_GetSettingsKeyValueString(CModSystem::ModInstance_t* const mod, const char* settingsPath, const char* const key, CUtlString& out)
 {
-	KeyValues* const keyvalue = mod->GetSettingsKeyRequired(settingsPath, key);
+	KeyValues* const pKeyValue = mod->GetSettingsKeyRequired(settingsPath, key);
 
-	if (!keyvalue)
+	if (!pKeyValue)
 		return false;
 
-	const char* const value = keyvalue->GetString();
+	const char* const value = pKeyValue->GetString();
 
 	if (!value[0])
 	{
@@ -446,13 +446,13 @@ static bool ModSystem_GetSettingsKeyValueString(CModSystem::ModInstance_t* const
 //-----------------------------------------------------------------------------
 bool CModSystem::ModInstance_t::ParseSettings()
 {
-	const CUtlString settingsPath = m_BasePath + MOD_SETTINGS_FILE;
+	const CUtlString settingsPath = basePath + MOD_SETTINGS_FILE;
 	const char* const pSettingsPath = settingsPath.Get();
 
-	m_SettingsKV = FileSystem()->LoadKeyValues(
+	settingsKV = FileSystem()->LoadKeyValues(
 		IFileSystem::TYPE_COMMON, pSettingsPath, "GAME");
 
-	if (!m_SettingsKV)
+	if (!settingsKV)
 	{
 		Error(eDLL_T::ENGINE, NO_ERROR,
 			"Failed to parse mod settings \"%s\"; skipping...\n", pSettingsPath);
@@ -460,23 +460,23 @@ bool CModSystem::ModInstance_t::ParseSettings()
 	}
 
 	// "author" "MyName"
-	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "author", m_Author))
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "author", author))
 		return false;
 
 	// "name" "An R5Reloaded Mod"
-	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "name", m_Name))
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "name", name))
 		return false;
 
 	// "id" "r5reloaded.TestMod"
-	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "id", m_ModID))
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "id", id))
 		return false;
 
 	// "description" "This mod does X and Y using Z"
-	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "description", m_Description))
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "description", description))
 		return false;
 
 	// "version" "1.0.0"
-	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "version", m_Version))
+	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "version", version))
 		return false;
 
 	return true;
@@ -487,8 +487,8 @@ bool CModSystem::ModInstance_t::ParseSettings()
 //-----------------------------------------------------------------------------
 void CModSystem::ModInstance_t::ParseConVars()
 {
-	Assert(m_SettingsKV);
-	const KeyValues* pConVars = m_SettingsKV->FindKey("ConVars");
+	Assert(settingsKV);
+	const KeyValues* pConVars = settingsKV->FindKey("ConVars");
 
 	if (!pConVars)
 		return;
@@ -534,7 +534,7 @@ void CModSystem::ModInstance_t::ParseConVars()
 			if (g_pCVar->FindCommandBase(pszName) != nullptr)
 			{
 				Warning(eDLL_T::ENGINE, "Failed to register ConVar \"%s\" for mod '%s'(\"%s\"); already registered.\n",
-					pszName, m_Name.String(), m_ModID.String());
+					pszName, name.String(), id.String());
 
 				continue;
 			}
@@ -545,12 +545,12 @@ void CModSystem::ModInstance_t::ParseConVars()
 			{
 				// Quit as we ran out of memory.
 				Error(eDLL_T::ENGINE, EXIT_FAILURE, "Failed to register ConVar \"%s\" for mod '%s'(\"%s\"); allocation failure.\n",
-					pszName, m_Name.String(), m_ModID.String());
+					pszName, name.String(), id.String());
 
 				return;
 			}
 
-			m_ConVars.AddToTail(cvar);
+			conVars.AddToTail(cvar);
 		}
 	}
 }
@@ -560,8 +560,8 @@ void CModSystem::ModInstance_t::ParseConVars()
 //-----------------------------------------------------------------------------
 void CModSystem::ModInstance_t::ParseLocalizationFiles()
 {
-	Assert(m_SettingsKV);
-	const KeyValues* pLocalizationFiles = m_SettingsKV->FindKey("LocalizationFiles");
+	Assert(settingsKV);
+	const KeyValues* pLocalizationFiles = settingsKV->FindKey("LocalizationFiles");
 
 	if (!pLocalizationFiles)
 		return;
@@ -569,7 +569,7 @@ void CModSystem::ModInstance_t::ParseLocalizationFiles()
 	for (KeyValues* pSubKey = pLocalizationFiles->GetFirstSubKey();
 		pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
 	{
-		m_LocalizationFiles.AddToTail(m_BasePath + pSubKey->GetName());
+		localizationFiles.AddToTail(basePath + pSubKey->GetName());
 	}
 }
 

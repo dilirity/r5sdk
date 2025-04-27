@@ -34,15 +34,15 @@ public:
 		void ParseConVars();
 		void ParseLocalizationFiles();
 
-		inline void SetState(eModState state) { m_iState = state; };
+		inline void SetState(const eModState newState) { state = newState; };
 
-		inline bool IsLoaded() const { return m_iState == eModState::LOADED; };
-		inline bool IsEnabled() const { return m_iState == eModState::ENABLED; };
+		inline bool IsLoaded() const { return state == eModState::LOADED; };
+		inline bool IsEnabled() const { return state == eModState::ENABLED; };
 
 		bool ShouldLoadPaks(const char* const targetPlaylist) const;
 
-		inline const CUtlString& GetBasePath() const { return m_BasePath; };
-		inline CUtlString GetScriptCompileListPath() const { return m_BasePath + GAME_SCRIPT_COMPILELIST; };
+		inline const CUtlString& GetBasePath() const { return basePath; };
+		inline CUtlString GetScriptCompileListPath() const { return basePath + GAME_SCRIPT_COMPILELIST; };
 
 		KeyValues* GetSettingsKeyRequired(const char* settingsPath, const char* key) const;
 
@@ -51,20 +51,20 @@ public:
 			return RSON::LoadFromFile(GetScriptCompileListPath().Get(), "GAME", parseFailure);
 		};
 
-		KeyValues* m_SettingsKV;
-		eModState m_iState = eModState::UNLOADED;
-		bool m_bHasSearchPath;
+		KeyValues* settingsKV;
+		eModState state = eModState::UNLOADED;
+		bool hasSearchPath;
 
-		CUtlVector<CUtlString> m_LocalizationFiles;
-		CUtlVector<ConVar*> m_ConVars;
+		CUtlVector<CUtlString> localizationFiles;
+		CUtlVector<ConVar*> conVars;
 
-		CUtlString m_Author;
-		CUtlString m_Name;
-		CUtlString m_ModID;
-		CUtlString m_Description;
-		CUtlString m_Version;
+		CUtlString author;
+		CUtlString name;
+		CUtlString id;
+		CUtlString description;
+		CUtlString version;
 
-		CUtlString m_BasePath;
+		CUtlString basePath;
 	};
 
 	CModSystem();

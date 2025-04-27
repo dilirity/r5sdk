@@ -22,9 +22,9 @@ bool Localize_LoadLocalizationFileLists(CLocalize* thisptr)
 			if (!mod->IsEnabled())
 				continue;
 
-			FOR_EACH_VEC(mod->m_LocalizationFiles, j)
+			FOR_EACH_VEC(mod->localizationFiles, j)
 			{
-				const char* localizationFile = mod->m_LocalizationFiles.Element(j).Get();
+				const char* localizationFile = mod->localizationFiles.Element(j).Get();
 
 				if (!CLocalize__AddFile(thisptr, localizationFile, "GAME"))
 					Warning(eDLL_T::ENGINE, "Failed to add localization file '%s'\n", localizationFile);
