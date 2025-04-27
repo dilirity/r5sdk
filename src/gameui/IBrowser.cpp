@@ -328,13 +328,14 @@ void CBrowser::DrawBrowserPanel(void)
                 ImGui::Text("%d", server->port);
 
                 ImGui::TableNextColumn();
-                string svConnectBtn = "Connect##";
-                svConnectBtn.append(server->name + server->address + server->map);
+                ImGui::PushID(i);
 
-                if (ImGui::Button(svConnectBtn.c_str()))
+                if (ImGui::Button("Connect##ServerBrowser_ServerListTable"))
                 {
                     g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey);
                 }
+
+                ImGui::PopID();
             }
         }
 
@@ -367,7 +368,7 @@ void CBrowser::DrawBrowserPanel(void)
         ImGui::InputTextWithHint("##ServerBrowser_ServerKey", "Encryption key", m_serverNetKeyTextBuf, sizeof(m_serverNetKeyTextBuf));
 
         ImGui::SameLine();
-        if (ImGui::Button("Connect", ImVec2(itemWidth, ImGui::GetFrameHeight())))
+        if (ImGui::Button("Connect##ServerBrowser_ServerConnect", ImVec2(itemWidth, ImGui::GetFrameHeight())))
         {
             if (m_serverAddressTextBuf[0])
             {
