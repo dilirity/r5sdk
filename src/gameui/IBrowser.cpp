@@ -76,7 +76,7 @@ CBrowser::~CBrowser(void)
 //-----------------------------------------------------------------------------
 bool CBrowser::Init(void)
 {
-    SetStyleVar(927.f, 524.f, -500.f, 50.f);
+    SetStyleVar();
 
     HMODULE sdkModule = reinterpret_cast<HMODULE>(g_SDKDll.GetModuleBase());
     m_lockedIconDataResource = GetModuleResource(sdkModule, IDB_PNG2);
@@ -202,6 +202,8 @@ bool CBrowser::DrawSurface(void)
         ImGui::End();
         return false;
     }
+
+    SetRect(927.f, 524.f, 50, 50.f);
 
     if (ImGui::BeginTabBar("CompMenu##ServerBrowser_DrawSurface"))
     {

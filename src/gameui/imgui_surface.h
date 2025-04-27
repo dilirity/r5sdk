@@ -18,7 +18,9 @@ public:
 	virtual void RunFrame() = 0;
 
 	virtual bool DrawSurface() = 0;
-	virtual void SetStyleVar(const float width, const float height, const float x, const float y);
+
+	virtual void SetStyleVar();
+	virtual void SetRect(const float width, const float height, const float x, const float y);
 
 	// inlines:
 	inline void ToggleActive() { m_activated ^= true; }
@@ -34,6 +36,7 @@ protected:
 
 	bool m_initialized;
 	bool m_activated;
+	bool m_rectSet;
 	bool m_reclaimFocus;
 };
 

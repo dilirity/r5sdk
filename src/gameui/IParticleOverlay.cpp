@@ -41,9 +41,9 @@ CParticleOverlay::~CParticleOverlay(void)
 //-----------------------------------------------------------------------------
 bool CParticleOverlay::Init(void)
 {
-	SetStyleVar(1200, 524, -1000, 50);
-
+	SetStyleVar();
 	m_initialized = true;
+
 	return true;
 }
 
@@ -122,6 +122,8 @@ bool CParticleOverlay::DrawSurface(void)
 		ImGui::End();
 		return false;
 	}
+
+	SetRect(567, 367, 10, 10);
 
 	ImGui::Checkbox("Freeze##ParticleOverlay_ParticleReport", &m_freezeCapture);
 

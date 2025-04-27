@@ -47,9 +47,9 @@ CStreamOverlay::~CStreamOverlay(void)
 //-----------------------------------------------------------------------------
 bool CStreamOverlay::Init(void)
 {
-	SetStyleVar(1200, 524, -1000, 50);
-
+	SetStyleVar();
 	m_initialized = true;
+
 	return true;
 }
 
@@ -128,6 +128,8 @@ bool CStreamOverlay::DrawSurface(void)
 		ImGui::End();
 		return false;
 	}
+
+	SetRect(791, 291, 10, 10);
 
 	if (ImGui::BeginChild("##StreamOverlay_StreamReport", ImVec2(-1, -1), ImGuiChildFlags_Border, ImGuiWindowFlags_HorizontalScrollbar))
 	{

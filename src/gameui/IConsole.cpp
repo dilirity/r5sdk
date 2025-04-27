@@ -86,7 +86,7 @@ CConsole::~CConsole(void)
 //-----------------------------------------------------------------------------
 bool CConsole::Init(void)
 {
-    SetStyleVar(1200, 524, -1000, 50);
+    SetStyleVar();
     return LoadFlagIcons();
 }
 
@@ -193,6 +193,7 @@ bool CConsole::DrawSurface(void)
         return false;
     }
 
+    SetRect(1200, 524, 50, 50);
     m_mainWindow = ImGui::GetCurrentWindow();
 
     const ImGuiStyle& style = ImGui::GetStyle();

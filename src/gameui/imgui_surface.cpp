@@ -9,6 +9,7 @@ CImguiSurface::CImguiSurface()
 	, m_surfaceStyle(ImGuiStyle_t::NONE)
 	, m_initialized(false)
 	, m_activated(false)
+	, m_rectSet(false)
 	, m_reclaimFocus(false)
 {}
 
@@ -31,13 +32,24 @@ void CImguiSurface::Animate()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: sets the surface front-end style and initial positions/sizes
+// Purpose: sets the surface front-end style
 //-----------------------------------------------------------------------------
-void CImguiSurface::SetStyleVar(const float width, const float height, 
-	const float x, const float y)
+void CImguiSurface::SetStyleVar()
 {
 	m_surfaceStyle = g_ImGuiConfig.InitStyle();
+}
 
-	ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_FirstUseEver);
+//-----------------------------------------------------------------------------
+// Purpose: sets the surface rect
+//-----------------------------------------------------------------------------
+void CImguiSurface::SetRect(const float width, const float height,
+	const float x, const float y)
+{
+	if (m_rectSet)
+		return;
+
+	ImGui::SetWindowSize(ImVec2(width, height), ImGuiCond_FirstUseEver);
 	ImGui::SetWindowPos(ImVec2(x, y), ImGuiCond_FirstUseEver);
+
+	m_rectSet = true;
 }
