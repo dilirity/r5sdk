@@ -11,6 +11,7 @@
 #include "rtech/async/asyncio.h"
 #include "rtech/pak/pakstate.h"
 #include "filesystem/filesystem.h"
+#include "pluginsystem/modsystem.h"
 #include "ebisusdk/EbisuSDK.h"
 #include "miles_impl.h"
 #include "miles/src/sdk/shared/rrthreads2.h"
@@ -33,20 +34,48 @@ static bool CSOM_Initialize()
 	if (!isDefaultLanguage)
 	{
 		const bool useShipSound = !CommandLine()->FindParm("-devsound") || CommandLine()->FindParm("-shipsound");
-		char baseStreamFilePath[MAX_PATH];
+		char baseStreamFilePath[MAX_OSPATH];
 
-		V_snprintf(baseStreamFilePath, sizeof(baseStreamFilePath), "%s/general_%s.mstr", useShipSound ? "audio/ship" : "audio/dev", pszLanguage);
+		V_snprintf(baseStreamFilePath, sizeof(baseStreamFilePath), "%s\\general_%s.mstr", useShipSound ? "audio\\ship" : "audio\\dev", pszLanguage);
+		bool found = FileExists(baseStreamFilePath);
 
-		// if the requested language for miles does not have a MSTR file present, throw a non-fatal error and force MILES_DEFAULT_LANGUAGE as a fallback
-		// if we are loading MILES_DEFAULT_LANGUAGE and the file is still not found, we can let it hit the regular engine error, since that is not recoverable
-		if (!FileSystem()->FileExists(baseStreamFilePath))
+		if (!found && ModSystem()->IsEnabled())
 		{
-			Error(eDLL_T::AUDIO, NO_ERROR, "%s: attempted to load language '%s' but the required streaming source file (%s) was not found. falling back to '%s'...\n",
+			ModSystem()->LockModList();
+
+			// Check for it in our mods.
+			FOR_EACH_VEC(ModSystem()->GetModList(), i)
+			{
+				const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+
+				if (!mod->IsEnabled())
+					continue;
+
+				const CUtlString modLookupPath = mod->GetBasePath() + baseStreamFilePath;
+				const char* const pModLookupPath = modLookupPath.String();
+
+				found = FileExists(pModLookupPath);
+
+				if (found)
+					break;
+			}
+
+			ModSystem()->UnlockModList();
+		}
+
+		if (!found)
+		{
+			// if the requested language for miles does not have a MSTR file present,
+			// throw a non-fatal error and force MILES_DEFAULT_LANGUAGE as a fallback if
+			// we are loading MILES_DEFAULT_LANGUAGE and the file is still not found, we
+			// can let it hit the regular engine error, since that is not recoverable.
+			Error(eDLL_T::AUDIO, NO_ERROR, "%s: attempted to load language '%s' but the required streaming source file (%s) was not found, falling back to '%s'...\n",
 				__FUNCTION__, pszLanguage, baseStreamFilePath, MILES_DEFAULT_LANGUAGE);
 
 			pszLanguage = MILES_DEFAULT_LANGUAGE;
-			miles_language->SetValue(pszLanguage);
 		}
+
+		miles_language->SetValue(pszLanguage);
 	}
 
 	Msg(eDLL_T::AUDIO, "%s: initializing MSS with language: '%s'\n", __FUNCTION__, pszLanguage);
