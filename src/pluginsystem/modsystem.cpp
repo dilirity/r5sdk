@@ -286,7 +286,7 @@ void CModSystem::WriteModStatusList()
 		if (mod->state == eModState::ENABLED)
 			enabled = true;
 
-		kv.SetBool(mod->id.Get(), enabled);
+		kv.SetBool(mod->id.String(), enabled);
 	}
 
 	UnlockModList();
@@ -331,7 +331,7 @@ CModSystem::ModInstance_t::ModInstance_t(const CUtlString& _basePath)
 	// [amos]: it might be better to pack core files into the VPK, and disable
 	//         the filesystem cache to disk reroute to avoid the file name
 	//         clashing problems, research required.
-	FileSystem()->AddSearchPath(basePath.Get(), "GAME", SearchPathAdd_t::PATH_ADD_TO_TAIL);
+	FileSystem()->AddSearchPath(basePath.String(), "GAME", SearchPathAdd_t::PATH_ADD_TO_TAIL);
 	hasSearchPath = true;
 
 	const CUtlString scriptsRsonPath = basePath + GAME_SCRIPT_COMPILELIST;
@@ -347,7 +347,7 @@ CModSystem::ModInstance_t::~ModInstance_t()
 		delete settingsKV;
 
 	if (hasSearchPath)
-		FileSystem()->RemoveSearchPath(basePath.Get(), "GAME");
+		FileSystem()->RemoveSearchPath(basePath.String(), "GAME");
 
 	FOR_EACH_VEC(conVars, i)
 	{
@@ -447,7 +447,7 @@ static bool ModSystem_GetSettingsKeyValueString(CModSystem::ModInstance_t* const
 bool CModSystem::ModInstance_t::ParseSettings()
 {
 	const CUtlString settingsPath = basePath + MOD_SETTINGS_FILE;
-	const char* const pSettingsPath = settingsPath.Get();
+	const char* const pSettingsPath = settingsPath.String();
 
 	settingsKV = FileSystem()->LoadKeyValues(
 		IFileSystem::TYPE_COMMON, pSettingsPath, "GAME");
