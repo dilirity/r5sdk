@@ -23,6 +23,7 @@ History:
 #include "engine/net.h"
 #include "engine/cmd.h"
 #include "engine/cmodel_bsp.h"
+#include "engine/host.h"
 #include "engine/host_state.h"
 #ifndef CLIENT_DLL
 #include "engine/server/server.h"
@@ -741,40 +742,7 @@ void CBrowser::DrawHostPanel(void)
     if (ImGui::Button("Reparse all scripts##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
     {
         Msg(eDLL_T::ENGINE, "Reparsing all scripts on %s\n", "server and client");
-
-        // NOTE: the following are already called during "reload" or "reconnect".
-        //"aisettings_reparse"
-        //"aisettings_reparse_client"
-
-        //"damagedefs_reparse"
-        //"damagedefs_reparse_client"
-
-        //"playerSettings_reparse"
-        //"fx_impact_reparse"
-
-        ProcessCommand("ReloadAimAssistSettings");
-        ProcessCommand("reload_localization");
-
-        ProcessCommand("playlist_reload");
-        ProcessCommand("banlist_reload");
-
-        ProcessCommand("weapon_reparse");
-
-        // Recompile all UI scripts
-        ProcessCommand("uiscript_reset");
-
-        if (serverActive)
-        {
-            // If we hit this code path, we are connected to a listen server,
-            // reconnect to it to recompile all server and client side scripts.
-            ProcessCommand("reload");
-        }
-        else if (clientActive)
-        {
-            // If we hit this code path, we are connected to a remote server,
-            // reconnect to it to recompile all client side scripts.
-            ProcessCommand("reconnect");
-        }
+        Host_ReparseAllScripts();
     }
 #endif // !CLIENT_DLL
 }

@@ -26,6 +26,7 @@ inline float* host_frametime_stddeviation = nullptr;
 #define MAX_FRAMETIME   0.1
 
 void Host_Error(const char* const error, ...);
+void Host_ReparseAllScripts();
 
 class CCommonHostState
 {

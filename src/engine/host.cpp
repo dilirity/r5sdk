@@ -7,9 +7,14 @@
 
 #include "core/stdafx.h"
 #include "tier0/frametask.h"
+#include "engine/cmd.h"
 #include "engine/host.h"
 #include "engine/debugoverlay.h"
+#ifndef CLIENT_DLL
+#include "server/server.h"
+#endif // !CLIENT_DLL
 #ifndef DEDICATED
+#include "client/clientstate.h"
 #include "windows/id3dx.h"
 #include "geforce/reflex.h"
 #include "vgui/vgui_debugpanel.h"
@@ -98,6 +103,59 @@ void Host_Error(const char* const error, ...)
 
 	Error(eDLL_T::ENGINE, NO_ERROR, "Host_Error: %s", buf);
 	v_Host_Error(buf);
+}
+
+void Host_ReparseAllScripts()
+{
+	// NOTE: the following are already called during "reload" or "reconnect".
+	//"aisettings_reparse"
+	//"aisettings_reparse_client"
+
+	//"damagedefs_reparse"
+	//"damagedefs_reparse_client"
+
+	//"playerSettings_reparse"
+	//"fx_impact_reparse"
+
+#ifndef DEDICATED
+	// Reparse banks.rson
+	Cbuf_AddText(Cbuf_GetCurrentPlayer(), "miles_reboot", cmd_source_t::kCommandSrcCode);
+#endif // !DEDICATED
+
+	Cbuf_AddText(Cbuf_GetCurrentPlayer(), "downloadPlaylists", cmd_source_t::kCommandSrcCode);
+	Cbuf_AddText(Cbuf_GetCurrentPlayer(), "banlist_reload", cmd_source_t::kCommandSrcCode);
+
+	Cbuf_AddText(Cbuf_GetCurrentPlayer(), "ReloadAimAssistSettings", cmd_source_t::kCommandSrcCode);
+	Cbuf_AddText(Cbuf_GetCurrentPlayer(), "reload_localization", cmd_source_t::kCommandSrcCode);
+
+	Cbuf_AddText(Cbuf_GetCurrentPlayer(), "weapon_reparse", cmd_source_t::kCommandSrcCode);
+
+#ifndef DEDICATED
+	// Recompile all UI scripts
+	Cbuf_AddText(Cbuf_GetCurrentPlayer(), "uiscript_reset", cmd_source_t::kCommandSrcCode);
+#endif // !DEDICATED
+
+	bool serverActive = false;
+
+#ifndef CLIENT_DLL
+	if (g_pServer->IsActive())
+	{
+		// If we hit this code path, we are the server (or the listen server),
+		// reload it to recompile all scripts.
+		Cbuf_AddText(Cbuf_GetCurrentPlayer(), "reload", cmd_source_t::kCommandSrcCode);
+		serverActive = true;
+	}
+#endif // !CLIENT_DLL
+#ifndef DEDICATED
+	if (!serverActive && g_pClientState->IsActive())
+	{
+		// If we hit this code path, we are connected to a remote server,
+		// reconnect to it to recompile all client side scripts.
+		Cbuf_AddText(Cbuf_GetCurrentPlayer(), "reconnect", cmd_source_t::kCommandSrcCode);
+	}
+#endif // !DEDICATED
+
+	Cbuf_Execute();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
