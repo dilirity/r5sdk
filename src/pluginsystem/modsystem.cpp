@@ -10,6 +10,8 @@
 #include "tier0/commandline.h"
 #include "tier1/cvar.h"
 #include "tier2/fileutils.h"
+#include "engine/host.h"
+#include "engine/cmodel_bsp.h"
 #include "rtech/rson.h"
 #include "localize/localize.h"
 #include "modsystem.h"
@@ -23,6 +25,9 @@ static void ModSystem_Reload_f()
 {
 	ModSystem()->Shutdown();
 	ModSystem()->Init();
+
+	Mod_InitiateUserLevelModPaksReprocess(); // Make sure our level mod rpaks reload.
+	Host_ReparseAllScripts(); // Reparse every script of the game.
 }
 
 static void ModSystem_EnableChanged_f(IConVar* var, const char* pOldValue, float flOldValue, ChangeUserData_t pUserData)

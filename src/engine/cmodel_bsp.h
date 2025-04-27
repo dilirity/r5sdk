@@ -166,6 +166,10 @@ extern CUtlVector<CUtlString> g_InstalledMaps;
 extern CThreadMutex g_InstalledMapsMutex;
 
 extern void Mod_GetAllInstalledMaps();
+
+extern void Mod_InitiateUserLevelModPaksReprocess();
+extern void Mod_CancelUserLevelModPaksReprocess();
+
 extern void Mod_SetPrecacheLevelName(const char* const levelName);
 extern void Mod_SetPrecachePlaylistName(const char* const playlistName);
 extern KeyValues* Mod_GetLevelCoreSettings(const char* pszLevelName);

@@ -469,7 +469,7 @@ static bool Mod_UnloadPreloadedPaks()
 //          be unloaded and loaded as some mod paks are necessary on certain
 //          playlists while others aren't
 //-----------------------------------------------------------------------------
-static void Mod_InitiateUserLevelModPaksReprocess()
+void Mod_InitiateUserLevelModPaksReprocess()
 {
     s_customPakData.reprocessUserLevelPaks = true;
     s_customPakData.reprocessUserLevelPaksUnloadFinished = false;
@@ -481,7 +481,7 @@ static void Mod_InitiateUserLevelModPaksReprocess()
 //-----------------------------------------------------------------------------
 // Purpose: cancel the user level mod paks reprocess request
 //-----------------------------------------------------------------------------
-static void Mod_CancelUserLevelModPaksReprocess()
+void Mod_CancelUserLevelModPaksReprocess()
 {
     s_customPakData.reprocessUserLevelPaks = false;
     s_customPakData.reprocessUserLevelPaksUnloadFinished = true;
