@@ -323,6 +323,7 @@ CModSystem::ModInstance_t::ModInstance_t(CModSystem* const _parentClass, const C
 	settingsKV = nullptr;
 
 	hasSearchPath = false;
+	hasPrecompiledScripts = false;
 
 	basePath = _basePath;
 	basePath.AppendSlash('/');

@@ -58,6 +58,7 @@ public:
 
 		eModState state = eModState::UNLOADED;
 		bool hasSearchPath;
+		bool hasPrecompiledScripts;
 
 		CUtlVector<CUtlString> localizationFiles;
 		CUtlVector<ConVar*> conVars;
