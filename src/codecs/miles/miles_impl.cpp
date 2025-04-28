@@ -90,6 +90,121 @@ static bool CSOM_Initialize()
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: appends banks from list to be loaded
+//-----------------------------------------------------------------------------
+static void CSOM_AppendBanksFromList(CSOM_BankList_s* const bankList, const char* const filePath, const bool mandatory)
+{
+	const int errorCode = mandatory ? EXIT_FAILURE : 0;
+	RSON::Node_t* root = nullptr;
+
+#define ERROR_AND_RETURN(fmt, ...) \
+		do {\
+			Error(eDLL_T::AUDIO, errorCode, "Error loading Miles Bank list from '%s': "##fmt, filePath, ##__VA_ARGS__); \
+			if (root) {\
+				RSON_Free(root, AlignedMemAlloc()); \
+				AlignedMemAlloc()->Free(root); \
+			}\
+			return; \
+		} while(0)\
+
+	if (bankList->bankCount == CSOM_MAX_LOADED_BANKS)
+	{
+		ERROR_AND_RETURN("Out of room -- already reached code limit of %d.\n", CSOM_MAX_LOADED_BANKS);
+		return;
+	}
+
+	CUtlBuffer buf;
+
+	if (!FileSystem()->ReadFile(filePath, nullptr, buf))
+	{
+		if (mandatory) // Only exit if the main file doesn't exist.
+			ERROR_AND_RETURN("Could not load file.\n");
+
+		return;
+	}
+
+	const RSON::eFieldType rootType = (RSON::eFieldType)(RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_VALUE);
+	root = RSON::LoadFromBuffer(filePath, (char*)buf.Base(), rootType);
+
+	const RSON::eFieldType expectType = (RSON::eFieldType)(RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_OBJECT);
+
+	if (!root || root->type != expectType)
+		ERROR_AND_RETURN("Data should be an array of objects.\n");
+
+	const int numSlotsLeft = (CSOM_MAX_LOADED_BANKS - bankList->bankCount);
+
+	if (root->valueCount > numSlotsLeft)
+		ERROR_AND_RETURN("Too many banks -- code limit is %d.\n", CSOM_MAX_LOADED_BANKS);
+
+	bool nameSetForBank = false;
+
+	for (int i = 0; i < root->valueCount; i++)
+	{
+		const RSON::Field_t* const key = root->GetArrayValue(i)->GetSubKey();
+
+		if (!key)
+			continue;
+
+		if (V_strcmp(key->name, "name") != 0)
+			ERROR_AND_RETURN("Only valid key is 'name', not '%s'.\n", key->name);
+
+		if (nameSetForBank)
+			ERROR_AND_RETURN("Each bank must have exactly one name.\n");
+
+		nameSetForBank = true;
+
+		if (key->node.type != RSON::eFieldType::RSON_STRING)
+			ERROR_AND_RETURN("'name' must be a single string.\n");
+
+		const char* const bankToAdd = key->GetString();
+
+		// Make sure this bank wasn't already added.
+		for (int j = 0; j < bankList->bankCount; j++)
+		{
+			if (V_stricmp(bankList->banks[j], bankToAdd) == 0)
+				ERROR_AND_RETURN("Each bank must be unique; '%s' was already listed.\n", bankToAdd);
+		}
+
+		V_strncpy(bankList->banks[bankList->bankCount++], bankToAdd, CSOM_MAX_FILE_NAME);
+	}
+
+	RSON_Free(root, AlignedMemAlloc());
+	AlignedMemAlloc()->Free(root);
+
+#undef ERROR_AND_RETURN
+}
+
+#define CSOM_BANK_LIST_FILE "scripts/audio/banks.rson"
+
+//-----------------------------------------------------------------------------
+// Purpose: initializes the bank list object dictating which banks to load
+//-----------------------------------------------------------------------------
+static void CSOM_InitializeBankList(CSOM_BankList_s* const bankList)
+{
+	bankList->bankCount = 0;
+	CSOM_AppendBanksFromList(bankList, CSOM_BANK_LIST_FILE, true);
+
+	if (ModSystem()->IsEnabled())
+	{
+		ModSystem()->LockModList();
+
+		// Add banks from our mods.
+		FOR_EACH_VEC(ModSystem()->GetModList(), i)
+		{
+			const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+
+			if (!mod->IsEnabled())
+				continue;
+
+			const CUtlString lookupPath = mod->GetBasePath() + CSOM_BANK_LIST_FILE;
+			CSOM_AppendBanksFromList(bankList, lookupPath.String(), false);
+		}
+
+		ModSystem()->UnlockModList();
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: logs debug output emitted from the Miles Sound System
 // Input  : nLogLevel - 
 //          pszMessage - 
@@ -473,6 +588,7 @@ void MilesCore::Detour(const bool bAttach) const
 	DetourSetup(&v_MilesQueueEventRun, &MilesQueueEventRun, bAttach);
 	//DetourSetup(&v_MilesBankPatch, &MilesBankPatch, bAttach);
 	DetourSetup(&v_CSOM_Initialize, &CSOM_Initialize, bAttach);
+	DetourSetup(&v_CSOM_InitializeBankList, &CSOM_InitializeBankList, bAttach);
 	DetourSetup(&v_CSOM_LogFunc, &CSOM_LogFunc, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileRead, &CSOM_MilesAsync_FileRead, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileStatus, &CSOM_MilesAsync_FileStatus, bAttach);
