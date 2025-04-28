@@ -169,8 +169,11 @@ void CModSystem::Init()
 			continue;
 		}
 
+		// The mod ID gets normalized here ('SDK.BaseMod' gets turned into
+		// 'SDK_BaseMod'. This ensures that we can generate unique script code
+		// callbacks and anything else that might be of interest in the future.
 		bool didInsert; // Mod ID's must be unique!
-		m_ModIdHashMap.Insert(mod->id, &didInsert);
+		const UtlHashHandle_t idHandle = m_ModIdHashMap.Insert(mod->id.Replace('.', '_'), &didInsert);
 
 		if (!didInsert)
 		{
