@@ -30,6 +30,7 @@
 #include "engine/cmodel_bsp.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 #include "vscript_shared.h"
+#include "game/shared/pluginsystem/modsystem.h"
 
 //-----------------------------------------------------------------------------
 // Purpose: expose SDK version to the VScript API
@@ -105,6 +106,8 @@ void Script_RegisterCommonAbstractions(CSquirrelVM* s)
     DEFINE_SHARED_SCRIPTFUNC_NAMED(s, GetAvailablePlaylists, "Gets an array of all available playlists", "array< string >", "", false);
 
     DEFINE_SHARED_SCRIPTFUNC_NAMED(s, ScriptError, "Throws a script error", "void", "string format, ...", true);
+
+    Script_RegisterModSystemFunctions(s);
 }
 
 //---------------------------------------------------------------------------------

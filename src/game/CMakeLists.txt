@@ -84,6 +84,11 @@ add_sources( SOURCE_GROUP "Script"
     "shared/vscript_debug_overlay_shared.h"
 )
 
+add_sources( SOURCE_GROUP "ModSystem"
+    "shared/pluginsystem/modsystem.cpp"
+    "shared/pluginsystem/modsystem.h"
+)
+
 endif()
 
 if( ${PROJECT_NAME} STREQUAL "server_static" )
