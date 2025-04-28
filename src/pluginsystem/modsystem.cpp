@@ -161,7 +161,7 @@ void CModSystem::Init()
 		// by the 'move' constructor (CUtlVector also doesn't support being
 		// nested unless its a pointer).
 		CModSystem::ModInstance_t* mod = 
-			new CModSystem::ModInstance_t(modFileList.Element(i).DirName());
+			new CModSystem::ModInstance_t(this, modFileList.Element(i).DirName());
 
 		if (!mod->IsLoaded())
 		{
@@ -185,6 +185,7 @@ void CModSystem::Init()
 			continue;
 		}
 
+		mod->idHashHandle = idHandle;
 		m_ModList.AddToTail(mod);
 	}
 
@@ -302,12 +303,25 @@ void CModSystem::WriteModStatusList()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: 
-// Input  : &_basePath - 
+// Purpose: returns the normalized mod ID for the given mod instance
+// Input  : *mod - 
+// Output : normalized mod ID (i.e. SDK.BaseMod gets returned as SDK_BaseMod)
 //-----------------------------------------------------------------------------
-CModSystem::ModInstance_t::ModInstance_t(const CUtlString& _basePath)
+const CUtlString& CModSystem::GetNormalizedModID(const ModInstance_t* const mod) const
 {
+	return m_ModIdHashMap[mod->idHashHandle];
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : *_parentClass - 
+//          &_basePath    - 
+//-----------------------------------------------------------------------------
+CModSystem::ModInstance_t::ModInstance_t(CModSystem* const _parentClass, const CUtlString& _basePath)
+{
+	parentClass = _parentClass;
 	settingsKV = nullptr;
+
 	hasSearchPath = false;
 
 	basePath = _basePath;

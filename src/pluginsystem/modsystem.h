@@ -27,7 +27,7 @@ public:
 
 	struct ModInstance_t
 	{
-		ModInstance_t(const CUtlString& basePath);
+		ModInstance_t(CModSystem* const _parentClass, const CUtlString& basePath);
 		~ModInstance_t();
 
 		bool ParseSettings();
@@ -51,7 +51,11 @@ public:
 			return RSON::LoadFromFile(GetScriptCompileListPath().Get(), "GAME", parseFailure);
 		};
 
+		CModSystem* parentClass;
 		KeyValues* settingsKV;
+
+		UtlHashHandle_t idHashHandle;
+
 		eModState state = eModState::UNLOADED;
 		bool hasSearchPath;
 
@@ -83,6 +87,8 @@ public:
 	const inline CUtlVector<ModInstance_t*>& GetModList() { return m_ModList; };
 	const void LockModList() { m_ModListMutex.Lock(); }
 	const void UnlockModList() { m_ModListMutex.Unlock(); }
+
+	const CUtlString& GetNormalizedModID(const ModInstance_t* const mod) const;
 
 private:
 	CUtlVector<ModInstance_t*> m_ModList;
