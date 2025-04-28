@@ -743,7 +743,7 @@ void CBrowser::DrawHostPanel(void)
 
     if (ImGui::Button("Reparse all scripts##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
     {
-        Msg(eDLL_T::ENGINE, "Reparsing all scripts on %s\n", "server and client");
+        Msg(eDLL_T::ENGINE, "Reparsing all scripts on %s\n", serverActive ? "server and client" : "client");
         Host_ReparseAllScripts();
     }
 #endif // !CLIENT_DLL
