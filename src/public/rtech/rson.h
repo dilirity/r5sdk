@@ -54,6 +54,8 @@ public:
 		Value_t value;
 
 		inline Field_t* GetFirstSubKey() const;
+
+		inline Field_t* GetArrayKey(const int index) const;
 		inline Value_t* GetArrayValue(const int index) const;
 
 		// does not support finding a key in a different level of the tree
@@ -103,6 +105,12 @@ RSON::Field_t* RSON::Node_t::FindKey(const char* const keyName) const
 	}
 
 	return NULL;
+}
+
+RSON::Field_t* RSON::Node_t::GetArrayKey(const int index) const
+{
+	assert(type & eFieldType::RSON_ARRAY);
+	return value.GetSubKey() + index;
 }
 
 RSON::Value_t* RSON::Node_t::GetArrayValue(const int index) const
