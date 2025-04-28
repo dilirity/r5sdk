@@ -33,14 +33,14 @@ public:
 	//-------------------------------------------------------------------------
 	union Value_t
 	{
-		inline Field_t* GetSubKey() const { return pSubKey; };
-		inline Value_t* GetSubValue() const { return pSubValue; };
-		inline const char* GetString() const { return pszString; };
+		inline Field_t* GetSubKey() const { return subKey; };
+		inline Value_t* GetSubValue() const { return subValue; };
+		inline const char* GetString() const { return stringValue; };
 		inline int64_t GetInt() const { return integerValue; };
 
-		Field_t* pSubKey;
-		Value_t* pSubValue;
-		char* pszString;
+		Field_t* subKey;
+		Value_t* subValue;
+		char* stringValue;
 		int64_t integerValue;
 	};
 
@@ -49,15 +49,15 @@ public:
 	//-------------------------------------------------------------------------
 	struct Node_t
 	{
-		eFieldType m_Type;
-		int m_nValueCount;
-		Value_t m_Value;
+		eFieldType type;
+		int valueCount;
+		Value_t value;
 
 		inline Field_t* GetFirstSubKey() const;
 		inline Value_t* GetArrayValue(const int index) const;
 
 		// does not support finding a key in a different level of the tree
-		inline Field_t* FindKey(const char* const pszKeyName) const;
+		inline Field_t* FindKey(const char* const keyName) const;
 	};
 
 	//-------------------------------------------------------------------------
@@ -65,45 +65,41 @@ public:
 	//-------------------------------------------------------------------------
 	struct Field_t
 	{
-		char* m_pszName;
-		Node_t m_Node;
-		Field_t* m_pNext;
-		Field_t* m_pPrev;
+		char* name;
+		Node_t node;
+		Field_t* next;
+		Field_t* prev;
 
 		// Inlines
-		inline const char* GetString() const { return (m_Node.m_Type == RSON_STRING) ? m_Node.m_Value.GetString() : NULL; };
-		inline Field_t* GetNextKey() const { return m_pNext; };
-		inline Field_t* GetLastKey() const { return m_pPrev; };
+		inline const char* GetString() const { return node.value.GetString(); };
+		inline Field_t* GetNextKey() const { return next; };
+		inline Field_t* GetLastKey() const { return prev; };
 
-		inline Field_t* GetFirstSubKey() const { return m_Node.GetFirstSubKey(); };
-		inline Field_t* FindKey(const char* pszKeyName) const { return m_Node.FindKey(pszKeyName); };
+		inline Field_t* GetFirstSubKey() const { return node.GetFirstSubKey(); };
+		inline Field_t* FindKey(const char* keyName) const { return node.FindKey(keyName); };
 	};
 
 public:
-	static Node_t* LoadFromBuffer(const char* pszBufferName, char* pBuffer, eFieldType rootType);
-	static Node_t* LoadFromFile(const char* pszFilePath, const char* pPathID = nullptr, bool* parseFailure = nullptr);
+	static Node_t* LoadFromBuffer(const char* const bufName, char* const buf, eFieldType rootType);
+	static Node_t* LoadFromFile(const char* const filePath, const char* const pathID = nullptr, bool* parseFailure = nullptr);
 };
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
 RSON::Field_t* RSON::Node_t::GetFirstSubKey() const
 {
-	if (m_Type & eFieldType::RSON_OBJECT)
-		return m_Value.pSubKey;
-
-	return NULL;
+	assert(type & eFieldType::RSON_OBJECT);
+	return value.subKey;
 };
 
-RSON::Field_t* RSON::Node_t::FindKey(const char* const pszKeyName) const
+RSON::Field_t* RSON::Node_t::FindKey(const char* const keyName) const
 {
-	if ((m_Type & eFieldType::RSON_OBJECT) == 0)
-		return NULL;
+	assert(type & eFieldType::RSON_OBJECT);
 
-	for (Field_t* pKey = GetFirstSubKey(); pKey != nullptr; pKey = pKey->GetNextKey())
+	for (Field_t* key = GetFirstSubKey(); key != nullptr; key = key->GetNextKey())
 	{
-		if (!_stricmp(pKey->m_pszName, pszKeyName))
-			return pKey;
+		if (!_stricmp(key->name, keyName))
+			return key;
 	}
 
 	return NULL;
@@ -111,8 +107,8 @@ RSON::Field_t* RSON::Node_t::FindKey(const char* const pszKeyName) const
 
 RSON::Value_t* RSON::Node_t::GetArrayValue(const int index) const
 {
-	assert(m_Type & eFieldType::RSON_ARRAY);
-	return m_Value.GetSubValue() + index;
+	assert(type & eFieldType::RSON_ARRAY);
+	return value.GetSubValue() + index;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

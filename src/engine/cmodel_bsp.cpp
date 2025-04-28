@@ -395,26 +395,26 @@ static void Mod_PreloadPaks(const char* const rootPath)
     if (!key)
         Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: missing array key \"%s\" in file \"%s\"\n", __FUNCTION__, arrayName, preloadFileBuf);
 
-    if ((key->m_Node.m_Type != (RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_STRING)) &&
-        (key->m_Node.m_Type != (RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_VALUE)))
+    if ((key->node.type != (RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_STRING)) &&
+        (key->node.type != (RSON::eFieldType::RSON_ARRAY | RSON::eFieldType::RSON_VALUE)))
     {
         Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: expected an array of strings in file \"%s\"\n", __FUNCTION__, preloadFileBuf);
     }
 
-    for (int i = 0; i < key->m_Node.m_nValueCount; i++)
+    for (int i = 0; i < key->node.valueCount; i++)
     {
-        const RSON::Value_t* const value = key->m_Node.GetArrayValue(i);
+        const RSON::Value_t* const value = key->node.GetArrayValue(i);
         const char* pakPath;
 
         if (*rootPath)
         {
-            Mod_FormatPakPath(preloadFileBuf, rootPath, value->pszString);
+            Mod_FormatPakPath(preloadFileBuf, rootPath, value->stringValue);
             pakPath = preloadFileBuf;
         }
         else
         {
             // For core paks, we shouldn't prepend the path.
-            pakPath = value->pszString;
+            pakPath = value->stringValue;
         }
 
         s_customPakData.PreloadAndAddPak(pakPath);
