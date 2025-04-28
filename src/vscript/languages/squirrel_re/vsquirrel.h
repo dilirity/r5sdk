@@ -101,6 +101,17 @@ inline CSquirrelVM* g_pUIScript;
 inline bool* g_bUIScriptInitialized;
 #endif // !DEDICATED
 
+inline const char* Script_GetCodeCallbackPrefixForContext(const SQCONTEXT context)
+{
+	switch (context)
+	{
+	case SQCONTEXT::SERVER: return "CodeCallback";
+	case SQCONTEXT::CLIENT: return "ClientCodeCallback";
+	case SQCONTEXT::UI: return "UICodeCallback";
+		NO_DEFAULT
+	}
+}
+
 template<typename... Args>
 FORCEINLINE void Script_RegisterEnumTable(CSquirrelVM* const s, const SQChar* const enumName, const int startValue, const Args... names)
 {
