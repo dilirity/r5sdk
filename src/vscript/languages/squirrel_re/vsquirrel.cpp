@@ -262,7 +262,8 @@ void CSquirrelVM::CompileModScripts()
 
 	FOR_EACH_VEC(ModSystem()->GetModList(), i)
 	{
-		const CModSystem::ModInstance_t* mod = ModSystem()->GetModList()[i];
+		CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+		mod->hasPrecompiledScripts = false;
 
 		if (!mod->IsEnabled())
 			continue;
@@ -284,17 +285,19 @@ void CSquirrelVM::CompileModScripts()
 			continue;
 		}
 
+		SetAsCompiler(rson);
+
 		char* scriptPathArray[MAX_PRECOMPILED_SCRIPTS];
 		int scriptCount = 0;
 
-		SetAsCompiler(rson);
-
-		if (Script_ParseScriptList(
+		mod->hasPrecompiledScripts = Script_ParseScriptList(
 			GetContext(),
 			mod->GetScriptCompileListPath().Get(),
 			rson,
 			scriptPathArray, &scriptCount,
-			nullptr, 0))
+			nullptr, 0);
+
+		if (mod->hasPrecompiledScripts)
 		{
 			for (int j = 0; j < scriptCount; ++j)
 			{
