@@ -17,10 +17,11 @@
 #include "modsystem.h"
 
 // NOTE: code using this should be development only; if the convars are used by
-// VGUI (i.e. attached to a slider or button), then it will most likely crash
-// the game. We might want to fix this in the future by making sure the handles
-// are always updated in the VGui system, however more reverse engineering is
-// required to make that work.
+// VGUI (i.e. attached to a slider or button), and we free them, but no longer
+// add them back in, the VGUI system will crash. This is therefore considered
+// an advanced function -- Possible fix: shutdown VGUI, reload mods, init VGUI?
+// Currently we shutdown the mod system, init it again and then shutdown VGUI
+// and all other systems.
 static void ModSystem_Reload_f()
 {
 	ModSystem()->Shutdown();
