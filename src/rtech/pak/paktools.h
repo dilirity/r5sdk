@@ -2,13 +2,11 @@
 #define RTECH_PAKTOOLS_H
 #include "rtech/ipakfile.h"
 
-extern bool Pak_BasePathExists();
-extern bool Pak_CreateBasePath();
+extern bool Pak_ReadPathExists();
+extern bool Pak_WritePathExists();
 
-extern bool Pak_OverridePathExists();
-extern bool Pak_CreateOverridePath();
-
-extern bool Pak_FileOverrideExists(const char* const pakFilePath, char* const outPath, const size_t outBufLen);
+extern bool Pak_CreateReadPath();
+extern bool Pak_CreateWritePath();
 
 extern int Pak_FileExists(const char* const pakFilePath);
 

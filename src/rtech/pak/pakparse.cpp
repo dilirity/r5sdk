@@ -471,7 +471,7 @@ static bool Pak_ProcessPakFile(PakFile_s* const pak)
                         return memoryData->patchSrcSize == 0;
 
                     char pakPatchPath[MAX_PATH] = {};
-                    sprintf(pakPatchPath, "%s%s", Pak_GetBaseLoadPath(), pak->memoryData.fileName);
+                    sprintf(pakPatchPath, "%s%s", Pak_GetReadPath(), pak->memoryData.fileName);
 
                     // get path of next patch rpak to load
                     if (pak->memoryData.patchIndices[pak->patchCount])
@@ -883,12 +883,12 @@ static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
     const char* nameUnqualified = V_UnqualifiedFileName(pakFilePath);
     char relativeFilePath[MAX_OSPATH];
 
-    // Only do this for the base pak file, path formatting is only performed on
-    // the base paks and patch paks derive from it. Patch paks are also only
-    // parsed and loaded from the base pak here.
+    // patches are only supported for paks that reside in the directory returned
+    // by the API 'Pak_GetBaseLoadPath()' relative from the executable. We only
+    // load a single patch master asset and it only tracks core paks.
     if (nameUnqualified == pakFilePath)
     {
-        snprintf(relativeFilePath, sizeof(relativeFilePath), "%s%s", Pak_GetBaseLoadPath(), pakFilePath);
+        snprintf(relativeFilePath, sizeof(relativeFilePath), "%s%s", Pak_GetReadPath(), pakFilePath);
         // if this pak is patched, load the last patch file first before proceeding
         // with any other pak that is getting patched. note that the patch number
         // does not indicate which pak file is the actual last patch file; a patch

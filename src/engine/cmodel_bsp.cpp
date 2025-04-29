@@ -364,7 +364,7 @@ static bool Mod_IsCustomPakLoadFinished(const int commonType)
 template <typename T, int N>
 static void Mod_FormatPakPath(T(&pOut)[N], const char* const rootPath, const char* const fileName)
 {
-    const int ret = V_snprintf(pOut, N, "%s%s%s", rootPath, Pak_GetBaseLoadPath(), fileName);
+    const int ret = V_snprintf(pOut, N, "%s%s%s", rootPath, Pak_GetReadPath(), fileName);
 
     if (ret < 0 || ret >= N)
         Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: failure encoding path for file \"%s\" in root \"%s\"\n", __FUNCTION__, fileName, rootPath);

@@ -149,11 +149,11 @@ void SDK_Init()
 #endif // !DEDICATED
 
 #ifndef DEDICATED
-    Pak_SetBaseLoadPath("paks\\Win64\\");
-    Pak_SetOverrideLoadPath("paks\\Win64_override\\");
+    Pak_SetReadPath("paks\\Win64\\");
+    Pak_SetWritePath("paks\\Win64_temp\\");
 #else
-    Pak_SetBaseLoadPath("paks\\Win64_server\\");
-    Pak_SetOverrideLoadPath("paks\\Win64_server_override\\");
+    Pak_SetReadPath("paks\\Win64_server\\");
+    Pak_SetWritePath("paks\\Win64_server_temp\\");
 #endif
 
     g_bSdkInitialized = true;

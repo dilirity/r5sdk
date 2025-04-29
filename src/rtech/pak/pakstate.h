@@ -7,11 +7,11 @@
 #include "rtech/async/asyncio.h"
 #include "rtech/ipakfile.h"
 
-extern void Pak_SetBaseLoadPath(const char* const basePath);
-extern void Pak_SetOverrideLoadPath(const char* const basePath);
+extern void Pak_SetReadPath(const char* const basePath);
+extern const char* Pak_GetReadPath();
 
-extern const char* Pak_GetBaseLoadPath();
-extern const char* Pak_GetOverrideLoadPath();
+extern void Pak_SetWritePath(const char* const basePath);
+extern const char* Pak_GetWritePath();
 
 struct PakLoadFuncs_s
 {

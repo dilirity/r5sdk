@@ -181,7 +181,7 @@ int RTech_PakSwap_f_CompletionFunc(char const* partial, char commands[COMMAND_CO
 	return _Host_Pak_f_CompletionFunc(&s_PakSwapAutoFileList, partial, commands);
 }
 
-static CBaseAutoCompleteFileList s_PakCompress("pak_compress", "paks/Win64_override", "rpak");
+static CBaseAutoCompleteFileList s_PakCompress("pak_compress", "paks/Win64", "rpak");
 //-----------------------------------------------------------------------------
 // Purpose: 
 // Input  : *partial - 

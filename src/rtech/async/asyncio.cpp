@@ -27,20 +27,6 @@ static HANDLE FS_Internal_OpenFile(const char* const fileToOpen)
 int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* const fileSizeOut)
 {
     const CHAR* fileToLoad = filePath;
-    char overridePath[1024];
-
-    // function can be called with null strings, for example if optional
-    // streaming sets are missing; check for it
-    if (fileToLoad && *fileToLoad)
-    {
-        // is this a pak file and do we have an override
-        if (strstr(fileToLoad, Pak_GetBaseLoadPath()) &&
-            Pak_FileOverrideExists(fileToLoad, overridePath, sizeof(overridePath)))
-        {
-            fileToLoad = overridePath;
-        }
-    }
-
     HANDLE hFile = FS_Internal_OpenFile(fileToLoad);
     CUtlString modLookupPath;
 

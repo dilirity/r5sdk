@@ -804,7 +804,7 @@ bool Pak_DecodePakFile(const char* const inPakFile, const char* const outPakFile
 {
 	// if this path doesn't exist, we must create it first before trying to
 	// open the out file
-	if (!Pak_CreateOverridePath())
+	if (!Pak_CreateWritePath())
 	{
 		Error(eDLL_T::RTECH, NO_ERROR, "%s: failed to create output path for pak file '%s'!\n",
 			__FUNCTION__, outPakFile);
