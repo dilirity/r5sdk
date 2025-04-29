@@ -459,6 +459,42 @@ static bool ModSystem_GetSettingsKeyValueString(CModSystem::ModInstance_t* const
 	return true;
 }
 
+#define MIN_MOD_ID_LENGTH 4
+
+//-----------------------------------------------------------------------------
+// Purpose: make sure mod ID's are valid (version numbers for example shouldn't
+//          be used inside mod ID's since we have a dedicated "version" field
+//          for this. Mod ID's are also used to generate the script entry point
+//          callback names, and in the future they can be used for even more
+//          automation to significantly reduce the surface area for user error.
+//-----------------------------------------------------------------------------
+static bool ModSystem_ValidateModID(const CUtlString& modId, const char* const settingsPath)
+{
+	const ssize_t modIdLength = modId.Length();
+	const char* const pModId = modId.String();
+
+	if (modIdLength < MIN_MOD_ID_LENGTH)
+	{
+		Error(eDLL_T::ENGINE, NO_ERROR, "Mod settings \"%s\" has ID \"%s\" with length %zd, however the minimum length is %zd; skipping...\n",
+			settingsPath, pModId, modIdLength, (ssize_t)MIN_MOD_ID_LENGTH);
+
+		return false;
+	}
+
+	const size_t pos = strspn(pModId, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._");
+	const bool hasInvalidChars = pModId[pos] != '\0';
+
+	if (hasInvalidChars)
+	{
+		Error(eDLL_T::ENGINE, NO_ERROR, "Mod settings \"%s\" has ID \"%s\" containing disallowed characters. ID's can only contain letters, periods (.) and underscores (_); skipping...\n",
+			settingsPath, pModId);
+
+		return false;
+	}
+
+	return true;
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: loads the settings KV and parses the main values
 // Output : true on success, false otherwise
@@ -488,6 +524,9 @@ bool CModSystem::ModInstance_t::ParseSettings()
 
 	// "id" "r5reloaded.TestMod"
 	if (!ModSystem_GetSettingsKeyValueString(this, pSettingsPath, "id", id))
+		return false;
+
+	if (!ModSystem_ValidateModID(id, pSettingsPath))
 		return false;
 
 	// "description" "This mod does X and Y using Z"
