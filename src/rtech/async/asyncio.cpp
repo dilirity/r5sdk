@@ -28,6 +28,7 @@ int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* c
 {
     const CHAR* fileToLoad = filePath;
     HANDLE hFile = FS_Internal_OpenFile(fileToLoad);
+
     CUtlString modLookupPath;
 
     if (hFile == INVALID_HANDLE_VALUE)
@@ -115,10 +116,7 @@ void FS_CloseAsyncFile(const int fileHandle)
         if (selectedLogChannel && (selectedLogChannel == -1 || s_fileHandleLogChannelIDs[slotNum] == selectedLogChannel))
             Msg(eDLL_T::RTECH, "%s: Closed file from slot #%d\n", __FUNCTION__, slotNum);
 
-        // TODO: StreamDB_Init has an inline version of FS_OpenAsyncFile, therefore
-        // anything loaded there will never have the channel id's set. In order to
-        // fix this, StreamDB_Init has to be rebuilt.
-        //assert(s_fileHandleLogChannelIDs[slotNum] != 0);
+        assert(s_fileHandleLogChannelIDs[slotNum] != 0);
         s_fileHandleLogChannelIDs[slotNum] = 0;
     }
 }
