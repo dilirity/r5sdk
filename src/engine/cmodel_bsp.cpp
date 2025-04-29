@@ -584,6 +584,32 @@ KeyValues* Mod_GetLevelCoreSettings(const char* const levelName)
     return Mod_GetLevelSettings(levelName, "");
 }
 
+enum PakLoadContext_e
+{
+    PLC_SERVER = 0, // Load server-side only.
+    PLC_CLIENT,     // Load client-side only.
+    PLC_BOTH        // Load on both.
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: determines if the pak should be loaded in the current context
+// Input  : mode - 
+// Output : true if we should load it, false otherwise
+//-----------------------------------------------------------------------------
+static bool Mod_ShouldLoadPakInCurrentContext(const int mode)
+{
+#ifdef DEDICATED
+    return (mode == PLC_SERVER || mode == PLC_BOTH);
+#elif defined CLIENT_DLL
+    return (mode == PLC_CLIENT || mode == PLC_BOTH);
+#else
+    if (HostState_IsTransitioningToLoad()) // If we are the host, load everything.
+        return (mode == PLC_SERVER || mode == PLC_CLIENT || mode == PLC_BOTH);
+    else // We are just a client connecting to a remote server.
+        return (mode == PLC_CLIENT || mode == PLC_BOTH);
+#endif
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: loads paks specified inside the level settings file
 // Input  : *settingsKV - 
@@ -601,8 +627,10 @@ static void Mod_LoadLevelPaks(KeyValues* const settingsKV, const char* const roo
 
     for (KeyValues* subKey = pakListKV->GetFirstSubKey(); subKey != nullptr; subKey = subKey->GetNextKey())
     {
-        if (!subKey->GetBool())
-            continue;
+        const int mode = subKey->GetInt(nullptr, -1);
+
+        if (!Mod_ShouldLoadPakInCurrentContext(mode))
+            continue; // This pak should not be loaded in our current context.
 
         const char* pakToLoad;
         bool isMod;
