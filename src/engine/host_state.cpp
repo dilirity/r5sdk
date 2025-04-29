@@ -156,6 +156,19 @@ void HostState_HandleAutoReload()
 }
 #endif // !CLIENT_DLL
 
+bool HostState_IsTransitioningToLoad()
+{
+	if (g_pHostState->m_iNextState == HostStates_t::HS_NEW_GAME ||
+		g_pHostState->m_iNextState == HostStates_t::HS_LOAD_GAME ||
+		g_pHostState->m_iNextState == HostStates_t::HS_CHANGE_LEVEL_SP ||
+		g_pHostState->m_iNextState == HostStates_t::HS_CHANGE_LEVEL_MP)
+	{
+		return true;
+	}
+
+	return false;
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: state machine's main processing loop
 //-----------------------------------------------------------------------------

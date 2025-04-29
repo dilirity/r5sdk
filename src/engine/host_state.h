@@ -15,6 +15,8 @@ enum class HostStates_t : int
 	HS_RESTART         = 0x7,
 };
 
+extern bool HostState_IsTransitioningToLoad();
+
 class CHostState
 {
 public:
