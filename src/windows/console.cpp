@@ -190,11 +190,12 @@ DWORD __stdcall ProcessConsoleWorker(LPVOID)
 		//-- Get the user input on the debug console
 		std::getline(std::cin, s_ConsoleInput);
 
-		// Execute the command.
-		Cbuf_AddText(Cbuf_GetCurrentPlayer(), s_ConsoleInput.c_str(), cmd_source_t::kCommandSrcCode);
-
 		if (!s_ConsoleInput.empty())
+		{
+			// Execute the command.
+			Cbuf_AddText(Cbuf_GetCurrentPlayer(), s_ConsoleInput.c_str(), cmd_source_t::kCommandSrcCode);
 			s_ConsoleInput.clear();
+		}
 
 		Sleep(50);
 	}
