@@ -52,7 +52,7 @@ static inline string CrashReporter_FormatAttributes(const CCrashHandler* const h
 	const CPUInformation& pi = GetCPUInformation();
 	const CrashHardWareInfo_s& hi = handler->GetHardwareInfo();
 
-	const char* const format = "uuid=%s&"  "build_id=%lld&"
+	const char* const format = "uuid=%s&" "build_id=%lld&"
 		"cpu_model=%s&" "cpu_speed=%lf GHz&" "gpu_model=%s&" "gpu_flags=%lu&"
 		"ram_phys_total=%.2lf MiB&" "ram_phys_avail=%.2lf MiB&"
 		"ram_virt_total=%.2lf MiB&" "ram_virt_avail=%.2lf MiB&"
@@ -66,6 +66,12 @@ static inline string CrashReporter_FormatAttributes(const CCrashHandler* const h
 		(f64)(ms.ullTotalPhys    / (1024.0*1024.0)), (f64)(ms.ullAvailPhys    / (1024.0*1024.0)),
 		(f64)(ms.ullTotalVirtual / (1024.0*1024.0)), (f64)(ms.ullAvailVirtual / (1024.0*1024.0)),
 		(f64)(hi.totalDiskSpace  / (1024.0*1024.0)), (f64)(hi.availDiskSpace  / (1024.0*1024.0)));
+}
+
+static string CrashReporter_FormatRequest(const string& attributes)
+{
+	return Format("%s%s/%s/%s/%s&%s",
+		"https://", backtrace_hostname.GetString(), backtrace_universe.GetString(), backtrace_token.GetString(), "minidump", attributes.c_str());
 }
 
 void CrashReporter_SubmitToCollector(const CCrashHandler* const handler)
@@ -83,8 +89,8 @@ void CrashReporter_SubmitToCollector(const CCrashHandler* const handler)
 		return; // failure.
 
 	const string attributes = CrashReporter_FormatAttributes(handler);
-	const string hostName = Format("%s%s/%s/%s/%s&%s", 
-		"https://", backtrace_hostname.GetString(), backtrace_universe.GetString(), backtrace_token.GetString(), "minidump", attributes.c_str());
+	const string request = CrashReporter_FormatRequest(attributes);
+
 	const string miniDumpPath = Format("%s/%s.dmp", g_LogSessionDirectory.c_str(), "minidump");
 
 	CURLParams params;
@@ -94,5 +100,5 @@ void CrashReporter_SubmitToCollector(const CCrashHandler* const handler)
 	params.verifyPeer = ssl_verify_peer.GetBool();
 	params.verbose = curl_debug.GetBool();
 
-	CURLUploadFile(hostName.c_str(), miniDumpPath.c_str(), "rb", nullptr, true, slist, params);
+	CURLUploadFile(request.c_str(), miniDumpPath.c_str(), "rb", nullptr, true, slist, params);
 }
