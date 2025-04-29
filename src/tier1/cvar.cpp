@@ -85,7 +85,7 @@ bool ConVar_ParseFlagString(const char* pszFlags, int& nFlags, const char* pszCo
 		if (find == -1)
 		{
 			Warning(eDLL_T::COMMON,
-				"%s: Attempted to parse invalid flag '%s' for convar '%s'\n",
+				"%s: Attempted to parse invalid flag \"%s\" for convar \"%s\"\n",
 				__FUNCTION__, sflag, pszConVarName);
 
 			return false;
@@ -441,7 +441,7 @@ void CCvarUtilities::CvarList(const CCommand& args)
 		}
 		else
 		{
-			Msg(eDLL_T::COMMON, "Couldn't open '%s' for writing!\n", fn);
+			Error(eDLL_T::COMMON, 0, "Couldn't open \"%s\" for writing!\n", fn);
 			return;
 		}
 
