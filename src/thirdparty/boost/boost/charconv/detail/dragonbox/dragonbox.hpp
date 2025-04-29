@@ -408,16 +408,13 @@ struct dragonbox_signed_significand_bits
         template <typename UInt>
         BOOST_CXX14_CONSTEXPR UInt divide_by_pow10(unsigned N, BOOST_ATTRIBUTE_UNUSED UInt n_max, UInt n) noexcept
         {
-            // r5sdk: commented as this BOOST_IF_CONSTEXPR doesn't compile on MSVC 15.6, despite technically being supported.
-            // We need to support MSVC 15.6 as that is what the game executable is compiled with.
-            // - error C2131: expression did not evaluate to a constant
-            /*BOOST_IF_CONSTEXPR*/ if (std::is_same<UInt, std::uint32_t>::value && N == 2) 
+            BOOST_IF_CONSTEXPR (std::is_same<UInt, std::uint32_t>::value && N == 2) 
             {
                 return static_cast<UInt>(umul64(static_cast<std::uint32_t>(n), static_cast<std::uint32_t>(1374389535)) >> UINT32_C(37));
             }
             // Specialize for 64-bit division by 1000.
             // Ensure that the correctness condition is met.
-            else /*BOOST_IF_CONSTEXPR*/ if (std::is_same<UInt, std::uint64_t>::value && N == 3 && n_max <= UINT64_C(15534100272597517998))
+            else BOOST_IF_CONSTEXPR (std::is_same<UInt, std::uint64_t>::value && N == 3 && n_max <= UINT64_C(15534100272597517998))
             {
                 return static_cast<UInt>(umul128_upper64(n, UINT64_C(2361183241434822607)) >> 7);
             }
