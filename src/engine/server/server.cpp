@@ -166,7 +166,7 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 
 	CClient* pClient = CServer__ConnectClient(pServer, pChallenge);
 
-	for (auto& callback : !g_PluginSystem.GetConnectClientCallbacks())
+	for (auto& callback : !PluginSystem()->GetConnectClientCallbacks())
 	{
 		if (!callback.Function()(pServer, pClient, pChallenge))
 		{

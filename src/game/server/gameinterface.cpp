@@ -163,7 +163,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 		return;
 	}
 
-	for (auto& cb : !g_PluginSystem.GetChatMessageCallbacks())
+	for (auto& cb : !PluginSystem()->GetChatMessageCallbacks())
 	{
 		if (!cb.Function()(pSenderPlayer, text, sv_forceChatToTeamOnly->GetBool()))
 		{
