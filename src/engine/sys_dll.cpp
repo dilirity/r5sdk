@@ -89,7 +89,7 @@ bool CModAppSystemGroup::StaticCreate(CModAppSystemGroup* pModAppSystemGroup)
 	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)KeyValuesSystem, CKeyValuesSystem, KEYVALUESSYSTEM_INTERFACE_VERSION);
 
 	InitPluginSystem(pModAppSystemGroup);
-	CALL_PLUGIN_CALLBACKS(g_PluginSystem.GetCreateCallbacks(), pModAppSystemGroup);
+	CALL_PLUGIN_CALLBACKS(PluginSystem()->GetCreateCallbacks(), pModAppSystemGroup);
 
 	ModSystem()->Init();
 
@@ -126,12 +126,12 @@ bool CModAppSystemGroup::StaticCreate(CModAppSystemGroup* pModAppSystemGroup)
 //-----------------------------------------------------------------------------
 void CModAppSystemGroup::InitPluginSystem(CModAppSystemGroup* pModAppSystemGroup)
 {
-	g_PluginSystem.Init();
+	PluginSystem()->Init();
 
-	for (auto& it : g_PluginSystem.GetInstances())
+	for (auto& it : PluginSystem()->GetInstances())
 	{
-		if (g_PluginSystem.LoadInstance(it))
 			Msg(eDLL_T::ENGINE, "Loaded plugin: '%s'\n", it.m_Name.String());
+		if (PluginSystem()->LoadInstance(it))
 		else
 			Warning(eDLL_T::ENGINE, "Failed loading plugin: '%s'\n", it.m_Name.String());
 	}
