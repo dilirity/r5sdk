@@ -130,10 +130,10 @@ void CModAppSystemGroup::InitPluginSystem(CModAppSystemGroup* pModAppSystemGroup
 
 	for (auto& it : PluginSystem()->GetInstances())
 	{
-			Msg(eDLL_T::ENGINE, "Loaded plugin: '%s'\n", it.m_Name.String());
 		if (PluginSystem()->LoadInstance(it))
+			Msg(eDLL_T::ENGINE, "Loaded plugin: '%s'\n", it.name.String());
 		else
-			Warning(eDLL_T::ENGINE, "Failed loading plugin: '%s'\n", it.m_Name.String());
+			Warning(eDLL_T::ENGINE, "Failed loading plugin: '%s'\n", it.name.String());
 	}
 }
 

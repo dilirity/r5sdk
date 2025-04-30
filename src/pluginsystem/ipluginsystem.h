@@ -21,10 +21,10 @@ struct PluginHelpWithAnything_t
 		OnReceivedChatMessage      = 3,
 	};
 
-	ePluginHelp m_nHelpID;
-	ePluginCallback m_nCallbackID;
-	const char* m_pszName;
-	void* m_pFunction;
+	ePluginHelp helpId;
+	ePluginCallback callbackId;
+	const char* name;
+	void* function;
 };
 
 abstract_class IPluginSystem

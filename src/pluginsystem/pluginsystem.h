@@ -106,19 +106,19 @@ protected:
 
 private:
 	T function;
-	wchar_t moduleName[MAX_PATH];
+	wchar_t moduleName[MAX_OSPATH];
 };
 
-class CPluginSystem : IPluginSystem
+class CPluginSystem : public IPluginSystem
 {
-public:	
+public:
 	struct PluginInstance_t
 	{
 		PluginInstance_t(const char* pName, const char* pPath, const char* pDescription = "")
-			: m_Name(pName)
-			, m_Path(pPath)
-			, m_Description(pDescription)
-			, m_bIsLoaded(false)
+			: name(pName)
+			, path(pPath)
+			, description(pDescription)
+			, isLoaded(false)
 		{
 		};
 
@@ -126,11 +126,11 @@ public:
 		typedef bool(*OnLoad)(const char*, const char*);
 		typedef void(*OnUnload)();
 
-		CModule m_hModule;
-		CUtlString m_Name;
-		CUtlString m_Path;
-		CUtlString m_Description;
-		bool m_bIsLoaded; // [ PIXIE ]: I don't like this and it's bad.
+		CModule moduleHandle;
+		CUtlString name;
+		CUtlString path;
+		CUtlString description;
+		bool isLoaded; // [ PIXIE ]: I don't like this and it's bad.
 		// I will make a module manager later which will grab all modules from the process and adds each module / removes module that passes through DLLMain.
 	};
 

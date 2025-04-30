@@ -32,7 +32,7 @@ void CPluginSystem::Init()
 		{
 			const PluginInstance_t& instance = m_Instances[j];
 
-			if (instance.m_Path.IsEqual_CaseInsensitive(path.String()) == 0)
+			if (instance.path.IsEqual_CaseInsensitive(path.String()) == 0)
 			{
 				addInstance = false; // Already exists.
 				break;
@@ -54,14 +54,14 @@ void CPluginSystem::Init()
 //-----------------------------------------------------------------------------
 bool CPluginSystem::LoadInstance(PluginInstance_t& pluginInst)
 {
-	if (pluginInst.m_bIsLoaded)
+	if (pluginInst.isLoaded)
 		return false;
 
-	HMODULE loadedPlugin = LoadLibraryA(pluginInst.m_Path.String());
+	HMODULE loadedPlugin = LoadLibraryA(pluginInst.path.String());
 	if (loadedPlugin == INVALID_HANDLE_VALUE || loadedPlugin == 0)
 		return false;
 
-	CModule pluginModule(pluginInst.m_Name.String());
+	CModule pluginModule(pluginInst.name.String());
 
 	// Pass selfModule here on load function, we have to do
 	// this because local listen/dedi/client dll's are called
@@ -71,14 +71,14 @@ bool CPluginSystem::LoadInstance(PluginInstance_t& pluginInst)
 
 	Assert(onLoadFn);
 
-	if (!onLoadFn || !onLoadFn(pluginInst.m_Name.String(), g_SDKDll.GetModuleName().c_str()))
+	if (!onLoadFn || !onLoadFn(pluginInst.name.String(), g_SDKDll.GetModuleName().c_str()))
 	{
 		FreeLibrary(loadedPlugin);
 		return false;
 	}
 
-	pluginInst.m_hModule = pluginModule;
-	return pluginInst.m_bIsLoaded = true;
+	pluginInst.moduleHandle = pluginModule;
+	return pluginInst.isLoaded = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -88,11 +88,11 @@ bool CPluginSystem::LoadInstance(PluginInstance_t& pluginInst)
 //-----------------------------------------------------------------------------
 bool CPluginSystem::UnloadInstance(PluginInstance_t& pluginInst)
 {
-	if (!pluginInst.m_bIsLoaded)
+	if (!pluginInst.isLoaded)
 		return false;
 
 	PluginInstance_t::OnUnload onUnloadFn = 
-		pluginInst.m_hModule.GetExportedSymbol(
+		pluginInst.moduleHandle.GetExportedSymbol(
 		"PluginInstance_OnUnload").RCast<PluginInstance_t::OnUnload>();
 
 	Assert(onUnloadFn);
@@ -100,10 +100,10 @@ bool CPluginSystem::UnloadInstance(PluginInstance_t& pluginInst)
 	if (onUnloadFn)
 		onUnloadFn();
 
-	bool unloadOk = FreeLibrary((HMODULE)pluginInst.m_hModule.GetModuleBase());
+	bool unloadOk = FreeLibrary((HMODULE)pluginInst.moduleHandle.GetModuleBase());
 	Assert(unloadOk);
 
-	pluginInst.m_bIsLoaded = false;
+	pluginInst.isLoaded = false;
 
 	return unloadOk;
 }
@@ -136,30 +136,30 @@ void CPluginSystem::AddCallback(PluginHelpWithAnything_t* help)
 {
 #define ADD_PLUGIN_CALLBACK(fn, callback, function) callback += reinterpret_cast<fn>(function); callback.GetCallbacks().Tail().SetModuleName(moduleName)
 
-	if (!help->m_pFunction)
+	if (!help->function)
 		return;
 
 	// [rexx]: This fetches the path to the module that contains the requested callback function.
 	// The module name is fetched so that callbacks can be identified by the plugin that they came from.
 	// This must use the wide-char version of this func, as file paths may contain non-ASCII characters and we don't really want those to break.
-	wchar_t moduleName[MAX_PATH] = {};
-	GetMappedFileNameW((HANDLE)-1, help->m_pFunction, moduleName, MAX_PATH);
+	wchar_t moduleName[MAX_OSPATH] = {};
+	GetMappedFileNameW((HANDLE)-1, help->function, moduleName, MAX_OSPATH);
 
-	switch (help->m_nCallbackID)
+	switch (help->callbackId)
 	{
 	case PluginHelpWithAnything_t::ePluginCallback::CModAppSystemGroup_Create:
 	{
-		ADD_PLUGIN_CALLBACK(CreateFn, GetCreateCallbacks(), help->m_pFunction);
+		ADD_PLUGIN_CALLBACK(CreateFn, GetCreateCallbacks(), help->function);
 		break;
 	}
 	case PluginHelpWithAnything_t::ePluginCallback::CServer_ConnectClient:
 	{
-		ADD_PLUGIN_CALLBACK(ConnectClientFn, GetConnectClientCallbacks(), help->m_pFunction);
+		ADD_PLUGIN_CALLBACK(ConnectClientFn, GetConnectClientCallbacks(), help->function);
 		break;
 	}
 	case PluginHelpWithAnything_t::ePluginCallback::OnReceivedChatMessage:
 	{
-		ADD_PLUGIN_CALLBACK(OnChatMessageFn, GetChatMessageCallbacks(), help->m_pFunction);
+		ADD_PLUGIN_CALLBACK(OnChatMessageFn, GetChatMessageCallbacks(), help->function);
 		break;
 	}
 	default:
@@ -177,24 +177,24 @@ void CPluginSystem::RemoveCallback(PluginHelpWithAnything_t* help)
 {
 #define REMOVE_PLUGIN_CALLBACK(fn, callback, function) callback -= reinterpret_cast<fn>(function)
 
-	if (!help->m_pFunction)
+	if (!help->function)
 		return;
 
-	switch (help->m_nCallbackID)
+	switch (help->callbackId)
 	{
 	case PluginHelpWithAnything_t::ePluginCallback::CModAppSystemGroup_Create:
 	{
-		REMOVE_PLUGIN_CALLBACK(CreateFn, GetCreateCallbacks(), help->m_pFunction);
+		REMOVE_PLUGIN_CALLBACK(CreateFn, GetCreateCallbacks(), help->function);
 		break;
 	}
 	case PluginHelpWithAnything_t::ePluginCallback::CServer_ConnectClient:
 	{
-		REMOVE_PLUGIN_CALLBACK(ConnectClientFn, GetConnectClientCallbacks(), help->m_pFunction);
+		REMOVE_PLUGIN_CALLBACK(ConnectClientFn, GetConnectClientCallbacks(), help->function);
 		break;
 	}
 	case PluginHelpWithAnything_t::ePluginCallback::OnReceivedChatMessage:
 	{
-		REMOVE_PLUGIN_CALLBACK(OnChatMessageFn, GetChatMessageCallbacks(), help->m_pFunction);
+		REMOVE_PLUGIN_CALLBACK(OnChatMessageFn, GetChatMessageCallbacks(), help->function);
 		break;
 	}
 	default:
@@ -211,7 +211,7 @@ void CPluginSystem::RemoveCallback(PluginHelpWithAnything_t* help)
 //-----------------------------------------------------------------------------
 void* CPluginSystem::HelpWithAnything(PluginHelpWithAnything_t* help)
 {
-	switch (help->m_nHelpID)
+	switch (help->helpId)
 	{
 	case PluginHelpWithAnything_t::ePluginHelp::PLUGIN_GET_FUNCTION:
 	{
