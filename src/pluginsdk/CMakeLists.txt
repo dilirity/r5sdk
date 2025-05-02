@@ -10,6 +10,10 @@ add_sources( SOURCE_GROUP "Core"
     "pluginsdk.h"
 )
 
+add_sources( SOURCE_GROUP "Script"
+    "vscript_plugindll_defs.h"
+)
+
 end_sources( "${BUILD_OUTPUT_DIR}/bin/x64_retail/plugins/" )
 
 target_link_libraries( ${PROJECT_NAME} PRIVATE
@@ -17,6 +21,8 @@ target_link_libraries( ${PROJECT_NAME} PRIVATE
     "mathlib"
     "tier0"
     "tier1"
+
+    "vscript"
 
     "libdetours"
     "libprotobuf"

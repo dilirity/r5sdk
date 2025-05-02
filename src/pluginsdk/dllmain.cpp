@@ -11,13 +11,13 @@
 
 extern "C" __declspec(dllexport) bool PluginInstance_OnLoad(const char* pszSelfModule, const char* pszSDKModule)
 {
-	g_pPluginSDK = new CPluginSDK(pszSelfModule);
-	g_pPluginSDK->SetSDKModule(CModule(pszSDKModule));
+	g_PluginSDK.SetSelfModule(pszSelfModule);
+	g_PluginSDK.SetSDKModule(pszSDKModule);
 
-	return g_pPluginSDK->InitSDK();
+	return g_PluginSDK.Init();
 }
 
-extern "C" __declspec(dllexport) void PluginInstance_OnUnload()
+extern "C" __declspec(dllexport) bool PluginInstance_OnUnload()
 {
-	delete g_pPluginSDK;
+	return g_PluginSDK.Shutdown();
 }

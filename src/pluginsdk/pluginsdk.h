@@ -1,25 +1,32 @@
 #pragma once
 
 class IFactorySystem;
-class IPluginSystem;
 //-----------------------------------------------------------------------------//
 
 class CPluginSDK
 {
 public:
-	CPluginSDK(const char* pszSelfModule);
+	CPluginSDK();
 	~CPluginSDK();
 
-	bool InitSDK();
+	bool Init();
+	bool Shutdown();
 
+	bool ObtainInterfaces();
+
+	inline void SetSelfModule(const CModule& selfModule) { m_SelfModule = selfModule; };
 	inline void SetSDKModule(const CModule& sdkModule) { m_SDKModule = sdkModule; };
+	inline void SetGameModule(const CModule& gameModule) { m_GameModule = gameModule; };
+
 private:
 
 	IFactorySystem* m_FactoryInstance;
-	IPluginSystem* m_PluginSystem;
+
 	CModule m_SelfModule;
-	CModule m_GameModule;
 	CModule m_SDKModule;
+	CModule m_GameModule;
+
+	bool m_Initialized;
 };
 
-extern CPluginSDK* g_pPluginSDK;
+extern CPluginSDK g_PluginSDK;
