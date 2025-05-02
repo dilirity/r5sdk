@@ -180,6 +180,10 @@ enum
 	FILESYSTEM_INVALID_FIND_HANDLE = -1
 };
 
+// This is the minimal interface that can be implemented to provide access to
+// a named set of files.
+#define BASEFILESYSTEM_INTERFACE_VERSION		"VBaseFileSystem012"
+
 //-----------------------------------------------------------------------------
 // 
 //-----------------------------------------------------------------------------

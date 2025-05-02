@@ -7,5 +7,5 @@ CFileSystem_Stdio* g_pFileSystem_Stdio = nullptr;
 
 CFileSystem_Stdio* FileSystem()
 {
-	return (*g_pFullFileSystem);
+	return g_pFileSystem_Stdio;
 }

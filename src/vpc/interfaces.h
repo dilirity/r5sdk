@@ -34,7 +34,6 @@
 #define SHADERSYSTEM_INTERFACE_VERSION            "ShaderSystem002"
 #define FACTORY_INTERFACE_VERSION                 "VFactorySystem002"
 #define FILESYSTEM_INTERFACE_VERSION              "VFileSystem017"
-#define BASEFILESYSTEM_INTERFACE_VERSION          "VBaseFileSystem011"
 #define KEYVALUESSYSTEM_INTERFACE_VERSION         "VKeyValuesSystem001"
 
 //-----------------------------------------------------------------------------
