@@ -33,6 +33,7 @@
 #include "windows/id3dx.h"
 #include "windows/input.h"
 #endif // !DEDICATED
+#include "vscript/languages/squirrel_re/vsquirrel_bridge.h"
 #include "vstdlib/keyvaluessystem.h"
 
 //-----------------------------------------------------------------------------
@@ -87,6 +88,7 @@ bool CModAppSystemGroup::StaticCreate(CModAppSystemGroup* pModAppSystemGroup)
 
 	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)PluginSystem, CPluginSystem, INTERFACEVERSION_PLUGINSYSTEM);
 	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)KeyValuesSystem, CKeyValuesSystem, KEYVALUESSYSTEM_INTERFACE_VERSION);
+	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)SquirrelVMBridge, CSquirrelVMBridge, SQUIRRELVM_BRIDGE_INTERFACE_VERSION);
 
 	InitPluginSystem(pModAppSystemGroup);
 	CALL_PLUGIN_CALLBACKS(PluginSystem()->GetCreateCallbacks(), pModAppSystemGroup);

@@ -11,6 +11,8 @@ add_sources( SOURCE_GROUP "Private"
 add_sources( SOURCE_GROUP "Squirrel_RE"
     "languages/squirrel_re/vsquirrel.cpp"
     "languages/squirrel_re/vsquirrel.h"
+    "languages/squirrel_re/vsquirrel_bridge.cpp"
+    "languages/squirrel_re/vsquirrel_bridge.h"
 )
 
 add_sources( SOURCE_GROUP "Squirrel_RE/squirrel"
