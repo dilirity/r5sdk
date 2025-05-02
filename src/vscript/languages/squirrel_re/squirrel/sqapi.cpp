@@ -69,7 +69,7 @@ SQRESULT sq_getbool(HSQUIRRELVM v, SQInteger idx, SQBool* b)
 {
 	SQObjectPtr& o = stack_get(v, idx);
 	if (sq_isbool(o)) {
-		*b = _integer(o);
+		*b = _bool(o);
 		return SQ_OK;
 	}
 	return SQ_ERROR;
@@ -106,7 +106,17 @@ SQInteger sq_gettop(HSQUIRRELVM v)
 }
 
 //---------------------------------------------------------------------------------
-SQRESULT sq_getstackobj(HSQUIRRELVM v, SQInteger idx, SQObject* po)
+void sq_settop(HSQUIRRELVM v, SQInteger newtop)
+{
+	SQInteger top = sq_gettop(v);
+	if (top > newtop)
+		sq_pop(v, top - newtop);
+	else
+		while (top++ < newtop) sq_pushnull(v);
+}
+
+//---------------------------------------------------------------------------------
+SQRESULT sq_getstackobj(HSQUIRRELVM v, SQInteger idx, HSQOBJECT* po)
 {
 	*po = stack_get(v, idx);
 	return SQ_OK;
@@ -117,6 +127,12 @@ void sq_pop(HSQUIRRELVM v, SQInteger nelemstopop)
 {
 	Assert(v->_top >= nelemstopop);
 	v->Pop(nelemstopop);
+}
+
+//---------------------------------------------------------------------------------
+void sq_pushnull(HSQUIRRELVM v)
+{
+	v->Push(_null_);
 }
 
 //---------------------------------------------------------------------------------
@@ -146,21 +162,27 @@ void sq_pushstring(HSQUIRRELVM v, const SQChar* s, SQInteger len)
 }
 
 //---------------------------------------------------------------------------------
-void sq_pushinteger(HSQUIRRELVM v, SQInteger val)
+void sq_pushinteger(HSQUIRRELVM v, SQInteger i)
 {
-	v->Push(val);
+	v->Push(i);
 }
 
 //---------------------------------------------------------------------------------
-void sq_pushfloat(HSQUIRRELVM v, SQFloat n)
+void sq_pushfloat(HSQUIRRELVM v, SQFloat f)
 {
-	v->Push(n);
+	v->Push(f);
 }
 
 //---------------------------------------------------------------------------------
 void sq_pushvector(HSQUIRRELVM v, const SQVector3D* w)
 {
 	v->Push(w);
+}
+
+//---------------------------------------------------------------------------------
+void sq_pushobject(HSQUIRRELVM v, HSQOBJECT obj)
+{
+	v->Push(SQObjectPtr(obj));
 }
 
 //---------------------------------------------------------------------------------

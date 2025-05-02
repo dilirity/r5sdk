@@ -68,7 +68,6 @@ typedef SQInteger SQRESULT;
 typedef int ScriptDataType_t;
 
 typedef struct SQVM* HSQUIRRELVM;
-//typedef SQObject HSQOBJECT;
 
 struct SQBufState;
 
@@ -201,6 +200,8 @@ typedef struct tagSQObject
 	SQObjectValue _unVal;
 } SQObject;
 
+typedef SQObject HSQOBJECT;
+
 ///////////////////////////////////////////////////////////////////////////////
 SQRESULT sq_pushroottable(HSQUIRRELVM v);
 SQRESULT sq_getinteger(HSQUIRRELVM v, SQInteger idx, SQInteger* i);
@@ -211,14 +212,17 @@ SQRESULT sq_getthread(HSQUIRRELVM v, SQInteger idx, HSQUIRRELVM* thread);
 SQRESULT sq_getstring(HSQUIRRELVM v, SQInteger idx, const SQChar** c);
 SQRESULT sq_get(HSQUIRRELVM v, SQInteger idx);
 SQInteger sq_gettop(HSQUIRRELVM v);
-SQRESULT sq_getstackobj(HSQUIRRELVM v, SQInteger idx, SQObject* po);
+void sq_settop(HSQUIRRELVM v, SQInteger newtop);
+SQRESULT sq_getstackobj(HSQUIRRELVM v, SQInteger idx, HSQOBJECT* po);
 void sq_pop(HSQUIRRELVM v, SQInteger nelemstopop);
+void sq_pushnull(HSQUIRRELVM v);
 SQRESULT sq_pushroottable(HSQUIRRELVM v);
 void sq_pushbool(HSQUIRRELVM v, SQBool b);
 void sq_pushstring(HSQUIRRELVM v, const SQChar* string, SQInteger len);
 void sq_pushinteger(HSQUIRRELVM v, SQInteger val);
-void sq_pushfloat(HSQUIRRELVM v, SQFloat n);
+void sq_pushfloat(HSQUIRRELVM v, SQFloat f);
 void sq_pushvector(HSQUIRRELVM v, const SQVector3D* w);
+void sq_pushobject(HSQUIRRELVM v, HSQOBJECT obj);
 void sq_newarray(HSQUIRRELVM v, SQInteger size);
 void sq_newtable(HSQUIRRELVM v);
 SQRESULT sq_newslot(HSQUIRRELVM v, SQInteger idx);
@@ -303,6 +307,8 @@ class VSquirrelAPI : public IDetour
 		LogFunAdr("sq_getentity", v_sq_getentity);
 
 		LogFunAdr("sq_startconsttable", v_sq_startconsttable);
+		LogFunAdr("sq_endconsttable", v_sq_endconsttable);
+
 		LogFunAdr("sq_endconsttable", v_sq_endconsttable);
 
 		LogFunAdr("StringTable::Add", v_StringTable__Add);
