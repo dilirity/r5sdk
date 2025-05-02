@@ -678,3 +678,8 @@ int CCvarUtilities::CvarFindFlagsCompletionCallback(const char* partial,
 
 ///////////////////////////////////////////////////////////////////////////////
 CCvar* g_pCVar = nullptr;
+
+CCvar* EngineCVar()
+{
+	return g_pCVar;
+}

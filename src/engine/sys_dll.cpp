@@ -87,6 +87,7 @@ bool CModAppSystemGroup::StaticCreate(CModAppSystemGroup* pModAppSystemGroup)
 #endif // DEDICATED
 
 	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)PluginSystem, CPluginSystem, INTERFACEVERSION_PLUGINSYSTEM);
+	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)EngineCVar, CCvar, CVAR_INTERFACE_VERSION);
 	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)KeyValuesSystem, CKeyValuesSystem, KEYVALUESSYSTEM_INTERFACE_VERSION);
 	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)SquirrelVMBridge, CSquirrelVMBridge, SQUIRRELVM_BRIDGE_INTERFACE_VERSION);
 
