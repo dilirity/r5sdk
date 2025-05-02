@@ -6,8 +6,9 @@
 #include "engine/debugoverlay.h"
 #include "vscript/vscript.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
-#include "game/shared/vscript_shared.h"
-#include "game/shared/vscript_debug_overlay_shared.h"
+#include "vscript_gamedll_defs.h"
+#include "vscript_shared.h"
+#include "vscript_debug_overlay_shared.h"
 
 SQRESULT SharedScript_DebugDrawSolidBox(HSQUIRRELVM v)
 {

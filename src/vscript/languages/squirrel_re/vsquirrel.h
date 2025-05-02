@@ -167,7 +167,7 @@ FORCEINLINE void Script_RegisterFuncNamed(CSquirrelVM* const s,
 			}(), ...);
 	}
 
-	s->RegisterFunction(&binding, fieldCount == 0);
+	SCRIPT_REGISTER_FUNC(s, binding, fieldCount == 0);
 }
 
 // Use this to return from any script func
@@ -176,7 +176,7 @@ FORCEINLINE void Script_RegisterFuncNamed(CSquirrelVM* const s,
 		SQSharedState* const sharedState = v->_sharedstate; \
 		if (sharedState->_internal_error) { \
 			\
-				CSquirrelVM__ThrowError(sharedState->_scriptvm, v); \
+				SCRIPT_THROW_ERROR_FUNC(sharedState->_scriptvm, v); \
 				return SQ_ERROR; \
 		} \
 		return val; \

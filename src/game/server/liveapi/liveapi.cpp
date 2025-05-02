@@ -14,6 +14,7 @@
 #include "engine/sys_utils.h"
 #include "vscript/languages/squirrel_re/include/sqtable.h"
 #include "vscript/languages/squirrel_re/include/sqarray.h"
+#include "game/shared/vscript_gamedll_defs.h"
 #include "game/server/vscript_server.h"
 #include "liveapi.h"
 

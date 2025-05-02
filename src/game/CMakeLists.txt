@@ -82,6 +82,7 @@ add_sources( SOURCE_GROUP "Script"
     "shared/vscript_shared.h"
     "shared/vscript_debug_overlay_shared.cpp"
     "shared/vscript_debug_overlay_shared.h"
+    "shared/vscript_gamedll_defs.h"
 )
 
 add_sources( SOURCE_GROUP "ModSystem"

@@ -29,6 +29,7 @@
 #include "engine/client/cl_main.h"
 #include "engine/cmodel_bsp.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
+#include "vscript_gamedll_defs.h"
 #include "vscript_shared.h"
 #include "game/shared/pluginsystem/modsystem.h"
 

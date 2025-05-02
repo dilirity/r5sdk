@@ -4,6 +4,7 @@
 // 
 //=============================================================================//
 #include "pluginsystem/modsystem.h"
+#include "game/shared/vscript_gamedll_defs.h"
 #include "game/shared/vscript_shared.h"
 
 static SQRESULT SharedScript_ModSystem_RunCallbacks(HSQUIRRELVM v)

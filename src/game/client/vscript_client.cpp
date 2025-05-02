@@ -30,6 +30,8 @@
 #include "vscript/vscript.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 
+#include "game/shared/vscript_gamedll_defs.h"
+
 #include "game/shared/vscript_shared.h"
 #include "game/shared/vscript_debug_overlay_shared.h"
 
