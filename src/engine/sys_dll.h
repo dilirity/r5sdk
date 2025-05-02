@@ -24,7 +24,7 @@ class CModAppSystemGroup : public CAppSystemGroup
 public:
 	static int StaticMain(CModAppSystemGroup* pModAppSystemGroup);
 	static bool StaticCreate(CModAppSystemGroup* pModAppSystemGroup);
-	static void InitPluginSystem(CModAppSystemGroup* pModAppSystemGroup);
+	static void StaticDestroy(CModAppSystemGroup* pModAppSystemGroup);
 
 	inline bool IsServerOnly(void) const
 	{
@@ -42,6 +42,7 @@ private:
 /* ==== CAPPSYSTEMGROUP ================================================================================================================================================= */
 inline int(*CModAppSystemGroup__Main)(CModAppSystemGroup* pModAppSystemGroup);
 inline bool(*CModAppSystemGroup__Create)(CModAppSystemGroup* pModAppSystemGroup);
+inline void(*CModAppSystemGroup__Destroy)(CModAppSystemGroup* pModAppSystemGroup);
 inline bool(*CSourceAppSystemGroup__PreInit)(CSourceAppSystemGroup* pModAppSystemGroup);
 inline bool(*CSourceAppSystemGroup__Create)(CSourceAppSystemGroup* pModAppSystemGroup);
 
@@ -62,6 +63,7 @@ class VSys_Dll : public IDetour
 	{
 		LogFunAdr("CModAppSystemGroup::Main", CModAppSystemGroup__Main);
 		LogFunAdr("CModAppSystemGroup::Create", CModAppSystemGroup__Create);
+		LogFunAdr("CModAppSystemGroup::Destroy", CModAppSystemGroup__Destroy);
 		LogFunAdr("CSourceAppSystemGroup::PreInit", CSourceAppSystemGroup__PreInit);
 		LogFunAdr("CSourceAppSystemGroup::Create", CSourceAppSystemGroup__Create);
 		LogFunAdr("Sys_Error_Internal", Sys_Error_Internal);
@@ -71,6 +73,7 @@ class VSys_Dll : public IDetour
 	{
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC 20 80 B9 ?? ?? ?? ?? ?? BB ?? ?? ?? ??").GetPtr(CModAppSystemGroup__Main);
 		Module_FindPattern(g_GameDll, "48 8B C4 55 41 54 41 55 41 56 41 57 48 8B EC 48 83 EC 60").GetPtr(CModAppSystemGroup__Create);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 57 48 83 EC ?? 33 FF 48 8B D9 48 39 3D").GetPtr(CModAppSystemGroup__Destroy);
 
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 48 8B F9 E8 ?? ?? ?? ?? 33 C9").GetPtr(CSourceAppSystemGroup__Create);
 		Module_FindPattern(g_GameDll, "48 89 74 24 ?? 55 48 8D AC 24 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ??").GetPtr(CSourceAppSystemGroup__PreInit);

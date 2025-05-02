@@ -77,6 +77,48 @@ int CModAppSystemGroup::StaticMain(CModAppSystemGroup* pModAppSystemGroup)
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Initialize plugin system
+//-----------------------------------------------------------------------------
+static void PluginSystem_Init(CModAppSystemGroup* const pModAppSystemGroup)
+{
+	PluginSystem()->Init();
+
+	FOR_EACH_VEC(PluginSystem()->GetInstances(), i)
+	{
+		CPluginSystem::PluginInstance_t& inst = PluginSystem()->GetInstances()[i];
+
+		if (PluginSystem()->LoadInstance(inst))
+			Msg(eDLL_T::ENGINE, "Loaded plugin: '%s'\n", inst.name.String());
+		else
+			Warning(eDLL_T::ENGINE, "Failed loading plugin: '%s'\n", inst.name.String());
+	}
+
+	CALL_PLUGIN_CALLBACKS(PluginSystem()->GetCreateCallbacks(), pModAppSystemGroup);
+	ModSystem()->Init();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Shutdown plugin system
+//-----------------------------------------------------------------------------
+static void PluginSystem_Shutdown(CModAppSystemGroup* const pModAppSystemGroup)
+{
+	ModSystem()->Shutdown();
+	CALL_PLUGIN_CALLBACKS(PluginSystem()->GetDestroyCallbacks(), pModAppSystemGroup);
+
+	FOR_EACH_VEC_BACK(PluginSystem()->GetInstances(), i)
+	{
+		CPluginSystem::PluginInstance_t& inst = PluginSystem()->GetInstances()[i];
+
+		if (PluginSystem()->UnloadInstance(inst))
+			Msg(eDLL_T::ENGINE, "Unloaded plugin: '%s'\n", inst.name.String());
+		else
+			Warning(eDLL_T::ENGINE, "Failed unloading plugin: '%s'\n", inst.name.String());
+	}
+
+	PluginSystem()->Shutdown();
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Instantiate all main libraries
 //-----------------------------------------------------------------------------
 bool CModAppSystemGroup::StaticCreate(CModAppSystemGroup* pModAppSystemGroup)
@@ -86,15 +128,14 @@ bool CModAppSystemGroup::StaticCreate(CModAppSystemGroup* pModAppSystemGroup)
 	*m_bIsDedicated = true;
 #endif // DEDICATED
 
-	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)PluginSystem, CPluginSystem, INTERFACEVERSION_PLUGINSYSTEM);
 	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)EngineCVar, CCvar, CVAR_INTERFACE_VERSION);
+	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)FileSystem, CFileSystem_Stdio, BASEFILESYSTEM_INTERFACE_VERSION);
+	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)FileSystem, CFileSystem_Stdio, FILESYSTEM_INTERFACE_VERSION);
 	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)KeyValuesSystem, CKeyValuesSystem, KEYVALUESSYSTEM_INTERFACE_VERSION);
 	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)SquirrelVMBridge, CSquirrelVMBridge, SQUIRRELVM_BRIDGE_INTERFACE_VERSION);
+	EXPOSE_INTERFACE_FN((InstantiateInterfaceFn)PluginSystem, CPluginSystem, INTERFACEVERSION_PLUGINSYSTEM);
 
-	InitPluginSystem(pModAppSystemGroup);
-	CALL_PLUGIN_CALLBACKS(PluginSystem()->GetCreateCallbacks(), pModAppSystemGroup);
-
-	ModSystem()->Init();
+	PluginSystem_Init(pModAppSystemGroup);
 
 	g_pDebugOverlay = (CIVDebugOverlay*)g_FactorySystem.GetFactory(VDEBUG_OVERLAY_INTERFACE_VERSION);
 #ifndef CLIENT_DLL
@@ -125,19 +166,12 @@ bool CModAppSystemGroup::StaticCreate(CModAppSystemGroup* pModAppSystemGroup)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Initialize plugin system
+// Purpose: Destroy all main libraries
 //-----------------------------------------------------------------------------
-void CModAppSystemGroup::InitPluginSystem(CModAppSystemGroup* pModAppSystemGroup)
+void CModAppSystemGroup::StaticDestroy(CModAppSystemGroup* pModAppSystemGroup)
 {
-	PluginSystem()->Init();
-
-	for (auto& it : PluginSystem()->GetInstances())
-	{
-		if (PluginSystem()->LoadInstance(it))
-			Msg(eDLL_T::ENGINE, "Loaded plugin: '%s'\n", it.name.String());
-		else
-			Warning(eDLL_T::ENGINE, "Failed loading plugin: '%s'\n", it.name.String());
-	}
+	CModAppSystemGroup__Destroy(pModAppSystemGroup);
+	PluginSystem_Shutdown(pModAppSystemGroup);
 }
 
 //-----------------------------------------------------------------------------
@@ -164,11 +198,12 @@ int HSys_Error_Internal(char* fmt, va_list args)
 
 void VSys_Dll::Detour(const bool bAttach) const
 {
-	DetourSetup(&CSourceAppSystemGroup__PreInit, &CSourceAppSystemGroup::StaticPreInit, bAttach);
-	DetourSetup(&CSourceAppSystemGroup__Create, &CSourceAppSystemGroup::StaticCreate, bAttach);
-
 	DetourSetup(&CModAppSystemGroup__Main, &CModAppSystemGroup::StaticMain, bAttach);
 	DetourSetup(&CModAppSystemGroup__Create, &CModAppSystemGroup::StaticCreate, bAttach);
+	DetourSetup(&CModAppSystemGroup__Destroy, &CModAppSystemGroup::StaticDestroy, bAttach);
+
+	DetourSetup(&CSourceAppSystemGroup__PreInit, &CSourceAppSystemGroup::StaticPreInit, bAttach);
+	DetourSetup(&CSourceAppSystemGroup__Create, &CSourceAppSystemGroup::StaticCreate, bAttach);
 
 	DetourSetup(&Sys_Error_Internal, &HSys_Error_Internal, bAttach);
 }
