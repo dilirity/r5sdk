@@ -31,6 +31,7 @@
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 #include "vscript_gamedll_defs.h"
 #include "vscript_shared.h"
+#include "pluginsystem/pluginsystem.h"
 #include "game/shared/pluginsystem/modsystem.h"
 
 //-----------------------------------------------------------------------------
@@ -112,6 +113,13 @@ void Script_RegisterCommonAbstractions(CSquirrelVM* s)
     DEFINE_SHARED_SCRIPTFUNC_NAMED(s, ScriptError, "Throws a script error", "void", "string format, ...", true);
 
     Script_RegisterModSystemFunctions(s);
+
+    // NOTE: plugin functions must always come after SDK functions!
+    for (auto& callback : !PluginSystem()->GetRegisterSharedScriptFuncsCallbacks())
+    {
+        // Register script functions inside plugins.
+        callback.Function()(s);
+    }
 }
 
 //---------------------------------------------------------------------------------

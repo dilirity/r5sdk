@@ -18,6 +18,7 @@
 #include "engine/server/server.h"
 #include "engine/host_state.h"
 #include "engine/debugoverlay.h"
+#include "pluginsystem/pluginsystem.h"
 #include "vscript/vscript.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 
@@ -651,6 +652,13 @@ void Script_RegisterServerFunctions(CSquirrelVM* s)
     Script_RegisterAdminServerFunctions(s);
 
     Script_RegisterLiveAPIFunctions(s);
+
+    // NOTE: plugin functions must always come after SDK functions!
+    for (auto& callback : !PluginSystem()->GetRegisterServerScriptFuncsCallbacks())
+    {
+        // Register script functions inside plugins.
+        callback.Function()(s);
+    }
 }
 
 void Script_RegisterServerEnums(CSquirrelVM* const s)

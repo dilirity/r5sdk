@@ -23,6 +23,7 @@
 #include "engine/cmodel_bsp.h"
 #include "engine/host_state.h"
 #include "engine/debugoverlay.h"
+#include "pluginsystem/pluginsystem.h"
 #include "networksystem/pylon.h"
 #include "networksystem/listmanager.h"
 #include "networksystem/hostmanager.h"
@@ -617,6 +618,13 @@ void Script_RegisterClientFunctions(CSquirrelVM* s)
 {
     Script_RegisterCommonAbstractions(s);
     Script_RegisterCoreClientFunctions(s);
+
+    // NOTE: plugin functions must always come after SDK functions!
+    for (auto& callback : !PluginSystem()->GetRegisterClientScriptFuncsCallbacks())
+    {
+        // Register script functions inside plugins.
+        callback.Function()(s);
+    }
 }
 
 //---------------------------------------------------------------------------------
@@ -663,6 +671,13 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     DEFINE_UI_SCRIPTFUNC_NAMED(s, ConnectToServer, "Joins server by ip address and encryption key", "void", "string address, string key", false);
     DEFINE_UI_SCRIPTFUNC_NAMED(s, ConnectToListedServer, "Joins listed server by index", "void", "int index", false);
     DEFINE_UI_SCRIPTFUNC_NAMED(s, ConnectToHiddenServer, "Joins hidden server by token", "void", "string token", false);
+
+    // NOTE: plugin functions must always come after SDK functions!
+    for (auto& callback : !PluginSystem()->GetRegisterUIScriptFuncsCallbacks())
+    {
+        // Register script functions inside plugins.
+        callback.Function()(s);
+    }
 }
 
 void Script_RegisterUIServerFunctions(CSquirrelVM* s)
