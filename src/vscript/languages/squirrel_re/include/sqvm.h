@@ -75,6 +75,9 @@ inline SQInteger(*v_SQVM_ScriptError)(const SQChar* pszFormat, ...);
 inline SQInteger(*v_SQVM_RaiseError)(HSQUIRRELVM v, const SQChar* pszFormat, ...);
 inline void(*v_SQVM_PrintObjVal)(HSQUIRRELVM v, const SQObject* oin, SQObject* oout);
 
+inline void(*v_SQVM_AllocCompileBuffer)(HSQUIRRELVM v, SQBufState* bufferState, const SQChar* bufferName, bool raiseError);
+inline void(*v_SQVM_FreeCompileBuffer)(HSQUIRRELVM v);
+
 void SQVM_CompileError(HSQUIRRELVM v, const SQChar* pszError, const SQChar* pszFile, SQUnsignedInteger nLine, SQInteger nColumn);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -89,6 +92,8 @@ class VSquirrelVM : public IDetour
 		LogFunAdr("SQVM_ScriptError", v_SQVM_ScriptError);
 		LogFunAdr("SQVM_RaiseError", v_SQVM_RaiseError);
 		LogFunAdr("SQVM_PrintObjVal", v_SQVM_PrintObjVal);
+		LogFunAdr("SQVM_AllocCompileBuffer", v_SQVM_AllocCompileBuffer);
+		LogFunAdr("SQVM_FreeCompileBuffer", v_SQVM_FreeCompileBuffer);
 	}
 	virtual void GetFun(void) const
 	{
@@ -99,6 +104,8 @@ class VSquirrelVM : public IDetour
 		Module_FindPattern(g_GameDll, "E9 ?? ?? ?? ?? F7 D2").FollowNearCallSelf().GetPtr(v_SQVM_ScriptError);
 		Module_FindPattern(g_GameDll, "48 89 54 24 ?? 4C 89 44 24 ?? 4C 89 4C 24 ?? 53 56 57 48 83 EC 40").GetPtr(v_SQVM_RaiseError);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ? 55 41 54 41 55 41 56 41 57 48 8B EC 48 83 EC 50 45 33 ED").GetPtr(v_SQVM_PrintObjVal);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 57 48 83 EC ?? 48 8B 59 ?? 48 8B F9 83 BB").GetPtr(v_SQVM_AllocCompileBuffer);
+		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 48 8B 41 ?? FF 88").GetPtr(v_SQVM_FreeCompileBuffer);
 	}
 	virtual void GetVar(void) const { }
 	virtual void GetCon(void) const { }

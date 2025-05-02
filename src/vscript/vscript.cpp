@@ -91,7 +91,6 @@ SQBool Script_PrecompileScripts(CSquirrelVM* vm)
 	CFastTimer timer;
 	timer.Start();
 
-	vm->CompileModScripts();
 	SQBool result = false;
 
 	switch (context)
@@ -108,6 +107,11 @@ SQBool Script_PrecompileScripts(CSquirrelVM* vm)
 		break;
 	}
 	}
+
+	// Compile mod scripts after we compiled the core scripts, so mods can use
+	// every symbol defined in the core scripts.
+	vm->CompileModScripts();
+	v_SQVM_FreeCompileBuffer(vm->GetVM()); // Free if after everything has been compiled.
 
 	timer.End();
 	Msg(eDLL_T(context), "Script compiler finished in %lf seconds\n", timer.GetDuration().GetSeconds());
@@ -166,4 +170,13 @@ void VScript::Detour(const bool bAttach) const
 	DetourSetup(&v_Script_LoadScriptFile, &Script_LoadScriptFile, bAttach);
 	DetourSetup(&v_Script_PrecompileServerScripts, &Script_PrecompileServerScripts, bAttach);
 	DetourSetup(&v_Script_PrecompileClientScripts, &Script_PrecompileClientScripts, bAttach);
+
+	// note(kawe): we have to NOP the call to SQVM_FreeCompileBuffer() here,
+	// because we compile our mods scripts directly after compiling the core
+	// scripts. However, since we call this function here, our buffers would
+	// be freed before we get to compile our mod scripts. This has now been
+	// moved into the Script_PrecompileScripts() implementation above, after
+	// out mods have been precompiled.
+	CMemory(v_Script_PrecompileServerScripts).Offset(0x21A).Patch({ 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 });
+	CMemory(v_Script_PrecompileClientScripts).Offset(0x1DB).Patch({ 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 });
 }
