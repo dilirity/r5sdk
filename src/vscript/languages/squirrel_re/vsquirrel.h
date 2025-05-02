@@ -4,6 +4,8 @@
 #include "tier1/utlhash.h"
 #include "tier1/utlbuffer.h"
 
+#include "vscript/languages/squirrel_re/include/sqstdaux.h"
+#include "vscript/languages/squirrel_re/include/sqstdstring.h"
 #include "vscript/languages/squirrel_re/include/squirrel.h"
 #include "vscript/languages/squirrel_re/include/sqstate.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
@@ -88,7 +90,10 @@ inline bool(*CSquirrelVM__PrecompileServerScripts)(CSquirrelVM* vm, SQCONTEXT co
 inline ScriptStatus_t(*CSquirrelVM__ExecuteFunction)(CSquirrelVM* s, HSCRIPT hFunction, const ScriptVariant_t* const pArgs, unsigned int nArgs, ScriptVariant_t* const pReturn, HSCRIPT hScope);
 inline bool(*CSquirrelVM__ExecuteCodeCallback)(CSquirrelVM* s, const SQChar* callbackName);
 
-inline bool(*CSquirrelVM__ThrowError)(CSquirrelVM* vm, HSQUIRRELVM v);
+inline bool(*CSquirrelVM__ThrowError)(CSquirrelVM* s, HSQUIRRELVM v);
+
+inline SQRESULT(*v_Script_PrintFunc)(HSQUIRRELVM v, SQChar* fmt, ...);
+inline SQBool(*v_Script_WarningFunc)(HSQUIRRELVM v, SQInteger nformatstringidx);
 
 #ifndef CLIENT_DLL
 inline CSquirrelVM* g_pServerScript;
@@ -198,6 +203,9 @@ class VSquirrel : public IDetour
 		LogFunAdr("CSquirrelVM::ExecuteFunction", CSquirrelVM__ExecuteFunction);
 		LogFunAdr("CSquirrelVM::ExecuteCodeCallback", CSquirrelVM__ExecuteCodeCallback);
 		LogFunAdr("CSquirrelVM::ThrowError", CSquirrelVM__ThrowError);
+
+		LogFunAdr("Script_PrintFunc", v_Script_PrintFunc);
+		LogFunAdr("Script_WarningFunc", v_Script_WarningFunc);
 	}
 	virtual void GetFun(void) const
 	{
@@ -219,6 +227,9 @@ class VSquirrel : public IDetour
 		Module_FindPattern(g_GameDll, "E8 ?? ?? ?? ?? 83 FB 5C").FollowNearCallSelf().GetPtr(CSquirrelVM__ExecuteFunction);
 		Module_FindPattern(g_GameDll, "E8 ?? ?? ?? ?? C6 47 1C 01").FollowNearCallSelf().GetPtr(CSquirrelVM__ExecuteCodeCallback);
 		Module_FindPattern(g_GameDll, "E8 ?? ?? ?? ?? BB ?? ?? ?? ?? 8B C3").FollowNearCallSelf().GetPtr(CSquirrelVM__ThrowError);
+
+		Module_FindPattern(g_GameDll, "48 8B C4 48 89 50 10 4C 89 40 18 4C 89 48 20 53 56 57 48 81 EC 30 08 ?? ?? 48 8B DA 48 8D 70 18 48 8B F9 E8 ?? ?? ?? FF 48 89 74 24 28 48 8D 54 24 30 33").GetPtr(v_Script_PrintFunc);
+		Module_FindPattern(g_GameDll, "40 53 48 83 EC ? 33 DB 48 8D 44 24 ? 4C 8D 4C 24").GetPtr(v_Script_WarningFunc);
 	}
 	virtual void GetVar(void) const
 	{

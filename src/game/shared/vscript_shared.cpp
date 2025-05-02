@@ -82,12 +82,15 @@ static SQRESULT SharedScript_GetAvailablePlaylists(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: forces a script error
+//-----------------------------------------------------------------------------
 static SQRESULT SharedScript_ScriptError(HSQUIRRELVM v)
 {
     SQChar* pString = NULL;
-    SQInteger a4 = 0;
+    SQInteger nLen = 0;
 
-    if (SQVM_sprintf(v, 0, 1, &a4, &pString) < 0)
+    if (v_sqstd_format(v, 0, SQTrue, &nLen, &pString) < 0)
         SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 
     v_SQVM_ScriptError("%s", pString);

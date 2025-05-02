@@ -11,7 +11,12 @@
 #include "sqstring.h"
 #include "vsquirrel.h"
 
+//---------------------------------------------------------------------------------
+// Console variables
+//---------------------------------------------------------------------------------
 static ConVar script_profile_codecalls("script_profile_codecalls", "0", FCVAR_DEVELOPMENTONLY, "Prints duration of native calls to script functions.", "0 = none, 1 = slow calls, 2 = all ( !slower! )");
+static ConVar script_show_output("script_show_output", "0", FCVAR_RELEASE, "Prints the VM output to the console ( !slower! ).", true, 0.f, true, 2.f, "0 = log to file. 1 = 0 + log to console. 2 = 1 + log to notify");
+static ConVar script_show_warning("script_show_warning", "0", FCVAR_RELEASE, "Prints the VM warning output to the console ( !slower! ).", true, 0.f, true, 2.f, "0 = log to file. 1 = 0 + log to console. 2 = 1 + log to notify");
 
 // Callbacks for registering abstracted script functions.
 void(*ServerScriptRegister_Callback)(CSquirrelVM* const s) = nullptr;
@@ -345,9 +350,118 @@ void CSquirrelVM::CompileModScripts()
 }
 
 //---------------------------------------------------------------------------------
+// Purpose: prints the output of each VM to the console
+// Input  : *sqvm - 
+//			*fmt - 
+//			... - 
+//---------------------------------------------------------------------------------
+SQRESULT Script_PrintFunc(HSQUIRRELVM v, SQChar* fmt, ...)
+{
+	eDLL_T remoteContext;
+	// We use the sqvm pointer as index for SDK usage as the function prototype has to match assembly.
+	// The compiler 'pointer truncation' warning couldn't be avoided, but it's safe to ignore it here.
+#pragma warning(push)
+#pragma warning(disable : 4302 4311)
+	switch (static_cast<SQCONTEXT>(reinterpret_cast<int>(v)))
+#pragma warning(pop)
+	{
+	case SQCONTEXT::SERVER:
+		remoteContext = eDLL_T::SCRIPT_SERVER;
+		break;
+	case SQCONTEXT::CLIENT:
+		remoteContext = eDLL_T::SCRIPT_CLIENT;
+		break;
+	case SQCONTEXT::UI:
+		remoteContext = eDLL_T::SCRIPT_UI;
+		break;
+	case SQCONTEXT::NONE:
+		remoteContext = eDLL_T::NONE;
+		break;
+	default:
+
+		SQCONTEXT scriptContext = v->GetContext();
+		switch (scriptContext)
+		{
+		case SQCONTEXT::SERVER:
+			remoteContext = eDLL_T::SCRIPT_SERVER;
+			break;
+		case SQCONTEXT::CLIENT:
+			remoteContext = eDLL_T::SCRIPT_CLIENT;
+			break;
+		case SQCONTEXT::UI:
+			remoteContext = eDLL_T::SCRIPT_UI;
+			break;
+		default:
+			remoteContext = eDLL_T::NONE;
+			break;
+		}
+		break;
+	}
+
+	// Determine whether this is an info or warning log.
+	const bool bLogLevelOverride = (g_bSQAuxError || (g_bSQAuxBadLogic && v == g_pErrorVM));
+	LogLevel_t level = LogLevel_t(script_show_output.GetInt());
+	LogType_t type = bLogLevelOverride ? LogType_t::SQ_WARNING : LogType_t::SQ_INFO;
+
+	// Always log script related problems to the console.
+	if (type == LogType_t::SQ_WARNING &&
+		level == LogLevel_t::LEVEL_DISK_ONLY)
+	{
+		level = LogLevel_t::LEVEL_CONSOLE;
+	}
+
+	va_list args;
+	va_start(args, fmt);
+	CoreMsgV(type, level, remoteContext, "squirrel_re", fmt, args);
+	va_end(args);
+
+	return SQ_OK;
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: prints the warnings of each VM to the console
+// Input  : *v -
+//          nformatstringidx -  
+//---------------------------------------------------------------------------------
+SQBool Script_WarningFunc(HSQUIRRELVM v, SQInteger nformatstringidx)
+{
+	SQInteger strLen = 0;
+	SQChar* str = nullptr;
+
+	const SQRESULT result = v_sqstd_format(v, nformatstringidx, SQTrue, &strLen, &str);
+
+	const SQCONTEXT scriptContext = v->GetContext();
+	eDLL_T remoteContext;
+
+	switch (scriptContext)
+	{
+	case SQCONTEXT::SERVER:
+		remoteContext = eDLL_T::SCRIPT_SERVER;
+		break;
+	case SQCONTEXT::CLIENT:
+		remoteContext = eDLL_T::SCRIPT_CLIENT;
+		break;
+	case SQCONTEXT::UI:
+		remoteContext = eDLL_T::SCRIPT_UI;
+		break;
+	default:
+		remoteContext = eDLL_T::NONE;
+		break;
+	}
+
+	CoreMsg(LogType_t::SQ_WARNING, static_cast<LogLevel_t>(script_show_warning.GetInt()),
+		remoteContext, NO_ERROR, "squirrel_re(warning)", "%s", str);
+
+	return SQ_SUCCEEDED(result);
+}
+
+//---------------------------------------------------------------------------------
 void VSquirrel::Detour(const bool bAttach) const
 {
 	DetourSetup(&CSquirrelVM__Init, &CSquirrelVM::Init, bAttach);
 	DetourSetup(&CSquirrelVM__DestroySignalEntryListHead, &CSquirrelVM::DestroySignalEntryListHead, bAttach);
 	DetourSetup(&CSquirrelVM__ExecuteFunction, &Script_ExecuteFunction, bAttach);
+
+	DetourSetup(&v_Script_PrintFunc, &Script_PrintFunc, bAttach);
+	DetourSetup(&v_Script_WarningFunc, &Script_WarningFunc, bAttach);
 }

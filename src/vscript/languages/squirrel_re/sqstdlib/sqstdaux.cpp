@@ -29,7 +29,7 @@ SQInteger sqstd_aux_badlogic(HSQUIRRELVM v, __m128i* a2, __m128i* a3)
     return results;
 }
 
-void VSquirrelAUX::Detour(const bool bAttach) const
+void VSquirrelStdAux::Detour(const bool bAttach) const
 {
     DetourSetup(&v_sqstd_aux_printerror, &sqstd_aux_printerror, bAttach);
     DetourSetup(&v_sqstd_aux_badlogic, &sqstd_aux_badlogic, bAttach);

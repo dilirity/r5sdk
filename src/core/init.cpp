@@ -127,6 +127,7 @@
 #include "vscript/languages/squirrel_re/include/squirrel.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 #include "vscript/languages/squirrel_re/include/sqstdaux.h"
+#include "vscript/languages/squirrel_re/include/sqstdstring.h"
 #include "vscript/languages/squirrel_re/vsquirrel.h"
 #include "vscript/vscript.h"
 #include "game/shared/r1/weapon_bolt.h"
@@ -687,7 +688,8 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 
 	// Squirrel
 	REGISTER(VSquirrelAPI);
-	REGISTER(VSquirrelAUX);
+	REGISTER(VSquirrelStdAux);
+	REGISTER(VSquirrelStdString);
 	REGISTER(VSquirrelVM);
 
 	// Game/shared

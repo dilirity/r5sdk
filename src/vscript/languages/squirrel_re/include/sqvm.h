@@ -67,8 +67,6 @@ inline SQObjectPtr& stack_get(HSQUIRRELVM v, SQInteger idx) { return ((idx >= 0)
 #define _ss(_vm_) (_vm_)->_sharedstate
 
 /* ==== SQUIRREL ======================================================================================================================================================== */
-inline SQRESULT(*v_SQVM_PrintFunc)(HSQUIRRELVM v, SQChar* fmt, ...);
-inline SQRESULT(*v_SQVM_sprintf)(HSQUIRRELVM v, SQInteger a2, SQInteger a3, SQInteger* nStringSize, SQChar** ppString);
 inline size_t(*v_SQVM_GetErrorLine)(const SQChar* pszFile, SQInteger nLine, SQChar* pszContextBuf, SQInteger nBufLen);
 inline SQRESULT(*v_SQVM_WarningCmd)(HSQUIRRELVM v, SQInteger a2);
 inline void(*v_SQVM_CompileError)(HSQUIRRELVM v, const SQChar* pszError, const SQChar* pszFile, SQUnsignedInteger nLine, SQInteger nColumn);
@@ -77,8 +75,6 @@ inline SQInteger(*v_SQVM_ScriptError)(const SQChar* pszFormat, ...);
 inline SQInteger(*v_SQVM_RaiseError)(HSQUIRRELVM v, const SQChar* pszFormat, ...);
 inline void(*v_SQVM_PrintObjVal)(HSQUIRRELVM v, const SQObject* oin, SQObject* oout);
 
-SQRESULT SQVM_PrintFunc(HSQUIRRELVM v, SQChar* fmt, ...);
-SQRESULT SQVM_sprintf(HSQUIRRELVM v, SQInteger a2, SQInteger a3, SQInteger* nStringSize, SQChar** ppString);
 void SQVM_CompileError(HSQUIRRELVM v, const SQChar* pszError, const SQChar* pszFile, SQUnsignedInteger nLine, SQInteger nColumn);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -86,8 +82,6 @@ class VSquirrelVM : public IDetour
 {
 	virtual void GetAdr(void) const
 	{
-		LogFunAdr("SQVM_PrintFunc", v_SQVM_PrintFunc);
-		LogFunAdr("SQVM_sprintf", v_SQVM_sprintf);
 		LogFunAdr("SQVM_GetErrorLine", v_SQVM_GetErrorLine);
 		LogFunAdr("SQVM_WarningCmd", v_SQVM_WarningCmd);
 		LogFunAdr("SQVM_CompileError", v_SQVM_CompileError);
@@ -98,8 +92,6 @@ class VSquirrelVM : public IDetour
 	}
 	virtual void GetFun(void) const
 	{
-		Module_FindPattern(g_GameDll, "48 8B C4 48 89 50 10 4C 89 40 18 4C 89 48 20 53 56 57 48 81 EC 30 08 ?? ?? 48 8B DA 48 8D 70 18 48 8B F9 E8 ?? ?? ?? FF 48 89 74 24 28 48 8D 54 24 30 33").GetPtr(v_SQVM_PrintFunc);
-		Module_FindPattern(g_GameDll, "4C 89 4C 24 20 44 89 44 24 18 89 54 24 10 53 55 56 57 41 54 41 55 41 56 41 57 48 83 EC ?? 48 8B").GetPtr(v_SQVM_sprintf);
 		Module_FindPattern(g_GameDll, "48 8B C4 55 56 48 8D A8 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 83 65 90 FC").GetPtr(v_SQVM_GetErrorLine);
 		Module_FindPattern(g_GameDll, "48 83 EC 38 F2 0F 10 05 ?? ?? ?? ??").GetPtr(v_SQVM_LogicError);
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC 30 33 DB 48 8D 44 24 ?? 4C 8D 4C 24 ??").GetPtr(v_SQVM_WarningCmd);

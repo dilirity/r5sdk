@@ -10,7 +10,7 @@ inline SQInteger(*v_sqstd_aux_printerror)(HSQUIRRELVM v);
 inline SQInteger(*v_sqstd_aux_badlogic)(HSQUIRRELVM v, __m128i* a2, __m128i* a3);
 
 ///////////////////////////////////////////////////////////////////////////////
-class VSquirrelAUX : public IDetour
+class VSquirrelStdAux : public IDetour
 {
 	virtual void GetAdr(void) const
 	{
