@@ -1,28 +1,32 @@
 #pragma once
 
-#define INTERFACEVERSION_PLUGINSYSTEM "VPluginSystem001"
+#define INTERFACEVERSION_PLUGINSYSTEM "VPluginSystem002"
 
-struct PluginHelpWithAnything_t
+struct PluginOperation_s
 {
-	enum class ePluginHelp : int16_t
+	enum class PluginCommand_e : int16_t
 	{
-		PLUGIN_GET_FUNCTION = 0,
-		PLUGIN_REGISTER_CALLBACK,
-		PLUGIN_UNREGISTER_CALLBACK
+		PLUGIN_INSTALL_CALLBACK = 0,
+		PLUGIN_REMOVE_CALLBACK
 	};
 
-	enum class ePluginCallback : int16_t
+	enum class PluginCallback_e : int16_t
 	{
 		// !! - WARNING: if any existing values are changed, you must increment INTERFACEVERSION_PLUGINSYSTEM - !! 
 
 		CModAppSystemGroup_Create  = 0,
-		CServer_ConnectClient      = 1,
-		SV_RegisterScriptFunctions = 2,
+		CModAppSystemGroup_Destroy = 1,
+		CServer_ConnectClient      = 2,
 		OnReceivedChatMessage      = 3,
+
+		OnRegisterSharedScriptFunctions = 4,
+		OnRegisterServerScriptFunctions = 5,
+		OnRegisterClientScriptFunctions = 6,
+		OnRegisterUIScriptFunctions     = 7,
 	};
 
-	ePluginHelp helpId;
-	ePluginCallback callbackId;
+	PluginCommand_e commandId;
+	PluginCallback_e callbackId;
 	const char* name;
 	void* function;
 };
@@ -30,5 +34,7 @@ struct PluginHelpWithAnything_t
 abstract_class IPluginSystem
 {
 public:
-	virtual void* HelpWithAnything(PluginHelpWithAnything_t * help) = 0;
+	virtual void* RunOperation(PluginOperation_s* const help) = 0;
+	virtual void CoreMsgV(LogType_t logType, LogLevel_t logLevel, eDLL_T context,
+		const char* pszLogger, const char* pszFormat, va_list args, const UINT exitCode, const char* pszUptimeOverride) = 0;
 };

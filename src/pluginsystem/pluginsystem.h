@@ -7,6 +7,7 @@ class CModAppSystemGroup;
 class CServer;
 class CClient;
 class CPlayer;
+class CSquirrelVM;
 struct user_creds_s;
 
 template<typename T>
@@ -124,7 +125,7 @@ public:
 
 		// Might wanna make a status code system.
 		typedef bool(*OnLoad)(const char*, const char*);
-		typedef void(*OnUnload)();
+		typedef bool(*OnUnload)();
 
 		CModule moduleHandle;
 		CUtlString name;
@@ -135,23 +136,34 @@ public:
 	};
 
 	void Init();
+	void Shutdown();
 
 	bool LoadInstance(PluginInstance_t& pluginInst);
 	bool UnloadInstance(PluginInstance_t& pluginInst);
 	bool ReloadInstance(PluginInstance_t& pluginInst);
 
-	void AddCallback(PluginHelpWithAnything_t* help);
-	void RemoveCallback(PluginHelpWithAnything_t* help);
+	void InstallCallback(PluginOperation_s* const pio);
+	void RemoveCallback(PluginOperation_s* const pio);
 
 	CUtlVector<PluginInstance_t>& GetInstances();
 
-	virtual void* HelpWithAnything(PluginHelpWithAnything_t* help);
+	// Implements IPluginSystem
+	virtual void* RunOperation(PluginOperation_s* const pio);
+	virtual void CoreMsgV(LogType_t logType, LogLevel_t logLevel, eDLL_T context,
+		const char* pszLogger, const char* pszFormat, va_list args, const UINT exitCode, const char* pszUptimeOverride);
 
 #define CREATE_PLUGIN_CALLBACK(typeName, type, funcName, varName) public: using typeName = type; CPluginCallbackList<CPluginCallback<typeName>>& funcName() { return varName; } private: CPluginCallbackList<CPluginCallback<typeName>> varName;
 
-	CREATE_PLUGIN_CALLBACK(CreateFn, bool(*)(CModAppSystemGroup*), GetCreateCallbacks, createCallbacks);
-	CREATE_PLUGIN_CALLBACK(ConnectClientFn, bool(*)(CServer*, CClient*, user_creds_s*), GetConnectClientCallbacks, connectClientCallbacks);
+	CREATE_PLUGIN_CALLBACK(OnCreateFn, bool(*)(CModAppSystemGroup*), GetCreateCallbacks, createCallbacks);
+	CREATE_PLUGIN_CALLBACK(OnDestroyFn, bool(*)(CModAppSystemGroup*), GetDestroyCallbacks, destroyCallbacks);
+
+	CREATE_PLUGIN_CALLBACK(OnConnectClientFn, bool(*)(CServer*, CClient*, user_creds_s*), GetConnectClientCallbacks, connectClientCallbacks);
 	CREATE_PLUGIN_CALLBACK(OnChatMessageFn, bool(*)(CPlayer*, const char*, bool), GetChatMessageCallbacks, chatMessageCallbacks);
+
+	CREATE_PLUGIN_CALLBACK(OnRegisterSharedScriptFunctionsFn, void(*)(CSquirrelVM*), GetRegisterSharedScriptFuncsCallbacks, registerSharedScriptFuncsCallbacks);
+	CREATE_PLUGIN_CALLBACK(OnRegisterServerScriptFunctionsFn, void(*)(CSquirrelVM*), GetRegisterServerScriptFuncsCallbacks, registerServerScriptFuncsCallbacks);
+	CREATE_PLUGIN_CALLBACK(OnRegisterClientScriptFunctionsFn, void(*)(CSquirrelVM*), GetRegisterClientScriptFuncsCallbacks, registerClientScriptFuncsCallbacks);
+	CREATE_PLUGIN_CALLBACK(OnRegisterUIScriptFunctionsFn, void(*)(CSquirrelVM*), GetRegisterUIScriptFuncsCallbacks, registerUIScriptFuncsCallbacks);
 
 #undef CREATE_PLUGIN_CALLBACK
 
