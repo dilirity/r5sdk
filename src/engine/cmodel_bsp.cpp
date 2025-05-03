@@ -368,6 +368,8 @@ static void Mod_FormatPakPath(T(&pOut)[N], const char* const rootPath, const cha
 
     if (ret < 0 || ret >= N)
         Error(eDLL_T::ENGINE, EXIT_FAILURE, "%s: failure encoding path for file \"%s\" in root \"%s\"\n", __FUNCTION__, fileName, rootPath);
+
+    V_FixSlashes(pOut);
 }
 
 //-----------------------------------------------------------------------------
