@@ -110,12 +110,11 @@ void CoreMsg(LogType_t logType, LogLevel_t logLevel, eDLL_T context,
 	const UINT exitCode, const char* pszLogger, const char* pszFormat, ...);
 
 // These functions do not return.
-DLL_EXPORT void Msg(eDLL_T context, const char* fmt, ...) FMTFUNCTION(2, 3);
-DLL_EXPORT void NetMsg(LogType_t logType, eDLL_T context, const char* uptime, const char* fmt, ...) FMTFUNCTION(4, 5);
-DLL_EXPORT void Warning(eDLL_T context, const char* fmt, ...) FMTFUNCTION(2, 3);
-DLL_EXPORT void Error(eDLL_T context, const UINT code, const char* fmt, ...) FMTFUNCTION(3, 4);
+void Msg(eDLL_T context, const char* fmt, ...) FMTFUNCTION(2, 3);
+void NetMsg(LogType_t logType, eDLL_T context, const char* uptime, const char* fmt, ...) FMTFUNCTION(4, 5);
+void Warning(eDLL_T context, const char* fmt, ...) FMTFUNCTION(2, 3);
+void Error(eDLL_T context, const UINT code, const char* fmt, ...) FMTFUNCTION(3, 4);
 
-// TODO[ AMOS ]: export to DLL?
 void Plat_FatalError(eDLL_T context, const char* fmt, ...);
 
 #if defined DBGFLAG_STRINGS_STRIP
