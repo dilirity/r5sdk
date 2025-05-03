@@ -1022,11 +1022,11 @@ void AppendPrintf(char* pBuffer, size_t nBufSize, char const* pFormat, ...)
     char scratch[1024];
     va_list argptr;
     va_start(argptr, pFormat);
-    _vsnprintf(scratch, sizeof(scratch) - 1, pFormat, argptr);
+    const int ret = V_vsnprintf(scratch, sizeof(scratch), pFormat, argptr);
     va_end(argptr);
-    scratch[sizeof(scratch) - 1] = 0;
 
-    strncat(pBuffer, scratch, nBufSize);
+    if (ret > 0)
+        strncat(pBuffer, scratch, nBufSize);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
