@@ -1016,15 +1016,17 @@ static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
 
     const __int64 v80 = 4 * assetCount;
     const uint64_t v90 = totalPakFileBufSize + 2080;
-    const __int64 v33 = -((int)totalPakFileBufSize + 2080 + 4 * (int)assetCount) & 7;
+    const __int64 v33 = -((__int64)totalPakFileBufSize + 2080 + 4 * (__int64)assetCount) & 7;
     const __int64 v89 = v33;
     const __int64 v34 = 4 * assetCount + totalPakFileBufSize + 2080 + v33 + 8 * memPageCount + 12 * assetCount;
-    const __int64 v35 = (-(4 * (int)assetCount + (int)totalPakFileBufSize + 2080 + (int)v33 + 8 * (int)memPageCount + 12 * (int)assetCount) & 7) + 4088i64;
+    const __int64 v35 = (-(4 * (__int64)assetCount + (__int64)totalPakFileBufSize + 2080 + (__int64)v33 + 8 * (__int64)memPageCount + 12 * (__int64)assetCount) & 7) + 4088i64;
 
     uint64_t ringBufferStreamSize;
     uint64_t ringBufferOutSize;
 
-    if ((pakHdr.flags & (PAK_HEADER_FLAGS_RTECH_ENCODED|PAK_HEADER_FLAGS_ZSTD_ENCODED)) != 0)
+    const bool isCompressed = (pakHdr.flags & (PAK_HEADER_FLAGS_RTECH_ENCODED | PAK_HEADER_FLAGS_ZSTD_ENCODED)) != 0;
+
+    if (isCompressed)
     {
         ringBufferStreamSize = PAK_DECODE_IN_RING_BUFFER_SIZE;
         ringBufferOutSize = PAK_DECODE_OUT_RING_BUFFER_SIZE;
@@ -1165,7 +1167,7 @@ static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
 
     pak->headerSize = sizeof(PakFileHeader_s);
 
-    pak->maxCopySize = (pakHdr.flags & PAK_HEADER_FLAGS_RTECH_ENCODED|PAK_HEADER_FLAGS_ZSTD_ENCODED) != 0
+    pak->maxCopySize = isCompressed
         ? PAK_DECODE_OUT_RING_BUFFER_MASK
         : PAK_DECODE_IN_RING_BUFFER_MASK;
 
