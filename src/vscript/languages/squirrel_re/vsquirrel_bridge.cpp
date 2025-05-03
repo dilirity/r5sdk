@@ -118,11 +118,12 @@ void CSquirrelVMBridge::RaiseError(HSQUIRRELVM v, const SQChar* pszFormat, ...)
 	va_list vArgs;
 	va_start(vArgs, pszFormat);
 
-	vsnprintf(_stack_scratchpad, sizeof(_stack_scratchpad), pszFormat, vArgs);
+	const int ret = V_vsnprintf(_stack_scratchpad, sizeof(_stack_scratchpad), pszFormat, vArgs);
 
-	_stack_scratchpad[sizeof(_stack_scratchpad) - 1] = '\0';
+	if (ret < 0)
+		_stack_scratchpad[0] = '\0';
+
 	va_end(vArgs);
-
 	v_SQVM_RaiseError(v, _stack_scratchpad);
 }
 
