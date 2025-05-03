@@ -466,7 +466,7 @@ static void RenderSweptBoxQueueFunctor(CallQueue_s* const queue)
 //     /   +------/---+
 //    /   /      /   /
 //   /   /      /   /
-//  +   /      + --/--> angles
+//  +----------+ --/--> angles
 // |   /      |   /
 // |  +-------|--+
 // | /|       | /|
