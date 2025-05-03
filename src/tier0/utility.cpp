@@ -1074,11 +1074,7 @@ string FormatV(const char* szFormat, va_list args)
     assert(iLen >= 0);
     string result;
 
-    if (iLen <= 0)
-    {
-        result.clear();
-    }
-    else
+    if (iLen > 0)
     {
         // NOTE: reserve enough buffer size for the string + the terminating
         // NULL character, then resize it to just the string len so we don't
