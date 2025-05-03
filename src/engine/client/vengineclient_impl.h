@@ -1,6 +1,7 @@
 #pragma once
+#include "engine/cdll_int.h"
 
-class CEngineClient
+class CEngineClient : public IVEngineClient
 {
 public:
 	void SetRestrictServerCommands(bool bRestrict);
