@@ -28,8 +28,7 @@ CSquirrelVM* Script_GetScriptHandle(const SQCONTEXT context)
 		return g_pClientScript;
 	case SQCONTEXT::UI:
 		return g_pUIScript;
-	default:
-		return nullptr;
+	NO_DEFAULT
 	}
 }
 
