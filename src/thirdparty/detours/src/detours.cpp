@@ -250,7 +250,7 @@ inline PBYTE detour_skip_jmp(PBYTE pbCode, PVOID *ppGlobals)
             // enough to hold the detour code bytes.
             if (pbCode[0] == 0xff &&
                 pbCode[1] == 0x25 &&
-                *(UNALIGNED INT32 *)&pbCode[2] == (UNALIGNED INT32)(pbCode + 0x1000)) {   // jmp [rip+PAGE_SIZE-6]
+                *(UNALIGNED INT32 *)&pbCode[2] == (UNALIGNED INT32)(pbCode + 0x1000)) {   // jmp [eip+PAGE_SIZE-6]
 
                 DETOUR_TRACE(("%p->%p: OS patch encountered, reset back to long jump 5 bytes prior to target function.\n", pbCode, pbCodeOriginal));
                 pbCode = pbCodeOriginal;
@@ -1453,6 +1453,21 @@ static PVOID detour_alloc_region_from_hi(PBYTE pbLo, PBYTE pbHi)
     return NULL;
 }
 
+// Return pbTarget clamped into [pLo, pHi] range.
+
+static PBYTE detour_target_region_clamp(PBYTE pbTarget,
+                                        PDETOUR_TRAMPOLINE pLo,
+                                        PDETOUR_TRAMPOLINE pHi)
+{
+    if (pbTarget < (PBYTE)pLo) {
+        return (PBYTE)pLo;
+    }
+    if (pbTarget > (PBYTE)pHi) {
+        return (PBYTE)pHi;
+    }
+    return pbTarget;
+}
+
 static PVOID detour_alloc_trampoline_allocate_new(PBYTE pbTarget,
                                                   PDETOUR_TRAMPOLINE pLo,
                                                   PDETOUR_TRAMPOLINE pHi)
@@ -1468,29 +1483,29 @@ static PVOID detour_alloc_trampoline_allocate_new(PBYTE pbTarget,
                   s_pSystemRegion2LowerBound, s_pSystemRegion2UpperBound));
     // Try looking 1GB below or lower.
     if (pbTry == NULL && pbTarget > (PBYTE)0x40000000) {
-        pbTry = detour_alloc_region_from_hi((PBYTE)pLo, pbTarget - 0x40000000);
+        pbTry = detour_alloc_region_from_hi((PBYTE)pLo, detour_target_region_clamp(pbTarget - 0x40000000, pLo, pHi));
     }
     // Try looking 1GB above or higher.
     if (pbTry == NULL && pbTarget < (PBYTE)0xffffffff40000000) {
-        pbTry = detour_alloc_region_from_lo(pbTarget + 0x40000000, (PBYTE)pHi);
+        pbTry = detour_alloc_region_from_lo(detour_target_region_clamp(pbTarget + 0x40000000, pLo, pHi), (PBYTE)pHi);
     }
     // Try looking 1GB below or higher.
     if (pbTry == NULL && pbTarget > (PBYTE)0x40000000) {
-        pbTry = detour_alloc_region_from_lo(pbTarget - 0x40000000, pbTarget);
+        pbTry = detour_alloc_region_from_lo(detour_target_region_clamp(pbTarget - 0x40000000, pLo, pHi), detour_target_region_clamp(pbTarget, pLo, pHi));
     }
     // Try looking 1GB above or lower.
     if (pbTry == NULL && pbTarget < (PBYTE)0xffffffff40000000) {
-        pbTry = detour_alloc_region_from_hi(pbTarget, pbTarget + 0x40000000);
+        pbTry = detour_alloc_region_from_hi(detour_target_region_clamp(pbTarget, pLo, pHi), detour_target_region_clamp(pbTarget + 0x40000000, pLo, pHi));
     }
 #endif
 
     // Try anything below.
     if (pbTry == NULL) {
-        pbTry = detour_alloc_region_from_hi((PBYTE)pLo, pbTarget);
+        pbTry = detour_alloc_region_from_hi((PBYTE)pLo, detour_target_region_clamp(pbTarget, pLo, pHi));
     }
     // try anything above.
     if (pbTry == NULL) {
-        pbTry = detour_alloc_region_from_lo(pbTarget, (PBYTE)pHi);
+        pbTry = detour_alloc_region_from_lo(detour_target_region_clamp(pbTarget, pLo, pHi), (PBYTE)pHi);
     }
 
     return pbTry;
@@ -2198,6 +2213,15 @@ LONG WINAPI DetourAttachEx(_Inout_ PVOID *ppPointer,
     DETOUR_TRACE(("  ppldTarget=%p, code=%p [gp=%p]\n",
                   ppldTarget, pbTarget, pTargetGlobals));
 #else // DETOURS_IA64
+#if defined(_M_ARM64EC)
+    if (RtlIsEcCode(reinterpret_cast<DWORD64>(*ppPointer))) {
+        DETOUR_TRACE(("*ppPointer is an Arm64EC address (ppPointer=%p). "
+                      "An Arm64EC address cannot be legitimately detoured with an x64 jmp. "
+                      "Mark the target function with __declspec(hybrid_patchable) to make it detour-able. "
+                      "We still allow an Arm64EC function to be detoured with an x64 jmp to make it easy (crash) to debug.\n", ppPointer));
+        DETOUR_BREAK();
+    }
+#endif
     pbTarget = (PBYTE)DetourCodeFromPointer(pbTarget, NULL);
     pDetour = DetourCodeFromPointer(pDetour, NULL);
 #endif // !DETOURS_IA64
