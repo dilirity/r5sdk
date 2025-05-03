@@ -12,7 +12,7 @@
 #include "game/shared/vscript_shared.h"
 #include "pluginsystem/modsystem.h"
 
-static const char* s_scriptContextNames[] = { "SERVER", "CLIENT", "UI", "NONE" };
+static const char* s_scriptContextNames[] = { "SERVER", "CLIENT", "UI" };
 
 //---------------------------------------------------------------------------------
 // Purpose: Returns the script VM pointer by context
