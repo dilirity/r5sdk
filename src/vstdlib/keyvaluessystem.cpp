@@ -128,8 +128,11 @@ static void KVLeak(char const* fmt, ...)
 	char data[1024];
 
 	va_start(argptr, fmt);
-	Q_vsnprintf(data, sizeof(data), fmt, argptr);
+	const int ret = Q_vsnprintf(data, sizeof(data), fmt, argptr);
 	va_end(argptr);
+
+	if (ret < 0)
+		data[0] = '\0';
 
 	Msg(eDLL_T::COMMON, "%s", data);
 }
