@@ -1,6 +1,6 @@
 #ifndef MODULE_H
 #define MODULE_H
-#include "windows/tebpeb64.h"
+#include "windows/peb.h"
 #include "tier0/sigmaker.h"
 
 class CModule
@@ -69,7 +69,7 @@ public:
 
 	// https://en.wikipedia.org/wiki/Win32_Thread_Information_Block
 	inline static PEB64* GetProcessEnvironmentBlock()
-	{ return reinterpret_cast<PEB64*>(__readgsqword(0x60)); }
+	{ return reinterpret_cast<PEB64*>(NtCurrentPeb()); }
 
 	inline static TEB64* GetThreadEnvironmentBlock()
 	{ return reinterpret_cast<TEB64*>(NtCurrentTeb()); }

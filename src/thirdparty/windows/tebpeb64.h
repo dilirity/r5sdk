@@ -20,8 +20,8 @@
 //
 //    2017-08-25:   initial public release
 //
-#ifndef TEBPEB_64_H
-#define TEBPEB_64_H
+#ifndef WINDOWS_TEBPEB_64_H
+#define WINDOWS_TEBPEB_64_H
 
 //
 // base types
@@ -152,7 +152,7 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS64
 //    0x0388    Windows 8
 //    0x07A0    Windows 10
 //
-struct PEB64
+typedef struct PEB
 {
     union
     {
@@ -239,12 +239,12 @@ struct PEB64
     QWORD                           SystemAssemblyStorageMap;           //0x0310
     QWORD                           MinimumStackCommit;                 //0x0318
 
-}; //struct PEB64
+} PEB64;
 
 //
 // TEB64 structure - preliminary structure; the portion listed current at least as of Windows 8
 //
-struct TEB64
+typedef struct TEB
 {
     NT_TIB64                        NtTib;                              //0x0000
     PVOID                           EnvironmentPointer;                 //0x0038
@@ -305,6 +305,6 @@ struct TEB64
     PVOID                           StackCommitMax;                     //0x1290
     PVOID                           StackReserved;                      //0x1298
     PVOID                           TlsExpansionSlots;                  //0x12A0
-};
+} TEB64;
 
-#endif // TEBPEB_64_H
+#endif // WINDOWS_TEBPEB_64_H
