@@ -56,9 +56,11 @@ static void FatalError(const char* fmt, ...)
 	va_start(vArgs, fmt);
 
 	char errorBuf[1024];
-	vsnprintf(errorBuf, sizeof(errorBuf), fmt, vArgs);
+	const int ret = V_vsnprintf(errorBuf, sizeof(errorBuf), fmt, vArgs);
 
-	errorBuf[sizeof(errorBuf) - 1] = '\0';
+	if (ret < 0)
+		errorBuf[0] = '\0';
+
 	va_end(vArgs);
 
 	MessageBoxA(NULL, errorBuf, "Loader Error", MB_ICONERROR | MB_OK);
