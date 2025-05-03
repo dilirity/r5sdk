@@ -220,7 +220,7 @@ static bool Mod_PlaylistHasChanged(const char* const playlistName)
 void Mod_GetAllInstalledMaps()
 {
     CUtlVector<CUtlString> fileList;
-    AddFilesToList(fileList, "vpk", "vpk", nullptr, '/');
+    AddFilesToList(fileList, "vpk", "vpk", "GAME", '/');
 
     boost::cmatch regexMatches;
     AUTO_LOCK(g_InstalledMapsMutex);
