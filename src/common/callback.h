@@ -12,6 +12,7 @@ inline void(*v__setClassVarClient_f)(const CCommand& args);
 #ifndef DEDICATED
 inline void(*v__UIScript_Reset_f)();
 #endif // !DEDICATED
+inline void(*v__Weapon_Reparse_f)();
 
 #ifndef CLIENT_DLL
 inline int* g_nCommandClientIndex = nullptr;
@@ -61,6 +62,7 @@ class VCallback : public IDetour
 #ifndef DEDICATED
 		LogFunAdr("UIScript_Reset_f", v__UIScript_Reset_f);
 #endif // !DEDICATED
+		LogFunAdr("Weapon_Reparse_f", v__Weapon_Reparse_f);
 	}
 	virtual void GetFun(void) const
 	{
@@ -74,6 +76,7 @@ class VCallback : public IDetour
 #ifndef DEDICATED
 		Module_FindPattern(g_GameDll, "40 55 41 54 48 8D AC 24 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 45 33 E4 48 8D 0D").GetPtr(v__UIScript_Reset_f);
 #endif // !DEDICATED
+		Module_FindPattern(g_GameDll, "48 83 EC ? 48 8B 0D ? ? ? ? 48 8B 01 FF 90 ? ? ? ? 84 C0 74 ? 48 8B 0D ? ? ? ? 48 8B 01 FF 90 ? ? ? ? 84 C0 74").GetPtr(v__Weapon_Reparse_f);
 	}
 	virtual void GetVar(void) const
 	{

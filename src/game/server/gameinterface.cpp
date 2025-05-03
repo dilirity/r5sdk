@@ -397,6 +397,8 @@ void VServerGameDLL::Detour(const bool bAttach) const
 	DetourSetup(&v_ExecuteFrameServerJob, &ExecuteFrameServerJob, bAttach);
 }
 
+CThreadMutex* g_serverFrameMutex;
+
 CServerGameDLL* g_pServerGameDLL = nullptr;
 CServerGameClients* g_pServerGameClients = nullptr;
 CServerGameEnts* g_pServerGameEntities = nullptr;

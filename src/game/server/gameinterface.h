@@ -136,6 +136,8 @@ inline void(*v_UserMessageBegin)(IRecipientFilter* filter, const char* pszMessag
 inline float* g_pflServerFrameTimeBase = nullptr;
 inline bf_write** g_ppUsrMessageBuffer = nullptr;
 
+extern CThreadMutex* g_serverFrameMutex;
+
 extern CServerGameDLL* g_pServerGameDLL;
 extern CServerGameClients* g_pServerGameClients;
 extern CServerGameEnts* g_pServerGameEntities;
@@ -156,6 +158,8 @@ class VServerGameDLL : public IDetour
 		LogFunAdr("ExecuteFrameServerJob", v_ExecuteFrameServerJob);
 		LogFunAdr("UserMessageBegin", v_UserMessageBegin);
 		LogVarAdr("g_flServerFrameTimeBase", g_pflServerFrameTimeBase);
+		LogVarAdr("g_ppUsrMessageBuffer", g_ppUsrMessageBuffer);
+		LogVarAdr("g_serverFrameMutex", g_serverFrameMutex);
 		LogVarAdr("g_pServerGameDLL", g_pServerGameDLL);
 		LogVarAdr("g_pServerGameClients", g_pServerGameClients);
 		LogVarAdr("g_pServerGameEntities", g_pServerGameEntities);
@@ -177,6 +181,7 @@ class VServerGameDLL : public IDetour
 		g_pflServerFrameTimeBase = CMemory(CServerGameDLL__GameInit).FindPatternSelf("F3 0F 11 0D").ResolveRelativeAddressSelf(0x4, 0x8).RCast<float*>();
 		g_randomStream = CMemory(CServerGameDLL__DLLInit).OffsetSelf(0x130).FindPatternSelf("48 8B").ResolveRelativeAddressSelf(0x3, 0x7).RCast<CServerRandomStream*>();
 		CMemory(v_UserMessageBegin).OffsetSelf(0xB1).FindPatternSelf("48 89").ResolveRelativeAddressSelf(0x3, 0x7).GetPtr(g_ppUsrMessageBuffer);
+		CMemory(v_DispatchFrameServerJob).FindPatternSelf("48 8D").ResolveRelativeAddressSelf(3, 7).GetPtr(g_serverFrameMutex);
 	}
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const;

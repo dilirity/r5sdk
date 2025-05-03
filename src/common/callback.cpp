@@ -19,6 +19,7 @@
 #include "engine/gl_screen.h"
 #include "engine/client/cl_rcon.h"
 #include "engine/client/clientstate.h"
+#include "engine/client/vengineclient_impl.h"
 #endif // !DEDICATED
 #include "engine/client/client.h"
 #include "engine/net.h"
@@ -62,6 +63,7 @@
 #include "public/bspflags.h"
 #include "public/cmodel.h"
 #include "public/localize/ilocalize.h"
+#include "game/shared/r1/weapon_parse.h"
 #ifndef CLIENT_DLL
 #include "game/server/detour_impl.h"
 #include "game/server/gameinterface.h"
@@ -633,6 +635,39 @@ void UIScript_Reset_f()
 }
 #endif // !DEDICATED
 
+void Weapon_Reparse_f()
+{
+#ifndef DEDICATED
+	if (g_pClientState->IsConnected())
+#endif // !DEDICATED
+	{
+#ifndef CLIENT_DLL
+		if (g_pServer->IsActive())
+		{
+			g_serverFrameMutex->Lock();
+			WeaponParse_LoadServerData(true);
+			g_serverFrameMutex->Unlock();
+
+#ifndef DEDICATED
+			// NOTE: we set 'parseScripts' false here, because these were
+			// already reparsed in the above WeaponParse_LoadServerData() call.
+			// These systems are shared so we do not need to parse it again.
+			WeaponParse_LoadClientData(false, true);
+#endif // !DEDICATED
+		}
+		else
+#endif // !CLIENT_DLL
+		{
+#ifndef DEDICATED
+			// Tell the server to reparse its weapon scripts, and reparse
+			// them locally on our client.
+			g_pEngineClient->ServerCmd("weapon_reparse");
+			WeaponParse_LoadClientData(true, true);
+#endif // !DEDICATED
+		}
+	}
+}
+
 void VCallback::Detour(const bool bAttach) const
 {
 #ifndef CLIENT_DLL
@@ -642,4 +677,5 @@ void VCallback::Detour(const bool bAttach) const
 #ifndef DEDICATED
 	DetourSetup(&v__UIScript_Reset_f, &UIScript_Reset_f, bAttach);
 #endif // !DEDICATED
+	DetourSetup(&v__Weapon_Reparse_f, &Weapon_Reparse_f, bAttach);
 }
