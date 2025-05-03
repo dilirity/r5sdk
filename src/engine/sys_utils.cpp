@@ -34,13 +34,14 @@ void _Error(const char* fmt, ...)
 		va_list args;
 		va_start(args, fmt);
 
-		int len = vsnprintf(buf, sizeof(buf), fmt, args);
+		const int len = V_vsnprintf(buf, sizeof(buf), fmt, args);
 
-		buf[sizeof(buf) - 1] = '\0';
+		if (len < 0)
+			buf[0] = '\0';
+		else
+			shouldNewline = buf[len - 1] != '\n';
+
 		va_end(args);
-
-		if (len > 0)
-			shouldNewline = buf[len-1] != '\n';
 	}/////////////////////////////
 
 	Error(eDLL_T::ENGINE, NO_ERROR, shouldNewline ? "%s\n" : "%s", buf);
@@ -61,13 +62,14 @@ void _Warning(int level, const char* fmt, ...)
 		va_list args;
 		va_start(args, fmt);
 
-		int len = vsnprintf(buf, sizeof(buf), fmt, args);
+		const int len = V_vsnprintf(buf, sizeof(buf), fmt, args);
 
-		buf[sizeof(buf) - 1] = '\0';
-		va_end(args);
-
-		if (len > 0)
+		if (len < 0)
+			buf[0] = '\0';
+		else
 			shouldNewline = buf[len - 1] != '\n';
+
+		va_end(args);
 	}/////////////////////////////
 
 	if (level < 5)
@@ -92,9 +94,11 @@ void _Con_NPrintf(int pos, const char* fmt, ...)
 		va_list args;
 		va_start(args, fmt);
 
-		vsnprintf(buf, sizeof(buf), fmt, args);
+		const int ret = V_vsnprintf(buf, sizeof(buf), fmt, args);
 
-		buf[sizeof(buf) - 1] = '\0';
+		if (ret < 0)
+			buf[0] = '\0';
+
 		va_end(args);
 	}/////////////////////////////
 

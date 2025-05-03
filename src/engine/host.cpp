@@ -95,9 +95,11 @@ void Host_Error(const char* const error, ...)
 		va_list args{};
 		va_start(args, error);
 
-		vsnprintf(buf, sizeof(buf), error, args);
+		const int ret = V_vsnprintf(buf, sizeof(buf), error, args);
 
-		buf[sizeof(buf) - 1] = '\0';
+		if (ret < 0)
+			buf[0] = '\0';
+
 		va_end(args);
 	}/////////////////////////////
 

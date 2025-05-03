@@ -58,9 +58,11 @@ void COM_ExplainDisconnection(bool bPrint, const char* fmt, ...)
 		va_list vArgs;
 		va_start(vArgs, fmt);
 
-		vsnprintf(szBuf, sizeof(szBuf), fmt, vArgs);
+		const int ret = V_vsnprintf(szBuf, sizeof(szBuf), fmt, vArgs);
 
-		szBuf[sizeof(szBuf) - 1] = '\0';
+		if (ret < 0)
+			szBuf[0] = '\0';
+
 		va_end(vArgs);
 	}/////////////////////////////
 
