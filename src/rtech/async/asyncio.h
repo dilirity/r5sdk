@@ -47,7 +47,7 @@ struct AsyncHandleStatus_s
 };
 static_assert(sizeof(AsyncHandleStatus_s) == 0x40);
 
-extern int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* const fileSizeOut);
+extern int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* const fileSizeOut, char* const openPathOut = nullptr, const size_t openPathSize = 0);
 extern void FS_CloseAsyncFile(const int fileHandle);
 
 inline int(*v_FS_OpenAsyncFile)(const char* const filePath, const int logChannel, size_t* const outFileSize);

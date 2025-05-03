@@ -24,7 +24,7 @@ static HANDLE FS_Internal_OpenFile(const char* const fileToOpen)
 //----------------------------------------------------------------------------------
 // open a file and add it to the async file handle array
 //----------------------------------------------------------------------------------
-int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* const fileSizeOut)
+int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* const fileSizeOut, char* const actualOpenPathOut, const size_t openPathSize)
 {
     const CHAR* fileToLoad = filePath;
     HANDLE hFile = FS_Internal_OpenFile(fileToLoad);
@@ -54,8 +54,9 @@ int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* c
                 continue;
 
             modLookupPath = mod->GetBasePath() + fileToLoad;
-            const char* const pModLookupPath = modLookupPath.String();
+            modLookupPath.FixSlashes();
 
+            const char* const pModLookupPath = modLookupPath.String();
             hFile = FS_Internal_OpenFile(pModLookupPath);
 
             if (hFile != INVALID_HANDLE_VALUE)
@@ -82,6 +83,17 @@ int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* c
             *fileSizeOut = fileSize.QuadPart;
     }
 
+    if (actualOpenPathOut)
+    {
+        // store the full path from where we ended up opening the file.
+        // i.e. if the caller provided "stbsp\\mp_lobby.stbsp" and we
+        // ended up loading this file from a mod directory (because it
+        // didn't exist in our base path), then our actual path will
+        // become "mods\\<modName>\\stbsp\\mp_lobby.stbsp".
+        assert(openPathSize > 0);
+        V_strncpy(actualOpenPathOut, fileToLoad, openPathSize);
+    }
+
     const int fileIdx = g_pAsyncFileSlotMgr->FindSlot();
     const int slotNum = (fileIdx & ASYNC_MAX_FILE_HANDLES_MASK);
 
@@ -98,6 +110,16 @@ int FS_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* c
         Msg(eDLL_T::RTECH, "%s: Opened file: '%s' to slot #%d\n", __FUNCTION__, fileToLoad, slotNum);
 
     return fileIdx;
+}
+
+//----------------------------------------------------------------------------------
+// internal wrapper for our OpenAsyncFile code hook, since the prototype of our new
+// function is different than what is compiled with the engine due to new features;
+// we have to account for it here to avoid undefined behavior
+//----------------------------------------------------------------------------------
+static int FS_Internal_OpenAsyncFile(const char* const filePath, const int logChannel, size_t* const fileSizeOut)
+{
+    return FS_OpenAsyncFile(filePath, logChannel, fileSizeOut);
 }
 
 //----------------------------------------------------------------------------------
@@ -127,6 +149,6 @@ void FS_CloseAsyncFile(const int fileHandle)
 ///////////////////////////////////////////////////////////////////////////////
 void V_AsyncIO::Detour(const bool bAttach) const
 {
-    DetourSetup(&v_FS_OpenAsyncFile, &FS_OpenAsyncFile, bAttach);
+    DetourSetup(&v_FS_OpenAsyncFile, &FS_Internal_OpenAsyncFile, bAttach);
     DetourSetup(&v_FS_CloseAsyncFile, &FS_CloseAsyncFile, bAttach);
 }
