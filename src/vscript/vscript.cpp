@@ -45,12 +45,12 @@ RSON::Node_t* Script_LoadScriptList(const SQChar* rsonfile)
 
 //---------------------------------------------------------------------------------
 // Purpose: loads script files listed in the script list, to be compiled.
-// Input  : *v - 
+// Input  : *s - 
 //			*path - 
 //			*name - 
 //			flags - 
 //---------------------------------------------------------------------------------
-SQBool Script_LoadScriptFile(HSQUIRRELVM v, const SQChar* path, const SQChar* name, SQInteger flags)
+SQBool Script_LoadScriptFile(CSquirrelVM* const s, const SQChar* path, const SQChar* name, SQInteger flags)
 {
 	// search for mod path identifier so the mod can decide where the file is
 	const char* modPath = strstr(path, MOD_SCRIPT_PATH_IDENTIFIER);
@@ -59,8 +59,7 @@ SQBool Script_LoadScriptFile(HSQUIRRELVM v, const SQChar* path, const SQChar* na
 		path = &modPath[sizeof(MOD_SCRIPT_PATH_IDENTIFIER)-1]; // skip "::MOD::"
 
 	///////////////////////////////////////////////////////////////////////////////
-
-	return v_Script_LoadScriptFile(v, path, name, flags);
+	return v_Script_LoadScriptFile(s, path, name, flags);
 }
 
 //---------------------------------------------------------------------------------
