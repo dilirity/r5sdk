@@ -7,9 +7,15 @@
 //=============================================================================//
 
 #include "core/stdafx.h"
+#include "tier0/commandline.h"
 #include "tier2/fileutils.h"
 #include "filesystem/filesystem.h"
 #include "pluginsystem.h"
+
+//-----------------------------------------------------------------------------
+// Console variables
+//-----------------------------------------------------------------------------
+static ConVar pluginsystem_debug("pluginsystem_debug", "0", FCVAR_RELEASE, "Debug the pluginsystem");
 
 //-----------------------------------------------------------------------------
 // Purpose: initialize the plugin system
@@ -17,8 +23,17 @@
 //-----------------------------------------------------------------------------
 void CPluginSystem::Init()
 {
+	if (CommandLine()->CheckParm("-pluginsystem_disable"))
+		return;
+
 	if (!FileSystem()->IsDirectory(PLUGIN_INSTALL_DIR, "GAME"))
 		return; // No plugins to load.
+
+	// plugin system initializes before the first Cbuf_Execute call, which
+	// executes commands/convars over the command line. we check for an
+	// explicit pluginsystem debug flag, and set the convar from here.
+	if (CommandLine()->CheckParm("-pluginsystem_debug"))
+		pluginsystem_debug.SetValue(true);
 
 	CUtlVector< CUtlString > pluginPaths;
 	AddFilesToList(pluginPaths, PLUGIN_INSTALL_DIR, "dll", "GAME");
@@ -45,6 +60,19 @@ void CPluginSystem::Init()
 			m_Instances.AddToTail(PluginInstance_t(baseFileName, path.String()));
 		}
 	}
+
+	FOR_EACH_VEC(m_Instances, i)
+	{
+		CPluginSystem::PluginInstance_t& inst = m_Instances[i];
+
+		if (LoadInstance(inst))
+		{
+			if (pluginsystem_debug.GetBool())
+				Msg(eDLL_T::ENGINE, "Loaded plugin: '%s'\n", inst.name.String());
+		}
+		else
+			Error(eDLL_T::ENGINE, 0, "Failed loading plugin: '%s'\n", inst.name.String());
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -53,6 +81,19 @@ void CPluginSystem::Init()
 //-----------------------------------------------------------------------------
 void CPluginSystem::Shutdown()
 {
+	FOR_EACH_VEC_BACK(m_Instances, i)
+	{
+		CPluginSystem::PluginInstance_t& inst = m_Instances[i];
+
+		if (UnloadInstance(inst))
+		{
+			if (pluginsystem_debug.GetBool())
+				Msg(eDLL_T::ENGINE, "Unloaded plugin: '%s'\n", inst.name.String());
+		}
+		else
+			Error(eDLL_T::ENGINE, 0, "Failed unloading plugin: '%s'\n", inst.name.String());
+	}
+
 	m_Instances.Purge();
 }
 

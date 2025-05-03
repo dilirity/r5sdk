@@ -83,16 +83,6 @@ static void PluginSystem_Init(CModAppSystemGroup* const pModAppSystemGroup)
 {
 	PluginSystem()->Init();
 
-	FOR_EACH_VEC(PluginSystem()->GetInstances(), i)
-	{
-		CPluginSystem::PluginInstance_t& inst = PluginSystem()->GetInstances()[i];
-
-		if (PluginSystem()->LoadInstance(inst))
-			Msg(eDLL_T::ENGINE, "Loaded plugin: '%s'\n", inst.name.String());
-		else
-			Warning(eDLL_T::ENGINE, "Failed loading plugin: '%s'\n", inst.name.String());
-	}
-
 	CALL_PLUGIN_CALLBACKS(PluginSystem()->GetCreateCallbacks(), pModAppSystemGroup);
 	ModSystem()->Init();
 }
@@ -104,16 +94,6 @@ static void PluginSystem_Shutdown(CModAppSystemGroup* const pModAppSystemGroup)
 {
 	ModSystem()->Shutdown();
 	CALL_PLUGIN_CALLBACKS(PluginSystem()->GetDestroyCallbacks(), pModAppSystemGroup);
-
-	FOR_EACH_VEC_BACK(PluginSystem()->GetInstances(), i)
-	{
-		CPluginSystem::PluginInstance_t& inst = PluginSystem()->GetInstances()[i];
-
-		if (PluginSystem()->UnloadInstance(inst))
-			Msg(eDLL_T::ENGINE, "Unloaded plugin: '%s'\n", inst.name.String());
-		else
-			Warning(eDLL_T::ENGINE, "Failed unloading plugin: '%s'\n", inst.name.String());
-	}
 
 	PluginSystem()->Shutdown();
 }
