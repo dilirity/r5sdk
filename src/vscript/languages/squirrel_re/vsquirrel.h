@@ -73,6 +73,8 @@ extern void(*UiAdminPanelScriptRegister_Callback)(CSquirrelVM* const s);
 
 extern void(*ScriptConstantRegister_Callback)(CSquirrelVM* const s);
 
+extern bool g_scriptIsPrecompilingMods[(SQInteger)SQCONTEXT::COUNT];
+
 inline bool(*CSquirrelVM__Init)(CSquirrelVM* s, SQCONTEXT context, SQFloat curtime);
 inline bool(*CSquirrelVM__DestroySignalEntryListHead)(CSquirrelVM* s, HSQUIRRELVM v, SQFloat f);
 inline SQRESULT(*CSquirrelVM__RegisterFunction)(CSquirrelVM* s, ScriptFunctionBinding_t* binding, const bool useTypeCompiler);

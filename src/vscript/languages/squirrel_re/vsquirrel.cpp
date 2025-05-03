@@ -35,6 +35,8 @@ void(*UiAdminPanelScriptRegister_Callback)(CSquirrelVM* const s) = nullptr;
 // Registering constants in scripts.
 void(*ScriptConstantRegister_Callback)(CSquirrelVM* const s) = nullptr;
 
+bool g_scriptIsPrecompilingMods[(SQInteger)SQCONTEXT::COUNT];
+
 //---------------------------------------------------------------------------------
 // Purpose: Initialises a Squirrel VM instance
 // Output : True on success, false on failure
@@ -264,6 +266,7 @@ void CSquirrelVM::CompileModScripts()
 		return;
 
 	ModSystem()->LockModList();
+	g_scriptIsPrecompilingMods[(int)GetContext()] = true;
 
 	FOR_EACH_VEC(ModSystem()->GetModList(), i)
 	{
@@ -346,6 +349,7 @@ void CSquirrelVM::CompileModScripts()
 		AlignedMemAlloc()->Free(rson);
 	}
 
+	g_scriptIsPrecompilingMods[(int)GetContext()] = false;
 	ModSystem()->UnlockModList();
 }
 

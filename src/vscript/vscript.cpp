@@ -52,11 +52,15 @@ RSON::Node_t* Script_LoadScriptList(const SQChar* rsonfile)
 //---------------------------------------------------------------------------------
 SQBool Script_LoadScriptFile(CSquirrelVM* const s, const SQChar* path, const SQChar* name, SQInteger flags)
 {
-	// search for mod path identifier so the mod can decide where the file is
-	const char* modPath = strstr(path, MOD_SCRIPT_PATH_IDENTIFIER);
+	// Small optimization, so we only do this for the files passed in from mods.
+	if (g_scriptIsPrecompilingMods[(SQInteger)s->GetContext()])
+	{
+		// Search for mod path identifier so the mod can decide where the file is.
+		const char* const modPath = strstr(path, MOD_SCRIPT_PATH_IDENTIFIER);
 
-	if (modPath)
-		path = &modPath[sizeof(MOD_SCRIPT_PATH_IDENTIFIER)-1]; // skip "::MOD::"
+		if (modPath)
+			path = &modPath[sizeof(MOD_SCRIPT_PATH_IDENTIFIER) - 1]; // skip "::MOD::"
+	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	return v_Script_LoadScriptFile(s, path, name, flags);

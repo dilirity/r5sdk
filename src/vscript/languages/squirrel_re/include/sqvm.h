@@ -13,7 +13,10 @@ enum class SQCONTEXT : SQInteger
 	SERVER = 0,
 	CLIENT,
 	UI,
-	NONE
+
+	// The enums below are not a context.
+	COUNT,
+	NONE = COUNT
 };
 
 struct SQVM : public CHAINABLE_OBJ
