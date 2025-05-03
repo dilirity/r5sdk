@@ -31,9 +31,11 @@ void CAI_Network::DebugConnectMsg(int node1, int node2, const char* pszFormat, .
 				va_list args{};
 				va_start(args, pszFormat);
 
-				vsnprintf(buf, sizeof(buf), pszFormat, args);
+				const int ret = V_vsnprintf(buf, sizeof(buf), pszFormat, args);
 
-				buf[sizeof(buf) - 1] = '\0';
+				if (ret < 0)
+					buf[0] = '\0';
+
 				va_end(args);
 			}/////////////////////////////
 
