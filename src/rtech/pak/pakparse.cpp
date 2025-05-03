@@ -905,8 +905,14 @@ static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
         pakFilePath = relativeFilePath;
     }
 
+    // This stored the actual load path of our pak file; if the pak is being
+    // loaded from a mod path, then that path will be stored here. This is
+    // needed because if a pak file has a module, then we need to load that
+    // from the same path as the pak file.
+    char actualLoadPath[MAX_OSPATH];
     size_t totalPakFileBufSize;
-    const int pakFileHandle = FS_OpenAsyncFile(pakFilePath, loadedInfo->logChannel, &totalPakFileBufSize);
+
+    const int pakFileHandle = FS_OpenAsyncFile(pakFilePath, loadedInfo->logChannel, &totalPakFileBufSize, actualLoadPath, sizeof(actualLoadPath));
 
     if (pakFileHandle == FS_ASYNC_FILE_INVALID)
     {
@@ -917,6 +923,7 @@ static bool Pak_SetupBuffersAndLoad(const PakHandle_t pakId)
     }
 
     loadedInfo->fileHandle = pakFileHandle;
+    pakFilePath = actualLoadPath; // Update it to our actual load path.
 
     // File is truncated or corrupt.
     if (totalPakFileBufSize < sizeof(PakFileHeader_s))
