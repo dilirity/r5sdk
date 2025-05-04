@@ -108,7 +108,7 @@ static void Loader_InitGameSDK(const LPSTR lpCmdLine)
 	if (!s_sdkModuleHandle)
 	{
 		Assert(0);
-		Loader_FatalError("Failed to load SDK: error code = %08x\n", GetLastError());
+		Loader_FatalError("Failed to load SDK module: error code = %08x\n", GetLastError());
 
 		return;
 	}
@@ -121,7 +121,7 @@ static void Loader_InitGameSDK(const LPSTR lpCmdLine)
 	if (!s_sdkInitFunc || !s_sdkShutdownFunc)
 	{
 		Assert(0);
-		Loader_FatalError("Loaded SDK is invalid: error code = %08x\n", GetLastError());
+		Loader_FatalError("Loaded SDK module is invalid: error code = %08x\n", GetLastError());
 
 		return;
 	}
