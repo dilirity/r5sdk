@@ -165,7 +165,6 @@ static void Loader_AttachToEntryPoint()
 	DetourUpdateThread(GetCurrentThread());
 
 	DetourAttach(&v_LauncherMain, &hkLauncherMain);
-
 	const HRESULT hr = DetourTransactionCommit();
 
 	if (hr != NO_ERROR) // Failed to hook into the process, terminate...
@@ -190,7 +189,7 @@ static void Loader_DetachFromEntryPoint()
 //-----------------------------------------------------------------------------
 // Purpose: APIENTRY
 //-----------------------------------------------------------------------------
-static BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved)
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved)
 {
 	switch (dwReason)
 	{
