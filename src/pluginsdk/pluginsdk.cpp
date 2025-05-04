@@ -333,7 +333,7 @@ static void PluginSDK_RemoveScriptFuncRegistrationCallbacks( IPluginSystem* cons
 //          and Error functions. We just pass it to the PluginSystem API
 //          IPluginSystem::CoreMsgV which then tunnels it to the engine logger.
 //-----------------------------------------------------------------------------
-void PluginSDK_LoggerSink( LogType_t logType, LogLevel_t logLevel, eDLL_T context,
+static void PluginSDK_LoggerSink( LogType_t logType, LogLevel_t logLevel, eDLL_T context,
 	const char* pszLogger, const char* pszFormat, va_list args,
 	const UINT exitCode, const char* pszUptimeOverride )
 {
