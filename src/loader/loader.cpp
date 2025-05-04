@@ -56,6 +56,8 @@ static int (*v_LauncherMain)(HINSTANCE, HINSTANCE, LPSTR, int) = nullptr;
 //-----------------------------------------------------------------------------
 static void Loader_FatalError(const char* const fmt, ...)
 {
+	Assert(0);
+
 	va_list vArgs;
 	va_start(vArgs, fmt);
 
@@ -84,9 +86,7 @@ static void Loader_InitGameSDK(const LPSTR lpCmdLine)
 	if (!GetModuleFileNameA((HMODULE)s_currentProcessDosHeader,
 		moduleName, sizeof(moduleName)))
 	{
-		Assert(0);
 		Loader_FatalError("Failed to retrieve process module name: error code = %08x\n", GetLastError());
-
 		return;
 	}
 
@@ -112,9 +112,7 @@ static void Loader_InitGameSDK(const LPSTR lpCmdLine)
 
 	if (!s_sdkModuleHandle)
 	{
-		Assert(0);
 		Loader_FatalError("Failed to load SDK module: error code = %08x\n", GetLastError());
-
 		return;
 	}
 
@@ -125,9 +123,7 @@ static void Loader_InitGameSDK(const LPSTR lpCmdLine)
 
 	if (!s_sdkInitFunc || !s_sdkShutdownFunc)
 	{
-		Assert(0);
 		Loader_FatalError("Loaded SDK module is invalid: error code = %08x\n", GetLastError());
-
 		return;
 	}
 
@@ -171,11 +167,9 @@ static void Loader_AttachToEntryPoint()
 	DetourAttach(&v_LauncherMain, &hkLauncherMain);
 
 	const HRESULT hr = DetourTransactionCommit();
+
 	if (hr != NO_ERROR) // Failed to hook into the process, terminate...
-	{
-		Assert(0);
 		Loader_FatalError("Failed to detour process: error code = %08x\n", hr);
-	}
 }
 
 //-----------------------------------------------------------------------------
