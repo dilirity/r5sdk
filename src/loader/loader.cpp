@@ -83,7 +83,12 @@ static void Loader_InitGameSDK(const LPSTR lpCmdLine)
 
 	if (!GetModuleFileNameA((HMODULE)s_currentProcessDosHeader,
 		moduleName, sizeof(moduleName)))
+	{
+		Assert(0);
+		Loader_FatalError("Failed to retrieve process module name: error code = %08x\n", GetLastError());
+
 		return;
+	}
 
 	// Prune the path.
 	const char* const pModuleName = strrchr(moduleName, '\\') + 1;
