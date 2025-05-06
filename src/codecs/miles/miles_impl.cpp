@@ -29,10 +29,13 @@ static ConVar miles_warnings("miles_warnings", "0", FCVAR_RELEASE, "Enables warn
 static bool CSOM_Initialize()
 {
 	const char* pszLanguage = HEbisuSDK_GetLanguage();
-	const bool isDefaultLanguage = _stricmp(pszLanguage, MILES_DEFAULT_LANGUAGE) == 0;
+	const bool isDefaultLanguage = V_stricmp(pszLanguage, MILES_DEFAULT_LANGUAGE) == 0;
 
 	if (!isDefaultLanguage)
 	{
+		if ((V_stricmp(pszLanguage, "schinese") == 0) || (V_stricmp(pszLanguage, "tchinese") == 0))
+			pszLanguage = "mandarin"; // schinese and tchinese use the mandarin bank.
+
 		const bool useShipSound = !CommandLine()->FindParm("-devsound") || CommandLine()->FindParm("-shipsound");
 		char baseStreamFilePath[MAX_OSPATH];
 
