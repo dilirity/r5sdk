@@ -341,10 +341,17 @@ void CHostState::Setup(void)
 	LiveAPISystem()->Init();
 #endif // !CLIENT_DLL
 
-	if (net_useRandomKey.GetBool())
+	if (CommandLine()->CheckParm("-norandomkey"))
 	{
+		// Change callbacks sets the default.
+		net_useRandomKey.SetValue(0);
+	}
+	else
+	{
+		// Generate a random net key.
 		NET_GenerateKey();
 	}
+
 #if !defined (DEDICATED) && !defined (CLIENT_DLL)
 	// Parallel processing of 'C_BaseAnimating::SetupBones()' is currently
 	// not supported on listen servers running the local client due to an
