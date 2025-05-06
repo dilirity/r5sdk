@@ -1123,7 +1123,10 @@ void CSurface::AppendHostParameters(string& svParameters)
 void CSurface::AppendNetParameters(string& svParameters)
 {
 	AppendParameterInternal(svParameters, "+net_encryptionEnable", this->m_NetEncryptionToggle->Checked() ? "1" : "0");
-	AppendParameterInternal(svParameters, "+net_useRandomKey", this->m_NetRandomKeyToggle->Checked() ? "1" : "0");
+
+	if (!this->m_NetRandomKeyToggle->Checked())
+		AppendParameterInternal(svParameters, "-norandomkey");
+
 	AppendParameterInternal(svParameters, "+net_queued_packet_thread", this->m_QueuedPacketThread->Checked() ? "1" : "0");
 
 	if (this->m_NoTimeOutToggle->Checked())
