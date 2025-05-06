@@ -31,13 +31,6 @@
 #include "tier0/module.h"
 
 //-----------------------------------------------------------------------------
-// Process image statics
-//-----------------------------------------------------------------------------
-static const PEB64* s_currentProcessEnvironmentBlock = nullptr;
-static const IMAGE_DOS_HEADER* s_currentProcessDosHeader = nullptr;
-static const IMAGE_NT_HEADERS64* s_currentProcessNtHeaders = nullptr;
-
-//-----------------------------------------------------------------------------
 // SDK image statics
 //-----------------------------------------------------------------------------
 static HMODULE s_sdkModuleHandle = NULL;
@@ -83,7 +76,7 @@ static void Loader_InitGameSDK(const LPSTR lpCmdLine)
 
 	char moduleName[MAX_OSPATH];
 
-	if (!GetModuleFileNameA((HMODULE)s_currentProcessDosHeader,
+	if (!GetModuleFileNameA((HMODULE)NtCurrentPeb()->ImageBaseAddress,
 		moduleName, sizeof(moduleName)))
 	{
 		Loader_FatalError("Failed to retrieve process module name: error code = %08x\n", GetLastError());
@@ -195,13 +188,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved)
 	{
 	case DLL_PROCESS_ATTACH:
 	{
-		s_currentProcessEnvironmentBlock = NtCurrentPeb();
-
-		s_currentProcessDosHeader = (IMAGE_DOS_HEADER*)s_currentProcessEnvironmentBlock->ImageBaseAddress;
-		s_currentProcessNtHeaders = (IMAGE_NT_HEADERS64*)((uintptr_t)s_currentProcessDosHeader
-			+ (uintptr_t)s_currentProcessDosHeader->e_lfanew);
-
-		v_LauncherMain = CModule::GetExportedSymbol((QWORD)s_currentProcessDosHeader, "LauncherMain")
+		v_LauncherMain = CModule::GetExportedSymbol(NtCurrentPeb()->ImageBaseAddress, "LauncherMain")
 			.RCast<int (*)(HINSTANCE, HINSTANCE, LPSTR, int)>();
 
 		Loader_AttachToEntryPoint();
