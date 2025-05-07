@@ -264,7 +264,7 @@ bool CNetChan::_ProcessMessages(CNetChan* pChan, bf_read* pBuf)
 
     if (pExtended->GetNetProcessingTimeMsecs() > net_processTimeBudget.GetFloat())
     {
-        Warning(eDLL_T::SERVER, "Removing netchannel '%s' ('%s' exceeded time budget by '%3.1f'ms!)\n",
+        Warning(eDLL_T::SERVER, "Removing netchannel %s(%s) (exceeded time budget by %3.1fms!)\n",
             pChan->GetName(), pChan->GetAddress(), (pExtended->GetNetProcessingTimeMsecs() - net_processTimeBudget.GetFloat()));
         pClient->Disconnect(Reputation_t::REP_MARK_BAD, "#DISCONNECT_NETCHAN_OVERFLOW");
 
