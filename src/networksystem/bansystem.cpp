@@ -23,29 +23,53 @@ void CBanSystem::LoadList(void)
 	if (IsBanListValid())
 		m_BannedList.Purge();
 
-	FileHandle_t pFile = FileSystem()->Open("banlist.json", "rt", "PLATFORM");
+	FileHandle_t pFile = FileSystem()->Open("banlist.json", "rb", "PLATFORM");
 	if (!pFile)
 		return;
 
-	const ssize_t nLen = FileSystem()->Size(pFile);
-	std::unique_ptr<char[]> pBuf(new char[nLen + 1]);
+	const ssize_t nFileSize = FileSystem()->Size(pFile);
 
-	const ssize_t nRead = FileSystem()->Read(pBuf.get(), nLen, pFile);
-	FileSystem()->Close(pFile);
-
-	pBuf[nRead] = '\0'; // Null terminate the string buffer containing our banned list.
-
-	rapidjson::Document document;
-	if (document.Parse(pBuf.get(), nRead).HasParseError())
+	if (nFileSize <= 0)
 	{
-		Warning(eDLL_T::SERVER, "%s: JSON parse error at position %zu: %s\n",
-			__FUNCTION__, document.GetErrorOffset(), rapidjson::GetParseError_En(document.GetParseError()));
+		Error(eDLL_T::SERVER, 0, "%s: Banned list file is empty\n", __FUNCTION__);
+		FileSystem()->Close(pFile);
+
 		return;
 	}
 
+	const u64 nBufSize = FileSystem()->GetOptimalReadSize(pFile, nFileSize+2);
+	char* const pBuf = (char*)FileSystem()->AllocOptimalReadBuffer(pFile, nBufSize, 0);
+
+	const ssize_t nRead = FileSystem()->ReadEx(pBuf, nBufSize, nFileSize, pFile);
+	FileSystem()->Close(pFile);
+
+	if (nRead == 0)
+	{
+		Error(eDLL_T::SERVER, 0, "%s: Banned list file read failure\n", __FUNCTION__);
+		FileSystem()->FreeOptimalReadBuffer(pBuf);
+
+		return;
+	}
+
+	pBuf[nFileSize] = '\0'; // Null terminate the string buffer containing our banned list.
+	pBuf[nFileSize+1] = '\0'; // Double null terminating in case this is an unicode file.
+
+	rapidjson::Document document;
+	if (document.Parse(pBuf, nRead).HasParseError())
+	{
+		Error(eDLL_T::SERVER, 0, "%s: JSON parse error at position %zu: %s\n",
+			__FUNCTION__, document.GetErrorOffset(), rapidjson::GetParseError_En(document.GetParseError()));
+		FileSystem()->FreeOptimalReadBuffer(pBuf);
+
+		return;
+	}
+
+	// Buffer is no longer needed.
+	FileSystem()->FreeOptimalReadBuffer(pBuf);
+
 	if (!document.IsObject())
 	{
-		Warning(eDLL_T::SERVER, "%s: JSON root was not an object\n", __FUNCTION__);
+		Error(eDLL_T::SERVER, 0, "%s: JSON root was not an object\n", __FUNCTION__);
 		return;
 	}
 
