@@ -193,7 +193,7 @@ CPackedStore* CBaseFileSystem::VMountVPKFile(CBaseFileSystem* pFileSystem, const
 	if (pPakData)
 	{
 		if (nHandle < 0) // Only log if VPK hasn't been mounted yet.
-			::Msg(eDLL_T::FS, "Mounted vpk file: '%s' with handle: '%i'\n", fileToLoad, pPakData->GetPackFileID());
+			::Msg(eDLL_T::FS, "Mounted vpk file: '%s' with handle: %i\n", fileToLoad, pPakData->GetPackFileID());
 	}
 	else // VPK failed to load or does not exist...
 	{
@@ -224,7 +224,7 @@ const char* CBaseFileSystem::VUnmountVPKFile(CBaseFileSystem* pFileSystem, const
 	if (nHandle >= 0)
 	{
 		pRet = CBaseFileSystem__UnmountVPKFile(pFileSystem, pszVpkPath);
-		::Msg(eDLL_T::FS, "Unmounted vpk file: '%s' with handle: '%i'\n", pszVpkPath, nHandle);
+		::Msg(eDLL_T::FS, "Unmounted vpk file: '%s' with handle: %i\n", pszVpkPath, nHandle);
 
 		return pRet;
 	}
