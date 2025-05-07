@@ -68,9 +68,9 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 	Assert((*g_ppAINetworkManager)->IsRuntimeCRCCalculated());
 
 	// Large NavMesh CRC.
-	DevMsg(eDLL_T::SERVER, " |-- AINet version: '%d'\n", AINET_VERSION_NUMBER);
-	DevMsg(eDLL_T::SERVER, " |-- Map version: '%d'\n", gpGlobals->mapVersion);
-	DevMsg(eDLL_T::SERVER, " |-- Runtime CRC: '0x%lX'\n", (*g_ppAINetworkManager)->GetRuntimeCRC());
+	DevMsg(eDLL_T::SERVER, " |-- AINet version: %d\n", AINET_VERSION_NUMBER);
+	DevMsg(eDLL_T::SERVER, " |-- Map version: %d\n", gpGlobals->mapVersion);
+	DevMsg(eDLL_T::SERVER, " |-- Runtime CRC: 0x%lX\n", (*g_ppAINetworkManager)->GetRuntimeCRC());
 
 	CUtlBuffer buf;
 
@@ -97,7 +97,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 	{
 		const CAI_Node* aiNode = pNetwork->GetPathNode(node);
 
-		DevMsg(eDLL_T::SERVER, " |-- Writing node '#%d' at '0x%zX'\n", aiNode->m_iID, buf.TellPut());
+		DevMsg(eDLL_T::SERVER, " |-- Writing node #%d at 0x%zX\n", aiNode->m_iID, buf.TellPut());
 
 		buf.Put(&aiNode->m_vOrigin, sizeof(Vector3D));
 		buf.PutFloat(aiNode->GetYaw());
@@ -125,7 +125,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 	
 	timer.Start();
 	DevMsg(eDLL_T::SERVER, "+- Writing node links...\n");
-	DevMsg(eDLL_T::SERVER, " |-- Cached node link count: '%d'\n", totalNumLinks);
+	DevMsg(eDLL_T::SERVER, " |-- Cached node link count: %d\n", totalNumLinks);
 
 	// -------------------------------
 	// Dump all the links to the file
@@ -144,7 +144,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 			// Skip links that don't originate from current node.
 			if (nodeLink->m_iSrcID == aiNode->m_iID)
 			{
-				DevMsg(eDLL_T::SERVER, "  |-- Writing link (%hd <--> %hd) at '0x%zX'\n", nodeLink->m_iSrcID, nodeLink->m_iDestID, buf.TellPut());
+				DevMsg(eDLL_T::SERVER, "  |-- Writing link (%hd <--> %hd) at 0x%zX\n", nodeLink->m_iSrcID, nodeLink->m_iDestID, buf.TellPut());
 
 				buf.PutShort(nodeLink->m_iSrcID);
 				buf.PutShort(nodeLink->m_iDestID);
@@ -190,7 +190,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 			wcIDs.Insert(nIndex, node);
 		}
 
-		DevMsg(eDLL_T::SERVER, " |-- Writing Hammer node (%d <--> %d) at '0x%zX'\n", nIndex, wcIDs.Element((unsigned short)nIndex), buf.TellPut());
+		DevMsg(eDLL_T::SERVER, " |-- Writing Hammer node (%d <--> %d) at 0x%zX\n", nIndex, wcIDs.Element((unsigned short)nIndex), buf.TellPut());
 		buf.PutInt(nIndex);
 	}
 
@@ -208,7 +208,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 
 	FOR_EACH_VEC(*g_pAITraverseNodes, i)
 	{
-		DevMsg(eDLL_T::SERVER, " |-- Writing traverse ex node '%d' at '0x%zX'\n", i, buf.TellPut());
+		DevMsg(eDLL_T::SERVER, " |-- Writing traverse ex node #%d at 0x%zX\n", i, buf.TellPut());
 
 		const CAI_TraverseNode& traverseExNode = (*g_pAITraverseNodes)[i];
 		buf.Put(&traverseExNode.m_Quat, sizeof(Quaternion));
@@ -255,7 +255,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 
 	FOR_EACH_VEC(*g_pAIPathClusters, i)
 	{
-		DevMsg(eDLL_T::SERVER, " |-- Writing cluster '#%d' at '0x%zX'\n", i, buf.TellPut());
+		DevMsg(eDLL_T::SERVER, " |-- Writing cluster #%d at 0x%zX\n", i, buf.TellPut());
 
 		const CAI_Cluster* pathClusters = (*g_pAIPathClusters)[i];
 
@@ -304,7 +304,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 		// Disk and memory structs are literally identical here so just directly write.
 		const CAI_ClusterLink* clusterLink = (*g_pAIClusterLinks)[i];
 
-		DevMsg(eDLL_T::SERVER, "  |-- Writing link (%hd <--> %hd) at '0x%zX'\n", clusterLink->m_iSrcID, clusterLink->m_iDestID, buf.TellPut());
+		DevMsg(eDLL_T::SERVER, "  |-- Writing link (%hd <--> %hd) at 0x%zX\n", clusterLink->m_iSrcID, clusterLink->m_iDestID, buf.TellPut());
 
 		buf.PutShort(clusterLink->m_iSrcID);
 		buf.PutShort(clusterLink->m_iDestID);
@@ -335,7 +335,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 	for (int node = 0; node < numScriptNodes; node++)
 	{
 		// Disk and memory structs for script nodes are identical.
-		DevMsg(eDLL_T::SERVER, " |-- Writing script node '#%d' at '0x%zX'\n", node, buf.TellPut());
+		DevMsg(eDLL_T::SERVER, " |-- Writing script node #%d at 0x%zX\n", node, buf.TellPut());
 		buf.Put(&pNetwork->m_ScriptNode[node], sizeof(CAI_ScriptNode));
 	}
 
@@ -353,7 +353,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 
 	for (int hint = 0; hint < numHinst; hint++)
 	{
-		DevMsg(eDLL_T::SERVER, " |-- Writing hint data '#%d' at '0x%zX'\n", hint, buf.TellPut());
+		DevMsg(eDLL_T::SERVER, " |-- Writing hint data #%d at 0x%zX\n", hint, buf.TellPut());
 		buf.PutShort(pNetwork->m_Hints[hint]);
 	}
 
@@ -387,7 +387,7 @@ void CAI_NetworkBuilder::SaveNetworkGraph(CAI_Network* pNetwork)
 
 	// Note: the NavMesh checksum is written at the END of the file
 	// to maintain compatibility with r1 and r2 AIN's.
-	DevMsg(eDLL_T::SERVER, " |-- Writing navmesh crc '%x' at '0x%zX'\n", nNavMeshCRC, buf.TellPut());
+	DevMsg(eDLL_T::SERVER, " |-- Writing navmesh crc %x at 0x%zX\n", nNavMeshCRC, buf.TellPut());
 	buf.PutInt(nNavMeshCRC);
 
 	timer.End();
@@ -469,20 +469,20 @@ void CAI_NetworkManager::LoadNetworkGraph(CAI_NetworkManager* pManager, CUtlBuff
 		// Too old; build with a different game???
 		if (nAiNetVersion > AINET_VERSION_NUMBER)
 		{
-			Warning(eDLL_T::SERVER, "AI node graph '%s' is unsupported (net version: '%d' expected: '%d')\n", 
+			Warning(eDLL_T::SERVER, "AI node graph '%s' is unsupported (net version: %d, expected: %d)\n", 
 				szGraphPath, nAiNetVersion, AINET_VERSION_NUMBER);
 		}
 		// AIN file was build with a different version of the map, therefore,
 		// the path node positions might be invalid.
 		else if (nAiMapVersion != gpGlobals->mapVersion)
 		{
-			Warning(eDLL_T::SERVER, "AI node graph '%s' is out of date (map version: '%d' expected: '%d')\n", 
+			Warning(eDLL_T::SERVER, "AI node graph '%s' is out of date (map version: %d, expected: %d)\n", 
 				szGraphPath, nAiMapVersion, gpGlobals->mapVersion);
 		}
 		// Data checksum is now what the runtime expects.
 		else if (nAiGraphCRC != nAiRuntimeCRC)
 		{
-			Warning(eDLL_T::SERVER, "AI node graph '%s' is out of date (ain checksum: '%x' expected: '%x')\n", 
+			Warning(eDLL_T::SERVER, "AI node graph '%s' is out of date (ain checksum: %x, expected: %x)\n", 
 				szGraphPath, nAiGraphCRC, nAiRuntimeCRC);
 		}
 		else if (bNavMeshAvailable)
@@ -497,7 +497,7 @@ void CAI_NetworkManager::LoadNetworkGraph(CAI_NetworkManager* pManager, CUtlBuff
 			// the script node positions might be incorrect.
 			if (nAiNavMeshCRC != nNavMeshCRC)
 			{
-				Warning(eDLL_T::SERVER, "AI node graph '%s' is out of date (nav checksum: '%x' expected: '%x')\n",
+				Warning(eDLL_T::SERVER, "AI node graph '%s' is out of date (nav checksum: %x, expected: %x)\n",
 					szGraphPath, nAiGraphCRC, nNavMeshCRC);
 			}
 		}

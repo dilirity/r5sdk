@@ -396,7 +396,7 @@ static void Detour_HotSwap_f()
     Detour_HotSwap();
 
     timer.End();
-    Msg(eDLL_T::SERVER, "Hot swap took '%lf' seconds\n", timer.GetDuration().GetSeconds());
+    Msg(eDLL_T::SERVER, "Hot swap took %lf seconds\n", timer.GetDuration().GetSeconds());
 }
 
 static ConCommand navmesh_hotswap("navmesh_hotswap", Detour_HotSwap_f, "Hot swap the NavMesh for all hulls", FCVAR_DEVELOPMENTONLY | FCVAR_SERVER_FRAME_THREAD);
