@@ -27,22 +27,38 @@ RSON::Node_t* RSON::LoadFromFile(const char* const filePath, const char* const p
 	if (parseFailure)
 		*parseFailure = false;
 
-	FileHandle_t file = FileSystem()->Open(filePath, "rt", pathID);
+	FileHandle_t file = FileSystem()->Open(filePath, "rb", pathID);
 
 	if (!file)
 		return NULL;
 
 	const ssize_t fileSize = FileSystem()->Size(file);
-	std::unique_ptr<char[]> fileBuf(new char[fileSize + 1]);
 
-	const ssize_t numRead = FileSystem()->Read(fileBuf.get(), fileSize, file);
+	if (fileSize <= 0)
+	{
+		FileSystem()->Close(file);
+		return NULL;
+	}
+
+	const u64 bufSize = FileSystem()->GetOptimalReadSize(file, fileSize+2);
+	char* const fileBuf = (char*)FileSystem()->AllocOptimalReadBuffer(file, bufSize, 0);
+
+	const ssize_t numRead = FileSystem()->ReadEx(fileBuf, bufSize, fileSize, file);
 	FileSystem()->Close(file);
 
-	fileBuf[numRead] = '\0';
-	RSON::Node_t* node = RSON::LoadFromBuffer(filePath, fileBuf.get(), eFieldType::RSON_OBJECT);
-	
+	RSON::Node_t* node = NULL;
+
+	if (numRead > 0)
+	{
+		fileBuf[fileSize] = '\0'; // null terminate file as EOF
+		fileBuf[fileSize+1] = '\0'; // double NULL terminating in case this is an unicode file
+
+		node = RSON::LoadFromBuffer(filePath, fileBuf, eFieldType::RSON_OBJECT);
+	}
+
 	if (!node && parseFailure)
 		*parseFailure = true;
 
+	FileSystem()->FreeOptimalReadBuffer(fileBuf);
 	return node;
 }
