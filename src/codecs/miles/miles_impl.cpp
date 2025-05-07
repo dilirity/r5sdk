@@ -88,7 +88,7 @@ static bool CSOM_Initialize()
 	const bool bResult = v_CSOM_Initialize();
 	initTimer.End();
 
-	Msg(eDLL_T::AUDIO, "%s: %s ('%f' seconds)\n", __FUNCTION__, bResult ? "success" : "failure", initTimer.GetDuration().GetSeconds());
+	Msg(eDLL_T::AUDIO, "%s: %s (%f seconds)\n", __FUNCTION__, bResult ? "success" : "failure", initTimer.GetDuration().GetSeconds());
 	return bResult;
 }
 
