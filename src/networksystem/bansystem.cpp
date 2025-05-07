@@ -67,42 +67,37 @@ void CBanSystem::LoadList(void)
 	// Buffer is no longer needed.
 	FileSystem()->FreeOptimalReadBuffer(pBuf);
 
-	if (!document.IsObject())
+	if (!document.IsArray())
 	{
-		Error(eDLL_T::SERVER, 0, "%s: JSON root was not an object\n", __FUNCTION__);
+		Error(eDLL_T::SERVER, 0, "%s: JSON root was not an array\n", __FUNCTION__);
 		return;
 	}
 
-	int nTotalBans = 0;
+	ssize_t currIdx = -1;
 
-	if (!JSON_GetValue(document, "totalBans", nTotalBans))
+	for (const rapidjson::Value& entry : document.GetArray())
 	{
-		return;
-	}
+		currIdx++;
 
-	for (int i = 0; i < nTotalBans; i++)
-	{
-		char idx[12]; itoa(i, idx, 10);
-
-		rapidjson::Value::ConstMemberIterator entryIt;
-
-		if (JSON_GetIterator(document, rapidjson::StringRef(idx, strlen(idx)), JSONFieldType_e::kObject, entryIt))
+		if (!entry.IsObject())
 		{
-			const rapidjson::Value& entry = entryIt->value;
+			Warning(eDLL_T::SERVER, "%s: Entry #%zd is of type %s, but code expects type %s\n", __FUNCTION__,
+				currIdx, JSON_TypeToString(JSON_ExtractType(entry)), JSON_TypeToString(JSONFieldType_e::kObject));
+			continue;
+		}
 
-			const char* ipAddress = nullptr;
-			NucleusID_t nucleusId = NULL;
+		const char* ipAddress = nullptr;
+		NucleusID_t nucleusId = NULL;
 
-			if (JSON_GetValue(entry, "ipAddress", ipAddress) && 
-				JSON_GetValue(entry, "nucleusId", nucleusId))
-			{
-				Banned_t banned;
+		if (JSON_GetValue(entry, "ipAddress", ipAddress) &&
+			JSON_GetValue(entry, "nucleusId", nucleusId))
+		{
+			Banned_t banned;
 
-				banned.m_Address = ipAddress;
-				banned.m_NucleusID = nucleusId;
+			banned.m_Address = ipAddress;
+			banned.m_NucleusID = nucleusId;
 
-				m_BannedList.AddToTail(banned);
-			}
+			m_BannedList.AddToTail(banned);
 		}
 	}
 }
@@ -120,24 +115,20 @@ void CBanSystem::SaveList(void) const
 	}
 
 	rapidjson::Document document;
-	document.SetObject();
+	document.SetArray();
 
 	rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
 
 	FOR_EACH_VEC(m_BannedList, i)
 	{
-		const Banned_t& banned = m_BannedList[i];
-		char idx[12]; itoa(i, idx, 10);
-
 		rapidjson::Value obj(rapidjson::kObjectType);
+		const Banned_t& banned = m_BannedList[i];
 
 		obj.AddMember("ipAddress", rapidjson::Value(banned.m_Address.String(), banned.m_Address.Length(), allocator), allocator);
 		obj.AddMember("nucleusId", banned.m_NucleusID, allocator);
 
-		document.AddMember(rapidjson::Value(idx, allocator), obj, allocator);
+		document.PushBack(obj, allocator);
 	}
-
-	document.AddMember("totalBans", m_BannedList.Count(), allocator);
 
 	rapidjson::StringBuffer buffer;
 	JSON_DocumentToBufferDeserialize(document, buffer);
