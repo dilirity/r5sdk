@@ -208,7 +208,7 @@ static void ReVPK_Pack(const CCommand& args)
     builder.PackStore(pair, workspacePath.String(), buildPath.String());
 
     timer.End();
-    Msg(eDLL_T::FS, "*** Time elapsed: '%lf' seconds\n", timer.GetDuration().GetSeconds());
+    Msg(eDLL_T::FS, "*** Time elapsed: %lf seconds\n", timer.GetDuration().GetSeconds());
     Msg(eDLL_T::FS, "\n");
 }
 
@@ -262,7 +262,7 @@ static void ReVPK_Unpack(const CCommand& args)
     builder.UnpackStore(vpk, argCount > 3 ? args.Arg(3) : "ship/");
 
     timer.End();
-    Msg(eDLL_T::FS, "*** Time elapsed: '%lf' seconds\n", timer.GetDuration().GetSeconds());
+    Msg(eDLL_T::FS, "*** Time elapsed: %lf seconds\n", timer.GetDuration().GetSeconds());
     Msg(eDLL_T::FS, "\n");
 }
 
