@@ -416,6 +416,7 @@ public:
 	// Optimal IO operations
 	//--------------------------------------------------------
 	virtual bool GetOptimalIOConstraints(FileHandle_t hFile, uint64_t* pOffsetAlign, uint64_t* pSizeAlign, uint64_t* pBufferAlign) = 0;
+	inline uint64_t GetOptimalReadSize(FileHandle_t hFile, const uint64_t logicalSize);
 	virtual void* AllocOptimalReadBuffer(FileHandle_t hFile, uint64_t nSize, uint64_t nOffset) = 0;
 	virtual void FreeOptimalReadBuffer(void*) = 0;
 
@@ -471,5 +472,15 @@ public:
 	virtual __int64 __fastcall sub_14038CC90(int a1, unsigned int a2, __int64 a3, __int64 a4) = 0;
 	virtual __int64 __fastcall UserMathErrorFunction() = 0;
 };
+
+uint64_t IFileSystem::GetOptimalReadSize(FileHandle_t hFile, const uint64_t logicalSize)
+{
+	uint64_t align;
+
+	if (GetOptimalIOConstraints(hFile, &align, NULL, NULL))
+		return AlignValue(logicalSize, align);
+
+	return logicalSize;
+}
 
 #endif // IFILESYSTEM_H
