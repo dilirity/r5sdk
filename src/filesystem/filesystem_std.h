@@ -171,8 +171,8 @@ public:
 	// Optimal IO operations
 	//--------------------------------------------------------
 	virtual bool GetOptimalIOConstraints(FileHandle_t hFile, uint64_t* pOffsetAlign, uint64_t* pSizeAlign, uint64_t* pBufferAlign);
-	virtual void* AllocOptimalReadBuffer(ptrdiff_t nOffset = 0/*!!! UNUSED !!!*/, ssize_t nSize = 0) { return nullptr; };
-	virtual void FreeOptimalReadBuffer(void*) {};
+	virtual void* AllocOptimalReadBuffer(FileHandle_t hFile, uint64_t nSize, uint64_t nOffset) { return malloc(nSize); };
+	virtual void FreeOptimalReadBuffer(void* p) { free(p); };
 
 
 	virtual bool __fastcall sub_140383E00(__int64 a2) { return false; };

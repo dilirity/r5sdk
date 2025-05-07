@@ -416,7 +416,7 @@ public:
 	// Optimal IO operations
 	//--------------------------------------------------------
 	virtual bool GetOptimalIOConstraints(FileHandle_t hFile, uint64_t* pOffsetAlign, uint64_t* pSizeAlign, uint64_t* pBufferAlign) = 0;
-	virtual void* AllocOptimalReadBuffer(ptrdiff_t nOffset = 0/*!!! UNUSED !!!*/, ssize_t nSize = 0) = 0;
+	virtual void* AllocOptimalReadBuffer(FileHandle_t hFile, uint64_t nSize, uint64_t nOffset) = 0;
 	virtual void FreeOptimalReadBuffer(void*) = 0;
 
 
