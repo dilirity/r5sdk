@@ -151,7 +151,7 @@ void VPK_Pack_f(const CCommand& args)
 	builder.PackStore(pair, workspacePath, "vpk/");
 
 	timer.End();
-	Msg(eDLL_T::FS, "*** Time elapsed: '%lf' seconds\n", timer.GetDuration().GetSeconds());
+	Msg(eDLL_T::FS, "*** Time elapsed: %lf seconds\n", timer.GetDuration().GetSeconds());
 	Msg(eDLL_T::FS, "\n");
 }
 
@@ -190,7 +190,7 @@ void VPK_Unpack_f(const CCommand& args)
 	builder.UnpackStore(vpk, fs_packedstore_workspace.GetString());
 
 	timer.End();
-	Msg(eDLL_T::FS, "*** Time elapsed: '%lf' seconds\n", timer.GetDuration().GetSeconds());
+	Msg(eDLL_T::FS, "*** Time elapsed: %lf seconds\n", timer.GetDuration().GetSeconds());
 	Msg(eDLL_T::FS, "\n");
 }
 
@@ -298,8 +298,8 @@ static void PrintChildMat(const CMaterialGlue* const materialGlue, const char* c
 	{
 		const MaterialGlue_s* const material = materialGlue->Get();
 
-		Msg(eDLL_T::MS, " |     |-- Pak GUID: '%llX'\n", material->guid);
-		Msg(eDLL_T::MS, " |     |-- Material name: '%s'\n", material->name);
+		Msg(eDLL_T::MS, " |     |-- Pak GUID: %llX\n", material->guid);
+		Msg(eDLL_T::MS, " |     |-- Material name: %s\n", material->name);
 	}
 }
 
@@ -317,28 +317,28 @@ void Mat_CrossHair_f(const CCommand& args)
 
 	Msg(eDLL_T::MS, "______________________________________________________________\n");
 	Msg(eDLL_T::MS, "-+ Material --------------------------------------------------\n");
-	Msg(eDLL_T::MS, " |-- Address: '%llX'\n", material);
-	Msg(eDLL_T::MS, " |-- Pak GUID: '%llX'\n", material->guid);
-	Msg(eDLL_T::MS, " |-- Samplers: '%08X'\n", *(uint32*)material->samplers);
-	Msg(eDLL_T::MS, " |-- Streaming handles: '%hu'\n", material->streamingTextureHandleCount);
-	Msg(eDLL_T::MS, " |-- Material width: '%hu'\n", material->width);
-	Msg(eDLL_T::MS, " |-- Material height: '%hu'\n", material->height);
+	Msg(eDLL_T::MS, " |-- Address: %llX\n", material);
+	Msg(eDLL_T::MS, " |-- Pak GUID: %llX\n", material->guid);
+	Msg(eDLL_T::MS, " |-- Samplers: %08X\n", *(uint32*)material->samplers);
+	Msg(eDLL_T::MS, " |-- Streaming handles: %hu\n", material->streamingTextureHandleCount);
+	Msg(eDLL_T::MS, " |-- Material width: %hu\n", material->width);
+	Msg(eDLL_T::MS, " |-- Material height: %hu\n", material->height);
 
-	Msg(eDLL_T::MS, " |-- Material name: '%s'\n", material->name);
-	Msg(eDLL_T::MS, " |-- Material surface name 1: '%s'\n", material->surfaceProp);
-	Msg(eDLL_T::MS, " |-- Material surface name 2: '%s'\n", material->surfaceProp2);
-	Msg(eDLL_T::MS, " |-- Uber buffer: '%llX'\n", material->uberBuffer);
-	Msg(eDLL_T::MS, " |-- View buffer: '%llX'\n", material->viewBuffer);
+	Msg(eDLL_T::MS, " |-- Material name: %s\n", material->name);
+	Msg(eDLL_T::MS, " |-- Material surface name 1: %s\n", material->surfaceProp);
+	Msg(eDLL_T::MS, " |-- Material surface name 2: %s\n", material->surfaceProp2);
+	Msg(eDLL_T::MS, " |-- Uber buffer: %llX\n", material->uberBuffer);
+	Msg(eDLL_T::MS, " |-- View buffer: %llX\n", material->viewBuffer);
 
-	PrintChildMat(material->depthMaterials[DEPTH_SHADOW], " |   |-+ Depth shadow: '%llX'\n");
-	PrintChildMat(material->depthMaterials[DEPTH_PREPASS], " |   |-+ Depth prepass: '%llX'\n");
-	PrintChildMat(material->depthMaterials[DEPTH_VSM], " |   |-+ Depth VSM: '%llX'\n");
-	PrintChildMat(material->depthMaterials[DEPTH_SHADOW_TIGHT], " |   |-+ Depth shadow tight: '%llX'\n");
-	PrintChildMat(material->colpassMaterial, " |   |-+ Color pass: '%llX'\n");
+	PrintChildMat(material->depthMaterials[DEPTH_SHADOW], " |   |-+ Depth shadow: %llX\n");
+	PrintChildMat(material->depthMaterials[DEPTH_PREPASS], " |   |-+ Depth prepass: %llX\n");
+	PrintChildMat(material->depthMaterials[DEPTH_VSM], " |   |-+ Depth VSM: %llX\n");
+	PrintChildMat(material->depthMaterials[DEPTH_SHADOW_TIGHT], " |   |-+ Depth shadow tight: %llX\n");
+	PrintChildMat(material->colpassMaterial, " |   |-+ Color pass: %llX\n");
 
 	Msg(eDLL_T::MS, "-+ Texture GUID map ------------------------------------------\n");
-	Msg(eDLL_T::MS, " |-- Texture handles: '%llX'\n", material->textureHandles);
-	Msg(eDLL_T::MS, " |-- Streaming texture handles: '%llX'\n", material->streamingTextureHandles);
+	Msg(eDLL_T::MS, " |-- Texture handles: %llX\n", material->textureHandles);
+	Msg(eDLL_T::MS, " |-- Streaming texture handles: %llX\n", material->streamingTextureHandles);
 
 	Msg(eDLL_T::MS, "--------------------------------------------------------------\n");
 }
