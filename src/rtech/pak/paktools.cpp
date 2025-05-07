@@ -394,17 +394,17 @@ void Pak_ShowHeaderDetails(const PakFileHeader_s* const pakHeader)
 
 	Msg(eDLL_T::RTECH, "______________________________________________________________\n");
 	Msg(eDLL_T::RTECH, "-+ Pak header details ----------------------------------------\n");
-	Msg(eDLL_T::RTECH, " |-- Magic    : '0x%08X'\n", pakHeader->magic);
-	Msg(eDLL_T::RTECH, " |-- Version  : '%hu'\n", pakHeader->version);
-	Msg(eDLL_T::RTECH, " |-- Flags    : '0x%04hX'\n", pakHeader->flags);
-	Msg(eDLL_T::RTECH, " |-- Time     : '%hu-%hu-%hu/%hu %hu:%hu:%hu.%hu'\n",
+	Msg(eDLL_T::RTECH, " |-- Magic    : 0x%08X\n", pakHeader->magic);
+	Msg(eDLL_T::RTECH, " |-- Version  : %hu\n", pakHeader->version);
+	Msg(eDLL_T::RTECH, " |-- Flags    : 0x%04hX\n", pakHeader->flags);
+	Msg(eDLL_T::RTECH, " |-- Time     : %hu-%hu-%hu/%hu %hu:%hu:%hu.%hu\n",
 		systemTime.wYear, systemTime.wMonth, systemTime.wDay, systemTime.wDayOfWeek,
 		systemTime.wHour, systemTime.wMinute, systemTime.wSecond, systemTime.wMilliseconds);
-	Msg(eDLL_T::RTECH, " |-- Checksum : '0x%08llX'\n", pakHeader->checksum);
-	Msg(eDLL_T::RTECH, " |-- Assets   : '%u'\n", pakHeader->assetCount);
+	Msg(eDLL_T::RTECH, " |-- Checksum : 0x%08llX\n", pakHeader->checksum);
+	Msg(eDLL_T::RTECH, " |-- Assets   : %u\n", pakHeader->assetCount);
 	Msg(eDLL_T::RTECH, " |-+ Compression ---------------------------------------------\n");
-	Msg(eDLL_T::RTECH, " | |-- Size comp: '%zu'\n", pakHeader->compressedSize);
-	Msg(eDLL_T::RTECH, " | |-- Size decp: '%zu'\n", pakHeader->decompressedSize);
-	Msg(eDLL_T::RTECH, " | |-- Ratio    : '%.02f'\n", (pakHeader->compressedSize * 100.f) / pakHeader->decompressedSize);
+	Msg(eDLL_T::RTECH, " | |-- Size comp: %zu\n", pakHeader->compressedSize);
+	Msg(eDLL_T::RTECH, " | |-- Size decp: %zu\n", pakHeader->decompressedSize);
+	Msg(eDLL_T::RTECH, " | |-- Ratio    : %.02f\n", (pakHeader->compressedSize * 100.f) / pakHeader->decompressedSize);
 	Msg(eDLL_T::RTECH, "--------------------------------------------------------------\n");
 }

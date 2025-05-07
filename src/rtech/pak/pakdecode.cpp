@@ -758,7 +758,7 @@ bool Pak_BufferToBufferDecode(uint8_t* const inBuf, uint8_t* const outBuf, const
 
 	if (decompressedSize != inHeader->decompressedSize)
 	{
-		Error(eDLL_T::RTECH, NO_ERROR, "%s: decompressed size: '%zu' expected: '%zu'!\n",
+		Error(eDLL_T::RTECH, NO_ERROR, "%s: decompressed size: %zu, expected: %zu!\n",
 			__FUNCTION__, decompressedSize, inHeader->decompressedSize);
 
 		if (dctx)
@@ -870,7 +870,7 @@ bool Pak_DecodePakFile(const char* const inPakFile, const char* const outPakFile
 
 	if (inHeader->compressedSize != fileSize)
 	{
-		Error(eDLL_T::RTECH, NO_ERROR, "%s: pak '%s' appears truncated or corrupt; compressed size: '%zu' expected: '%zu'!\n",
+		Error(eDLL_T::RTECH, NO_ERROR, "%s: pak '%s' appears truncated or corrupt; compressed size: %zu, expected: %zu!\n",
 			__FUNCTION__, inPakFile, fileSize, inHeader->compressedSize);
 
 		return false;

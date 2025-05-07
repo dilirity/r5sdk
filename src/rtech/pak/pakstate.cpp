@@ -120,7 +120,7 @@ static void Pak_RequestUnload_f(const CCommand& args)
 
 		if (pakInfo->status != PAK_STATUS_LOADED)
 		{
-			Warning(eDLL_T::RTECH, "Pak with handle '%d' is currently unavailable; status '%s', cannot unload\n",
+			Warning(eDLL_T::RTECH, "Pak with handle %d is currently unavailable; status %s, cannot unload\n",
 				pakHandle, Pak_StatusToString(pakInfo->status));
 			return;
 		}
@@ -137,13 +137,13 @@ static void Pak_RequestUnload_f(const CCommand& args)
 		}
 		else if (pakInfo->status != PAK_STATUS_LOADED)
 		{
-			Warning(eDLL_T::RTECH, "Pak with name '%s' is currently unavailable; status '%s', cannot unload\n",
+			Warning(eDLL_T::RTECH, "Pak with name '%s' is currently unavailable; status %s, cannot unload\n",
 				pakName, Pak_StatusToString(pakInfo->status));
 			return;
 		}
 	}
 
-	Msg(eDLL_T::RTECH, "Requested pak unload for file '%s' with handle '%d'\n", pakInfo->fileName, pakInfo->handle);
+	Msg(eDLL_T::RTECH, "Requested pak unload for file '%s' with handle %d\n", pakInfo->fileName, pakInfo->handle);
 	g_pakLoadApi->UnloadAsync(pakInfo->handle);
 }
 
@@ -181,7 +181,7 @@ static void Pak_RequestSwap_f(const CCommand& args)
 
 		if (pakInfo->status != PAK_STATUS_LOADED)
 		{
-			Warning(eDLL_T::RTECH, "Pak with handle '%d' is currently unavailable; status '%s', cannot swap\n",
+			Warning(eDLL_T::RTECH, "Pak with handle %d is currently unavailable; status %s, cannot swap\n",
 				pakHandle, Pak_StatusToString(pakInfo->status));
 			return;
 		}
@@ -198,13 +198,13 @@ static void Pak_RequestSwap_f(const CCommand& args)
 		}
 		else if (pakInfo->status != PAK_STATUS_LOADED)
 		{
-			Warning(eDLL_T::RTECH, "Pak with name '%s' is currently unavailable; status '%s', cannot swap\n",
+			Warning(eDLL_T::RTECH, "Pak with name '%s' is currently unavailable; status %s, cannot swap\n",
 				pakName, Pak_StatusToString(pakInfo->status));
 			return;
 		}
 	}
 
-	Msg(eDLL_T::RTECH, "Requested pak swap for file '%s' with handle '%d'\n", pakInfo->fileName, pakInfo->handle);
+	Msg(eDLL_T::RTECH, "Requested pak swap for file '%s' with handle %d\n", pakInfo->fileName, pakInfo->handle);
 
 	g_pakLoadApi->UnloadAsyncAndWait(pakInfo->handle); // Wait till this slot gets free'd.
 	g_pakLoadApi->LoadAsync(pakInfo->fileName, AlignedMemAlloc(), pakInfo->logChannel, pakInfo->unkAC);
