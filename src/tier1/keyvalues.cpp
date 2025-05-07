@@ -1884,8 +1884,11 @@ bool KeyValues::LoadFromFile(IBaseFileSystem* filesystem, const char* resourceNa
 	// load file into a null-terminated buffer
 	const ssize_t fileSize = filesystem->Size(f);
 
-	if (!fileSize)
+	if (fileSize <= 0)
+	{
+		filesystem->Close(f);
 		return false;
+	}
 
 	std::unique_ptr<char[]> pBuf(new char[fileSize + 1]);
 
