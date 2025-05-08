@@ -92,6 +92,7 @@
 0x3E9B0B: mov r8, qword ptr ds:[r15+rax*8] // Remove immediate '0x235A7918'.
 0x3E9D5B: mov rcx, qword ptr ds:[r15+rax*8]
 0x3E9DC1: mov rcx, qword ptr ds:[r15+rax*8]
+0x3E9E18: mov r15, qword ptr ds:[0x00000001635A7918] // Swap LEA module base with MOV 's_textureStreamMgr.streamingTextures'.
 0x3E9E30: mov r11, qword ptr ds:[r15+rax*8]
 
 // Dereference old array to get pointer to new array for the call to TextureStreamMgr_FillItems
