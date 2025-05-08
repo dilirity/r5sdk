@@ -170,7 +170,7 @@
 // *** sub_1403F4AA0 ***
 0x3F4091: mov dword ptr ds:[0x00000001671CAA84], 0x3
 0x3F409B: mov dword ptr ds:[0x00000001671CAA88], 0x3
-0x3F40A6: mov qword ptr ds:[0x00000001671CAA8C], 0x3 // NEW: sets the 3rd elem
+0x3F40A5: mov dword ptr ds:[0x00000001671CAA8C], 0x3 // NEW: sets the 3rd elem
 // all other instructions from here have been shifted to accomodate the new
 // instruction at 0x3F40A6.
 // ------------------------
@@ -178,7 +178,7 @@
 // shift this bool at 0x1671CAA88 with 8 bytes downwards as its originalspace has now been used.
 // This is the only place this bool is ever accessed from. We have 24 bytes padding before we
 // reach our next static element so enough space.
-0x3F40B9: mov byte ptr ds:[0x00000001671CAA90], 0x1
+0x3F40B7: mov byte ptr ds:[0x00000001671CAA90], 0x1
 
 // *** sub_1403F4A30 ***
 0x3F3E84: mov dword ptr ds:[0x00000001671CAA84], 0x3
@@ -193,7 +193,7 @@
 
 // Since we increased dword_1671CAA48 and qword_1671CAA10 from 6 elements to 9 elements,
 // we need to setup the last 3 elements here as well, so this immediate has been increased
-// from 2 to 3 to take there into account
+// from 2 to 3 to take these into account.
 0x3F3FA5: mov qword ptr ss:[rbp+0x7FF90], 0x3
 
 // 1671CAA10 has been moved to address 1635A7940, because there was not enough room left in our
