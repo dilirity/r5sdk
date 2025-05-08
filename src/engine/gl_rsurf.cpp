@@ -9,19 +9,41 @@
 #include "windows/id3dx.h"
 #include "geforce/reflex.h"
 #include "engine/gl_rsurf.h"
-#include <materialsystem/cmaterialsystem.h>
+#include "materialsystem/cmaterialsystem.h"
+#include "materialsystem/texturestreaming.h"
 
 static ConVar r_drawWorldMeshes("r_drawWorldMeshes", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Render world meshes.");
 static ConVar r_drawWorldMeshesDepthOnly("r_drawWorldMeshesDepthOnly", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Render world meshes (depth only).");
 static ConVar r_drawWorldMeshesDepthAtTheEnd("r_drawWorldMeshesDepthAtTheEnd", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Render world meshes (depth at the end).");
 
-void* R_DrawDepthOfField(const float scalar)
+static void* R_DrawDepthOfField(const float scalar)
 {
 	GeForce_SetLatencyMarker(D3D11Device(), RENDERSUBMIT_START, MaterialSystem()->GetCurrentFrameCount());
 	return V_DrawDepthOfField(scalar);
 }
 
-void* R_DrawWorldMeshes(void* baseEntity, void* renderContext, DrawWorldLists_t worldLists)
+static void R_DrawAlphaSort(CViewRender* const viewRender, __int64 a2, __int64 a3, unsigned int a4, int a5, __int64 a6)
+{
+	bool commitComputeShaderResult = false;
+
+	if (a5 && r_drawalphasort->GetBool())
+	{
+		const u32 flags = *(_DWORD*)(a2 + 464);
+
+		if (!flags && gpu_driven_tex_stream->GetBool())
+		{
+			TextureStreamMgr_GetComputeShaderResult();
+			commitComputeShaderResult = true;
+		}
+	}
+
+	V_DrawAlphaSort(viewRender, a2, a3, a4, a5, a6);
+
+	if (commitComputeShaderResult)
+		TextureStreamMgr_CommitComputeShaderResult(2);
+}
+
+static void* R_DrawWorldMeshes(void* baseEntity, void* renderContext, DrawWorldLists_t worldLists)
 {
 	if (r_drawWorldMeshes.GetBool())
 		return V_DrawWorldMeshes(baseEntity, renderContext, worldLists);
@@ -29,7 +51,7 @@ void* R_DrawWorldMeshes(void* baseEntity, void* renderContext, DrawWorldLists_t 
 		return nullptr;
 }
 
-void* R_DrawWorldMeshesDepthOnly(void* renderContext, DrawWorldLists_t worldLists)
+static void* R_DrawWorldMeshesDepthOnly(void* renderContext, DrawWorldLists_t worldLists)
 {
 	if (r_drawWorldMeshesDepthOnly.GetBool())
 		return V_DrawWorldMeshesDepthOnly(renderContext, worldLists);
@@ -37,7 +59,7 @@ void* R_DrawWorldMeshesDepthOnly(void* renderContext, DrawWorldLists_t worldList
 		return nullptr;
 }
 
-void* R_DrawWorldMeshesDepthAtTheEnd(void* ptr1, void* ptr2, void* ptr3, DrawWorldLists_t worldLists)
+static void* R_DrawWorldMeshesDepthAtTheEnd(void* ptr1, void* ptr2, void* ptr3, DrawWorldLists_t worldLists)
 {
 	if (r_drawWorldMeshesDepthAtTheEnd.GetBool())
 		return V_DrawWorldMeshesDepthAtTheEnd(ptr1, ptr2, ptr3, worldLists);
@@ -48,6 +70,7 @@ void* R_DrawWorldMeshesDepthAtTheEnd(void* ptr1, void* ptr2, void* ptr3, DrawWor
 void VGL_RSurf::Detour(const bool bAttach) const
 {
 	DetourSetup(&V_DrawDepthOfField, &R_DrawDepthOfField, bAttach);
+	DetourSetup(&V_DrawAlphaSort, &R_DrawAlphaSort, bAttach);
 	DetourSetup(&V_DrawWorldMeshes, &R_DrawWorldMeshes, bAttach);
 	DetourSetup(&V_DrawWorldMeshesDepthOnly, &R_DrawWorldMeshesDepthOnly, bAttach);
 	DetourSetup(&V_DrawWorldMeshesDepthAtTheEnd, &R_DrawWorldMeshesDepthAtTheEnd, bAttach);

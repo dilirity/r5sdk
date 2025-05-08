@@ -151,6 +151,9 @@ inline void(*v_StreamDB_CreditModelTextures)(TextureAsset_s** const textureAsset
 inline void(*TextureStreamMgr_GetStreamOverlay)(const char* const mode, char* const buf, const size_t bufSize);
 inline const char* (*TextureStreamMgr_DrawStreamOverlayToInterface)(void* thisptr, uint8_t* a2, void* unused, void* debugOverlayIface);
 
+inline void(*TextureStreamMgr_GetComputeShaderResult)();
+inline void(*TextureStreamMgr_CommitComputeShaderResult)(const int renderStep);
+
 inline ssize_t* g_textureStreamMemoryUsed = nullptr; // array size = STREAMING_TEXTURES_MEMORY_LATENCY_FRAME_COUNT.
 inline ssize_t* g_textureStreamMemoryTarget = nullptr; // pointer to single size var.
 
@@ -170,6 +173,9 @@ class VTextureStreaming : public IDetour
 		LogFunAdr("TextureStreamMgr_GetStreamOverlay", TextureStreamMgr_GetStreamOverlay);
 		LogFunAdr("TextureStreamMgr_DrawStreamOverlayToInterface", TextureStreamMgr_DrawStreamOverlayToInterface);
 
+		LogFunAdr("TextureStreamMgr_GetComputeShaderResult", TextureStreamMgr_GetComputeShaderResult);
+		LogFunAdr("TextureStreamMgr_CommitComputeShaderResult", TextureStreamMgr_CommitComputeShaderResult);
+
 		LogVarAdr("g_textureStreamMemoryUsed", g_textureStreamMemoryUsed);
 		LogVarAdr("g_textureStreamMemoryTarget", g_textureStreamMemoryTarget);
 
@@ -186,6 +192,9 @@ class VTextureStreaming : public IDetour
 
 		Module_FindPattern(g_GameDll, "E8 ?? ?? ?? ?? 80 7C 24 ?? ?? 0F 84 ?? ?? ?? ?? 48 89 9C 24 ?? ?? ?? ??").FollowNearCallSelf().GetPtr(TextureStreamMgr_GetStreamOverlay);
 		Module_FindPattern(g_GameDll, "41 56 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 2B E0 C6 02 ??").GetPtr(TextureStreamMgr_DrawStreamOverlayToInterface);
+
+		Module_FindPattern(g_GameDll, "E8 ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? F3 0F 10 40 ?? FF 15").FollowNearCallSelf().GetPtr(TextureStreamMgr_GetComputeShaderResult);
+		Module_FindPattern(g_GameDll, "40 53 57 48 81 EC ?? ?? ?? ?? 65 48 8B 04 25").GetPtr(TextureStreamMgr_CommitComputeShaderResult);
 	}
 	virtual void GetVar(void) const
 	{

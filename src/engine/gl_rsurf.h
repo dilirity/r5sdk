@@ -1,7 +1,10 @@
 #pragma once
 #include "public/ivrenderview.h"
+#include "game/client/viewrender.h"
 
 inline void*(*V_DrawDepthOfField)(const float scalar);
+inline void(*V_DrawAlphaSort)(CViewRender* const viewRender, __int64 a2, __int64 a3, unsigned int a4, int a5, __int64 a6);
+
 inline void*(*V_DrawWorldMeshes)(void* baseEntity, void* renderContext, DrawWorldLists_t worldLists);
 inline void*(*V_DrawWorldMeshesDepthOnly)(void* renderContext, DrawWorldLists_t worldLists);
 inline void*(*V_DrawWorldMeshesDepthAtTheEnd)(void* ptr1, void* ptr2, void* ptr3, DrawWorldLists_t worldLists);
@@ -19,6 +22,7 @@ class VGL_RSurf : public IDetour
 	virtual void GetFun(void) const
 	{
 		Module_FindPattern(g_GameDll, "48 83 EC 48 0F 28 E8").GetPtr(V_DrawDepthOfField);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 4C 89 44 24 ?? 48 89 54 24 ?? 48 89 4C 24 ?? 55 56 57 41 54 41 55 41 56 41 57 B8").GetPtr(V_DrawAlphaSort);
 		Module_FindPattern(g_GameDll, "48 8B C4 48 89 48 08 53 57 41 55").GetPtr(V_DrawWorldMeshes);
 		Module_FindPattern(g_GameDll, "40 56 57 B8 ?? ?? ?? ??").GetPtr(V_DrawWorldMeshesDepthOnly);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 48 8B 0D ?? ?? ?? ?? 41 8B F9").GetPtr(V_DrawWorldMeshesDepthAtTheEnd);

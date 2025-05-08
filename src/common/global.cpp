@@ -54,6 +54,7 @@ ConVar* mp_gamemode                        = nullptr;
 ConVar* r_visualizetraces                  = nullptr;
 ConVar* r_visualizetraces_duration         = nullptr;
 ConVar* r_drawvgui                         = nullptr;
+ConVar* r_drawalphasort                    = nullptr;
 #endif // !DEDICATED
 
 ConVar* stream_overlay                     = nullptr;
@@ -202,6 +203,7 @@ void ConVar_InitShipped(void)
 	r_visualizetraces                = g_pCVar->FindVar("r_visualizetraces");
 	r_visualizetraces_duration       = g_pCVar->FindVar("r_visualizetraces_duration");
 	r_drawvgui                       = g_pCVar->FindVar("r_drawvgui");
+	r_drawalphasort                  = g_pCVar->FindVar("r_drawalphasort");
 #endif // !DEDICATED
 	staticProp_no_fade_scalar        = g_pCVar->FindVar("staticProp_no_fade_scalar");
 	staticProp_gather_size_weight    = g_pCVar->FindVar("staticProp_gather_size_weight");

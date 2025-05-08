@@ -155,6 +155,62 @@
 0x12945B5: cmp dword ptr ds:[0x000000014180A128], 0x2 // Checks if client signon is SIGNONSTATE_CONNECTED.
 0x12945BC: jmp 0x00000001402975BE                     // jump back to original code (handles the SIGNONSTATE_CONNECTED check).
 
+// ------------------------------------------------------------------------------------------------
+// This fixes an engine bug causing alphasort (translucent world) textures to not stream when using
+// the GPU driven feedback approach. Since we need to run and apply an update during R_DrawAlphaSort(),
+// we need to create a separate set of DX buffers and handles to allow this to work without interfering
+// with other render passes. For this, the static arrays had to be increased with the following set of
+// patches bellow.
+// The immediate to access 0x1671CAA80 has been increased with 4 bytes to create enough space
+// for 3rd elem in int array at 0x1671CAA78, 0x1671CAA80 is now at 0x1671CAA84.
+// *** sub_1403F4F80 ***
+0x3F45EF: mov eax, dword ptr ds:[r13+r15*4+0x271CAA84]
+0x3F482A: mov dword ptr ds:[r13+r15*4+0x271CAA84], eax
+
+// *** sub_1403F4AA0 ***
+0x3F4091: mov dword ptr ds:[0x00000001671CAA84], 0x3
+0x3F409B: mov dword ptr ds:[0x00000001671CAA88], 0x3
+0x3F40A6: mov qword ptr ds:[0x00000001671CAA8C], 0x3 // NEW: sets the 3rd elem
+// all other instructions from here have been shifted to accomodate the new
+// instruction at 0x3F40A6.
+// ------------------------
+// Since the increase of the i32 arrays above with 1 element each (8 bytes total). We need to
+// shift this bool at 0x1671CAA88 with 8 bytes downwards as its originalspace has now been used.
+// This is the only place this bool is ever accessed from. We have 24 bytes padding before we
+// reach our next static element so enough space.
+0x3F40B9: mov byte ptr ds:[0x00000001671CAA90], 0x1
+
+// *** sub_1403F4A30 ***
+0x3F3E84: mov dword ptr ds:[0x00000001671CAA84], 0x3
+0x3F3E8E: mov dword ptr ds:[0x00000001671CAA88], 0x3
+// Jump to code cave to set the 3rd (new) element, because there was not enough space left in
+// the current function frame.
+0x3F3E98: jmp 0x00000001412951E1
+0x12945E1: mov dword ptr ds:[0x00000001671CAA8C], 0x3
+0x12945EB: jmp 0x00000001403F4A2B // Jump back to top of the function frame
+0x3F3E2B: add rsp, 0x28 // Restored instructions overwritten by long jmp to codecave.
+0x3F3E2F: ret
+
+// Since we increased dword_1671CAA48 and qword_1671CAA10 from 6 elements to 9 elements,
+// we need to setup the last 3 elements here as well, so this immediate has been increased
+// from 2 to 3 to take there into account
+0x3F3FA5: mov qword ptr ss:[rbp+0x7FF90], 0x3
+
+// 1671CAA10 has been moved to address 1635A7940, because there was not enough room left in our
+// old location to increase it from 6 elements to 9 to account for the alphasort render step.
+// 1635A7940 is inside our old static texture streaming handle array that has been increased in
+// commit ... -- since this large array is no longer used, we can use it for this change.
+0x3F3F9E: lea rbx, ds:[0x00000001635A7940]
+0x3F45D2: mov rdx, qword ptr ds:[r13+rbp*8+0x235A7940]
+0x3F462C: mov rdx, qword ptr ds:[r13+rdi*8+0x235A7940]
+0x3F4729: mov rdx, qword ptr ds:[r13+rdi*8+0x235A7940]
+
+// 1671CAA48 has been moved to address 1635A7988, same reason as above, this array contains
+// handles for the dx buffers.
+0x3F3F97: lea rdi, ds:[0x00000001635A7988]
+0x3F44F8: lea rsi, ds:[r13+0x235A7988]
+// ------------------------------------------------------------------------------------------------
+
 /////////////////////////////
 /////////////////////////////
 //// Exploitable defects ////
