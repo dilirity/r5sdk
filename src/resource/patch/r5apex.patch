@@ -211,6 +211,23 @@
 0x3F44F8: lea rsi, ds:[r13+0x235A7988]
 // ------------------------------------------------------------------------------------------------
 
+// ------------------------------------------------------------------------------------------------
+// This fixes a regression with the scaling of VGUI elements for smart weapon overlays, the HUD system
+// underwent a large refactor which is where this regression originates from.
+
+// *** Hud_DrawTargetRingOverlay ***
+0x95B924: mov rax, rsi                       // store root panel in rax instead of its child.
+0x95B931: mov dword ptr ds:[rax+0x12C], r14d // store the scalar in the root panel instead of its child.
+0x95B938: mov rax, rsi
+0x95B93C: mov dword ptr ds:[rax+0x130], r14d
+
+// *** Hud_DrawTitanWeaponHomingRocketOverlay ***
+0x95D803: mov rax, r14
+0x95D80E: mov dword ptr ds:[rax+0x12C], edx
+0x95D817: mov rax, r14
+0x95D81B: mov dword ptr ds:[rax+0x130], edx
+// ------------------------------------------------------------------------------------------------
+
 /////////////////////////////
 /////////////////////////////
 //// Exploitable defects ////
