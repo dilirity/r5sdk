@@ -1759,10 +1759,8 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 		if (landTile == tile)
 			continue; // Already dealt with when fixing up internal links.
 
-		if (processedExtTiles.find(landTile) != processedExtTiles.end())
+		if (!processedExtTiles.insert(landTile).second)
 			continue;
-
-		processedExtTiles.insert(landTile);
 
 		const dtMeshHeader* landHdr = landTile->header;
 
@@ -1807,10 +1805,8 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 		if (!conCount)
 			continue;
 
-		if (processedExtTiles.find(offTile) != processedExtTiles.end())
+		if (!processedExtTiles.insert(offTile).second)
 			continue;
-
-		processedExtTiles.insert(offTile);
 
 		for (int j = 0; j < conCount; j++)
 		{
