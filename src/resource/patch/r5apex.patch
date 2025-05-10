@@ -228,6 +228,43 @@
 0x95D81B: mov dword ptr ds:[rax+0x130], edx
 // ------------------------------------------------------------------------------------------------
 
+// ------------------------------------------------------------------------------------------------
+// This fixes a crash if we run out of tracing slots, the array is of a fixed size and can run
+// out of room in which the slot -1 is returned and the structure pointer is set to NULL. However,
+// the structure pointer is still dereferenced leading to the crash. For the patch, the nulling of
+// this register has been removed and the new space is used to transform the short jmp instruction
+// to a long jmp to return gadget (which for all these functions either sets the slot result (-1)
+// to the provided pointer, or into EAX).
+
+// *** sub_1408AD8D0 ***
+0x8ACD28: jmp 0x00000001408ADA0E // long jump to return gadget if slot = -1 (used to be short jmp to rest of code exec).
+
+// *** sub_1405F2320 ***
+0x5F1841: jmp 0x00000001405F252D
+
+// *** sub_1405F2570 ***
+0x5F1A7A: jmp 0x00000001405F2766
+
+// *** sub_140608EE0 ***
+0x608692: jmp 0x0000000140609370
+
+// *** sub_14085D900 ***
+0x85D57E: je 0x000000014085E22C
+
+// *** sub_1408AD720 ***
+0x8ACB78: jmp 0x00000001408AD8AE
+
+// *** sub_140951D30 ***
+0x95118D: jmp 0x0000000140951E8B
+
+// *** sub_140954C60 ***
+0x955206: jmp 0x0000000140955EC9
+0x955309: jmp 0x0000000140955FD3
+
+// *** sub_140A46ED0 ***
+0xA46531: jmp 0x0000000140A4722E
+// ------------------------------------------------------------------------------------------------
+
 /////////////////////////////
 /////////////////////////////
 //// Exploitable defects ////
