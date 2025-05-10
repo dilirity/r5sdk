@@ -430,6 +430,11 @@ void ConCommand_InitShipped(void)
 	ConCommand* convar_list = g_pCVar->FindCommand("convar_list");
 	ConCommand* convar_differences = g_pCVar->FindCommand("convar_differences");
 	ConCommand* convar_findByFlags = g_pCVar->FindCommand("convar_findByFlags");
+
+#ifdef DEDICATED
+	ConCommand* weapon_reparse = g_pCVar->FindCommand("weapon_reparse");
+#endif // DEDICATED
+
 #ifndef DEDICATED
 	//-------------------------------------------------------------------------
 	// MATERIAL SYSTEM
@@ -452,6 +457,16 @@ void ConCommand_InitShipped(void)
 	map->m_fnCompletionCallback = Host_Map_f_CompletionFunc;
 	map_background->m_fnCompletionCallback = Host_Background_f_CompletionFunc;
 	ss_map->m_fnCompletionCallback = Host_SSMap_f_CompletionFunc;
+
+#ifdef DEDICATED
+	// This must be flagged FCVAR_GAMEDLL for dedi builds, because when this
+	// commend gets executed on the client, the server will be requested to
+	// reparse their weapon scripts as well through ServerCmd() which only
+	// works if this is a gamedll command. NOTE that this command has the
+	// cheats flags so adding this flag will not cause problems.
+	weapon_reparse->RemoveFlags(FCVAR_CLIENTDLL);
+	weapon_reparse->AddFlags(FCVAR_GAMEDLL);
+#endif // DEDICATED
 
 #ifndef DEDICATED
 	mat_crosshair->m_fnCommandCallback = Mat_CrossHair_f;
