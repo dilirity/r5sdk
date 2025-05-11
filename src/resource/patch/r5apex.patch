@@ -212,20 +212,19 @@
 // ------------------------------------------------------------------------------------------------
 
 // ------------------------------------------------------------------------------------------------
-// This fixes a regression with the scaling of VGUI elements for smart weapon overlays, the HUD system
-// underwent a large refactor which is where this regression originates from.
+// This fixes a regression that was caused after a refactor on HUD data structures; the base sizes
+// are now written in a child structure, however, the function `Hud_SetScale` still accessed the old
+// root structure members. This regression broke the HUD overlays for weapons such as the smart pistol,
+// SRAM rocket launcher titan homing rockets, etc.. as well as the abstracted script function binding.
+// The `Hud_SetScaleX()` and `Hud_SetScaleY()` methods actually do access the correct child data members
+// confirming this function to be broken. The patch is simple; the child data structure is accessed
+// below our incorrect instructions for obtaining the base size, we just move the instruction above the
+// getters for the base size, and use that register instead with the updated offsets to obtain the right values.
 
-// *** Hud_DrawTargetRingOverlay ***
-0x95B924: mov rax, rsi                       // store root panel in rax instead of its child.
-0x95B931: mov dword ptr ds:[rax+0x12C], r14d // store the scalar in the root panel instead of its child.
-0x95B938: mov rax, rsi
-0x95B93C: mov dword ptr ds:[rax+0x130], r14d
-
-// *** Hud_DrawTitanWeaponHomingRocketOverlay ***
-0x95D803: mov rax, r14
-0x95D80E: mov dword ptr ds:[rax+0x12C], edx
-0x95D817: mov rax, r14
-0x95D81B: mov dword ptr ds:[rax+0x130], edx
+// *** Hud_SetScale ***
+0x9841DA: mov rcx, qword ptr ds:[r14+0x28]
+0x9841DE: movd xmm0, dword ptr ds:[rcx+0x144]
+0x9841E6: movd xmm1, dword ptr ds:[rcx+0x148]
 // ------------------------------------------------------------------------------------------------
 
 // ------------------------------------------------------------------------------------------------
