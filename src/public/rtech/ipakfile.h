@@ -335,8 +335,8 @@ struct PakGlobalState_s
 	// assets that are tracked across all asset types
 	PakAssetTracker_s trackedAssets[PAK_MAX_TRACKED_ASSETS];
 
-	RHashMap trackedAssetMap; // links to 'trackedAssets'
-	RHashMap loadedPakMap;    // links to 'loadedPaks'
+	RFixedArray trackedAssetMap; // links to 'trackedAssets'
+	RFixedArray loadedPakMap;    // links to 'loadedPaks'
 
 	// all currently loaded pak handles
 	PakLoadedInfo_s loadedPaks[PAK_MAX_LOADED_PAKS];

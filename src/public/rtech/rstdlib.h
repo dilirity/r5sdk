@@ -1,58 +1,58 @@
 #pragma once
 
-class RHashMap;
+class RFixedArray;
 
 /* ==== RTECH =========================================================================================================================================================== */
 // [ PIXIE ]: I'm very unsure about this, but it really seems like it
-inline int(*v_RHashMap_FindSlot)(RHashMap* const thisptr);
-inline void(*v_RHashMap_FreeSlot)(RHashMap* const thisptr, const int slotNum);
+inline int(*v_RFixedArray_FindSlot)(RFixedArray* const thisptr);
+inline void(*v_RFixedArray_FreeSlot)(RFixedArray* const thisptr, const int slotNum);
 
 
-class RHashMap
+class RFixedArray
 {
 public:
 	inline int FindSlot(void)
 	{
-		return v_RHashMap_FindSlot(this);
+		return v_RFixedArray_FindSlot(this);
 	}
 
 	inline void FreeSlot(const unsigned int slotNum)
 	{
-		v_RHashMap_FreeSlot(this, slotNum);
+		v_RFixedArray_FreeSlot(this, slotNum);
 	}
 
 private:
-	int m_index;
-	int m_slotsLeft;
-	int m_structSize;
-	int m_searchMask;
-	void* m_buffer;
-	int m_slotsUsed;
+	int index;
+	int slotsLeft;
+	int structSize;
+	int modMask;
+	void* buffer;
+	int slotsUsed;
 	int padding_perhaps;
 };
 
-class RHashMap_MT
+class RFixedArrayMT
 {
 public:
 	inline int FindSlot(void)
 	{
-		AcquireSRWLockExclusive(&m_lock);
-		const int slot = m_mgr.FindSlot();
-		ReleaseSRWLockExclusive(&m_lock);
+		AcquireSRWLockExclusive(&lock);
+		const int slot = array.FindSlot();
+		ReleaseSRWLockExclusive(&lock);
 
 		return slot;
 	}
 
 	inline void FreeSlot(const unsigned int slotNum)
 	{
-		AcquireSRWLockExclusive(&m_lock);
-		m_mgr.FreeSlot(slotNum);
-		ReleaseSRWLockExclusive(&m_lock);
+		AcquireSRWLockExclusive(&lock);
+		array.FreeSlot(slotNum);
+		ReleaseSRWLockExclusive(&lock);
 	}
 
 private:
-	RHashMap m_mgr;
-	SRWLOCK m_lock;
+	RFixedArray array;
+	SRWLOCK lock;
 };
 
 struct RMultiHashMap
@@ -121,13 +121,13 @@ class V_ReSTD : public IDetour
 {
 	virtual void GetAdr(void) const
 	{
-		LogFunAdr("RHashMap::FindSlot", v_RHashMap_FindSlot);
-		LogFunAdr("RHashMap::FreeSlot", v_RHashMap_FreeSlot);
+		LogFunAdr("RHashMap::FindSlot", v_RFixedArray_FindSlot);
+		LogFunAdr("RHashMap::FreeSlot", v_RFixedArray_FreeSlot);
 	}
 	virtual void GetFun(void) const 
 	{
-		Module_FindPattern(g_GameDll, "44 8B 51 0C 4C 8B C1").GetPtr(v_RHashMap_FindSlot);
-		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 44 8B 59 0C").GetPtr(v_RHashMap_FreeSlot);
+		Module_FindPattern(g_GameDll, "44 8B 51 0C 4C 8B C1").GetPtr(v_RFixedArray_FindSlot);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 44 8B 59 0C").GetPtr(v_RFixedArray_FreeSlot);
 	}
 	virtual void GetVar(void) const { }
 	virtual void GetCon(void) const { }
