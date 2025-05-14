@@ -320,6 +320,16 @@ bool sdl_init(SDL_Window*& window, SDL_Renderer*& renderer, int &width, int &hei
 // Gradient background
 void draw_background(const GLfloat width, const GLfloat height)
 {
+	glClearColor(0.24f, 0.26f, 0.28f, 1.0f);
+
+	rdIgnoreUnused(width);
+	rdIgnoreUnused(height);
+
+	// TODO: make this some sort of a static sphere
+	// to create a skybox effect since this gradient
+	// approach isn't fantastic. For now we use a
+	// uniform background.
+	/*
 	glBegin(GL_QUADS);
 
 	// top-left
@@ -339,6 +349,7 @@ void draw_background(const GLfloat width, const GLfloat height)
 	glVertex2f(0.0f, height);
 
 	glEnd();
+	*/
 }
 
 #if 1
