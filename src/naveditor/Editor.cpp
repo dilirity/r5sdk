@@ -1524,7 +1524,7 @@ bool Editor::loadAll(std::string path, const bool fullPath)
 		mesh->addTile(data, tileHeader.dataSize, DT_TILE_FREE_DATA, tileHeader.tileRef, NULL);
 	}
 
-	// Read read static pathing data.
+	// Read static pathing data.
 	if (header.params.polyGroupCount >= DT_MIN_POLY_GROUP_COUNT)
 	{
 		for (int i = 0; i < header.params.traverseTableCount; i++)
