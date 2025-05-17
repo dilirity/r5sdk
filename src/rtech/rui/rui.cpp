@@ -10,7 +10,7 @@
 #include "tier1/cvar.h"
 
 static ConVar rui_drawEnable("rui_drawEnable", "1", FCVAR_RELEASE, "Draws the RUI if set", false, 0.f, false, 0.f, "1 = draw; 0 (zero) = no draw");
-static ConVar rui_codeAsserts("rui_codeAsserts", "1", FCVAR_RELEASE, "Prints the RUI code assertions that fail to the console if set", false, 0.f, false, 0.f, "1 = print; 0 (zero) = no print");
+static ConVar rui_codeAsserts("rui_codeAsserts", "0", FCVAR_RELEASE, "Prints the RUI code assertions that fail to the console if set", false, 0.f, false, 0.f, "1 = print; 0 (zero) = no print");
 
 //-----------------------------------------------------------------------------
 // Purpose: draw RUI frame
