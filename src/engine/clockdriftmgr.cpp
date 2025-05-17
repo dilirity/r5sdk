@@ -16,8 +16,8 @@
 
 void CClockDriftMgr::Clear()
 {
-	m_nClientTick = 0;
 	m_nServerTick = 0;
+	m_nClientTick = 0;
 	m_iCurClockOffset = 0;
 	memset(m_ClockOffsets, 0, sizeof(m_ClockOffsets));
 }

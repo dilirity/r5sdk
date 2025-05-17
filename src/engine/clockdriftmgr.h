@@ -21,8 +21,8 @@ struct CClockDriftMgr
 	int m_nSimulationTick;
 	float m_flClientTickTime;
 	float m_flServerTickTime;
-	int m_nClientTick;
 	int m_nServerTick;
+	int m_nClientTick;
 };
 static_assert(sizeof(CClockDriftMgr) == 0x94);
 
