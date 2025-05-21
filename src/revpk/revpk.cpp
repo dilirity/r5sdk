@@ -18,8 +18,8 @@
 #include "vstdlib/keyvaluessystem.h"
 #include "filesystem/filesystem_std.h"
 
-#define PACK_COMMAND "pack"
-#define UNPACK_COMMAND "unpack"
+#define PACK_COMMAND "-pack"
+#define UNPACK_COMMAND "-unpack"
 
 #define PACK_LOG_DIR "manifest/pack_logs/"
 #define UNPACK_LOG_DIR "manifest/unpack_logs/"
@@ -83,22 +83,22 @@ static void ReVPK_Shutdown()
 //-----------------------------------------------------------------------------
 // Purpose: logs tool's usage
 //-----------------------------------------------------------------------------
-static void ReVPK_Usage()
+static void ReVPK_ExplainUsage()
 {
     CFmtStr1024 usage;
 
     usage.Format(
-        "ReVPK instructions and options:\n"
-        "For packing; run 'revpk %s' with the following parameters:\n"
+        "*** ReVPK ( built on " __DATE__ " at " __TIME__" ) usage guide ***\n"
+        "For packing, run 'revpk %s' with the following parameters:\n"
         "\t<%s>\t- locale prefix for the directory file ( defaults to \"%s\" )\n"
-        "\t<%s>\t- context scope for the VPK files [\"%s\", \"%s\"]\n"
+        "\t<%s>\t- context scope for the VPK files [ \"%s\", \"%s\" ]\n"
         "\t<%s>\t- level name for the VPK files\n"
         "\t<%s>\t- ( optional ) path to the workspace containing the manifest file\n"
         "\t<%s>\t- ( optional ) path in which the VPK files will be built\n"
-        "\t<%s>\t- ( optional ) max LZHAM helper threads [\"%d\", \"%d\"] \"%d\" ( default ) for max practical\n"
-        "\t<%s>\t- ( optional ) the level of compression [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"]\n\n"
+        "\t<%s>\t- ( optional ) max LZHAM helper threads [ \"%d\", \"%d\" ] \"%d\" ( default ) for max practical\n"
+        "\t<%s>\t- ( optional ) the level of compression [ \"%s\", \"%s\", \"%s\", \"%s\", \"%s\" ]\n\n"
 
-        "For unpacking; run 'revpk %s' with the following parameters:\n"
+        "For unpacking, run 'revpk %s' with the following parameters:\n"
         "\t<%s>\t- path and name of the target VPK files\n"
         "\t<%s>\t- ( optional ) path in which the VPK files will be unpacked\n"
         "\t<%s>\t- ( optional ) whether to parse the directory file name from the pack file name\n",
@@ -161,7 +161,7 @@ static void ReVPK_Pack(const CCommand& args)
 
     if (argCount < 5)
     {
-        ReVPK_Usage();
+        ReVPK_ExplainUsage();
         return;
     }
 
@@ -221,7 +221,7 @@ static void ReVPK_Unpack(const CCommand& args)
 
     if (argCount < 3)
     {
-        ReVPK_Usage();
+        ReVPK_ExplainUsage();
         return;
     }
 
@@ -285,7 +285,7 @@ int main(int argc, char* argv[])
     args.Tokenize(str.Get(), cmd_source_t::kCommandSrcCode, &s_BreakSetWithoutColons);
 
     if (!args.ArgC()) {
-        ReVPK_Usage();
+        ReVPK_ExplainUsage();
     }
     else
     {
@@ -296,7 +296,7 @@ int main(int argc, char* argv[])
             ReVPK_Unpack(args);
         }
         else {
-            ReVPK_Usage();
+            ReVPK_ExplainUsage();
         }
     }
 
