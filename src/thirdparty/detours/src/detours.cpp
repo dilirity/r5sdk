@@ -11,6 +11,7 @@
 //#define DETOUR_DEBUG 1
 #define DETOURS_INTERNAL
 #include "../include/detours.h"
+#include "../../windows/peb.h"
 
 #if DETOURS_VERSION != 0x4c0c1   // 0xMAJORcMINORcPATCH
 #error detours.h version mismatch
@@ -53,48 +54,151 @@ C_ASSERT(sizeof(_DETOUR_ALIGN) == 1);
 //
 // Region reserved for system DLLs, which cannot be used for trampolines.
 //
-// On Windows 10, ntdll.dll is mapped at random location (ASLR) within a
-// range near the top of the user-mode address space.
-// After that, further system DLLs are mapped top down within this range.
-// In the bottom of the range is reached, the allocator wraps to the top.
-//
-// We also want to exclude any pages that share a CFG bitmap page with a system DLL
-// so leave an additional a 1MB buffer on each side of the range.
-//
+// Since NT6, ntdll.dll is mapped at random location (ASLR) within a range
+// near the top of the user-mode address space. After that, further system
+// DLLs are mapped top down within this range. If the bottom of the range is
+// reached, the allocator wraps to the top.
+// 
+// 32-bit process: [0x50000000 ... 0x78000000), a total of 640MB.
+// 64-bit process: [0x7FF7FFFF0000 ... 0x7FFFFFFF0000), a total of 32GB.
+// 
+// We also want to exclude any pages that share a CFG bitmap page with a
+// system DLL so leave an additional a 1MB buffer on each side of the range.
+// 
+// Even without ASLR, consider keeping a certain size area from the top.
+// 
+// NOTE: this implementation was initially taken from the pull request:
+// https://github.com/microsoft/Detours/pull/307
+// 
+// However, some users had experienced problems on Windows 7 VPS servers,
+// this is caused as this initial implementation did not take systems into
+// account that had ASLR explicitly disabled (see the discussion in the pull
+// request above).
+// 
+// This implementation has been reworked with a more refined strategy from
+// KNSoft's SlimDetours, which takes this scenario into account. See:
+// https://github.com/KNSoft/KNSoft.SlimDetours/commit/a06830e01c4d1c381d88a74350ba1ec8860a6bd7
 #if defined(DETOURS_64BIT)
-// On X64 the range is 0x7FF800000000..0x7FFFFFFF0000 - which is 32GB!
-// So we likely must allocate in the system DLL range to be +/- 2GB.
-// But we want to avoid at least the first 1GB that will be used for system DLLs.
-// Due to wrapping, this may be two separate ranges.
-static PVOID    s_pSystemRegionUpperBound = (PVOID)((ULONG_PTR)GetModuleHandleW(L"ntdll.dll") + (ULONG_PTR)0x100000);
-static PVOID    s_pSystemRegionLowerBound = (PVOID)((ULONG_PTR)s_pSystemRegionUpperBound < (ULONG_PTR)0x7FF83F000000 ?
-                                                    (ULONG_PTR)0x7FF7FF000000 : ((ULONG_PTR)s_pSystemRegionUpperBound - (ULONG_PTR)0x40000000));
-static SIZE_T   s_pSystemRegionSize       = (ULONG_PTR)s_pSystemRegionUpperBound - (ULONG_PTR)s_pSystemRegionLowerBound; // up to 1GB
-
-static SIZE_T   s_pSystemRegion2Size       = (SIZE_T)0x40000000 - s_pSystemRegionSize;
-static PVOID    s_pSystemRegion2UpperBound = (PVOID)(ULONG_PTR)0x800000000000;
-static PVOID    s_pSystemRegion2LowerBound = (PVOID)((ULONG_PTR)s_pSystemRegion2UpperBound - s_pSystemRegion2Size);
+/* [0x00007FF7FFFF0000 ... 0x00007FFFFFFF0000), 32G */
+#define MI_ASLR_BITMAP_SIZE 0x10000
+#define MI_ASLR_LOWEST_SYSTEM_RANGE_ADDRESS ((PVOID)0x00007FF7FFFF0000ULL)
+#define MI_ASLR_HIGHEST_SYSTEM_RANGE_ADDRESS ((PVOID)0x00007FFFFFFEFFFFULL)
 #else
-// On X86 the range was originally 0x70000000..0x80000000
-// However, since Windows 8, the range is now 0x50000000..0x78000000
-// Reference: Windows Internals, 7th Edition, page 368
-// We just exclude both ranges.
-static PVOID    s_pSystemRegionUpperBound = (PVOID)((ULONG_PTR)0x80000000);
-static PVOID    s_pSystemRegionLowerBound = (PVOID)((ULONG_PTR)0x50000000 - 0x100000);
-static SIZE_T   s_pSystemRegionSize       = (ULONG_PTR)s_pSystemRegionUpperBound - (ULONG_PTR)s_pSystemRegionLowerBound; // 769MB
+/* [0x50000000 ... 0x78000000), 640M */
+#define MI_ASLR_BITMAP_SIZE 0x500
+#define MI_ASLR_LOWEST_SYSTEM_RANGE_ADDRESS ((PVOID)0x50000000UL)
+#define MI_ASLR_HIGHEST_SYSTEM_RANGE_ADDRESS ((PVOID)0x77FFFFFFUL)
 #endif
+
+C_ASSERT((ULONG_PTR)MI_ASLR_HIGHEST_SYSTEM_RANGE_ADDRESS - (ULONG_PTR)MI_ASLR_LOWEST_SYSTEM_RANGE_ADDRESS + 1 == 
+    (ULONG_PTR)MI_ASLR_BITMAP_SIZE * 8UL * (ULONG_PTR)MM_ALLOCATION_GRANULARITY);
+
+#define SYSTEM_RESERVED_REGION_HIGHEST ((ULONG_PTR)MI_ASLR_HIGHEST_SYSTEM_RANGE_ADDRESS)
+#define SYSTEM_RESERVED_REGION_SIZE (MI_ASLR_BITMAP_SIZE * (ULONG_PTR)CHAR_BIT * MM_ALLOCATION_GRANULARITY)
+#define SYSTEM_RESERVED_REGION_LOWEST (SYSTEM_RESERVED_REGION_HIGHEST - SYSTEM_RESERVED_REGION_SIZE + 1)
+
+#if defined(DETOURS_64BIT)
+C_ASSERT(SYSTEM_RESERVED_REGION_HIGHEST + 1 == 0x00007FFFFFFF0000ULL);
+C_ASSERT(SYSTEM_RESERVED_REGION_SIZE == 0x800000000); // 32GB
+C_ASSERT(SYSTEM_RESERVED_REGION_LOWEST == 0x00007FF7FFFF0000ULL);
+
+static ULONG_PTR s_ulSystemRegionHighLowerBound = MAXULONG_PTR;
+#else
+C_ASSERT(SYSTEM_RESERVED_REGION_HIGHEST + 1 == 0x78000000UL);
+C_ASSERT(SYSTEM_RESERVED_REGION_SIZE == 0x28000000); // 640MB
+C_ASSERT(SYSTEM_RESERVED_REGION_LOWEST == 0x50000000UL);
+#endif
+
+static ULONG_PTR s_ulSystemRegionLowUpperBound = 0;
+static ULONG_PTR s_ulSystemRegionLowLowerBound = 0;
+static SYSTEM_INFO g_systemInformation;
+
+static BOOL detours_aslr_enabled() {
+    HKEY hKey;
+    DWORD value = 0;
+    DWORD type = 0;
+    DWORD valueSize = sizeof(value);
+
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+        "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
+        0, KEY_READ, &hKey) != ERROR_SUCCESS) {
+        return TRUE;
+    }
+
+    if (RegQueryValueExA(hKey, "MoveImages", nullptr, &type,
+        reinterpret_cast<LPBYTE>(&value), &valueSize) != ERROR_SUCCESS) {
+        RegCloseKey(hKey);
+        return TRUE;
+    }
+
+    RegCloseKey(hKey);
+    return type != REG_DWORD || value != 0;
+}
+
+static void detour_init_memory()
+{
+    GetSystemInfo(&g_systemInformation);
+    const PEB64* const peb = NtCurrentPeb();
+
+    if (peb->OSMajorVersion >= 6) {
+        if (detours_aslr_enabled()) {
+#if defined(DETOURS_64BIT)
+            /* 1GB after Ntdll.dll */
+            PLDR_DATA_TABLE_ENTRY NtdllLdrEntry = CONTAINING_RECORD(NtCurrentPeb()->Ldr->InMemoryOrderModuleList.Flink,
+                _LDR_DATA_TABLE_ENTRY, InInitializationOrderLinks);
+
+            s_ulSystemRegionLowUpperBound = (ULONG_PTR)NtdllLdrEntry->DllBase + NtdllLdrEntry->SizeOfImage - 1;
+            s_ulSystemRegionLowLowerBound = s_ulSystemRegionLowUpperBound - 0x40000000/*1GB*/ - 1;
+
+            if (s_ulSystemRegionLowLowerBound < SYSTEM_RESERVED_REGION_LOWEST) {
+                s_ulSystemRegionHighLowerBound = s_ulSystemRegionLowLowerBound + SYSTEM_RESERVED_REGION_SIZE;
+                s_ulSystemRegionLowLowerBound = SYSTEM_RESERVED_REGION_LOWEST;
+            }
+#else
+            s_ulSystemRegionLowUpperBound = SYSTEM_RESERVED_REGION_HIGHEST;
+            s_ulSystemRegionLowLowerBound = SYSTEM_RESERVED_REGION_LOWEST;
+#endif
+        }
+        else {
+            /* Reserve a region in the top */
+            s_ulSystemRegionLowUpperBound = (ULONG_PTR)g_systemInformation.lpMaximumApplicationAddress;
+            s_ulSystemRegionLowLowerBound = s_ulSystemRegionLowUpperBound -
+#if defined(DETOURS_64BIT)
+                0x40000000/*1GB*/
+#else
+                0x28000000/*640MB*/
+#endif
+                + 1;
+        }
+    }
+    else {
+        /*
+         * This is the original Detours behavior, for NT5 only.
+         * ntdll.dll, kernel32.dll, user32.dll in this range even if on 64-bit process
+         */
+        s_ulSystemRegionLowUpperBound = 0x80000000;
+        s_ulSystemRegionLowLowerBound = 0x70000000;
+    }
+}
+
+struct DetourMemoryAutoInit
+{
+    DetourMemoryAutoInit()
+    {
+        detour_init_memory();
+    }
+};
+static DetourMemoryAutoInit s_detourMemoryAutoInit;
 
 inline SIZE_T should_skip_sytem_range_size(PBYTE pbTry)
 {
-    if (pbTry >= s_pSystemRegionLowerBound && pbTry <= s_pSystemRegionUpperBound) {
-        return s_pSystemRegionSize;
-    }
+    return
+        ((ULONG_PTR)pbTry >= s_ulSystemRegionLowLowerBound && (ULONG_PTR)pbTry <= s_ulSystemRegionLowUpperBound)
 #if defined(DETOURS_64BIT)
-    if (pbTry >= s_pSystemRegion2LowerBound && pbTry <= s_pSystemRegion2UpperBound) {
-        return s_pSystemRegion2Size;
-    }
+        || ((ULONG_PTR)pbTry >= s_ulSystemRegionHighLowerBound &&
+            (ULONG_PTR)pbTry <= SYSTEM_RESERVED_REGION_HIGHEST)
 #endif
-    return 0;
+        ;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -136,16 +240,20 @@ static bool detour_is_imported(PBYTE pbCode, PBYTE pbAddress)
 
 inline ULONG_PTR detour_2gb_below(ULONG_PTR address)
 {
-    return (address > (ULONG_PTR)0x7ff80000) ? address - 0x7ff80000 : 0x80000;
+    return address > (ULONG_PTR)g_systemInformation.lpMinimumApplicationAddress + 0x80000000/*2GB*/ ?
+        (ULONG_PTR)address - (0x80000000/*2GB*/ - 0x80000/*512KB*/) :
+        (ULONG_PTR)((ULONG_PTR)g_systemInformation.lpMinimumApplicationAddress + 0x80000/*512KB*/);
 }
 
 inline ULONG_PTR detour_2gb_above(ULONG_PTR address)
 {
-#if defined(DETOURS_64BIT)
-    return (address < (ULONG_PTR)0xffffffff80000000) ? address + 0x7ff80000 : (ULONG_PTR)0xfffffffffff80000;
-#else
-    return (address < (ULONG_PTR)0x80000000) ? address + 0x7ff80000 : (ULONG_PTR)0xfff80000;
+    return (
+#if !defined(DETOURS_64BIT)
+        g_sbi.MaximumUserModeAddress >= 0x80000000/*2GB*/ &&
 #endif
+        address <= (ULONG_PTR)g_systemInformation.lpMaximumApplicationAddress - 0x80000000/*2GB*/) ?
+        (ULONG_PTR)address + (0x80000000/*2GB*/ - 0x80000/*512KB*/) :
+        (ULONG_PTR)((ULONG_PTR)g_systemInformation.lpMaximumApplicationAddress - 0x80000/*512KB*/);
 }
 
 ///////////////////////////////////////////////////////////////////////// X86.
@@ -1713,15 +1821,15 @@ BOOL WINAPI DetourSetRetainRegions(_In_ BOOL fRetain)
 
 PVOID WINAPI DetourSetSystemRegionLowerBound(_In_ PVOID pSystemRegionLowerBound)
 {
-    PVOID pPrevious = s_pSystemRegionLowerBound;
-    s_pSystemRegionLowerBound = pSystemRegionLowerBound;
+    PVOID pPrevious = (PVOID)s_ulSystemRegionLowLowerBound;
+    s_ulSystemRegionLowLowerBound = (ULONG_PTR)pSystemRegionLowerBound;
     return pPrevious;
 }
 
 PVOID WINAPI DetourSetSystemRegionUpperBound(_In_ PVOID pSystemRegionUpperBound)
 {
-    PVOID pPrevious = s_pSystemRegionUpperBound;
-    s_pSystemRegionUpperBound = pSystemRegionUpperBound;
+    PVOID pPrevious = (PVOID)s_ulSystemRegionLowUpperBound;
+    s_ulSystemRegionLowUpperBound = (ULONG_PTR)pSystemRegionUpperBound;
     return pPrevious;
 }
 
