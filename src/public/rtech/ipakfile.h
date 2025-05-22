@@ -21,7 +21,8 @@
 
 // compression flags, code uses this to select which decoder to use.
 #define PAK_HEADER_FLAGS_RTECH_ENCODED (1<<8)
-#define PAK_HEADER_FLAGS_ZSTD_ENCODED (1<<9)
+#define PAK_HEADER_FLAGS_OODLE_ENCODED (1<<9)
+#define PAK_HEADER_FLAGS_ZSTD_ENCODED (1<<15)
 
 // max amount of types at runtime in which assets will be tracked
 #define PAK_MAX_TRACKED_TYPES 64
