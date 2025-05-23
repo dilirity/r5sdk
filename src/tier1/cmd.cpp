@@ -191,7 +191,7 @@ bool CCommand::Tokenize(const char* pCommand, cmd_source_t source, characterset_
 //-----------------------------------------------------------------------------
 bool CCommand::HasOnlyDigits(int nIndex) const
 {
-	const char* source = Arg(nIndex);
+	const char* source = nIndex == -1 ? ArgS() : Arg(nIndex);
 
 	for (size_t i = 0; source[i] != '\0'; i++)
 	{
