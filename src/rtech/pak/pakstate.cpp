@@ -173,6 +173,7 @@ static void Pak_RequestSwap_f(const CCommand& args)
 	}
 
 	const PakLoadedInfo_s* pakInfo = nullptr;
+	const char* pakName = nullptr;
 
 	if (args.HasOnlyDigits(1))
 	{
@@ -188,7 +189,7 @@ static void Pak_RequestSwap_f(const CCommand& args)
 	}
 	else
 	{
-		const char* const pakName = args.Arg(1);
+		pakName = args.Arg(1);
 		pakInfo = Pak_GetPakInfo(pakName);
 
 		if (!pakInfo)
@@ -206,8 +207,22 @@ static void Pak_RequestSwap_f(const CCommand& args)
 
 	Msg(eDLL_T::RTECH, "Requested pak swap for file '%s' with handle %d\n", pakInfo->fileName, pakInfo->handle);
 
+	// Store these since they will be clobbered.
+	const int logChannel = pakInfo->logChannel;
+	const uint8_t unkAC = pakInfo->unkAC;
+	char tempName[MAX_OSPATH];
+
+	// Small optimization, the command argument persist through the unload, so
+	// use that if available. Else copy the name from the pak info struct and
+	// reuse that since this will be freed during the unload!
+	if (!pakName)
+	{
+		strncpy(tempName, pakInfo->fileName, sizeof(tempName));
+		pakName = tempName;
+	}
+
 	g_pakLoadApi->UnloadAsyncAndWait(pakInfo->handle); // Wait till this slot gets free'd.
-	g_pakLoadApi->LoadAsync(pakInfo->fileName, AlignedMemAlloc(), pakInfo->logChannel, pakInfo->unkAC);
+	g_pakLoadApi->LoadAsync(pakName, AlignedMemAlloc(), logChannel, unkAC);
 }
 
 /*
