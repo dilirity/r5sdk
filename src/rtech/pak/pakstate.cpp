@@ -113,9 +113,9 @@ static void Pak_RequestUnload_f(const CCommand& args)
 
 	const PakLoadedInfo_s* pakInfo = nullptr;
 
-	if (args.HasOnlyDigits(1))
+	if (args.HasOnlyDigits(-1))
 	{
-		const PakHandle_t pakHandle = atoi(args.Arg(1));
+		const PakHandle_t pakHandle = atoi(args.ArgS());
 		pakInfo = Pak_GetPakInfo(pakHandle);
 
 		if (pakInfo->status != PAK_STATUS_LOADED)
@@ -127,7 +127,7 @@ static void Pak_RequestUnload_f(const CCommand& args)
 	}
 	else
 	{
-		const char* const pakName = args.Arg(1);
+		const char* const pakName = args.ArgS();
 		pakInfo = Pak_GetPakInfo(pakName);
 
 		if (!pakInfo)
@@ -154,7 +154,7 @@ Pak_RequestLoad_f
 */
 static void Pak_RequestLoad_f(const CCommand& args)
 {
-	const char* const pakFile = args.Arg(1);
+	const char* const pakFile = args.ArgS();
 
 	Msg(eDLL_T::RTECH, "Requested pak load for file '%s'\n", pakFile);
 	g_pakLoadApi->LoadAsync(pakFile, AlignedMemAlloc(), 1, 0);
@@ -175,9 +175,9 @@ static void Pak_RequestSwap_f(const CCommand& args)
 	const PakLoadedInfo_s* pakInfo = nullptr;
 	const char* pakName = nullptr;
 
-	if (args.HasOnlyDigits(1))
+	if (args.HasOnlyDigits(-1))
 	{
-		const PakHandle_t pakHandle = atoi(args.Arg(1));
+		const PakHandle_t pakHandle = atoi(args.ArgS());
 		pakInfo = Pak_GetPakInfo(pakHandle);
 
 		if (pakInfo->status != PAK_STATUS_LOADED)
@@ -189,7 +189,7 @@ static void Pak_RequestSwap_f(const CCommand& args)
 	}
 	else
 	{
-		pakName = args.Arg(1);
+		pakName = args.ArgS();
 		pakInfo = Pak_GetPakInfo(pakName);
 
 		if (!pakInfo)
@@ -237,7 +237,7 @@ static void Pak_StringToGUID_f(const CCommand& args)
 		return;
 	}
 
-	const PakGuid_t guid = Pak_StringToGuid(args.Arg(1));
+	const PakGuid_t guid = Pak_StringToGuid(args.ArgS());
 
 	Msg(eDLL_T::RTECH, "______________________________________________________________\n");
 	Msg(eDLL_T::RTECH, "] RTECH_HASH ]------------------------------------------------\n");
@@ -259,8 +259,8 @@ static void Pak_Decompress_f(const CCommand& args)
 		return;
 	}
 
-	const CFmtStr1024 inPakFile("%s%s", Pak_GetReadPath(), args.Arg(1));
-	const CFmtStr1024 outPakFile("%s%s", Pak_GetWritePath(), args.Arg(1));
+	const CFmtStr1024 inPakFile("%s%s", Pak_GetReadPath(), args.ArgS());
+	const CFmtStr1024 outPakFile("%s%s", Pak_GetWritePath(), args.ArgS());
 
 	if (!Pak_DecodePakFile(inPakFile.String(), outPakFile.String()))
 	{
@@ -268,6 +268,10 @@ static void Pak_Decompress_f(const CCommand& args)
 			__FUNCTION__, inPakFile.String());
 	}
 }
+
+static ConVar pak_compresslevel("pak_compresslevel", "6", FCVAR_DEVELOPMENTONLY, "Determines the RPAK file compression level.",
+	true, (float)-5, // See https://github.com/facebook/zstd/issues/3032
+	true, (float)ZSTD_maxCLevel(), "int");
 
 /*
 =====================
@@ -284,13 +288,10 @@ static void Pak_Compress_f(const CCommand& args)
 		return;
 	}
 
-	const CFmtStr1024 inPakFile("%s%s", Pak_GetReadPath(), args.Arg(1));
-	const CFmtStr1024 outPakFile("%s%s", Pak_GetWritePath(), args.Arg(1));
+	const CFmtStr1024 inPakFile("%s%s", Pak_GetReadPath(), args.ArgS());
+	const CFmtStr1024 outPakFile("%s%s", Pak_GetWritePath(), args.ArgS());
 
-	// NULL means default compress level
-	const int compressLevel = args.ArgC() > 2 ? atoi(args.Arg(2)) : NULL;
-
-	if (!Pak_EncodePakFile(inPakFile.String(), outPakFile.String(), compressLevel))
+	if (!Pak_EncodePakFile(inPakFile.String(), outPakFile.String(), pak_compresslevel.GetInt()))
 	{
 		Error(eDLL_T::RTECH, NO_ERROR, "%s - compression failed for '%s'!\n",
 			__FUNCTION__, inPakFile.String());
