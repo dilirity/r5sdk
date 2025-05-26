@@ -144,7 +144,7 @@ static void detour_init_memory()
         if (detours_aslr_enabled()) {
 #if defined(DETOURS_64BIT)
             /* 1GB after Ntdll.dll */
-            PLDR_DATA_TABLE_ENTRY NtdllLdrEntry = CONTAINING_RECORD(NtCurrentPeb()->Ldr->InMemoryOrderModuleList.Flink,
+            PLDR_DATA_TABLE_ENTRY NtdllLdrEntry = CONTAINING_RECORD(NtCurrentPeb()->Ldr->InInitializationOrderModuleList.Flink,
                 _LDR_DATA_TABLE_ENTRY, InInitializationOrderLinks);
 
             s_ulSystemRegionLowUpperBound = (ULONG_PTR)NtdllLdrEntry->DllBase + NtdllLdrEntry->SizeOfImage - 1;
@@ -1586,9 +1586,6 @@ static PVOID detour_alloc_trampoline_allocate_new(PBYTE pbTarget,
     //     in order to maintain ASLR entropy.
 
 #if defined(DETOURS_64BIT)
-    DETOUR_TRACE(("  System DLL regions to skip: %p->%p and %p->%p\n",
-                  s_pSystemRegionLowerBound, s_pSystemRegionUpperBound,
-                  s_pSystemRegion2LowerBound, s_pSystemRegion2UpperBound));
     // Try looking 1GB below or lower.
     if (pbTry == NULL && pbTarget > (PBYTE)0x40000000) {
         pbTry = detour_alloc_region_from_hi((PBYTE)pLo, detour_target_region_clamp(pbTarget - 0x40000000, pLo, pHi));
