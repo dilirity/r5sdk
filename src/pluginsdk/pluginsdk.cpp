@@ -16,7 +16,6 @@
 //       everything you need to get started. You can do many more things with
 //       all the interfaces available from the engine & sdk. This example can
 //       be used as a base to build your plugin!
-// 
 //=============================================================================//
 
 #include "tier0/dbg.h"
@@ -78,7 +77,7 @@ static void PluginExampleConVarChanged_f( IConVar* pConVar, const char* pOldStri
 	// Get the reference to our convar "plugin_example_command".
 	static ConVar* const pConVarRef = g_pCVar->FindVar( pConVar->GetName() );
 
-	if (!pConVarRef)
+	if ( !pConVarRef )
 	{
 		Assert( 0 ); // Code bug; improperly registered or obtained.
 		return;
