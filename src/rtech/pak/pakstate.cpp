@@ -3,6 +3,7 @@
 // Purpose: pak runtime memory and management
 //
 //=============================================================================//
+#include "tier0/fasttimer.h"
 #include "tier1/fmtstr.h"
 #include "common/completion.h"
 #include "rtech/ipakfile.h"
@@ -205,11 +206,15 @@ static void Pak_RequestSwap_f(const CCommand& args)
 		}
 	}
 
-	Msg(eDLL_T::RTECH, "Requested pak swap for file '%s' with handle %d\n", pakInfo->fileName, pakInfo->handle);
+	Msg(eDLL_T::RTECH, "Requested hot swap for pak file '%s' with handle %d\n", pakInfo->fileName, pakInfo->handle);
+
+	CFastTimer timer;
+	timer.Start();
 
 	// Store these since they will be clobbered.
 	const int logChannel = pakInfo->logChannel;
 	const uint8_t unkAC = pakInfo->unkAC;
+
 	char tempName[MAX_OSPATH];
 
 	// Small optimization, the command argument persist through the unload, so
@@ -223,6 +228,9 @@ static void Pak_RequestSwap_f(const CCommand& args)
 
 	g_pakLoadApi->UnloadAsyncAndWait(pakInfo->handle); // Wait till this slot gets free'd.
 	g_pakLoadApi->LoadAsync(pakName, AlignedMemAlloc(), logChannel, unkAC);
+
+	timer.End();
+	Msg(eDLL_T::RTECH, "Hot swap took %lf seconds\n", timer.GetDuration().GetSeconds());
 }
 
 /*
