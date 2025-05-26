@@ -153,6 +153,15 @@ static SQRESULT ClientScript_DebugScreenTextWithColor(HSQUIRRELVM v)
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: gets the most recent server id
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_GetServerID(HSQUIRRELVM v)
+{
+    sq_pushstring(v, Host_GetSessionID(), -1);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: checks if the server index is valid, raises an error if not
 //-----------------------------------------------------------------------------
 static SQBool Script_CheckServerIndexAndFailure(HSQUIRRELVM v, SQInteger iServer)
@@ -377,6 +386,15 @@ static SQRESULT UIScript_GetServerMaxPlayers(HSQUIRRELVM v)
     const SQInteger maxPlayers = g_ServerListManager.m_vServerList[iServer].maxPlayers;
     sq_pushinteger(v, maxPlayers);
 
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the most recent server id
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetServerID(HSQUIRRELVM v)
+{
+    sq_pushstring(v, Host_GetSessionID(), -1);
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -638,6 +656,8 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, DebugDrawTriangle, "Draw a debug overlay triangle", "void", "vector p1, vector p2, vector p3, vector color, float alpha, bool drawThroughWorld, float duration", false);
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, DebugDrawSolidSphere, "Draw a debug overlay solid sphere", "void", "vector origin, float radius, int theta, int phi, vector color, float alpha, bool drawThroughWorld, float duration", false);
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, DebugDrawCapsule, "Draw a debug overlay capsule", "void", "vector start, vector end, float radius, vector color, float alpha, bool drawThroughWorld, float duration", false);
+
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetServerID, "Gets the ID of the most recent server", "string", "", false);
 }
 
 //---------------------------------------------------------------------------------
@@ -662,6 +682,8 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerCurrentPlayers, "Gets the current player count of the server at the specified index of the server list", "int", "int index", false);
 
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerMaxPlayers, "Gets the max player count of the server at the specified index of the server list", "int", "int index", false);
+
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerID, "Gets the ID of the most recent server", "string", "", false);
 
     // Misc main menu functions
     DEFINE_UI_SCRIPTFUNC_NAMED(s, RequestEULAContents, "Requests the latest online EULA contents, calls UICodeCallback_OnEULARequestCompleted on completion", "void", "", false);
