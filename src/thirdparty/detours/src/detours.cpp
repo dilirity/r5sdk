@@ -141,7 +141,9 @@ static void detour_init_memory()
     const PEB64* const peb = NtCurrentPeb();
 
     if (peb->OSMajorVersion >= 6) {
-        if (detours_aslr_enabled()) {
+        if (peb->OSMajorVersion != 6 ||
+            peb->OSMinorVersion > 1 ||
+            detours_aslr_enabled()) {
 #if defined(DETOURS_64BIT)
             /* 1GB after Ntdll.dll */
             PLDR_DATA_TABLE_ENTRY NtdllLdrEntry = CONTAINING_RECORD(NtCurrentPeb()->Ldr->InInitializationOrderModuleList.Flink,
