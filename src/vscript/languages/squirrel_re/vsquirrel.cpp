@@ -35,8 +35,6 @@ void(*UiAdminPanelScriptRegister_Callback)(CSquirrelVM* const s) = nullptr;
 // Registering constants in scripts.
 void(*ScriptConstantRegister_Callback)(CSquirrelVM* const s) = nullptr;
 
-bool g_scriptIsPrecompilingMods[(SQInteger)SQCONTEXT::COUNT];
-
 //---------------------------------------------------------------------------------
 // Purpose: Initialises a Squirrel VM instance
 // Output : True on success, false on failure
@@ -255,102 +253,6 @@ void CSquirrelVM::SetAsCompiler(RSON::Node_t* rson)
 		break;
 	}
 	}
-}
-
-//---------------------------------------------------------------------------------
-// Purpose: Precompiles mod scripts
-//---------------------------------------------------------------------------------
-void CSquirrelVM::CompileModScripts()
-{
-	if (!ModSystem()->IsEnabled())
-		return;
-
-	ModSystem()->LockModList();
-	g_scriptIsPrecompilingMods[(int)GetContext()] = true;
-
-	FOR_EACH_VEC(ModSystem()->GetModList(), i)
-	{
-		CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
-		mod->hasPrecompiledScripts = false;
-
-		if (!mod->IsEnabled())
-			continue;
-
-		// allocs parsed rson buffer
-		bool parseFailure;
-		RSON::Node_t* rson = mod->LoadScriptCompileList(&parseFailure);
-
-		if (!rson)
-		{
-			if (parseFailure)
-			{
-				Error(GetNativeContext(), NO_ERROR,
-					"%s: Failed to parse RSON file '%s'\n",
-					__FUNCTION__, mod->GetScriptCompileListPath().Get());
-			}
-
-			// else just continue, this mod doesn't contain a compile list.
-			continue;
-		}
-
-		SetAsCompiler(rson);
-
-		char* scriptPathArray[MAX_PRECOMPILED_SCRIPTS];
-		int scriptCount = 0;
-
-		mod->hasPrecompiledScripts = Script_ParseScriptList(
-			GetContext(),
-			mod->GetScriptCompileListPath().Get(),
-			rson,
-			scriptPathArray, &scriptCount,
-			nullptr, 0);
-
-		if (mod->hasPrecompiledScripts)
-		{
-			for (int j = 0; j < scriptCount; ++j)
-			{
-				// add "::MOD::" to the start of the script path so it can be
-				// identified from Script_LoadScript later, this is so we can
-				// avoid script naming conflicts by removing the engine's
-				// forced directory of "scripts/vscripts/" and adding the mod
-				// path to the start
-				CUtlString scriptPath;
-				scriptPath.Format("%s%s%s%s",
-					MOD_SCRIPT_PATH_IDENTIFIER, mod->GetBasePath().Get(),
-					GAME_SCRIPT_PATH, scriptPathArray[j]);
-
-				scriptPath.FixSlashes(); // normalise slash direction
-				scriptPathArray[j] = V_strdup(scriptPath.Get());
-			}
-
-			switch (GetContext())
-			{
-			case SQCONTEXT::SERVER:
-			{
-				CSquirrelVM__PrecompileServerScripts(this, GetContext(), scriptPathArray, scriptCount);
-				break;
-			}
-			case SQCONTEXT::CLIENT:
-			case SQCONTEXT::UI:
-			{
-				CSquirrelVM__PrecompileClientScripts(this, GetContext(), scriptPathArray, scriptCount);
-				break;
-			}
-			}
-
-			// clean up our allocated script paths
-			for (int j = 0; j < scriptCount; ++j)
-			{
-				free(scriptPathArray[j]);
-			}
-		}
-
-		RSON_Free(rson, AlignedMemAlloc());
-		AlignedMemAlloc()->Free(rson);
-	}
-
-	g_scriptIsPrecompilingMods[(int)GetContext()] = false;
-	ModSystem()->UnlockModList();
 }
 
 //---------------------------------------------------------------------------------

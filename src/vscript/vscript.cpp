@@ -15,6 +15,35 @@
 static const char* s_scriptContextNames[] = { "SERVER", "CLIENT", "UI" };
 
 //---------------------------------------------------------------------------------
+// Since we parse and append mod scripts to the base script list, we must defer the
+// deallocation of the RSON buffer until after the pre-compile job has finished, as
+// the script list holds pointers to the strings inside the RSON object!
+//---------------------------------------------------------------------------------
+struct ScriptModPrecompileListDeferred_s
+{
+	void Reset()
+	{
+		for (int i = 0; i < MAX_MODS_TO_LOAD; i++)
+		{
+			RSON::Node_t* const modRson = rson[i];
+
+			if (!modRson)
+				continue; // Nothing to free.
+
+			RSON_Free(modRson, AlignedMemAlloc());
+			AlignedMemAlloc()->Free(modRson);
+
+			rson[i] = nullptr;
+		}
+	}
+
+	RSON::Node_t* rson[ MAX_MODS_TO_LOAD ];
+};
+
+static ScriptModPrecompileListDeferred_s s_scriptModPrecompileListDeferred[(int)SQCONTEXT::COUNT];
+static bool s_scriptModListAppended[(int)SQCONTEXT::COUNT];
+
+//---------------------------------------------------------------------------------
 // Purpose: Returns the script VM pointer by context
 // Input  : context - 
 //---------------------------------------------------------------------------------
@@ -51,18 +80,91 @@ RSON::Node_t* Script_LoadScriptList(const SQChar* rsonfile)
 //---------------------------------------------------------------------------------
 SQBool Script_LoadScriptFile(CSquirrelVM* const s, const SQChar* path, const SQChar* name, SQInteger flags)
 {
-	// Small optimization, so we only do this for the files passed in from mods.
-	if (g_scriptIsPrecompilingMods[(SQInteger)s->GetContext()])
-	{
-		// Search for mod path identifier so the mod can decide where the file is.
-		const char* const modPath = strstr(path, MOD_SCRIPT_PATH_IDENTIFIER);
-
-		if (modPath)
-			path = &modPath[sizeof(MOD_SCRIPT_PATH_IDENTIFIER) - 1]; // skip "::MOD::"
-	}
-
 	///////////////////////////////////////////////////////////////////////////////
 	return v_Script_LoadScriptFile(s, path, name, flags);
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: appends listed mod script into an already existing script array
+// Input  : context - 
+//			*scriptArray - 
+//			*pScriptCount - 
+//---------------------------------------------------------------------------------
+static void Script_AppendModScriptList(const SQCONTEXT context, char** const scriptArray, int* const pScriptCount)
+{
+	ModSystem()->LockModList();
+	CSquirrelVM* const s = Script_GetScriptHandle(context);
+
+	FOR_EACH_VEC(ModSystem()->GetModList(), i)
+	{
+		CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+		mod->hasPrecompiledScripts = false;
+
+		if (!mod->IsEnabled())
+			continue;
+
+		// If its already loaded, use that one. This func can be called twice
+		// from CSquirrelVM::PrecompileServerScripts() and we don't want to
+		// load the rson again.
+		RSON::Node_t* modRson = s_scriptModPrecompileListDeferred[(int)context].rson[i];
+
+		if (!modRson)
+		{
+			bool parseFailure;
+			modRson = mod->LoadScriptCompileList(&parseFailure);
+
+			if (parseFailure)
+			{
+				Error(s->GetNativeContext(), 0,
+					"%s: Failed to parse RSON file \"%s\"\n",
+					__FUNCTION__, mod->GetScriptCompileListPath().Get());
+			}
+
+			if (!modRson)
+				continue; // Just continue, this mod doesn't contain a compile list.
+
+			s_scriptModPrecompileListDeferred[(int)context].rson[i] = modRson;
+		}
+
+		s->SetAsCompiler(modRson);
+
+		const CUtlString currentScriptList = mod->GetScriptCompileListPath();
+		const char* const pCurrentScriptList = currentScriptList.String();
+
+		char* modScriptPaths[MAX_SCRIPT_FILES_TO_LOAD];
+		int modScriptCount = 0;
+
+		v_Script_ParseScriptList(context, pCurrentScriptList, modRson, modScriptPaths, &modScriptCount,
+			// We check on the main `scriptArray` now because `scriptArray` was
+			// already checked on `precompiledScriptArray` on the previous call.
+			scriptArray, *pScriptCount);
+
+		if (modScriptCount > 0)
+		{
+			const int newScriptCount = *pScriptCount + modScriptCount;
+
+			// Make sure we didn't exceed it!
+			if (newScriptCount > MAX_SCRIPT_FILES_TO_LOAD)
+			{
+				Error(s->GetNativeContext(), 0,
+					"%s: Out of room appending scripts from mod '%s'(\"%s\"); max is MAX_SCRIPT_FILES_TO_LOAD = %d, got %d\n",
+					__FUNCTION__, mod->name.String(), mod->id.String(), MAX_SCRIPT_FILES_TO_LOAD, newScriptCount);
+
+				break;
+			}
+
+			// Append it.
+			memcpy(&scriptArray[*pScriptCount], modScriptPaths, modScriptCount * sizeof(char*));
+			*pScriptCount = newScriptCount;
+
+			// Only set this when everything was successful, this is so that
+			// SharedScript_ModSystem_RunCallbacks() doesn't do unnecessary
+			// work for mods that don't have scripts at all.
+			mod->hasPrecompiledScripts = true;
+		}
+	}
+
+	ModSystem()->UnlockModList();
 }
 
 //---------------------------------------------------------------------------------
@@ -75,10 +177,22 @@ SQBool Script_LoadScriptFile(CSquirrelVM* const s, const SQChar* path, const SQC
 //			**precompiledScriptArray - 
 //			precompiledScriptCount - 
 //---------------------------------------------------------------------------------
-SQBool Script_ParseScriptList(SQCONTEXT context, const char* scriptListPath,
-	RSON::Node_t* rson, char** scriptArray, int* pScriptCount, char** precompiledScriptArray, int precompiledScriptCount)
+bool Script_ParseScriptList(SQCONTEXT context, const char* scriptListPath,
+	RSON::Node_t* rson, char** scriptArray, int* pScriptCount,
+	char** precompiledScriptArray, int precompiledScriptCount)
 {
-	return v_Script_ParseScriptList(context, scriptListPath, rson, scriptArray, pScriptCount, precompiledScriptArray, precompiledScriptCount);
+	v_Script_ParseScriptList(context, scriptListPath, rson, scriptArray,
+		pScriptCount, precompiledScriptArray, precompiledScriptCount);
+
+	if (ModSystem()->IsEnabled() && !s_scriptModListAppended[(int)context])
+	{
+		Script_AppendModScriptList(context, scriptArray, pScriptCount);
+		s_scriptModListAppended[(int)context] = true;
+	}
+
+	// always returns true internally, and code never checks return value,
+	// so just do the same here.
+	return true;
 }
 
 //---------------------------------------------------------------------------------
@@ -94,6 +208,7 @@ SQBool Script_PrecompileScripts(CSquirrelVM* vm)
 	timer.Start();
 
 	SQBool result = false;
+	s_scriptModListAppended[(int)context] = false;
 
 	switch (context)
 	{
@@ -110,14 +225,10 @@ SQBool Script_PrecompileScripts(CSquirrelVM* vm)
 	}
 	}
 
-	// Compile mod scripts after we compiled the core scripts, so mods can use
-	// every symbol defined in the core scripts.
-	vm->CompileModScripts();
-	v_SQVM_FreeCompileBuffer(vm->GetVM()); // Free if after everything has been compiled.
-
+	s_scriptModPrecompileListDeferred[(int)context].Reset();
 	timer.End();
-	Msg(eDLL_T(context), "Script compiler finished in %lf seconds\n", timer.GetDuration().GetSeconds());
 
+	Msg(eDLL_T(context), "Script compiler finished in %lf seconds\n", timer.GetDuration().GetSeconds());
 	return result;
 }
 
@@ -170,15 +281,7 @@ void VScript::Detour(const bool bAttach) const
 {
 	DetourSetup(&v_Script_LoadScriptList, &Script_LoadScriptList, bAttach);
 	DetourSetup(&v_Script_LoadScriptFile, &Script_LoadScriptFile, bAttach);
+	DetourSetup(&v_Script_ParseScriptList, &Script_ParseScriptList, bAttach);
 	DetourSetup(&v_Script_PrecompileServerScripts, &Script_PrecompileServerScripts, bAttach);
 	DetourSetup(&v_Script_PrecompileClientScripts, &Script_PrecompileClientScripts, bAttach);
-
-	// note(kawe): we have to NOP the call to SQVM_FreeCompileBuffer() here,
-	// because we compile our mods scripts directly after compiling the core
-	// scripts. However, since we call this function here, our buffers would
-	// be freed before we get to compile our mod scripts. This has now been
-	// moved into the Script_PrecompileScripts() implementation above, after
-	// out mods have been precompiled.
-	CMemory(v_Script_PrecompileServerScripts).Offset(0x21A).Patch({ 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 });
-	CMemory(v_Script_PrecompileClientScripts).Offset(0x1DB).Patch({ 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 });
 }

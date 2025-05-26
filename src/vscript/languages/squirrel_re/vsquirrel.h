@@ -13,7 +13,7 @@
 
 #include "rtech/rson.h"
 
-#define MAX_PRECOMPILED_SCRIPTS 1024
+#define MAX_SCRIPT_FILES_TO_LOAD 1024
 
 class CSquirrelVM
 {
@@ -21,7 +21,6 @@ public:
 	static bool Init(CSquirrelVM* s, SQCONTEXT context, float curtime);
 	static bool DestroySignalEntryListHead(CSquirrelVM* s, HSQUIRRELVM v, SQFloat f);
 
-	void CompileModScripts();
 	void SetAsCompiler(RSON::Node_t* rson);
 
 	SQRESULT RegisterFunction(ScriptFunctionBinding_t* const binding, const bool useTypeCompiler);
@@ -72,8 +71,6 @@ extern void(*UiServerScriptRegister_Callback)(CSquirrelVM* const s);
 extern void(*UiAdminPanelScriptRegister_Callback)(CSquirrelVM* const s);
 
 extern void(*ScriptConstantRegister_Callback)(CSquirrelVM* const s);
-
-extern bool g_scriptIsPrecompilingMods[(SQInteger)SQCONTEXT::COUNT];
 
 inline bool(*CSquirrelVM__Init)(CSquirrelVM* s, SQCONTEXT context, SQFloat curtime);
 inline bool(*CSquirrelVM__DestroySignalEntryListHead)(CSquirrelVM* s, HSQUIRRELVM v, SQFloat f);
