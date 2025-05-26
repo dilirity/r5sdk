@@ -667,7 +667,6 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
 void Script_RegisterUIFunctions(CSquirrelVM* s)
 {
     Script_RegisterCommonAbstractions(s);
-    Script_RegisterCoreClientFunctions(s);
 
     DEFINE_UI_SCRIPTFUNC_NAMED(s, RequestServerList, "Requests the latest public server list, calls UICodeCallback_OnServerListRequestCompleted on completion", "void", "", false);
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerCount, "Gets the number of public servers", "int", "", false);
