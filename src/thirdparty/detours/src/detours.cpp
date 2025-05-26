@@ -190,7 +190,7 @@ struct DetourMemoryAutoInit
 };
 static DetourMemoryAutoInit s_detourMemoryAutoInit;
 
-inline SIZE_T should_skip_sytem_range_size(PBYTE pbTry)
+inline BOOL should_skip_sytem_range_size(PBYTE pbTry)
 {
     return
         ((ULONG_PTR)pbTry >= s_ulSystemRegionLowLowerBound && (ULONG_PTR)pbTry <= s_ulSystemRegionLowUpperBound)
@@ -1470,10 +1470,9 @@ static PVOID detour_alloc_region_from_lo(PBYTE pbLo, PBYTE pbHi)
     for (; pbTry < pbHi;) {
         MEMORY_BASIC_INFORMATION mbi;
 
-        const SIZE_T nSkipSize = should_skip_sytem_range_size(pbTry);
-        if (nSkipSize) {
+        if (should_skip_sytem_range_size(pbTry)) {
             // Skip region reserved for system DLLs, but preserve address space entropy.
-            pbTry += nSkipSize;
+            pbTry += 0x08000000;
             continue;
         }
 
@@ -1521,10 +1520,9 @@ static PVOID detour_alloc_region_from_hi(PBYTE pbLo, PBYTE pbHi)
         MEMORY_BASIC_INFORMATION mbi;
 
         DETOUR_TRACE(("  Try %p\n", pbTry));
-        const SIZE_T nSkipSize = should_skip_sytem_range_size(pbTry);
-        if (nSkipSize) {
+        if (should_skip_sytem_range_size(pbTry)) {
             // Skip region reserved for system DLLs, but preserve address space entropy.
-            pbTry -= nSkipSize;
+            pbTry -= 0x08000000;
             continue;
         }
 
