@@ -16,6 +16,7 @@ enum class HostStates_t : int
 };
 
 extern bool HostState_IsTransitioningToLoad();
+extern const char* Host_GetSessionID();
 
 class CHostState
 {

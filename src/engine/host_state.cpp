@@ -64,6 +64,7 @@ static ConVar host_autoReloadRate("host_autoReloadRate", "0", FCVAR_RELEASE, "Ti
 static ConVar host_autoReloadRespectGameState("host_autoReloadRespectGameState", "0", FCVAR_RELEASE, "Check the game state before proceeding to auto-reload (don't reload in the middle of a match).");
 #endif // !CLIENT_DLL
 
+static ConVar host_sessionId("host_sessionId", "", FCVAR_REPLICATED|FCVAR_DEVELOPMENTONLY, "Host session ID.");
 ConVar hostdesc("hostdesc", "", FCVAR_RELEASE, "Host game server description.");
 
 #ifdef DEDICATED
@@ -167,6 +168,16 @@ bool HostState_IsTransitioningToLoad()
 	}
 
 	return false;
+}
+
+const char* Host_GetSessionID()
+{
+	return host_sessionId.GetString();
+}
+
+static void Host_UpdateSessionID()
+{
+	host_sessionId.SetValue(g_LogSessionUUID.c_str());
 }
 
 //-----------------------------------------------------------------------------
@@ -514,8 +525,6 @@ void CHostState::State_NewGame(void)
 {
 	Msg(eDLL_T::ENGINE, "%s: Loading level: '%s'\n", __FUNCTION__, g_pHostState->m_levelName);
 
-	LARGE_INTEGER time{};
-
 #ifndef CLIENT_DLL
 	const bool bSplitScreenConnect = m_bSplitScreenConnect;
 	m_bSplitScreenConnect = false;
@@ -527,6 +536,8 @@ void CHostState::State_NewGame(void)
 #endif // !CLIENT_DLL
 
 #ifndef CLIENT_DLL
+	LARGE_INTEGER time{};
+
 	if (!CModelLoader__Map_IsValid(g_pModelLoader, m_levelName) // Check if map is valid and if we can start a new game.
 		|| !v_Host_NewGame(m_levelName, nullptr, m_bBackgroundLevel, bSplitScreenConnect, time) || !g_pServerGameClients)
 	{
@@ -538,6 +549,7 @@ void CHostState::State_NewGame(void)
 	}
 #endif // !CLIENT_DLL
 
+	Host_UpdateSessionID();
 	SetState(HostStates_t::HS_RUN);
 }
 
@@ -558,8 +570,8 @@ void CHostState::State_ChangeLevelSP(void)
 		Error(eDLL_T::ENGINE, NO_ERROR, "%s: Unable to find level: '%s'\n", __FUNCTION__, m_levelName);
 	}
 
-	// Set current state to run.
-	SetState(HostStates_t::HS_RUN);
+	Host_UpdateSessionID();
+	SetState(HostStates_t::HS_RUN); // Set current state to run.
 }
 
 //-----------------------------------------------------------------------------
@@ -585,8 +597,8 @@ void CHostState::State_ChangeLevelMP(void)
 		Error(eDLL_T::ENGINE, NO_ERROR, "%s: Unable to find level: '%s'\n", __FUNCTION__, m_levelName);
 	}
 
-	// Set current state to run.
-	SetState(HostStates_t::HS_RUN);
+	Host_UpdateSessionID();
+	SetState(HostStates_t::HS_RUN); // Set current state to run.
 }
 
 //-----------------------------------------------------------------------------
