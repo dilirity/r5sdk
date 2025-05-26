@@ -299,9 +299,9 @@ static SQRESULT ServerScript_GetNumFakeClients(HSQUIRRELVM v)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: gets the current server id
+// Purpose: gets our current session id
 //-----------------------------------------------------------------------------
-static SQRESULT ServerScript_GetServerID(HSQUIRRELVM v)
+static SQRESULT ServerScript_GetSessionID(HSQUIRRELVM v)
 {
     sq_pushstring(v, g_LogSessionUUID.c_str(), (SQInteger)g_LogSessionUUID.length());
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -679,7 +679,7 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, DebugDrawCapsule, "Draw a debug overlay capsule", "void", "vector start, vector end, float radius, vector color, float alpha, bool drawThroughWorld, float duration", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SetAutoReloadState, "Set whether we can auto-reload the server", "void", "bool canAutoReload", false);
-    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, GetServerID, "Gets the current server ID", "string", "", false);
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, GetSessionID, "Gets our current session ID", "string", "", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPos, "Finds the nearest position to the provided point on the hull's NavMesh using the hull's bounds as extents", "vector ornull", "vector searchPoint, int hullType", false);
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPosInBounds, "Finds the nearest position to the provided point on the hull's NavMesh using provided bounds as extents", "vector ornull", "vector searchPoint, vector halfExtents, int hullType", false);
