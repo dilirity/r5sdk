@@ -598,6 +598,12 @@ void CSurface::LoadSettings()
 	this->m_ConsoleToggle->SetChecked(sv->GetBool("enableConsole"));
 	this->m_ColorConsoleToggle->SetChecked(sv->GetBool("colorConsole"));
 
+	// Main.
+	this->m_ModeCombo->SetSelectedIndex(sv->GetInt("hostMode", 0));
+	this->m_HostNameTextBox->SetText(sv->GetString("hostName"));
+	this->m_VisibilityCombo->SetSelectedIndex(sv->GetInt("hostVisibility", 0));
+	this->m_LaunchArgsTextBox->SetText(sv->GetString("commandLine"));
+
 	// Engine.
 	this->m_ReservedCoresTextBox->SetText(sv->GetString("reservedCoreCount", "-1"));
 	this->m_WorkerThreadsTextBox->SetText(sv->GetString("workerThreadCount", "-1"));
@@ -653,11 +659,17 @@ void CSurface::SaveSettings()
 	kv.AddSubKey(sv);
 
 	// Game.
-	sv->SetString("playlistsFile", this->m_PlaylistFileTextBox->Text().ToCString());
 	sv->SetBool("enableCheats", this->m_CheatsToggle->Checked());
 	sv->SetBool("enableDeveloper", this->m_DeveloperToggle->Checked());
 	sv->SetBool("enableConsole", this->m_ConsoleToggle->Checked());
 	sv->SetBool("colorConsole", this->m_ColorConsoleToggle->Checked());
+	sv->SetString("playlistsFile", this->m_PlaylistFileTextBox->Text().ToCString());
+
+	// Main.
+	sv->SetInt("hostMode", this->m_ModeCombo->SelectedIndex());
+	sv->SetString("hostName", this->m_HostNameTextBox->Text().ToCString());
+	sv->SetInt("hostVisibility", this->m_VisibilityCombo->SelectedIndex());
+	sv->SetString("commandLine", this->m_LaunchArgsTextBox->Text().ToCString());
 
 	// Engine.
 	sv->SetString("reservedCoreCount", this->m_ReservedCoresTextBox->Text().ToCString());
