@@ -1335,7 +1335,7 @@ eLaunchMode CSurface::BuildParameter(string& svParameters)
 uint64_t CSurface::GetProcessorAffinity(string& svParameters)
 {
 	char* pEnd;
-	const uint64_t nProcessorAffinity = strtoull(this->m_ProcessorAffinityTextBox->Text().ToCString(), &pEnd, 16);
+	const uint64_t nProcessorAffinity = strtoull(this->m_ProcessorAffinityTextBox->Text().ToCString(), &pEnd, 0);
 
 	if (nProcessorAffinity)
 	{
