@@ -30,29 +30,29 @@ enum class ServerDataResponseType_e : int
 
 struct ConnectedNetConsoleData_s
 {
-	SocketHandle_t m_hSocket;
-	u32  m_nPayloadLen;     // Num bytes for this message.
-	u32  m_nPayloadRead;    // Num read bytes from input buffer.
-	s32  m_nFailedAttempts; // Num failed authentication attempts.
-	s32  m_nIgnoredMessage; // Count how many times client ignored the no-auth message.
-	bool m_bValidated;      // Revalidates netconsole if false.
-	bool m_bAuthorized;     // Set to true after successful netconsole auth.
-	bool m_bInputOnly;      // If set, don't send spew to this netconsole.
-	NetConFrameHeader_s m_FrameHeader; // Current frame header.
-	vector<byte> m_RecvBuffer;
+	SocketHandle_t socket;
+	u32 payloadLen;        // Num bytes for this message.
+	u32 payloadRead;       // Num read bytes from input buffer.
+	s32 numFailedAttempts; // Num failed authentication attempts.
+	s32 numIgnoredMessage; // Count how many times client ignored the no-auth message.
+	bool validated;        // Revalidates netconsole if false.
+	bool authorized;       // Set to true after successful netconsole auth.
+	bool inputOnly;        // If set, don't send spew to this netconsole.
+	NetConFrameHeader_s frameHeader; // Current frame header.
+	vector<byte> recvBuffer;
 
 	ConnectedNetConsoleData_s(SocketHandle_t hSocket = -1)
 	{
-		m_hSocket = hSocket;
-		m_nPayloadLen = 0;
-		m_nPayloadRead = 0;
-		m_nFailedAttempts = 0;
-		m_nIgnoredMessage = 0;
-		m_bValidated = false;
-		m_bAuthorized = false;
-		m_bInputOnly = true;
-		m_FrameHeader.magic = 0;
-		m_FrameHeader.length = 0;
+		socket = hSocket;
+		payloadLen = 0;
+		payloadRead = 0;
+		numFailedAttempts = 0;
+		numIgnoredMessage = 0;
+		validated = false;
+		authorized = false;
+		inputOnly = true;
+		frameHeader.magic = 0;
+		frameHeader.length = 0;
 	}
 };
 

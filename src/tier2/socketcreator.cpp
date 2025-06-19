@@ -334,7 +334,7 @@ int CSocketCreator::GetAuthorizedSocketCount(void) const
 
 	for (int i = 0; i < m_AcceptedSockets.Count(); ++i)
 	{
-		if (m_AcceptedSockets[i].m_Data.m_bAuthorized)
+		if (m_AcceptedSockets[i].m_Data.authorized)
 		{
 			ret++;
 		}

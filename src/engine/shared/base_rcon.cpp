@@ -57,7 +57,7 @@ void CNetConBase::SetKey(const char* pBase64NetKey, const bool bUseDefaultOnFail
 			}
 			else
 			{
-				m_Base64NetKey = tokenizedKey.c_str();
+				m_Base64NetKey.SetDirect(tokenizedKey.c_str(), ssize_t(tokenizedKey.length()));
 			}
 		}
 	}
@@ -81,9 +81,7 @@ void CNetConBase::SetKey(const char* pBase64NetKey, const bool bUseDefaultOnFail
 			}
 			else // Try to encode it
 			{
-				char encodedKey[45];
-				memset(encodedKey, 0, sizeof(encodedKey));
-
+				char encodedKey[AES_128_B64_ENCODED_SIZE+1]; // +1 for null terminator.
 				size_t numBytesEncoded = 0;
 
 				const int encodeRet = mbedtls_base64_encode(reinterpret_cast<unsigned char*>(&encodedKey),
@@ -101,7 +99,7 @@ void CNetConBase::SetKey(const char* pBase64NetKey, const bool bUseDefaultOnFail
 				}
 				else
 				{
-					m_Base64NetKey = encodedKey;
+					m_Base64NetKey.SetDirect(encodedKey, numBytesEncoded);
 				}
 			}
 		}
@@ -113,7 +111,7 @@ void CNetConBase::SetKey(const char* pBase64NetKey, const bool bUseDefaultOnFail
 		mbedtls_base64_decode(m_NetKey, sizeof(m_NetKey), &numBytesDecoded,
 			reinterpret_cast<const unsigned char*>(DEFAULT_NET_ENCRYPTION_KEY), AES_128_B64_ENCODED_SIZE);
 
-		m_Base64NetKey = DEFAULT_NET_ENCRYPTION_KEY;
+		m_Base64NetKey.SetDirect(DEFAULT_NET_ENCRYPTION_KEY, sizeof(DEFAULT_NET_ENCRYPTION_KEY));
 	}
 }
 
@@ -149,39 +147,39 @@ bool CNetConBase::ProcessBuffer(ConnectedNetConsoleData_s& data, const byte* pRe
 	while (nRecvLen > 0)
 	{
 		// Read payload if it's already in progress.
-		if (data.m_nPayloadLen)
+		if (data.payloadLen)
 		{
-			const u32 bytesToCopy = Min(nRecvLen, data.m_nPayloadLen - data.m_nPayloadRead);
-			memcpy(&data.m_RecvBuffer[data.m_nPayloadRead], pRecvBuf, bytesToCopy);
+			const u32 bytesToCopy = Min(nRecvLen, data.payloadLen - data.payloadRead);
+			memcpy(&data.recvBuffer[data.payloadRead], pRecvBuf, bytesToCopy);
 
-			data.m_nPayloadRead += bytesToCopy;
+			data.payloadRead += bytesToCopy;
 
 			pRecvBuf += bytesToCopy;
 			nRecvLen -= bytesToCopy;
 
-			if (data.m_nPayloadRead == data.m_nPayloadLen)
+			if (data.payloadRead == data.payloadLen)
 			{
-				if (!ProcessMessage(data.m_RecvBuffer.data(), data.m_nPayloadLen, nMaxLen))
+				if (!ProcessMessage(data.recvBuffer.data(), data.payloadLen, nMaxLen))
 					return false;
 
 				// Reset state.
-				data.m_nPayloadLen = 0;
-				data.m_nPayloadRead = 0;
+				data.payloadLen = 0;
+				data.payloadRead = 0;
 			}
 		}
-		else if (data.m_nPayloadRead < sizeof(NetConFrameHeader_s)) // Read the header if we haven't fully recv'd it.
+		else if (data.payloadRead < sizeof(NetConFrameHeader_s)) // Read the header if we haven't fully recv'd it.
 		{
-			const u32 bytesToCopy = Min(nRecvLen, int(sizeof(NetConFrameHeader_s)) - data.m_nPayloadRead);
-			memcpy(reinterpret_cast<char*>(&data.m_FrameHeader) + data.m_nPayloadRead, pRecvBuf, bytesToCopy);
+			const u32 bytesToCopy = Min(nRecvLen, int(sizeof(NetConFrameHeader_s)) - data.payloadRead);
+			memcpy(reinterpret_cast<char*>(&data.frameHeader) + data.payloadRead, pRecvBuf, bytesToCopy);
 
-			data.m_nPayloadRead += bytesToCopy;
+			data.payloadRead += bytesToCopy;
 
 			pRecvBuf += bytesToCopy;
 			nRecvLen -= bytesToCopy;
 
-			if (data.m_nPayloadRead == sizeof(NetConFrameHeader_s))
+			if (data.payloadRead == sizeof(NetConFrameHeader_s))
 			{
-				NetConFrameHeader_s& header = data.m_FrameHeader;
+				NetConFrameHeader_s& header = data.frameHeader;
 
 				// Convert byte order and check for desync.
 				header.magic = ntohl(header.magic);
@@ -216,10 +214,10 @@ bool CNetConBase::ProcessBuffer(ConnectedNetConsoleData_s& data, const byte* pRe
 					return false;
 				}
 
-				data.m_nPayloadLen = header.length;
-				data.m_nPayloadRead = 0;
+				data.payloadLen = header.length;
+				data.payloadRead = 0;
 
-				data.m_RecvBuffer.resize(header.length);
+				data.recvBuffer.resize(header.length);
 			}
 		}
 	}
@@ -305,7 +303,7 @@ void CNetConBase::Recv(ConnectedNetConsoleData_s& data, const u32 nMaxLen)
 	static char szRecvBuf[1024];
 
 	{//////////////////////////////////////////////
-		const int nPendingLen = ::recv(data.m_hSocket, szRecvBuf, sizeof(szRecvBuf), MSG_PEEK);
+		const int nPendingLen = ::recv(data.socket, szRecvBuf, sizeof(szRecvBuf), MSG_PEEK);
 		if (nPendingLen == SOCKET_ERROR && m_Socket.IsSocketBlocking())
 		{
 			return;
@@ -323,7 +321,7 @@ void CNetConBase::Recv(ConnectedNetConsoleData_s& data, const u32 nMaxLen)
 	}//////////////////////////////////////////////
 
 	u_long nReadLen = 0; // Find out how much we have to read.
-	const int iResult = ::ioctlsocket(data.m_hSocket, FIONREAD, &nReadLen);
+	const int iResult = ::ioctlsocket(data.socket, FIONREAD, &nReadLen);
 
 	if (iResult == SOCKET_ERROR)
 	{
@@ -333,7 +331,7 @@ void CNetConBase::Recv(ConnectedNetConsoleData_s& data, const u32 nMaxLen)
 
 	while (nReadLen > 0)
 	{
-		const int nRecvLen = ::recv(data.m_hSocket, szRecvBuf, MIN(sizeof(szRecvBuf), nReadLen), MSG_NOSIGNAL);
+		const int nRecvLen = ::recv(data.socket, szRecvBuf, MIN(sizeof(szRecvBuf), nReadLen), MSG_NOSIGNAL);
 		if (nRecvLen == 0) // Socket was closed.
 		{
 			Disconnect("socket closed");

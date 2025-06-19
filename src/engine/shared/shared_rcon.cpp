@@ -320,7 +320,7 @@ SocketHandle_t NetconShared_GetSocketHandle(CNetConBase* pBase, const int iSocke
 		return SOCKET_ERROR;
 	}
 
-	return pData->m_hSocket;
+	return pData->socket;
 }
 
 #ifndef _TOOLS

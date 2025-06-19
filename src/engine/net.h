@@ -2,7 +2,7 @@
 
 constexpr unsigned int AES_128_KEY_SIZE = 16;
 constexpr unsigned int AES_128_B64_ENCODED_SIZE = 24;
-constexpr const char* DEFAULT_NET_ENCRYPTION_KEY = "WDNWLmJYQ2ZlM0VoTid3Yg==";
+constexpr const char DEFAULT_NET_ENCRYPTION_KEY[AES_128_B64_ENCODED_SIZE+1] = "WDNWLmJYQ2ZlM0VoTid3Yg==";
 
 #ifndef _TOOLS
 #include "engine/net_chan.h"

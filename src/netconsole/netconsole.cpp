@@ -268,7 +268,7 @@ void CNetCon::RunInput(const string& lineInput)
 
 		if (bSend) // Only send if serialization process was successful.
 		{
-			if (!Send(hSocket, vecMsg.data(), int(vecMsg.size())))
+			if (!Send(hSocket, vecMsg.data(), u32(vecMsg.size())))
 			{
 				Error(eDLL_T::CLIENT, NO_ERROR, "Failed to send RCON message: (%s)\n", "SOCKET_ERROR");
 			}

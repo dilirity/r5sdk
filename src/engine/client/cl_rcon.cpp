@@ -73,7 +73,7 @@ void CRConClient::RunFrame(void)
 {
 	if (IsInitialized() && IsConnected())
 	{
-		ConnectedNetConsoleData_s* pData = GetData();
+		ConnectedNetConsoleData_s* const pData = GetData();
 		Assert(pData != nullptr);
 
 		if (pData)
