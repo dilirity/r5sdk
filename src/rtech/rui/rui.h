@@ -1,6 +1,8 @@
 #ifndef RTECH_RUI_H
 #define RTECH_RUI_H
 
+struct RuiInstance_s;
+
 enum class RuiArgumentType_e : u8
 {
 	TYPE_STRING = 0x1,
@@ -42,40 +44,99 @@ struct RuiArgCluster_s
 	i16 unk_10;
 };
 
-struct RuiInstance_s
-{
-	char* pName;
-	char* unk1;
-	char* unk2;
-	float elementWidth;
-	float elementHeight;
-	float float20;
-	float float24;
-	_QWORD qword28;
-	RuiArgCluster_s* pArgClusters;
-	RuiArg_s* pArgs;
-	u16 argCount;
-	u16 short42;
-	_DWORD dword44;
-	bool bool48;
-	bool hasError;
-	u16 short4a;
-	u16 short4c;
-	u16 argClusterCount;
-	void* unk3;
-	void* unk4;
-	_QWORD qword60;
-	void(__fastcall* drawFunc)(__int64(__fastcall**)(), __int64, __int64, __int64);
-	void* hiddenFunc;
-};
-
 struct RuiFuncs_s
 {
-	void (*unkFunc1)(RuiInstance_s* const inst);
-	void (*unkFunc2)(RuiInstance_s* const inst);
+	void (*SetHidden)(RuiInstance_s* const rui);
+	void (*SetNoRender)(RuiInstance_s* const rui);
+	void (*SetNoRenderAndAssert)(RuiInstance_s* const rui, const char* const errorMsg);
 
-	void (*codeError)(RuiInstance_s* const inst, const char* const errorMsg);
-	// todo: reverse the rest.
+	float (*GetTransformSize)(RuiInstance_s* const rui);
+	void (*GetTextSize)(RuiInstance_s* const rui);
+
+	void* unk1;
+
+	void (*ExecuteTransform)(RuiInstance_s* const rui, const int index);
+	void (*ExecuteTransformAndResize)(RuiInstance_s* const rui, const int index);
+
+	const char* (*SNPrintF)(RuiInstance_s* const rui, const char* const fmt, ...);
+	const char* (*Localize)(RuiInstance_s* const rui, const char* const key, __int64 a3, __int64 a4, __int64 a5, __int64 a6, __int64 a7);
+
+	const char* (*ToUpper)(RuiInstance_s* const rui, char* const text);
+	const char* (*FormatNumber)(RuiInstance_s* const rui, const char* fmt, const float number);
+
+	void* unk2;
+	void* unk3;
+	void* unk4;
+	void* unk5;
+	void* unk6;
+	void* unk7;
+
+	// Returns -1 on failure.
+	u32 (*FindAsset)(RuiInstance_s* const rui, const char* const assetName);
+
+	void* unk8;
+	void* unk9;
+	void* unk10;
+	void* unk11;
+	void* unk12;
+	void* unk13;
+
+	u32(*StringToHash)(RuiInstance_s* const rui, const char* const assetName);
+	void* (*GetActiveColorBlindPaletteColor)(RuiInstance_s* const rui, const int a2, const int a3);
+	
+	void* unk14;
+};
+
+struct RuiGlobalState_s
+{
+
+};
+
+struct RuiHeader_s
+{
+	char* name;
+	void* defaultValues;
+	char* transformData;
+	float elementWidth;
+	float elementHeight;
+	float elementWidthRatio;
+	float elementHeightRatio;
+	char* argNames;
+	RuiArgCluster_s* argClusters;
+	RuiArg_s* args;
+	u16 argCount;
+	u16 short42;
+	u16 ruiDataStructSize;
+	u16 defaultValuesSize;
+	u16 styleDescriptorCount;
+	u16 unk_4A;
+	u16 renderJobCount;
+	u16 argClusterCount;
+	void* styleDescriptors;
+	void* renderJobs;
+	void* mappingData;
+	void (*ruiFunc)(RuiFuncs_s* const api, RuiGlobalState_s* const state, RuiInstance_s* const rui, char* const values);
+	void (*ruiHiddenFunc)(RuiFuncs_s* const api, RuiGlobalState_s* const state, RuiInstance_s* const rui, char* const values);
+};
+
+
+struct RuiInstance_s
+{
+	RuiHeader_s* header;
+	float elementWidth;
+	float elementHeight;
+	float elementWidthRatio;
+	float elementHeightRatio;
+	void* str_v1;
+	__m128 m128_20;
+	_BYTE gap_30[8];
+	i64 createTimeStamp;
+	_QWORD qword_40;
+	bool isHidden;
+	bool hasError;
+	_BYTE gap_4A[14];
+	void* pointer_58;
+	_BYTE data[1];
 };
 
 /* ==== RUI ====================================================================================================================================================== */
