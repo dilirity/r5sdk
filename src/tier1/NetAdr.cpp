@@ -118,18 +118,15 @@ void CNetAdr::ToAdrinfo(addrinfo* pHint) const
 //////////////////////////////////////////////////////////////////////
 void CNetAdr::ToSockadr(struct sockaddr_storage* pSadr) const
 {
-	memset(pSadr, NULL, sizeof(struct sockaddr));
+	reinterpret_cast<sockaddr_in6*>(pSadr)->sin6_family = AF_INET6;
+	reinterpret_cast<sockaddr_in6*>(pSadr)->sin6_port = port;
 
 	if (GetType() == netadrtype_t::NA_IP)
 	{
-		reinterpret_cast<sockaddr_in6*>(pSadr)->sin6_family = AF_INET6;
-		reinterpret_cast<sockaddr_in6*>(pSadr)->sin6_port = port;
-		inet_pton(AF_INET6, ToString(true), &reinterpret_cast<sockaddr_in6*>(pSadr)->sin6_addr);
+		reinterpret_cast<sockaddr_in6*>(pSadr)->sin6_addr = adr;
 	}
 	else if (GetType() == netadrtype_t::NA_LOOPBACK)
 	{
-		reinterpret_cast<sockaddr_in6*>(pSadr)->sin6_family = AF_INET6;
-		reinterpret_cast<sockaddr_in6*>(pSadr)->sin6_port = port;
 		reinterpret_cast<sockaddr_in6*>(pSadr)->sin6_addr = in6addr_loopback;
 	}
 }
