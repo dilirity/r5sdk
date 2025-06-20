@@ -42,7 +42,7 @@ bool CNetAdr::CompareAdr(const CNetAdr& other) const
 //////////////////////////////////////////////////////////////////////
 // Convert address to string.
 //////////////////////////////////////////////////////////////////////
-const char* CNetAdr::ToString(bool bOnlyBase) const
+const char* CNetAdr::ToString(const bool bOnlyBase) const
 {
 	// Main or server frame thread only due to use of static buffers.
 	Assert(ThreadInMainOrServerFrameThread());
@@ -62,33 +62,40 @@ const char* CNetAdr::ToString(bool bOnlyBase) const
 //////////////////////////////////////////////////////////////////////
 // Convert address to string.
 //////////////////////////////////////////////////////////////////////
-void CNetAdr::ToString(char* pchBuffer, size_t unBufferSize, bool bOnlyBase) const
+size_t CNetAdr::ToString(char* const pchBuffer, const size_t unBufferSize, const bool bOnlyBase) const
 {
 	if (type == netadrtype_t::NA_NULL)
 	{
 		strncpy(pchBuffer, "null", unBufferSize);
+		return Min(sizeof("null")-1, unBufferSize);
 	}
 	else if (type == netadrtype_t::NA_LOOPBACK)
 	{
 		strncpy(pchBuffer, "loopback", unBufferSize);
+		return Min(sizeof("loopback")-1, unBufferSize);
 	}
 	else if (type == netadrtype_t::NA_IP)
 	{
 		char pStringBuf[128];
 		inet_ntop(AF_INET6, &adr, pStringBuf, INET6_ADDRSTRLEN);
 
+		int ret;
+
 		if (bOnlyBase)
 		{
-			snprintf(pchBuffer, unBufferSize, "%s", pStringBuf);
+			ret = snprintf(pchBuffer, unBufferSize, "%s", pStringBuf);
 		}
 		else
 		{
-			snprintf(pchBuffer, unBufferSize, "[%s]:%i", pStringBuf, (int)ntohs(port));
+			ret = snprintf(pchBuffer, unBufferSize, "[%s]:%i", pStringBuf, (int)ntohs(port));
 		}
+
+		return ret < 0 ? 0 : Min(static_cast<size_t>(ret), unBufferSize);
 	}
 	else
 	{
 		memmove(pchBuffer, "unknown", unBufferSize);
+		return Min(sizeof("unknown")-1, unBufferSize);
 	}
 }
 

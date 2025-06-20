@@ -33,8 +33,8 @@ public:
 	inline bool	ComparePort(const CNetAdr& other) const { return port == other.port; }
 	inline bool	IsLoopback(void) const { return type == netadrtype_t::NA_LOOPBACK; } // true if engine loopback buffers are used.
 
-	const char*	ToString(bool onlyBase = false) const;
-	void		ToString(char* pchBuffer, size_t unBufferSize, bool onlyBase = false) const;
+	const char*	ToString(const bool onlyBase = false) const;
+	size_t		ToString(char* const pchBuffer, const size_t unBufferSize, const bool onlyBase = false) const;
 	void		ToAdrinfo(addrinfo* pHint) const;
 	void		ToSockadr(struct sockaddr_storage* s) const;
 
