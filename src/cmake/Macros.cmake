@@ -179,6 +179,7 @@ macro( thirdparty_suppress_warnings )
             /wd4505 # Unreferenced local function has been removed.
             /wd4701 # potentially uninitialized local variable.
             /wd4702 # Unreachable code.
+            /wd4706 # assignment within conditional expression.
         )
     endif()
     warnings_as_errors( ${PROJECT_NAME} FALSE )
