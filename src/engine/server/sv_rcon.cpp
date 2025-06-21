@@ -152,7 +152,7 @@ void CRConServer::Think(void)
 		for (m_nConnIndex = nCount - 1; m_nConnIndex >= 0; m_nConnIndex--)
 		{
 			const netadr_t& netAdr = m_Socket.GetAcceptedSocketAddress(m_nConnIndex);
-			if (!m_WhiteListAddress.CompareAdr(netAdr))
+			if (!netAdr.CompareAdr(m_WhiteListAddress))
 			{
 				const ConnectedNetConsoleData_s& data = m_Socket.GetAcceptedSocketData(m_nConnIndex);
 				if (!data.authorized)
@@ -544,7 +544,7 @@ bool CRConServer::CheckForBan(ConnectedNetConsoleData_s& data)
 		}
 
 		// Only allow whitelisted at this point.
-		if (!m_WhiteListAddress.CompareAdr(netAdr))
+		if (!netAdr.CompareAdr(m_WhiteListAddress))
 		{
 			if (rcon_debug.GetBool())
 			{
@@ -568,7 +568,7 @@ bool CRConServer::CheckForBan(ConnectedNetConsoleData_s& data)
 		|| data.numIgnoredMessage >= sv_rcon_maxignores.GetInt())
 	{
 		// Don't add white listed address to banned list.
-		if (m_WhiteListAddress.CompareAdr(netAdr))
+		if (netAdr.CompareAdr(m_WhiteListAddress))
 		{
 			data.numFailedAttempts = 0;
 			data.numIgnoredMessage = 0;
