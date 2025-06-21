@@ -54,6 +54,7 @@ CRConServer::CRConServer(void)
 	: m_nConnIndex(0)
 	, m_nAuthConnections(0)
 	, m_bInitialized(false)
+	, m_bSocketFailure(false)
 {
 	memset(m_PasswordHash, 0, sizeof(m_PasswordHash));
 }
@@ -89,12 +90,21 @@ void CRConServer::Init(const char* pPassword, const char* pNetKey)
 	}
 
 	const char* pszAddress = sv_rcon_useloopbacksocket.GetBool() ? NET_IPV6_LOOPBACK : NET_IPV6_UNSPEC;
+	const string addressFormatted = Format("[%s]:%i", pszAddress, hostport->GetInt());
 
-	m_Address.SetFromString(Format("[%s]:%i", pszAddress, hostport->GetInt()).c_str(), true);
-	m_Socket.CreateListenSocket(m_Address);
+	if (!m_Address.SetFromString(addressFormatted.c_str(), true))
+	{
+		Error(eDLL_T::SERVER, 0, "Internal failure while initializing remote server access address ('%s')\n", addressFormatted.c_str());
+		return;
+	}
+	
+	m_bSocketFailure = !m_Socket.CreateListenSocket(m_Address);
 
-	Msg(eDLL_T::SERVER, "Remote server access initialized ('%s') with key %s'%s%s%s'\n",
-		m_Address.ToString(), g_svReset.c_str(), g_svGreyB.c_str(), GetKey(), g_svReset.c_str());
+	if (!m_bSocketFailure)
+	{
+		Msg(eDLL_T::SERVER, "Remote server access initialized ('%s') with key %s'%s%s%s'\n",
+			m_Address.ToString(), g_svReset.c_str(), g_svGreyB.c_str(), GetKey(), g_svReset.c_str());
+	}
 
 	m_bInitialized = true;
 }
@@ -113,8 +123,6 @@ void CRConServer::Shutdown(void)
 		return;
 	}
 
-	m_bInitialized = false;
-
 	const int nConnCount = m_Socket.GetAcceptedSocketCount();
 	m_Socket.CloseAllAcceptedSockets();
 
@@ -123,7 +131,10 @@ void CRConServer::Shutdown(void)
 		m_Socket.CloseListenSocket();
 	}
 
+	m_BannedList.clear();
+
 	Msg(eDLL_T::SERVER, "Remote server access deinitialized (%i accepted sockets closed)\n", nConnCount);
+	m_bInitialized = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -164,11 +175,11 @@ void CRConServer::Think(void)
 	}
 
 	// Create a new listen socket if authenticated connection is closed.
-	if (nCount == 0)
+	if (nCount == 0 && !m_bSocketFailure)
 	{
 		if (!m_Socket.IsListening())
 		{
-			m_Socket.CreateListenSocket(m_Address);
+			m_bSocketFailure = !m_Socket.CreateListenSocket(m_Address);
 		}
 	}
 }
@@ -221,6 +232,8 @@ bool CRConServer::SetPassword(const char* pszPassword)
 	}
 
 	m_bInitialized = true;
+	m_bSocketFailure = false;
+
 	return true;
 }
 
@@ -530,7 +543,6 @@ bool CRConServer::CheckForBan(ConnectedNetConsoleData_s& data)
 	}
 
 	const netadr_t& netAdr = m_Socket.GetAcceptedSocketAddress(m_nConnIndex);
-	const char* szNetAdr = netAdr.ToString(true);
 
 	if (m_BannedList.size() >= RCON_MAX_BANNEDLIST_SIZE)
 	{
@@ -548,7 +560,7 @@ bool CRConServer::CheckForBan(ConnectedNetConsoleData_s& data)
 		{
 			if (rcon_debug.GetBool())
 			{
-				Warning(eDLL_T::SERVER, "Banned list is full, dropping '%s'\n", szNetAdr);
+				Warning(eDLL_T::SERVER, "Banned list is full, dropping '%s'\n", netAdr.ToString(true));
 			}
 
 			return true;
@@ -558,7 +570,7 @@ bool CRConServer::CheckForBan(ConnectedNetConsoleData_s& data)
 	data.validated = true;
 
 	// Check if IP is in the banned list.
-	if (m_BannedList.find(szNetAdr) != m_BannedList.end())
+	if (m_BannedList.find(netAdr.GetIP()) != m_BannedList.end())
 	{
 		return true;
 	}
@@ -572,11 +584,16 @@ bool CRConServer::CheckForBan(ConnectedNetConsoleData_s& data)
 		{
 			data.numFailedAttempts = 0;
 			data.numIgnoredMessage = 0;
+
 			return false;
 		}
 
-		Warning(eDLL_T::SERVER, "Banned '%s' for RCON hacking attempts\n", szNetAdr);
-		m_BannedList.insert(szNetAdr);
+		m_BannedList.insert(netAdr.GetIP());
+
+		if (rcon_debug.GetBool())
+		{
+			Warning(eDLL_T::SERVER, "Banned '%s' for RCON hacking attempts\n", netAdr.ToString(true));
+		}
 
 		return true;
 	}
