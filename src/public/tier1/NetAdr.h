@@ -15,19 +15,20 @@ enum class netadrtype_t
 class CNetAdr
 {
 public:
-	CNetAdr(void)            { Clear(); }
-	CNetAdr(const char* pch) { SetFromString(pch); }
+	CNetAdr(void)                  { Clear(); }
+	CNetAdr(const char* const pch) { SetFromString(pch); }
 	void	Clear(void);
 
-	inline void	SetIP(IN6_ADDR* inAdr)        { adr = *inAdr; }
-	inline void	SetPort(uint16_t newport)     { port = newport; }
-	inline void	SetType(netadrtype_t newtype) { type = newtype; }
+	inline void	SetIP(const in6_addr* const inAdr)  { adr = *inAdr; }
+	inline void	SetPort(const uint16_t newport)     { port = newport; }
+	inline void	SetType(const netadrtype_t newtype) { type = newtype; }
 
 	bool	SetFromSockadr(struct sockaddr_storage* s);
-	bool	SetFromString(const char* pch, bool bUseDNS = false);
+	bool	SetFromString(const char* const pch, const bool bUseDNS = false);
 
 	inline netadrtype_t	GetType(void) const { return type; }
 	inline uint16_t		GetPort(void) const { return port; }
+	inline const in6_addr* GetIP(void) const { return &adr; }
 
 	bool		CompareAdr(const CNetAdr& other) const;
 	inline bool	ComparePort(const CNetAdr& other) const { return port == other.port; }
@@ -36,11 +37,11 @@ public:
 	const char*	ToString(const bool onlyBase = false) const;
 	size_t		ToString(char* const pchBuffer, const size_t unBufferSize, const bool onlyBase = false) const;
 	void		ToAdrinfo(addrinfo* pHint) const;
-	void		ToSockadr(struct sockaddr_storage* s) const;
+	void		ToSockadr(struct sockaddr_storage* const s) const;
 
 private:
 	netadrtype_t type;
-	IN6_ADDR adr;
+	in6_addr adr;
 	uint16_t port;
 	bool field_16;
 	bool reliable;
