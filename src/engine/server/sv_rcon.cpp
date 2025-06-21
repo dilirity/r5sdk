@@ -231,7 +231,7 @@ bool CRConServer::SetPassword(const char* pszPassword)
 //-----------------------------------------------------------------------------
 bool CRConServer::SetWhiteListAddress(const char* pszAddress)
 {
-	return m_WhiteListAddress.SetFromString(pszAddress);
+	return m_WhiteListAddress.SetFromString(pszAddress, true);
 }
 
 //-----------------------------------------------------------------------------
