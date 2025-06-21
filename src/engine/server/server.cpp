@@ -114,15 +114,21 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 	char* pszPersonaName = pChallenge->personaName;
 	NucleusID_t nNucleusID = pChallenge->personaId;
 
-	char pszAddresBuffer[128]; // Render the client's address.
-	pChallenge->netAdr.ToString(pszAddresBuffer, sizeof(pszAddresBuffer), true);
-
 	const bool bEnableLogging = sv_showconnecting.GetBool();
 	const int nPort = int(ntohs(pChallenge->netAdr.GetPort()));
 
+	char szAddresBuffer[128];
+	const char* pszAddresBuffer = nullptr;
+
 	if (bEnableLogging)
+	{
+		// Render the client address once.
+		pChallenge->netAdr.ToString(szAddresBuffer, sizeof(szAddresBuffer), true);
+		pszAddresBuffer = szAddresBuffer;
+
 		Msg(eDLL_T::SERVER, "Processing connectionless challenge for '[%s]:%i' ('%llu')\n",
 			pszAddresBuffer, nPort, nNucleusID);
+	}
 
 	bool bValidName = false;
 
@@ -144,27 +150,30 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 	if (!bValidName)
 	{
 		pServer->RejectConnection(pServer->m_Socket, &pChallenge->netAdr, "#Valve_Reject_Invalid_Name");
+
 		if (bEnableLogging)
+		{
 			Warning(eDLL_T::SERVER, "Connection rejected for '[%s]:%i' ('%llu' has an invalid name!)\n",
 				pszAddresBuffer, nPort, nNucleusID);
+		}
 
 		return nullptr;
 	}
 
-	if (g_BanSystem.IsBanListValid())
+	if (g_BanSystem.IsBanned(&pChallenge->netAdr, nNucleusID))
 	{
-		if (g_BanSystem.IsBanned(pszAddresBuffer, nNucleusID))
-		{
-			pServer->RejectConnection(pServer->m_Socket, &pChallenge->netAdr, "#Valve_Reject_Banned");
-			if (bEnableLogging)
-				Warning(eDLL_T::SERVER, "Connection rejected for '[%s]:%i' ('%llu' is banned from this server!)\n",
-					pszAddresBuffer, nPort, nNucleusID);
+		pServer->RejectConnection(pServer->m_Socket, &pChallenge->netAdr, "#Valve_Reject_Banned");
 
-			return nullptr;
+		if (bEnableLogging)
+		{
+			Warning(eDLL_T::SERVER, "Connection rejected for '[%s]:%i' ('%llu' is banned from this server!)\n",
+				pszAddresBuffer, nPort, nNucleusID);
 		}
+
+		return nullptr;
 	}
 
-	CClient* pClient = CServer__ConnectClient(pServer, pChallenge);
+	CClient* const pClient = CServer__ConnectClient(pServer, pChallenge);
 
 	for (auto& callback : !PluginSystem()->GetConnectClientCallbacks())
 	{
@@ -179,6 +188,12 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 	{
 		if (!pClient->GetNetChan()->GetRemoteAddress().IsLoopback())
 		{
+			if (!pszAddresBuffer)
+			{
+				pChallenge->netAdr.ToString(szAddresBuffer, sizeof(szAddresBuffer), true);
+				pszAddresBuffer = szAddresBuffer;
+			}
+
 			const string addressBufferCopy(pszAddresBuffer);
 			const string personaNameCopy(pszPersonaName);
 

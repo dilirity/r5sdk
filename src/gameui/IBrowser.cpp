@@ -672,6 +672,7 @@ void CBrowser::DrawHostPanel(void)
 
         if (ImGui::Button("Reload banlist##ServerBrowser_DrawHostPanel", ImVec2(contentRegionMax.x, 32)))
         {
+            g_BanSystem.Clear();
             g_BanSystem.LoadList();
         }
     }

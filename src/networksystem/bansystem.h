@@ -1,13 +1,7 @@
 #pragma once
+#include "tier1/NetAdr.h"
+#include "tier2/netadrutils.h"
 #include "ebisusdk/EbisuTypes.h"
-
-enum EKickType
-{
-	KICK_NAME = 0,
-	KICK_ID,
-	BAN_NAME,
-	BAN_ID
-};
 
 class CBanSystem
 {
@@ -45,11 +39,12 @@ public:
 	void LoadList(void);
 	void SaveList(void) const;
 
-	bool AddEntry(const char* ipAddress, const NucleusID_t nucleusId);
-	bool DeleteEntry(const char* ipAddress, const NucleusID_t nucleusId);
+	void Clear();
 
-	bool IsBanned(const char* ipAddress, const NucleusID_t nucleusId) const;
-	bool IsBanListValid(void) const;
+	bool AddEntry(const netadr_t* const adr, const NucleusID_t nuc);
+	bool DeleteEntry(const netadr_t* const adr, const NucleusID_t nuc);
+
+	bool IsBanned(const netadr_t* const adr, const NucleusID_t nuc) const;
 
 	void KickPlayerByName(const char* playerName, const char* reason = nullptr);
 	void KickPlayerById(const char* playerHandle, const char* reason = nullptr);
@@ -60,10 +55,16 @@ public:
 	void UnbanPlayer(const char* criteria);
 
 private:
+	bool AddEntry(const in6_addr* const adr, const NucleusID_t nuc);
+	bool DeleteEntry(const in6_addr* const adr, const NucleusID_t nuc);
+
+	bool IsBanned(const in6_addr* const adr, const NucleusID_t nuc) const;
+
 	void AuthorPlayerByName(const char* playerName, const bool bBan, const char* reason = nullptr);
 	void AuthorPlayerById(const char* playerHandle, const bool bBan, const char* reason = nullptr);
 
-	BannedList_t m_BannedList;
+	std::unordered_set<NucleusID_t> m_bannedIdList;
+	std::unordered_set<IPv6Wrapper_s, IPv6Hasher_s> m_bannedIpList;
 };
 
 extern CBanSystem g_BanSystem;
