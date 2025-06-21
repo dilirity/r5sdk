@@ -45,7 +45,8 @@ void CSocketCreator::ProcessAccept(void)
 {
 	sockaddr_storage inClient{};
 	int nLengthAddr = sizeof(inClient);
-	SocketHandle_t newSocket = SocketHandle_t(::accept(SOCKET(m_hListenSocket), reinterpret_cast<sockaddr*>(&inClient), &nLengthAddr));
+	const SocketHandle_t newSocket = SocketHandle_t(::accept(SOCKET(m_hListenSocket), reinterpret_cast<sockaddr*>(&inClient), &nLengthAddr));
+
 	if (newSocket == SOCKET_ERROR)
 	{
 		if (!IsSocketBlocking())
@@ -62,7 +63,14 @@ void CSocketCreator::ProcessAccept(void)
 	}
 
 	netadr_t netAdr;
-	netAdr.SetFromSockadr(&inClient);
+
+	if (!netAdr.SetFromSockadr(&inClient))
+	{
+		Error(eDLL_T::COMMON, NO_ERROR, "%s - Failed to set from socket address\n", __FUNCTION__);
+		DisconnectSocket(newSocket);
+
+		return;
+	}
 
 	OnSocketAccepted(newSocket, netAdr);
 }
@@ -151,7 +159,7 @@ int CSocketCreator::ConnectSocket(const netadr_t& netAdr, bool bSingleSocket)
 	struct sockaddr_storage s{};
 	netAdr.ToSockadr(&s);
 
-	int results = ::connect(hSocket, reinterpret_cast<sockaddr*>(&s), sizeof(sockaddr_in6));
+	const int results = ::connect(hSocket, reinterpret_cast<sockaddr*>(&s), sizeof(sockaddr_in6));
 	if (results == SOCKET_ERROR)
 	{
 		if (!IsSocketBlocking())
@@ -162,14 +170,15 @@ int CSocketCreator::ConnectSocket(const netadr_t& netAdr, bool bSingleSocket)
 			return SOCKET_ERROR;
 		}
 
-		fd_set writefds{};
-		timeval tv{};
-
-		tv.tv_usec = 0;
-		tv.tv_sec  = 1;
+		fd_set writefds;
 
 		FD_ZERO(&writefds);
 		FD_SET(static_cast<u_int>(hSocket), &writefds);
+
+		timeval tv;
+
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
 
 		if (::select(hSocket + 1, NULL, &writefds, NULL, &tv) < 1) // block for at most 1 second.
 		{
@@ -180,10 +189,7 @@ int CSocketCreator::ConnectSocket(const netadr_t& netAdr, bool bSingleSocket)
 		}
 	}
 
-	// TODO: CRConClient check if connected.
-
-	int nIndex = OnSocketAccepted(hSocket, netAdr);
-	return nIndex;
+	return OnSocketAccepted(hSocket, netAdr);
 }
 
 //-----------------------------------------------------------------------------
@@ -262,17 +268,14 @@ bool CSocketCreator::ConfigureSocket(SocketHandle_t hSocket, bool bDualStack /*=
 // Purpose: handles new TCP requests and puts them in accepted queue
 // Input  : hSocket - 
 //			*netAdr - 
-// Output : accepted socket index, -1 if failed
+// Output : accepted socket index
 //-----------------------------------------------------------------------------
 int CSocketCreator::OnSocketAccepted(SocketHandle_t hSocket, const netadr_t& netAdr)
 {
 	AcceptedSocket_t newEntry(hSocket);
 	newEntry.m_Address = netAdr;
 
-	m_AcceptedSockets.AddToTail(newEntry);
-
-	int nIndex = m_AcceptedSockets.Count() - 1;
-	return nIndex;
+	return m_AcceptedSockets.AddToTail(newEntry);
 }
 
 //-----------------------------------------------------------------------------
