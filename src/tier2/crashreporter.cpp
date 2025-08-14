@@ -29,22 +29,24 @@ static inline bool CrashReporter_ShowMessageBox()
 
 static inline bool CrashReporter_ShouldSubmitReport()
 {
-	if (!ConVar_IsRegistered())
-	{
+	return false;
+
+	//if (!ConVar_IsRegistered())
+	//{
 		// Can't check if the user accepted the EULA or not, show a prompt instead.
-		if (!CrashReporter_ShowMessageBox())
-			return false;
-	}
-	else
-	{
-		if (!backtrace_enabled.GetBool())
-			return false;
+	//	if (!CrashReporter_ShowMessageBox())
+	//		return false;
+	//}
+	//else
+	//{
+	//	if (!backtrace_enabled.GetBool())
+	//		return false;
 
-		if (!IsEULAUpToDate())
-			return false;
-	}
+	//	if (!IsEULAUpToDate())
+	//		return false;
+	//}
 
-	return true;
+	//return true;
 }
 
 static inline string CrashReporter_FormatAttributes(const CCrashHandler* const handler)
