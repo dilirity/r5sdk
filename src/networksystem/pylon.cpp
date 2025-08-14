@@ -71,7 +71,7 @@ bool CPylon::GetServerList(vector<NetGameServer_t>& outServerList, string& outMe
     rapidjson::Document responseJson;
     CURLINFO status;
 
-    if (!SendRequest("/servers", requestJson, responseJson,
+    if (!SendRequest("api/servers", requestJson, responseJson,
         outMessage, status, "server list error"))
     {
         return false;
@@ -129,7 +129,7 @@ bool CPylon::GetServerByToken(NetGameServer_t& outGameServer,
     rapidjson::Document responseJson;
     CURLINFO status;
 
-    if (!SendRequest("/server/byToken", requestJson, responseJson,
+    if (!SendRequest("api/server/byToken", requestJson, responseJson,
         outMessage, status, "server not found"))
     {
         return false;
@@ -192,7 +192,7 @@ bool CPylon::PostServerHost(string& outMessage, string& outToken, string& outHos
     rapidjson::Document responseJson;
     CURLINFO status;
 
-    if (!SendRequest("/servers/add", requestJson, responseJson, outMessage, status, "server host error"))
+    if (!SendRequest("api/servers/add", requestJson, responseJson, outMessage, status, "server host error"))
     {
         return false;
     }
@@ -259,7 +259,7 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
     string outMessage;
     CURLINFO status;
 
-    if (!SendRequest("/banlist/bulkCheck", requestJson, responseJson, outMessage, status, "banned bulk check error"))
+    if (!SendRequest("api/banlist/bulkCheck", requestJson, responseJson, outMessage, status, "banned bulk check error"))
     {
         return false;
     }
@@ -331,7 +331,7 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
     string outMessage;
     CURLINFO status;
 
-    if (!SendRequest("/banlist/isBanned", requestJson, responseJson, outMessage, status, "banned check error"))
+    if (!SendRequest("api/banlist/isBanned", requestJson, responseJson, outMessage, status, "banned check error"))
     {
         return false;
     }
@@ -397,7 +397,7 @@ bool CPylon::AuthForConnection(const uint64_t nucleusId, const char* ipAddress,
 
     CURLINFO status;
 
-    if (!SendRequest("/client/authenticate", requestJson, responseJson, outMessage, status, "origin auth error"))
+    if (!SendRequest("api/client/authenticate", requestJson, responseJson, outMessage, status, "origin auth error"))
     {
         return false;
     }
@@ -433,7 +433,7 @@ bool CPylon::GetEULA(MSEulaData_t& outData, string& outMessage) const
     rapidjson::Document responseJson;
     CURLINFO status;
 
-    if (!SendRequest("/eula", requestJson, responseJson, outMessage, status, "eula fetch error", false))
+    if (!SendRequest("api/eula", requestJson, responseJson, outMessage, status, "eula fetch error", false))
     {
         return false;
     }
