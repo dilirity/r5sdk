@@ -23,6 +23,8 @@ History:
 #include "engine/cmd.h"
 #include "gameui/IConsole.h"
 #include "imgui_system.h"
+#include <algorithm> // Required for std::remove_if
+#include <sstream>   // Required for std::stringstream
 
 //-----------------------------------------------------------------------------
 // Console variables
@@ -50,10 +52,44 @@ static ConCommand con_removeline("con_removeline", CConsole::RemoveLine_f, "Remo
 static ConCommand con_clearlines("con_clearlines", CConsole::ClearLines_f, "Clears all lines from the developer console", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 static ConCommand con_clearhistory("con_clearhistory", CConsole::ClearHistory_f, "Clears all submissions from the developer console history", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 
+//DevMenu
+static void DevMenuAdd_f(const CCommand& args)
+{
+    if (args.ArgC() < 3)
+    {
+        Msg(eDLL_T::CLIENT, "Usage: dev_menu_add \"<path/to/item>\" \"<command>\" [\"<tooltip>\"]\n");
+        return;
+    }
+    const char* path = args[1];
+    const char* command = args[2];
+    const char* tooltip = (args.ArgC() > 3) ? args[3] : "";
+
+    g_Console.AddPresetCommand(path, command, tooltip);
+}
+static ConCommand dev_menu_add("dev_menu_add", DevMenuAdd_f, "Adds a hierarchical preset command to the console top bar.", FCVAR_DEVELOPMENTONLY);
+
+static void DevMenuRemove_f(const CCommand& args)
+{
+    if (args.ArgC() != 2)
+    {
+        Msg(eDLL_T::CLIENT, "Usage: dev_menu_remove \"<path/to/item>\"\n");
+        return;
+    }
+    g_Console.RemovePresetCommand(args[1]);
+}
+static ConCommand dev_menu_remove("dev_menu_remove", DevMenuRemove_f, "Removes a preset command from the console top bar by its path.", FCVAR_DEVELOPMENTONLY);
+
+static void DevMenuClear_f(const CCommand& args)
+{
+    g_Console.ClearPresetCommands();
+}
+static ConCommand dev_menu_clear("dev_menu_clear", DevMenuClear_f, "Removes all preset commands from the console top bar.", FCVAR_DEVELOPMENTONLY);
+
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
-CConsole::CConsole(void) 
+CConsole::CConsole(void)
     : m_loggerLabel("LoggingRegion")
     , m_historyPos(ConAutoCompletePos_e::kPark)
     , m_suggestPos(ConAutoCompletePos_e::kPark)
@@ -187,7 +223,7 @@ bool CConsole::DrawSurface(void)
     if (!IsVisible())
         return false;
 
-    if (!ImGui::Begin(m_surfaceLabel, &m_activated, ImGuiWindowFlags_None, &ResetInput))
+    if (!ImGui::Begin(m_surfaceLabel, &m_activated, ImGuiWindowFlags_MenuBar, &ResetInput))
     {
         ImGui::End();
         return false;
@@ -196,10 +232,14 @@ bool CConsole::DrawSurface(void)
     SetRect(1200, 524, 50, 50);
     m_mainWindow = ImGui::GetCurrentWindow();
 
+    // Draw the preset commands top bar inside the console window.
+    DrawPresetBar();
+
     const ImGuiStyle& style = ImGui::GetStyle();
     const ImVec2 fontSize = ImGui::GetFont()->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, -1.0f, "#", nullptr, nullptr);
 
     ///////////////////////////////////////////////////////////////////////
+    // The main console content starts here
     ImGui::Separator();
     if (ImGui::BeginPopup("Options##Console_DrawSurface"))
     {
@@ -250,10 +290,10 @@ bool CConsole::DrawSurface(void)
         footerHeightReserve += style.ItemSpacing.y;
     }
 
-    const static int colorLoggerWindowFlags = 
-        ImGuiWindowFlags_NoMove                    |
-        ImGuiWindowFlags_HorizontalScrollbar       |
-        ImGuiWindowFlags_NoNavInputs               |
+    const static int colorLoggerWindowFlags =
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_HorizontalScrollbar |
+        ImGuiWindowFlags_NoNavInputs |
         ImGuiWindowFlags_OverlayHorizontalScrollbar;
 
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, m_fadeAlpha); numLoggerStyleVars++;
@@ -282,12 +322,12 @@ bool CConsole::DrawSurface(void)
 
     ///////////////////////////////////////////////////////////////////////
     const static int inputTextFieldFlags =
-        ImGuiInputTextFlags_EnterReturnsTrue       |
-        ImGuiInputTextFlags_CallbackCompletion     |
-        ImGuiInputTextFlags_CallbackHistory        |
-        ImGuiInputTextFlags_CallbackAlways         |
-        ImGuiInputTextFlags_CallbackCharFilter     |
-        ImGuiInputTextFlags_CallbackEdit           |
+        ImGuiInputTextFlags_EnterReturnsTrue |
+        ImGuiInputTextFlags_CallbackCompletion |
+        ImGuiInputTextFlags_CallbackHistory |
+        ImGuiInputTextFlags_CallbackAlways |
+        ImGuiInputTextFlags_CallbackCharFilter |
+        ImGuiInputTextFlags_CallbackEdit |
         ImGuiInputTextFlags_AutoCaretEnd;
 
     ImGui::PushItemWidth(footerWidthReserve - 80);
@@ -407,6 +447,56 @@ void CConsole::DrawOptionsPanel(void)
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: draws the preset command bar at the top of the console
+//-----------------------------------------------------------------------------
+void CConsole::DrawPresetBar(void)
+{
+    if (m_vecRootCommands.empty())
+    {
+        return;
+    }
+
+    if (ImGui::BeginMenuBar())
+    {
+        DrawMenuRecursive(m_vecRootCommands);
+        ImGui::EndMenuBar();
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: recursively draws the menu items
+//-----------------------------------------------------------------------------
+void CConsole::DrawMenuRecursive(const vector<CConsole::PresetCommand_t>& commands)
+{
+    for (const auto& command : commands)
+    {
+        // If it has children, it's a menu
+        if (!command.m_vecChildren.empty())
+        {
+            if (ImGui::BeginMenu(command.m_svLabel.c_str()))
+            {
+                DrawMenuRecursive(command.m_vecChildren);
+                ImGui::EndMenu();
+            }
+        }
+        // Otherwise, it's a clickable item
+        else
+        {
+            if (ImGui::MenuItem(command.m_svLabel.c_str()))
+            {
+                ProcessCommand(command.m_svCommand.c_str());
+            }
+
+            if (ImGui::IsItemHovered() && !command.m_svTooltip.empty())
+            {
+                ImGui::SetTooltip("%s", command.m_svTooltip.c_str());
+            }
+        }
+    }
+}
+
+
+//-----------------------------------------------------------------------------
 // Purpose: returns flag texture index for CommandBase (must be aligned with resource.h!)
 //          in the future we should build the texture procedurally with use of popcnt.
 // Input  : nFlags - 
@@ -515,12 +605,12 @@ static void AddHint(const ConVarFlags::FlagDesc_t& cvarInfo, const vector<MODULE
 //-----------------------------------------------------------------------------
 void CConsole::DrawAutoCompletePanel(void)
 {
-    const static int autoCompleteWindowFlags = 
-        ImGuiWindowFlags_NoTitleBar                |
-        ImGuiWindowFlags_NoMove                    |
-        ImGuiWindowFlags_NoSavedSettings           |
-        ImGuiWindowFlags_NoFocusOnAppearing        |
-        ImGuiWindowFlags_AlwaysVerticalScrollbar   |
+    const static int autoCompleteWindowFlags =
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_AlwaysVerticalScrollbar |
         ImGuiWindowFlags_AlwaysHorizontalScrollbar;
 
     ImGui::Begin("##Console_DrawAutoCompletePanel_Suggest", nullptr, autoCompleteWindowFlags);
@@ -730,13 +820,13 @@ template <size_t N1, size_t N2>
 static void EncaseAppendString(string& targetString, const char* toEncase, const char(&open)[N1], const char(&close)[N2])
 {
     const size_t appLen = strlen(toEncase);
-    const size_t newLen = targetString.length() + (N1-1) + (N2-1) + appLen+1;
+    const size_t newLen = targetString.length() + (N1 - 1) + (N2 - 1) + appLen + 1;
 
     targetString.reserve(newLen);
 
-    targetString.append(open, N1-1);
+    targetString.append(open, N1 - 1);
     targetString.append(toEncase, appLen);
-    targetString.append(close, N2-1);
+    targetString.append(close, N2 - 1);
 }
 
 //-----------------------------------------------------------------------------
@@ -859,7 +949,7 @@ void CConsole::BuildSummaryText(const char* const inputText, const size_t textLe
         if (conVar && !conVar->IsFlagSet(FCVAR_HIDDEN))
         {
             // Display the current and default value of ConVar if found.
-            snprintf(m_summaryTextBuf, sizeof(m_summaryTextBuf), "(\"%s\", default \"%s\")", 
+            snprintf(m_summaryTextBuf, sizeof(m_summaryTextBuf), "(\"%s\", default \"%s\")",
                 conVar->GetString(), conVar->GetDefault());
 
             return;
@@ -985,7 +1075,7 @@ int CConsole::TextEditCallback(ImGuiInputTextCallbackData* iData)
     {
         if (m_autoCompleteActive)
         {
-            if (iData->EventKey == ImGuiKey_UpArrow && m_suggestPos > - 1)
+            if (iData->EventKey == ImGuiKey_UpArrow && m_suggestPos > -1)
             {
                 m_suggestPos--;
                 m_autoCompletePosMoved = true;
@@ -1261,6 +1351,117 @@ void CConsole::ClearLog(void)
 {
     AUTO_LOCK(m_colorTextLoggerMutex);
     m_colorTextLogger.RemoveLine(0, (m_colorTextLogger.GetTotalLines() - 1));
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: adds a preset command to the dev menu tree
+//-----------------------------------------------------------------------------
+void CConsole::AddPresetCommand(const char* const szPath, const char* const szCommand, const char* const szTooltip)
+{
+    std::stringstream ss(szPath);
+    string segment;
+    vector<string> pathParts;
+
+    while (std::getline(ss, segment, '/'))
+    {
+        pathParts.push_back(segment);
+    }
+
+    if (pathParts.empty()) return;
+
+    vector<PresetCommand_t>* currentLevel = &m_vecRootCommands;
+
+    // Traverse or create menus for all but the last part of the path
+    for (size_t i = 0; i < pathParts.size() - 1; ++i)
+    {
+        const string& part = pathParts[i];
+        auto it = std::find_if(currentLevel->begin(), currentLevel->end(),
+            [&part](const PresetCommand_t& cmd) { return cmd.m_svLabel == part; });
+
+        if (it == currentLevel->end())
+        {
+            // Menu doesn't exist, create it
+            currentLevel->emplace_back(part);
+            currentLevel = &currentLevel->back().m_vecChildren;
+        }
+        else
+        {
+            // Menu exists, move to the next level
+            currentLevel = &it->m_vecChildren;
+        }
+    }
+
+    // Handle the final part: the command item itself
+    const string& finalPart = pathParts.back();
+    auto it = std::find_if(currentLevel->begin(), currentLevel->end(),
+        [&finalPart](const PresetCommand_t& cmd) { return cmd.m_svLabel == finalPart; });
+
+    if (it != currentLevel->end())
+    {
+        // Item already exists, update it
+        it->m_svCommand = szCommand;
+        it->m_svTooltip = szTooltip;
+        it->m_vecChildren.clear(); // Ensure it's a command item, not a menu
+    }
+    else
+    {
+        // Item doesn't exist, create it
+        currentLevel->emplace_back(finalPart, szCommand, szTooltip);
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: removes a preset command from the dev menu tree by its path
+//-----------------------------------------------------------------------------
+void CConsole::RemovePresetCommand(const char* const szPath)
+{
+    std::stringstream ss(szPath);
+    string segment;
+    vector<string> pathParts;
+
+    while (std::getline(ss, segment, '/'))
+    {
+        pathParts.push_back(segment);
+    }
+
+    if (pathParts.empty()) return;
+
+    vector<PresetCommand_t>* parentLevel = &m_vecRootCommands;
+
+    // Traverse to the parent of the target item
+    for (size_t i = 0; i < pathParts.size() - 1; ++i)
+    {
+        const string& part = pathParts[i];
+        auto it = std::find_if(parentLevel->begin(), parentLevel->end(),
+            [&part](const PresetCommand_t& cmd) { return cmd.m_svLabel == part; });
+
+        if (it == parentLevel->end())
+        {
+            // Path does not exist
+            return;
+        }
+        parentLevel = &it->m_vecChildren;
+    }
+
+    // Find and remove the target item from its parent
+    const string& finalPart = pathParts.back();
+    auto it = std::remove_if(parentLevel->begin(), parentLevel->end(),
+        [&finalPart](const PresetCommand_t& cmd) {
+            return cmd.m_svLabel == finalPart;
+        });
+
+    if (it != parentLevel->end())
+    {
+        parentLevel->erase(it, parentLevel->end());
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: removes all preset commands from the console top bar
+//-----------------------------------------------------------------------------
+void CConsole::ClearPresetCommands(void)
+{
+    m_vecRootCommands.clear();
 }
 
 //-----------------------------------------------------------------------------

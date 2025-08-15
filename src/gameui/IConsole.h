@@ -21,7 +21,12 @@ public:
     virtual bool DrawSurface(void);
 
 private:
+    // Forward declaration for the recursive struct
+    struct PresetCommand_t;
+
     void DrawOptionsPanel(void);
+    void DrawPresetBar(void);
+    void DrawMenuRecursive(const vector<PresetCommand_t>& commands);
     void DrawAutoCompletePanel(void);
 
     bool RunAutoComplete(void);
@@ -52,6 +57,11 @@ public:
     void AddHistory(const char* const command);
     const vector<string>& GetHistory(void) const;
     void ClearHistory(void);
+
+    // Preset command management
+    void AddPresetCommand(const char* const szPath, const char* const szCommand, const char* const szTooltip);
+    void RemovePresetCommand(const char* const szPath);
+    void ClearPresetCommands(void);
 
 public:
     // Console command callbacks
@@ -103,10 +113,28 @@ private:
         int flags;
     };
 
+    // This struct is recursive to support nested menus.
+    struct PresetCommand_t
+    {
+        string m_svLabel;
+        string m_svCommand;
+        string m_svTooltip;
+        vector<PresetCommand_t> m_vecChildren; // Children for sub-menus
+
+        // Constructor for a menu (which has children but no command)
+        PresetCommand_t(const string& label) : m_svLabel(label) {}
+
+        // Constructor for a command item (which has a command but no children)
+        PresetCommand_t(const string& label, const string& command, const string& tooltip)
+            : m_svLabel(label), m_svCommand(command), m_svTooltip(tooltip) {
+        }
+    };
+
+
 private:
     ///////////////////////////////////////////////////////////////////////////
-    ImGuiWindow*                   m_mainWindow;
-    const char*                    m_loggerLabel;
+    ImGuiWindow* m_mainWindow;
+    const char* m_loggerLabel;
     char                           m_inputTextBuf[512];
     char                           m_summaryTextBuf[256];
 
@@ -173,6 +201,7 @@ private:
     vector<ConAutoCompleteSuggest_s>           m_vecSuggest;
     vector<MODULERESOURCE>         m_vecFlagIcons;
     vector<string>                 m_vecHistory;
+    vector<PresetCommand_t>        m_vecRootCommands; // Holds the root of the menu tree
 
     // The color logger in which text gets added, note that the mutex lock
     // should always be acquired when using this as this is accessed from 
