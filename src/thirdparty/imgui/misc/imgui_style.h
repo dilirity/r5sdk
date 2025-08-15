@@ -6,7 +6,8 @@ enum class ImGuiStyle_t
     NONE = -1,
     DEFAULT,
     LEGACY,
-    MODERN
+    MODERN,
+    OG
 };
 
 void ImGui_SetStyle(const ImGuiStyle_t style);

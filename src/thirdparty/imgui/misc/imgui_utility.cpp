@@ -88,6 +88,10 @@ ImGuiStyle_t ImGuiConfig::InitStyle() const
     {
         selected = ImGuiStyle_t::MODERN;
     }
+    else if (strcmp(CommandLine()->ParmValue("-imgui_theme", ""), "og") == 0)
+    {
+        selected = ImGuiStyle_t::OG;
+    }
     else
     {
         selected = ImGuiStyle_t::DEFAULT;
