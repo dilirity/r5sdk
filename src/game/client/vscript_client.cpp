@@ -389,6 +389,22 @@ static SQRESULT UIScript_GetServerMaxPlayers(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+static SQRESULT UIScript_GetServerHasPassword(HSQUIRRELVM v)
+{
+    AUTO_LOCK(g_ServerListManager.m_Mutex);
+
+    SQInteger iServer = -1;
+    sq_getinteger(v, 2, &iServer);
+
+    if (!Script_CheckServerIndexAndFailure(v, iServer))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const SQBool hasPassword = g_ServerListManager.m_vServerList[iServer].hasPassword;
+    sq_pushbool(v, hasPassword);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: gets the most recent server id
 //-----------------------------------------------------------------------------
@@ -686,6 +702,8 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerCurrentPlayers, "Gets the current player count of the server at the specified index of the server list", "int", "int index", false);
 
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerMaxPlayers, "Gets the max player count of the server at the specified index of the server list", "int", "int index", false);
+
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerHasPassword, "Gets the current hasPassword bool at the specified index of the server list", "bool", "int index", false);
 
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetServerID, "Gets the ID of the most recent server", "string", "", false);
 
