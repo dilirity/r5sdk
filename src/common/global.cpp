@@ -61,8 +61,8 @@ ConVar* stream_overlay                     = nullptr;
 ConVar* stream_overlay_mode                = nullptr;
 ConVar* gpu_driven_tex_stream              = nullptr;
 
-ConVar* eula_version                       = nullptr;
-ConVar* eula_version_accepted              = nullptr;
+//ConVar* eula_version                       = nullptr;
+//ConVar* eula_version_accepted              = nullptr;
 
 ConVar* language_cvar                      = nullptr;
 
@@ -178,8 +178,8 @@ void ConVar_InitShipped(void)
 	base_tickinterval_mp             = g_pCVar->FindVar("base_tickinterval_mp");
 	fs_showAllReads                  = g_pCVar->FindVar("fs_showAllReads");
 
-	eula_version                     = g_pCVar->FindVar("eula_version");
-	eula_version_accepted            = g_pCVar->FindVar("eula_version_accepted");
+	//eula_version                     = g_pCVar->FindVar("eula_version");
+	//eula_version_accepted            = g_pCVar->FindVar("eula_version_accepted");
 
 	language_cvar                    = g_pCVar->FindVar("language");
 	voice_noxplat                    = g_pCVar->FindVar("voice_noxplat");
@@ -580,24 +580,5 @@ void ConCommand_PurgeShipped(void)
 			g_pCVar->UnregisterConCommand(pCommandBase);
 		}
 	}
-#endif // DEDICATED
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: checks if the accepted EULA is up to date.
-// Output : true on success, false on failure.
-//-----------------------------------------------------------------------------
-bool IsEULAUpToDate()
-{
-#ifdef DEDICATED
-	// Users of the dedicated servers are by default agreeing to the EULA
-	// when using it. They can use it offline (not using the r5reloaded
-	// master servers) to not accept it. The challenge of implementing
-	// something that allows the dedi operator to agree to the EULA upon
-	// launch is that it will break the automation of spinning up dedi
-	// instances.
-	return true;
-#else
-	return (eula_version_accepted->GetInt() == eula_version->GetInt());
 #endif // DEDICATED
 }

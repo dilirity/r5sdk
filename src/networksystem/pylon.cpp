@@ -437,7 +437,7 @@ bool CPylon::GetEULA(MSEulaData_t& outData, string& outMessage) const
     rapidjson::Document responseJson;
     CURLINFO status;
 
-    if (!SendRequest("/api/eula", requestJson, responseJson, outMessage, status, "eula fetch error", false))
+    if (!SendRequest("/api/eula", requestJson, responseJson, outMessage, status, "eula fetch error"))
     {
         return false;
     }
@@ -476,13 +476,8 @@ bool CPylon::GetEULA(MSEulaData_t& outData, string& outMessage) const
 //-----------------------------------------------------------------------------
 bool CPylon::SendRequest(const char* endpoint, const rapidjson::Document& requestJson,
     rapidjson::Document& responseJson, string& outMessage, CURLINFO& status,
-    const char* errorText, const bool checkEula) const
+    const char* errorText) const
 {
-    if (!IsDedicated() && !IsEULAUpToDate() && checkEula)
-    {
-        outMessage = "EULA not accepted";
-        return false;
-    }
 
     rapidjson::StringBuffer stringBuffer;
     JSON_DocumentToBufferDeserialize(requestJson, stringBuffer);

@@ -48,8 +48,8 @@ extern ConVar* gpu_driven_tex_stream;
 #endif // !DEDICATED
 //-------------------------------------------------------------------------
 // SHARED                                                                 |
-extern ConVar* eula_version;
-extern ConVar* eula_version_accepted;
+//extern ConVar* eula_version;
+//extern ConVar* eula_version_accepted;
 
 extern ConVar* language_cvar;
 
@@ -150,8 +150,6 @@ extern ConVar* rui_defaultDebugFontFace;
 #ifndef DEDICATED
 extern ConVar* miles_language;
 #endif
-
-bool IsEULAUpToDate();
 
 void ConVar_InitShipped(void);
 void ConVar_PurgeShipped(void);

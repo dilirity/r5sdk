@@ -471,12 +471,6 @@ static void Internal_UIScript_RequestEULAThreaded()
 
     g_TaskQueue.Dispatch([success, errorMsg = std::move(responseMsg), eulaData = std::move(eulaDataMs)]
         {
-            if (success)
-            {
-                // set EULA version cvar to the newly fetched EULA version
-                eula_version->SetValue(eulaData.version);
-            }
-
             if (!g_pUIScript)
                 return;
 

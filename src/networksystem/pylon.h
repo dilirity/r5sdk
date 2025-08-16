@@ -49,7 +49,7 @@ private:
 	void ExtractError(const string& response, string& outMessage, CURLINFO status, const char* messageText = nullptr) const;
 
 	void LogBody(const rapidjson::Document& responseJson) const;
-	bool SendRequest(const char* endpoint, const rapidjson::Document& requestJson, rapidjson::Document& responseJson, string& outMessage, CURLINFO& status, const char* errorText = nullptr, const bool checkEula = true) const;
+	bool SendRequest(const char* endpoint, const rapidjson::Document& requestJson, rapidjson::Document& responseJson, string& outMessage, CURLINFO& status, const char* errorText = nullptr) const;
 	bool QueryServer(const char* endpoint, const char* request, string& outResponse, string& outMessage, CURLINFO& outStatus) const;
 
 	void SetDisabledMessage(string& outMsg) const;
