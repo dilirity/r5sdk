@@ -15,19 +15,36 @@
 #include "server.h"
 #include "game/server/gameinterface.h"
 #include "game/server/util_server.h"
+#include "tier2/cryptutils.h"
+#include "thirdparty/mbedtls/include/mbedtls/sha256.h"
 
-// Simple non-reversible tag for equality check without leaking plaintext
 static string SV_HashPasswordTag(const char* const pszPassword)
 {
 	if (!pszPassword || !pszPassword[0])
 		return string();
-	uint64_t h = 1469598103934665603ULL; // FNV-1a 64-bit
-	for (const unsigned char* p = reinterpret_cast<const unsigned char*>(pszPassword); *p; ++p)
+
+	char ctx[128] = {};
+	const char* ip = hostip->GetString();
+	int port = hostport->GetInt();
+	Q_snprintf(ctx, sizeof(ctx), "%s:%d", (ip && ip[0]) ? ip : "0.0.0.0", port);
+
+	string material;
+	material.reserve(strlen(pszPassword) + strlen("R5SDK_PW_PPR_v1") + strlen(ctx) + 2);
+	material.append(pszPassword);
+	material.push_back('|');
+	material.append("R5SDK_PW_PPR_v1");
+	material.push_back('|');
+	material.append(ctx);
+
+	uint8_t digest[32] = {};
+	if (mbedtls_sha256(reinterpret_cast<const unsigned char*>(material.data()), (size_t)material.size(), digest, 0) != 0)
 	{
-		h ^= *p;
-		h *= 1099511628211ULL;
+		return string();
 	}
-	return Format("pw:%016llx", h);
+
+	uint64_t tag64 = 0;
+	memcpy(&tag64, digest, sizeof(tag64));
+	return Format("pw:%016llx", (unsigned long long)tag64);
 }
 
 static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOldValue, ChangeUserData_t pUserData)
@@ -38,7 +55,7 @@ static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString,
 		return;
 
 	const char* const newPw = pPassword->GetString();
-	// Skip if value hasn't actually changed.
+
 	if (pOldString && strcmp(pOldString, newPw) == 0)
 		return;
 
