@@ -52,6 +52,7 @@ private:
     char m_serverTokenTextBuf[128];
     char m_serverAddressTextBuf[128];
     char m_serverNetKeyTextBuf[45];
+    char m_serverPasswordTextBuf[1128];
 
     ID3D11ShaderResourceView* m_lockedIconShaderResource;
     MODULERESOURCE m_lockedIconDataResource;

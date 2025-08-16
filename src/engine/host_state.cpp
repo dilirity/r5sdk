@@ -79,16 +79,20 @@ static void HostState_KeepAlive()
 		return;
 	}
 
+	string password = sv_password.GetString();
+
 	const NetGameServer_t gameServer
 	{
 		hostname->GetString(),
 		hostdesc.GetString(),
 		pylon_host_visibility.GetInt() == ServerVisibility_e::HIDDEN,
+		password.length() > 0,
 		g_pHostState->m_levelName,
 		v_Playlists_GetCurrent(),
 		hostip->GetString(),
 		hostport->GetInt(),
 		g_pNetKey->GetBase64NetKey(),
+		password,
 		*g_nServerRemoteChecksum,
 		SDK_VERSION,
 		g_pServer->GetNumClients(),

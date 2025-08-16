@@ -39,6 +39,7 @@ History:
 #include "public/edict.h"
 #include "game/shared/vscript_shared.h"
 #include "game/server/gameinterface.h"
+#include <engine/server/sv_main.cpp>
 
 static ConCommand togglebrowser("togglebrowser", CBrowser::ToggleBrowser_f, "Show/hide the server browser", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 
@@ -58,6 +59,7 @@ CBrowser::CBrowser(void)
     memset(m_serverTokenTextBuf, '\0', sizeof(m_serverTokenTextBuf));
     memset(m_serverAddressTextBuf, '\0', sizeof(m_serverAddressTextBuf));
     memset(m_serverNetKeyTextBuf, '\0', sizeof(m_serverNetKeyTextBuf));
+    memset(m_serverPasswordTextBuf, '\0', sizeof(m_serverPasswordTextBuf));
 
     m_levelName = "mp_lobby";
     m_modeName = "dev_default";
@@ -228,6 +230,8 @@ bool CBrowser::DrawSurface(void)
     return true;
 }
 
+static char s_passwordBuf[128] = { 0 };
+
 //-----------------------------------------------------------------------------
 // Purpose: draws the server browser section
 //-----------------------------------------------------------------------------
@@ -252,7 +256,7 @@ void CBrowser::DrawBrowserPanel(void)
 
     const float fFooterHeight = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
 
-    if (ImGui::BeginTable("##ServerBrowser_DrawBrowserPanel_ServerListTable", 6, ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY, { 0, -fFooterHeight }))
+    if (ImGui::BeginTable("##ServerBrowser_DrawBrowserPanel_ServerListTable", 7, ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY, { 0, -fFooterHeight }))
     {
         if (m_surfaceStyle == ImGuiStyle_t::MODERN)
         {
@@ -263,6 +267,7 @@ void CBrowser::DrawBrowserPanel(void)
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4.f, 0.f }); frameStyleVars++;
         }
 
+        ImGui::TableSetupColumn(" ", ImGuiTableColumnFlags_WidthFixed, 12); // Lock icon
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 25);
         ImGui::TableSetupColumn("Map", ImGuiTableColumnFlags_WidthStretch, 20);
         ImGui::TableSetupColumn("Playlist", ImGuiTableColumnFlags_WidthStretch, 10);
@@ -305,10 +310,22 @@ void CBrowser::DrawBrowserPanel(void)
                 const NetGameServer_t* const server = filteredServers[i];
                 const ImGuiTextFlags textFlags = ImGuiTextFlags_NoWidthForLargeClippedText;
 
+                // Lock icon column
                 ImGui::TableNextColumn();
+                if (server->hasPassword && m_lockedIconShaderResource)
+                {
+                    ImGui::Image((ImTextureID)(intptr_t)m_lockedIconShaderResource, ImVec2(12.f, 12.f));
+                }
 
+                // Name column
+                ImGui::TableNextColumn();
                 const char* const pszHostName = server->name.c_str();
+                const bool tintLocked = server->hasPassword;
+                if (tintLocked)
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.00f, 0.85f, 0.00f, 1.00f));
                 ImGui::TextEx(pszHostName, &pszHostName[server->name.length()], textFlags);
+                if (tintLocked)
+                    ImGui::PopStyleColor();
 
                 ImGui::TableNextColumn();
 
@@ -333,9 +350,42 @@ void CBrowser::DrawBrowserPanel(void)
                 ImGui::TableNextColumn();
                 ImGui::PushID(i);
 
-                if (ImGui::Button("Connect"))
+                const std::string popupName = Format("Enter Password##popup_row_%d", i);
+                const bool isLocked = server->hasPassword;
+
+                if (ImGui::Button(isLocked ? "Enter password" : "Connect"))
                 {
-                    g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey);
+                    if (isLocked)
+                    {
+                        s_passwordBuf[0] = '\0';
+                        ImGui::OpenPopup(popupName.c_str());
+                    }
+                    else
+                    {
+                        g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, "");
+                    }
+                }
+
+                // Draw the modal if opened
+                if (ImGui::BeginPopupModal(popupName.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+                {
+                    ImGui::Text("This server requires a password.");
+                    ImGui::Spacing();
+                    ImGui::InputText("Password", s_passwordBuf, IM_ARRAYSIZE(s_passwordBuf), ImGuiInputTextFlags_Password);
+
+                    ImGui::Spacing();
+                    if (ImGui::Button("Connect", ImVec2(120, 0)))
+                    {
+                        g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, s_passwordBuf);
+                        ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Cancel", ImVec2(120, 0)))
+                    {
+                        ImGui::CloseCurrentPopup();
+                    }
+
+                    ImGui::EndPopup();
                 }
 
                 ImGui::PopID();
@@ -371,11 +421,14 @@ void CBrowser::DrawBrowserPanel(void)
         ImGui::InputTextWithHint("##ServerBrowser_DrawBrowserPanel_ServerKey", "Encryption key", m_serverNetKeyTextBuf, sizeof(m_serverNetKeyTextBuf));
 
         ImGui::SameLine();
+        ImGui::InputTextWithHint("##ServerBrowser_DrawBrowserPanel_ServerPassword", "Server Password", m_serverPasswordTextBuf, sizeof(m_serverPasswordTextBuf));
+
+        ImGui::SameLine();
         if (ImGui::Button("Connect##ServerBrowser_DrawBrowserPanel_ServerConnect", ImVec2(itemWidth, ImGui::GetFrameHeight())))
         {
             if (m_serverAddressTextBuf[0])
             {
-                g_ServerListManager.ConnectToServer(m_serverAddressTextBuf, m_serverNetKeyTextBuf);
+                g_ServerListManager.ConnectToServer(m_serverAddressTextBuf, m_serverNetKeyTextBuf, m_serverPasswordTextBuf);
             }
         }
 
@@ -487,7 +540,7 @@ void CBrowser::HiddenServersModal(void)
 
                 if (result && !server.name.empty())
                 {
-                    g_ServerListManager.ConnectToServer(server.address, server.port, server.netKey); // Connect to the server
+                    g_ServerListManager.ConnectToServer(server.address, server.port, server.netKey, ""); // Connect to the server
                     m_hiddenServerRequestMessage = Format("Found server: %s", server.name.c_str());
                     m_hiddenServerMessageColor = ImVec4(0.00f, 1.00f, 0.00f, 1.00f);
                     ImGui::CloseCurrentPopup();
@@ -554,6 +607,9 @@ void CBrowser::HandleInvalidFields(const bool offline)
         m_hostMessageColor = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
     }
 }
+
+static char s_hostPassword[128] = {};
+static bool s_pwInited = false;
 
 //-----------------------------------------------------------------------------
 // Purpose: draws the host section
@@ -630,6 +686,51 @@ void CBrowser::DrawHostPanel(void)
     if (ImGui::SameLine(); ImGui::RadioButton("public##ServerBrowser_DrawHostPanel", pylon_host_visibility.GetInt() == ServerVisibility_e::PUBLIC))
     {
         pylon_host_visibility.SetValue(ServerVisibility_e::PUBLIC);
+    }
+
+    if ((pylon_host_visibility.GetInt() == PUBLIC))
+    {
+        if (!s_pwInited)
+        {
+            if (ConVar* cvPw = g_pCVar->FindVar("sv_password"))
+                Q_strncpy(s_hostPassword, cvPw->GetString(), sizeof(s_hostPassword));
+            else
+                s_hostPassword[0] = '\0';
+            s_pwInited = true;
+        }
+
+        ImGui::Separator();
+        ImGui::TextUnformatted("Server Password");
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12.0f);
+        if (ImGui::InputText("##host_password", s_hostPassword, IM_ARRAYSIZE(s_hostPassword), ImGuiInputTextFlags_Password))
+        {
+            if (ConVar* cvPw = g_pCVar->FindVar("sv_password")) cvPw->SetValue(s_hostPassword);
+        }
+
+        // Update sv_password when editing finishes
+        if (ImGui::IsItemDeactivatedAfterEdit())
+        {
+            if (ConVar* cvPw = g_pCVar->FindVar("sv_password"))
+                cvPw->SetValue(s_hostPassword);
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Clear"))
+        {
+            s_hostPassword[0] = '\0';
+            if (ConVar* cvPw = g_pCVar->FindVar("sv_password"))
+                cvPw->SetValue("");
+        }
+
+        ImGui::TextDisabled("Leave blank for no password");
+    }
+    else
+    {
+        // Reset init state when switching away from Public so we re-pull sv_password next time
+        s_pwInited = false;
+
+        // Optional: automatically clear password when not public
+        // if (ConVar* cvPw = g_pCVar->FindVar("sv_password")) cvPw->SetValue("");
     }
 
     ImGui::TextColored(m_hostMessageColor, "%s", m_hostMessage.c_str());
@@ -796,16 +897,20 @@ void CBrowser::UpdateHostingStatus(void)
             break;
         }
 
+        string password = sv_password.GetString();
+
         NetGameServer_t netGameServer
         {
             hostname->GetString(),
             hostdesc.GetString(),
             pylon_host_visibility.GetInt() == ServerVisibility_e::HIDDEN,
+            password.length() > 0,
             g_pHostState->m_levelName,
             v_Playlists_GetCurrent(),
             hostip->GetString(),
             hostport->GetInt(),
             g_pNetKey->GetBase64NetKey(),
+            password,
             *g_nServerRemoteChecksum,
             SDK_VERSION,
             g_pServer->GetNumClients(),

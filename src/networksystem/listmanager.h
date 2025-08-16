@@ -10,8 +10,8 @@ public:
 	bool RefreshServerList(string& outMessage, size_t& numServers);
 	void ClearServerList(void);
 
-	void ConnectToServer(const string& svIp, const int nPort, const string& svNetKey) const;
-	void ConnectToServer(const string& svServer, const string& svNetKey) const;
+	void ConnectToServer(const string& svIp, const int nPort, const string& svNetKey, const string& svNetPassword) const;
+	void ConnectToServer(const string& svServer, const string& svNetKey, const string& svNetPassword) const;
 
 	// TODO: make private!
 	vector<NetGameServer_t> m_vServerList;

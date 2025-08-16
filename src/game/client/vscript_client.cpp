@@ -518,8 +518,14 @@ static SQRESULT UIScript_ConnectToServer(HSQUIRRELVM v)
         SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
     }
 
+    const SQChar* password = nullptr;
+    if (SQ_FAILED(sq_getstring(v, 4, &password)))
+    {
+        password = "";
+    }
+
     Msg(eDLL_T::UI, "Connecting to server with ip address '%s' and encryption key '%s'\n", ipAddress, cryptoKey);
-    g_ServerListManager.ConnectToServer(ipAddress, cryptoKey);
+    g_ServerListManager.ConnectToServer(ipAddress, cryptoKey, password);
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -534,6 +540,12 @@ static SQRESULT UIScript_ConnectToListedServer(HSQUIRRELVM v)
     SQInteger iServer = -1;
     sq_getinteger(v, 2, &iServer);
 
+    const SQChar* password = nullptr;
+    if (SQ_FAILED(sq_getstring(v, 4, &password)))
+    {
+        password = "";
+    }
+
     if (!Script_CheckServerIndexAndFailure(v, iServer))
     {
         SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
@@ -541,8 +553,7 @@ static SQRESULT UIScript_ConnectToListedServer(HSQUIRRELVM v)
 
     const NetGameServer_t& gameServer = g_ServerListManager.m_vServerList[iServer];
 
-    g_ServerListManager.ConnectToServer(gameServer.address, gameServer.port,
-        gameServer.netKey);
+    g_ServerListManager.ConnectToServer(gameServer.address, gameServer.port, gameServer.netKey, password);
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -567,7 +578,7 @@ static SQRESULT UIScript_ConnectToHiddenServer(HSQUIRRELVM v)
     const bool result = g_MasterServer.GetServerByToken(netListing, hiddenServerRequestMessage, privateToken); // Send token connect request.
     if (result)
     {
-        g_ServerListManager.ConnectToServer(netListing.address, netListing.port, netListing.netKey);
+        g_ServerListManager.ConnectToServer(netListing.address, netListing.port, netListing.netKey, "");
     }
     else
     {

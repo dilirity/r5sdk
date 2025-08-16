@@ -11,6 +11,7 @@ struct NetGameServer_t
 	// on the masterserver to determine whether or not to broadcast your
 	// listing from there
 	bool hidden = true;
+	bool hasPassword = false;
 
 	// the level and playlist of the server, which will be display to the
 	// client's server browser
@@ -25,6 +26,8 @@ struct NetGameServer_t
 	// the base64 net key used to decrypt game packets, the client has to
 	// install this before issuing a connectionless packet
 	string netKey;
+
+	string netPassword;
 
 	// version identifiers used to check if the gameserver and gameclient are
 	// compatible with each other

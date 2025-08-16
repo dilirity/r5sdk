@@ -63,13 +63,13 @@ void CServerListManager::ClearServerList(void)
 //          nPort - 
 //          &svNetKey - 
 //-----------------------------------------------------------------------------
-void CServerListManager::ConnectToServer(const string& svIp, const int nPort, const string& svNetKey) const
+void CServerListManager::ConnectToServer(const string& svIp, const int nPort, const string& svNetKey, const string& svNetPassword) const
 {
     if (!ThreadInMainThread())
     {
-        g_TaskQueue.Dispatch([this, svIp, nPort, svNetKey]()
+        g_TaskQueue.Dispatch([this, svIp, nPort, svNetKey, svNetPassword]()
             {
-                this->ConnectToServer(svIp, nPort, svNetKey);
+                this->ConnectToServer(svIp, nPort, svNetKey, svNetPassword);
             }, 0);
         return;
     }
@@ -77,6 +77,18 @@ void CServerListManager::ConnectToServer(const string& svIp, const int nPort, co
     if (!svNetKey.empty())
     {
         NET_SetKey(svNetKey);
+    }
+
+    // Set the engine's server filter to carry the password in the connect request.
+    if (!svNetPassword.empty())
+    {
+        const string tagged = Format("pw:%016llx\n", [] (const string& s) {
+            uint64_t h = 1469598103934665603ULL;
+            for (unsigned char c : s) { h ^= c; h *= 1099511628211ULL; }
+            return h;
+        }(svNetPassword));
+        const string setFilter = Format("serverFilter \"%s\"\n", tagged.c_str());
+        Cbuf_AddText(Cbuf_GetCurrentPlayer(), setFilter.c_str(), cmd_source_t::kCommandSrcCode);
     }
 
     const string command = Format("%s \"[%s]:%i\"", "connect", svIp.c_str(), nPort);
@@ -88,13 +100,13 @@ void CServerListManager::ConnectToServer(const string& svIp, const int nPort, co
 // Input  : &svServer - 
 //          &svNetKey - 
 //-----------------------------------------------------------------------------
-void CServerListManager::ConnectToServer(const string& svServer, const string& svNetKey) const
+void CServerListManager::ConnectToServer(const string& svServer, const string& svNetKey, const string& svNetPassword) const
 {
     if (!ThreadInMainThread())
     {
-        g_TaskQueue.Dispatch([this, svServer, svNetKey]()
+        g_TaskQueue.Dispatch([this, svServer, svNetKey, svNetPassword]()
             {
-                this->ConnectToServer(svServer, svNetKey);
+                this->ConnectToServer(svServer, svNetKey, svNetPassword);
             }, 0);
         return;
     }
@@ -102,6 +114,18 @@ void CServerListManager::ConnectToServer(const string& svServer, const string& s
     if (!svNetKey.empty())
     {
         NET_SetKey(svNetKey);
+    }
+
+    // Set the engine's server filter to carry the password in the connect request.
+    if (!svNetPassword.empty())
+    {
+        const string tagged = Format("pw:%016llx\n", [] (const string& s) {
+            uint64_t h = 1469598103934665603ULL;
+            for (unsigned char c : s) { h ^= c; h *= 1099511628211ULL; }
+            return h;
+        }(svNetPassword));
+        const string setFilter = Format("serverFilter \"%s\"\n", tagged.c_str());
+        Cbuf_AddText(Cbuf_GetCurrentPlayer(), setFilter.c_str(), cmd_source_t::kCommandSrcCode);
     }
 
     const string command = Format("%s \"%s\"", "connect", svServer.c_str()).c_str();

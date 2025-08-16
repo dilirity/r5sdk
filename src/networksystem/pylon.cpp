@@ -41,6 +41,9 @@ static bool GetServerListingFromJSON(const rapidjson::Value& value, NetGameServe
         JSON_GetValue(value, "numPlayers",  outGameServer.numPlayers)  &&
         JSON_GetValue(value, "maxPlayers",  outGameServer.maxPlayers))
     {
+        // Optional fields
+        JSON_GetValue(value, "hasPassword", outGameServer.hasPassword);
+        JSON_GetValue(value, "password",    outGameServer.netPassword);
         return true;
     }
 
@@ -188,6 +191,7 @@ bool CPylon::PostServerHost(string& outMessage, string& outToken, string& outHos
     requestJson.AddMember("numPlayers",  netGameServer.numPlayers,                           allocator);
     requestJson.AddMember("maxPlayers",  netGameServer.maxPlayers,                           allocator);
     requestJson.AddMember("timeStamp",   netGameServer.timeStamp,                            allocator);
+    requestJson.AddMember("password", rapidjson::Value(netGameServer.netPassword.c_str(), netGameServer.netPassword.length(), allocator), allocator);
 
     rapidjson::Document responseJson;
     CURLINFO status;
@@ -259,7 +263,7 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
     string outMessage;
     CURLINFO status;
 
-    if (!SendRequest("/api/banlist/bulkCheck", requestJson, responseJson, outMessage, status, "banned bulk check error"))
+    if (!SendRequest("/api/banlist/check", requestJson, responseJson, outMessage, status, "banned bulk check error"))
     {
         return false;
     }
@@ -331,7 +335,7 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
     string outMessage;
     CURLINFO status;
 
-    if (!SendRequest("/api/banlist/isBanned", requestJson, responseJson, outMessage, status, "banned check error"))
+    if (!SendRequest("/api/bans/hasActiveBan", requestJson, responseJson, outMessage, status, "banned check error"))
     {
         return false;
     }
@@ -397,7 +401,7 @@ bool CPylon::AuthForConnection(const uint64_t nucleusId, const char* ipAddress,
 
     CURLINFO status;
 
-    if (!SendRequest("/api/client/authenticate", requestJson, responseJson, outMessage, status, "origin auth error"))
+    if (!SendRequest("/api/client/auth", requestJson, responseJson, outMessage, status, "origin auth error"))
     {
         return false;
     }
