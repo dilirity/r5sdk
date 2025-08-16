@@ -66,6 +66,17 @@ void COM_ExplainDisconnection(bool bPrint, const char* fmt, ...)
 		va_end(vArgs);
 	}/////////////////////////////
 
+	// Strip trailing control characters (CR/LF etc.) so UI won't render squares
+	{
+		size_t n = strlen(szBuf);
+		while (n > 0)
+		{
+			unsigned char c = (unsigned char)szBuf[n - 1];
+			if (c >= 32 && c != 0x7F) break;
+			szBuf[--n] = '\0';
+		}
+	}
+
 	if (bPrint)
 	{
 		if (szBuf[0] == '#')
@@ -95,4 +106,34 @@ void COM_ExplainDisconnection(bool bPrint, const char* fmt, ...)
 void VCommon::Detour(const bool bAttach) const
 {
 	DetourSetup(&v_COM_ExplainDisconnection, COM_ExplainDisconnection, bAttach);
+	if (v_COM_Notify)
+	{
+		DetourSetup(&v_COM_Notify, H_COM_Notify, bAttach);
+	}
+}
+
+__int64 __fastcall H_COM_Notify(void* a1, unsigned int a2, __int64 a3, const char* fmt, ...)
+{
+    if (!v_COM_Notify) return 0; // safety
+
+    char buffer[1024]; buffer[0] = '\0';
+    va_list va; va_start(va, fmt);
+    _vsnprintf_s(buffer, _countof(buffer), _TRUNCATE, fmt, va);
+    va_end(va);
+
+    // strip trailing control chars
+    size_t n = strlen(buffer);
+    while (n > 0)
+    {
+        unsigned char c = (unsigned char)buffer[n - 1];
+        if (c >= 32 && c != 0x7F) break;
+        buffer[--n] = '\0';
+    }
+
+    if (v_COM_NotifySink)
+    {
+        return v_COM_NotifySink(a2, a3, "%c%s", 75, buffer);
+    }
+    // Fallback: call original to preserve behavior
+    return v_COM_Notify(a1, a2, a3, "%s", buffer);
 }
