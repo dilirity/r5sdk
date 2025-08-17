@@ -15,6 +15,12 @@ add_sources( SOURCE_GROUP "Miles"
     "miles/miles_shim.h"
     "miles/miles_types.h" # TODO[ AMOS ]: move to public!
     "miles/radshal_wasapi.h"
+    "miles/miles_overrides.cpp"
+    "miles/miles_overrides.h"
+    "miles/miles_pcm.cpp"
+    "miles/miles_pcm.h"
+    "miles/wav_player.cpp"
+    "miles/wav_player.h"
 )
 
 add_sources( SOURCE_GROUP "Public"
@@ -25,3 +31,4 @@ add_sources( SOURCE_GROUP "Public"
 end_sources()
 
 target_include_directories( ${PROJECT_NAME} PRIVATE "${ENGINE_SOURCE_DIR}/tier0/" "${ENGINE_SOURCE_DIR}/tier1/" )
+target_link_libraries( ${PROJECT_NAME} PRIVATE "winmm.lib" )

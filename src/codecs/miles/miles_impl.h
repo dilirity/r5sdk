@@ -29,6 +29,19 @@ inline void(*v_MilesQueueEventRun)(Miles::Queue*, const char*);
 inline void(*v_MilesBankPatch)(Miles::Bank*, char*, char*);
 inline unsigned int (*v_MilesSampleSetSourceRaw)(__int64 a1, __int64 a2, unsigned int a3, int a4, unsigned __int16 a5, bool a6);
 inline unsigned int (*v_MilesEventGetDetails)(__int64 a1, __int64 a2, __int64 a3, __int64 a4, __int64 a5, __int64 a6, void* const releaseList);
+inline __int64 (*v_MilesSampleCreate)(__int64 a1, __int64 a2, unsigned __int8 a3);
+inline void (*v_MilesSampleSet3DPosition)(void* sample, float x, float y, float z);
+inline void (*v_MilesSamplePlay)(void* sample);
+inline void (*v_MilesSampleSetListenerMask)(void* sample, unsigned int mask);
+inline void (*v_MilesSampleSetVolumeLevel)(void* sample, float volume);
+inline int (*v_MilesSampleGetRouteCount)(__int64 sample);
+inline __int64 (*v_MilesSampleCreateRoute)(__int64 sample, __int64 a2, __int64 a3, unsigned __int8 a4);
+inline __int64 (*v_MilesSampleGetRoute)(__int64 sample, int index);
+inline void (*v_MilesRouteSetSpatialized)(void* route);
+inline void (*v_MilesSampleSet3DAutoSpreadDistance)(void* sample, float distance);
+inline void (*v_MilesSampleSetPanLeftRight)(void* sample, float pan);
+inline void (*v_MilesSampleSet3DOrientation)(__int64 sample, float fx, float fy, float fz, float upY, int flags, float extra);
+inline void (*v_MilesSampleSet3DVolumeCone)(__int64 sample, int enable, float inner, float outer, int flags);
 
 inline bool(*v_CSOM_Initialize)();
 inline void(*v_CSOM_InitializeBankList)(CSOM_BankList_s* const bankList);
@@ -111,6 +124,19 @@ class MilesCore : public IDetour
 		g_RadAudioSystemDll.GetExportedSymbol("MilesBankPatch").GetPtr(v_MilesBankPatch);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSetSourceRaw").GetPtr(v_MilesSampleSetSourceRaw);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesEventGetDetails").GetPtr(v_MilesEventGetDetails);
+		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleCreate").GetPtr(v_MilesSampleCreate);
+		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DPosition").GetPtr(v_MilesSampleSet3DPosition);
+		g_RadAudioSystemDll.GetExportedSymbol("MilesSamplePlay").GetPtr(v_MilesSamplePlay);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSetListenerMask").GetPtr(v_MilesSampleSetListenerMask);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSetVolumeLevel").GetPtr(v_MilesSampleSetVolumeLevel);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleGetRouteCount").GetPtr(v_MilesSampleGetRouteCount);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleCreateRoute").GetPtr(v_MilesSampleCreateRoute);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleGetRoute").GetPtr(v_MilesSampleGetRoute);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesRouteSetSpatialized").GetPtr(v_MilesRouteSetSpatialized);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DAutoSpreadDistance").GetPtr(v_MilesSampleSet3DAutoSpreadDistance);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSetPanLeftRight").GetPtr(v_MilesSampleSetPanLeftRight);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DOrientation").GetPtr(v_MilesSampleSet3DOrientation);
+        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DVolumeCone").GetPtr(v_MilesSampleSet3DVolumeCone);
 	}
 	virtual void GetVar(void) const
 	{

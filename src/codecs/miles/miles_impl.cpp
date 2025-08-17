@@ -12,6 +12,8 @@
 #include "rtech/pak/pakstate.h"
 #include "filesystem/filesystem.h"
 #include "pluginsystem/modsystem.h"
+#include "miles_overrides.h"
+#include "miles_pcm.h"
 #include "ebisusdk/EbisuSDK.h"
 #include "miles_impl.h"
 #include "miles/src/sdk/shared/rrthreads2.h"
@@ -226,6 +228,15 @@ void MilesQueueEventRun(Miles::Queue* queue, const char* eventName)
 	if(miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: running event: '%s'\n", __FUNCTION__, eventName);
 
+	// If we have PCM for this event, mark TLS pending here so the audio thread sees it immediately.
+	if (eventName && *eventName)
+	{
+		if (MilesPcmOverrides::Get(eventName))
+		{
+			MilesPcmOverrides::MarkPendingTLS(eventName);
+		}
+	}
+
 	v_MilesQueueEventRun(queue, eventName);
 }
 
@@ -266,8 +277,99 @@ static void CSOM_AddEventToQueue(const char* eventName)
 	if (miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
 
-	v_CSOM_AddEventToQueue(eventName);
+	// Resolve overrides lazily on first use each run of the game.
+	static bool s_loadedOverrides = false;
+	if (!s_loadedOverrides)
+	{
+		MilesOverrides::LoadAll();
+		s_loadedOverrides = true;
+	}
 
+	// Check for direct WAV override from mods using the requested event ID.
+	CUtlString wavPath;
+	if (MilesOverrides::FindWavForEvent(eventName, wavPath))
+	{
+		if (miles_debug.GetBool())
+			Msg(eDLL_T::AUDIO, "%s: replacing '%s' with WAV '%s'\n", __FUNCTION__, eventName, wavPath.String());
+		if (MilesPcmOverrides::EnsureLoaded(eventName, wavPath.String()))
+		{
+			const MilesPcmData* pcm = MilesPcmOverrides::Get(eventName);
+			if (pcm)
+			{
+				void* sample = reinterpret_cast<void*>(v_MilesSampleCreate(reinterpret_cast<__int64>(g_milesGlobals->driver), 0, 0));
+				if (sample)
+				{
+					// Position and base routing
+					v_MilesSampleSet3DPosition(sample, g_milesGlobals->queuedSoundPosition.x, g_milesGlobals->queuedSoundPosition.y, g_milesGlobals->queuedSoundPosition.z);
+					if (v_MilesSampleSetListenerMask) v_MilesSampleSetListenerMask(sample, 0xFFFFFFFFu);
+					if (v_MilesSampleSetVolumeLevel) v_MilesSampleSetVolumeLevel(sample, g_milesGlobals->soundMasterVolume);
+					if (v_MilesSampleSet3DOrientation)
+					{
+						// Use a simple forward vector along +Y (arbitrary) and default params
+						v_MilesSampleSet3DOrientation((__int64)sample, 0.0f, 1.0f, 0.0f, 1.0f /*upY*/, 0 /*flags*/, 0.0f);
+					}
+					if (v_MilesSampleSet3DVolumeCone)
+					{
+						// Enable cone with inner=1.0 (full), outer=0.2 (falloff)
+						v_MilesSampleSet3DVolumeCone((__int64)sample, 1, 1.0f, 0.2f, 0);
+					}
+
+					const void* dataPtr = pcm->samples.Base();
+					const unsigned int dataBytes = pcm->samples.Count();
+					const int sampleRate = pcm->sampleRate;
+					const unsigned __int16 fmt = (unsigned __int16)((pcm->bitsPerSample << 8) | (pcm->channels & 0xFF));
+					v_MilesSampleSetSourceRaw((__int64)sample, reinterpret_cast<const __int64>(dataPtr), dataBytes, sampleRate, fmt, false);
+
+					// Ensure existing routes are spatialized
+					if (v_MilesSampleGetRouteCount && v_MilesSampleGetRoute && v_MilesRouteSetSpatialized)
+					{
+						const int rc = v_MilesSampleGetRouteCount((__int64)sample);
+						for (int r = 0; r < rc; ++r)
+						{
+							__int64 route = v_MilesSampleGetRoute((__int64)sample, r);
+							if (route)
+								v_MilesRouteSetSpatialized(reinterpret_cast<void*>(route));
+						}
+						// If there were no routes, try to create one and spatialize it.
+						if (rc == 0 && v_MilesSampleCreateRoute)
+						{
+							__int64 route = v_MilesSampleCreateRoute((__int64)sample, 0, 0, (unsigned __int8)1u);
+							if (route)
+							{
+								v_MilesRouteSetSpatialized(reinterpret_cast<void*>(route));
+								if (miles_debug.GetBool())
+									Msg(eDLL_T::AUDIO, "PCM play: created spatialized route for sample\n");
+							}
+						}
+					}
+
+					// Set 3D spread distance to enable more noticeable spatialization
+					if (v_MilesSampleSet3DAutoSpreadDistance)
+						v_MilesSampleSet3DAutoSpreadDistance(sample, 10.0f);
+
+					// Optional: slight left-right pan preview based on x position (non-destructive)
+					if (v_MilesSampleSetPanLeftRight)
+					{
+						const float pan = std::clamp(g_milesGlobals->queuedSoundPosition.x / 50.0f, -1.0f, 1.0f);
+						v_MilesSampleSetPanLeftRight(sample, pan);
+					}
+
+					v_MilesSamplePlay(sample);
+					if (miles_debug.GetBool())
+					{
+						Msg(eDLL_T::AUDIO, "PCM play: bytes=%u rate=%d ch=%u bps=%u pos=(%.2f,%.2f,%.2f)\n",
+							dataBytes, sampleRate, pcm->channels, pcm->bitsPerSample,
+							g_milesGlobals->queuedSoundPosition.x, g_milesGlobals->queuedSoundPosition.y, g_milesGlobals->queuedSoundPosition.z);
+					}
+				}
+			}
+			// Queue a blank event to keep the state machine happy but avoid duplicating the sound
+			v_CSOM_AddEventToQueue("");
+			return;
+		}
+	}
+
+	v_CSOM_AddEventToQueue(eventName);
 	if (miles_warnings.GetBool())
 	{
 		if (g_milesGlobals->queuedEventHash == 1)
