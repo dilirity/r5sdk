@@ -21,44 +21,13 @@
 // within the Miles Sound System library remains unmodified.
 
 #pragma region ConVars
-static ConVar miles_pcm_inject("miles_pcm_inject", "1", FCVAR_RELEASE, "Enable Miles PCM override injection");
 static ConVar miles_pcm_log("miles_pcm_log", "0", FCVAR_RELEASE, "Log MilesSampleSetSourceRaw args and injection");
 #pragma endregion
 
 #pragma optimize( "", off )
 static unsigned int MilesSampleSetSourceRaw(__int64 a1, __int64 a2, unsigned int a3, int a4, unsigned __int16 a5, bool a6)
 {
-	// Active playback path: if a PCM override is pending but this function isn't hit by the event pipeline,
-	// create a sample ourselves and play the PCM positioned at the queued sound position, then pass-through.
-	if (miles_pcm_inject.GetBool() && MilesPcmOverrides::HasPending())
-	{
-		const MilesPcmData* pcm = MilesPcmOverrides::ConsumePending();
-		if (pcm)
-		{
-			void* sample = reinterpret_cast<void*>(v_MilesSampleCreate(reinterpret_cast<__int64>(g_milesGlobals->driver), 0, 0));
-			if (sample)
-			{
-				const void* dataPtr = pcm->samples.Base();
-				const unsigned int dataBytes = pcm->samples.Count();
-				const int sampleRate = pcm->sampleRate;
-				const unsigned __int16 fmt = (unsigned __int16)((pcm->bitsPerSample << 8) | (pcm->channels & 0xFF));
-				v_MilesSampleSet3DPosition(sample, g_milesGlobals->queuedSoundPosition.x, g_milesGlobals->queuedSoundPosition.y, g_milesGlobals->queuedSoundPosition.z);
-				// Route to all listeners and set base volume
-				if (v_MilesSampleSetListenerMask) v_MilesSampleSetListenerMask(sample, 0xFFFFFFFFu);
-				if (v_MilesSampleSetVolumeLevel) v_MilesSampleSetVolumeLevel(sample, 1.0f);
-				v_MilesSampleSetSourceRaw((__int64)sample, reinterpret_cast<const __int64>(dataPtr), dataBytes, sampleRate, fmt, a6);
-				v_MilesSamplePlay(sample);
-				if (miles_pcm_log.GetBool())
-				{
-					Msg(eDLL_T::AUDIO, "Miles active playback: bytes=%u rate=%d ch=%u bps=%u\n", dataBytes, sampleRate, pcm->channels, pcm->bitsPerSample);
-				}
-			}
-			else if (miles_pcm_log.GetBool())
-			{
-				Warning(eDLL_T::AUDIO, "Miles active playback: failed to create sample\n");
-			}
-		}
-	}
+	NOTE_UNUSED(a6);
 
 	if (miles_pcm_log.GetBool())
 	{
