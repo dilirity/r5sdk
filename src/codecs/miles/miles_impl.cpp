@@ -277,14 +277,6 @@ static void CSOM_AddEventToQueue(const char* eventName)
 	if (miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
 
-	// Resolve overrides lazily on first use each run of the game.
-	static bool s_loadedOverrides = false;
-	if (!s_loadedOverrides)
-	{
-		MilesOverrides::LoadAll();
-		s_loadedOverrides = true;
-	}
-
 	// Check for direct WAV override from mods using the requested event ID.
 	CUtlString wavPath;
 	if (MilesOverrides::FindWavForEvent(eventName, wavPath))
