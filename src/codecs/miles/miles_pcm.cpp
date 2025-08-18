@@ -14,6 +14,12 @@ static CUtlVector<CUtlString>* s_pPendingList = nullptr;
 static CThreadMutex s_pendingMutex;
 static thread_local CUtlString s_tlsPending;
 
+static void CC_wav_clear_cache(const CCommand& args)
+{
+	s_pPcmCache = new CUtlMap<CUtlString, MilesPcmData*>(UtlStringLessFunc);
+}
+static ConCommand wav_clear_cache("wav_clear_cache", CC_wav_clear_cache, "Clears PCM Cache", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
 static void EnsureMap()
 {
 	if (!s_pPcmCache)
