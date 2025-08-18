@@ -33,6 +33,7 @@ inline __int64 (*v_MilesSampleCreate)(__int64 a1, __int64 a2, unsigned __int8 a3
 inline void (*v_MilesSampleSet3DPosition)(void* sample, float x, float y, float z);
 inline void (*v_MilesSamplePlay)(void* sample);
 inline __int64 (*v_MilesSamplePause)(_BYTE* sample);
+inline __int64 (*v_MilesSamplePauseFade)(__int64 sample);
 inline __int64 (*v_MilesSampleDestroy)(__int64 sample);
 inline __int64 (*v_MilesSampleGetDurationMs)(__int64 sample);
 inline __int64 (*v_MilesSampleGetDurationSamples)(__int64 sample);
@@ -96,6 +97,18 @@ struct CSOM_GlobalState_s
 	char unk[96];
 };
 
+struct EventTableEntry {
+	// A 64-bit value that serves as an index to the next entry in case of a hash collision.
+	// A value of 0 indicates the end of the list for this bucket.
+	uint64_t nextEntryIndex; // Offset 0x00
+
+	// The full 64-bit FNV-1a hash of the normalized event name.
+	uint64_t fullHash;       // Offset 0x08
+
+	// The remaining 32 bytes would contain the actual event data, like a function pointer, etc.
+	char eventData[32];      // Offset 0x10
+};
+
 inline CSOM_GlobalState_s* g_milesGlobals;
 
 // Global listener position tracking
@@ -154,6 +167,7 @@ class MilesCore : public IDetour
 		g_RadAudioSystemDll.GetExportedSymbol("MilesEventGetDetails").GetPtr(v_MilesEventGetDetails);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleCreate").GetPtr(v_MilesSampleCreate);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesSamplePause").GetPtr(v_MilesSamplePause);
+		g_RadAudioSystemDll.GetExportedSymbol("MilesSamplePauseFade").GetPtr(v_MilesSamplePauseFade);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleDestroy").GetPtr(v_MilesSampleDestroy);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleGetDurationMs").GetPtr(v_MilesSampleGetDurationMs);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleGetDurationSamples").GetPtr(v_MilesSampleGetDurationSamples);

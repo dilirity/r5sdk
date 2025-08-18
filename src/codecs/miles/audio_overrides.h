@@ -43,6 +43,8 @@ struct EventOverrideData
 	bool hasVolumeUpdateRate = false; float volumeUpdateRate = 0.1f;
 	bool hasAllowSilence = false; bool allowSilence = true;
 	bool hasSilenceCutoff = false; float silenceCutoff = 0.001f;
+	bool hasCancelOnReplay = false; bool cancelOnReplay = false;
+	bool hasFadeOnDestroy = false; bool fadeOnDestroy = false;
 };
 
 class CustomAudioManager
@@ -76,6 +78,9 @@ public:
 		bool& hasVolumeUpdateRate, float& volumeUpdateRate,
 		bool& hasAllowSilence, bool& allowSilence,
 		bool& hasSilenceCutoff, float& silenceCutoff);
+
+	bool GetCancelOnReplayForEvent(const char* eventName, bool& cancelOnReplay);
+	bool GetFadeOnDestroyForEvent(const char* eventName, bool& fadeOnDestroy);
 
 private:
 	std::unordered_map<std::string, std::shared_ptr<EventOverrideData>> m_overrides;

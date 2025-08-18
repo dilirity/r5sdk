@@ -20,6 +20,8 @@
 #include "game/client/viewrender.h"
 #include "miles/src/sdk/shared/rrthreads2.h"
 #include "audio_overrides.h"
+#include <unordered_map>
+#include <mutex>
 
 //-----------------------------------------------------------------------------
 // Console variables
@@ -42,6 +44,16 @@ static ConVar wav_force_convars("wav_force_convars", "0", FCVAR_RELEASE, "Force 
 
 // Level change detection
 static ConVar miles_wav_auto_stop_on_level_change("miles_wav_auto_stop_on_level_change", "1", FCVAR_RELEASE, "Automatically stop custom audio when level changes (1 = enabled, 0 = disabled)");
+
+static void CC_reload_audio_mods(const CCommand& args)
+{
+	if (ModSystem()->IsEnabled())
+	{
+		GetAudioOverrideManager()->LoadFromMods();
+		Msg(eDLL_T::AUDIO, "Loaded %d audio overrides\n", GetAudioOverrideManager()->GetOverrideCount());
+	}
+}
+static ConCommand reload_audio_mods("reload_audio_mods", CC_reload_audio_mods, "", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 
 
 //-----------------------------------------------------------------------------
@@ -68,6 +80,20 @@ static int s_numActiveWavSamples = 0;
 
 // Timer for periodic volume updates
 static float s_lastVolumeUpdateTime = 0.0f;
+
+// A global pointer that will be set to the address of the found event's data.
+// It's used as a return value for the function.
+void* g_pFoundEventData; // Corresponds to qword_1655B9658
+
+// Base address of the main table containing the EventTableEntry structs.
+EventTableEntry* g_EventTableBase; // Corresponds to qword_14D4E4AE8
+
+// An array of 4096 (0x1000) indices that maps a partial hash to the first entry in a bucket.
+uint32_t g_EventTableBuckets[4096]; // Corresponds to dword_14D4E0AE8
+
+// Track active custom samples per event for CancelOnReplay behavior
+static std::unordered_map<std::string, std::vector<void*>> s_eventActiveSamples;
+static std::mutex s_eventSamplesMutex;
 
 //-----------------------------------------------------------------------------
 // Purpose: Stops and cleans up all active custom WAV samples
@@ -594,101 +620,213 @@ static void CSOM_AddEventToQueue(const char* eventName)
 
 	if(enable_audio_mods.GetBool())
 	{
-		const void* buf = nullptr; unsigned len = 0; int rate = 0; unsigned short ch = 0; unsigned short bps = 0;
-		if (GetAudioOverrideManager()->TryGetOverrideForEventDetailed(eventName, buf, len, rate, ch, bps))
+		// New: Northstar-style override manager path (JSON or folder-based)
 		{
-			void* sample = reinterpret_cast<void*>(v_MilesSampleCreate(reinterpret_cast<__int64>(g_milesGlobals->driver), 0, 0));
-			if (sample)
+			const void* buf = nullptr; unsigned len = 0; int rate = 0; unsigned short ch = 0; unsigned short bps = 0;
+			if (GetAudioOverrideManager()->TryGetOverrideForEventDetailed(eventName, buf, len, rate, ch, bps))
 			{
-				Vector3D soundPos = g_milesGlobals->queuedSoundPosition;
-				Vector3D playerPos = {0.0f, 0.0f, 0.0f};
-				if (g_vecRenderOrigin)
+				// Honor CancelOnReplay: destroy any currently running samples for this event
+				bool cancelOnReplay = false;
+				if (GetAudioOverrideManager()->GetCancelOnReplayForEvent(eventName, cancelOnReplay) && cancelOnReplay)
 				{
-					playerPos = *g_vecRenderOrigin;
-					CSOM_UpdateListenerPosition(playerPos);
-				}
-				else
-				{
-					CSOM_UpdateListenerPosition({0.0f, 0.0f, 0.0f});
-				}
-
-				const unsigned __int16 fmt = (unsigned __int16)((bps << 8) | (ch & 0xFF));
-				v_MilesSampleSetSourceRaw((__int64)sample, reinterpret_cast<const __int64>(buf), len, rate, fmt, false);
-
-				Vector3D deltaPos = {
-					soundPos.x - g_listenerPosition.x,
-					soundPos.y - g_listenerPosition.y,
-					soundPos.z - g_listenerPosition.z
-				};
-				float distance = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y + deltaPos.z * deltaPos.z);
-
-				bool hasVB=false; float jVB=1.0f;
-				bool hasVM=false; float jVM=0.0f;
-				bool hasDS=false; float jDS=100.0f;
-				bool hasFP=false; float jFP=1.0f;
-				bool hasUR=false; float jUR=0.1f;
-				bool hasAS=false; bool jAS=true;
-				bool hasSC=false; float jSC=0.001f;
-				if (!wav_force_convars.GetBool())
-				{
-					GetAudioOverrideManager()->GetOverrideSettingsForEvent(
-						eventName,
-						hasVB, jVB,
-						hasVM, jVM,
-						hasDS, jDS,
-						hasFP, jFP,
-						hasUR, jUR,
-						hasAS, jAS,
-						hasSC, jSC);
-				}
-
-				float baseVolume = g_milesGlobals->soundMasterVolume * (hasVB ? jVB : wav_volume_base.GetFloat());
-				float distanceStart = hasDS ? jDS : wav_distance_start.GetFloat();
-				float falloffPower = hasFP ? jFP : wav_falloff_power.GetFloat();
-				float minVolume = hasVM ? jVM : wav_volume_min.GetFloat();
-				bool allowSilence = hasAS ? jAS : wav_allow_silence.GetBool();
-				float silenceCutoff = hasSC ? jSC : wav_silence_cutoff.GetFloat();
-
-				// Apply override to global update cadence if specified
-				if (hasUR)
-				{
-					// update cadence: just set convar so system-wide volume updates follow
-					wav_volume_update_rate.SetValue(jUR);
-				}
-
-				float initialVolume;
-				if (distance > distanceStart)
-				{
-					float falloffFactor = distanceStart / distance;
-					initialVolume = baseVolume * pow(falloffFactor, falloffPower);
-					if (allowSilence)
+					std::lock_guard<std::mutex> lg(s_eventSamplesMutex);
+					auto itSamples = s_eventActiveSamples.find(eventName);
+					if (itSamples != s_eventActiveSamples.end())
 					{
-						if (initialVolume < silenceCutoff) initialVolume = 0.0f;
-						else initialVolume = max(initialVolume, minVolume);
+						for (void* samplePtr : itSamples->second)
+						{
+							// Mark in active tracking as inactive
+							for (int i = 0; i < s_numActiveWavSamples; ++i)
+							{
+								if (s_activeWavSamples[i].isActive && s_activeWavSamples[i].sample == samplePtr)
+									s_activeWavSamples[i].isActive = false;
+							}
+							// Fade or mute and pause then destroy
+							bool fadeOnDestroy = false;
+							GetAudioOverrideManager()->GetFadeOnDestroyForEvent(eventName, fadeOnDestroy);
+							if (fadeOnDestroy && v_MilesSamplePauseFade)
+							{
+								v_MilesSamplePauseFade(reinterpret_cast<__int64>(samplePtr));
+							}
+							else
+							{
+								if (v_MilesSampleSetVolumeLevel)
+									v_MilesSampleSetVolumeLevel(samplePtr, 0.0f);
+								if (v_MilesSamplePause)
+									v_MilesSamplePause(reinterpret_cast<_BYTE*>(samplePtr));
+							}
+							if (v_MilesSampleDestroy)
+								v_MilesSampleDestroy(reinterpret_cast<__int64>(samplePtr));
+						}
+						itSamples->second.clear();
+					}
+				}
+
+				void* sample = reinterpret_cast<void*>(v_MilesSampleCreate(reinterpret_cast<__int64>(g_milesGlobals->driver), 0, 0));
+				if (sample)
+				{
+					Vector3D soundPos = g_milesGlobals->queuedSoundPosition;
+					Vector3D playerPos = {0.0f, 0.0f, 0.0f};
+					if (g_vecRenderOrigin)
+					{
+						playerPos = *g_vecRenderOrigin;
+						CSOM_UpdateListenerPosition(playerPos);
 					}
 					else
 					{
-						initialVolume = max(initialVolume, minVolume);
+						CSOM_UpdateListenerPosition({0.0f, 0.0f, 0.0f});
 					}
+
+					const unsigned __int16 fmt = (unsigned __int16)((bps << 8) | (ch & 0xFF));
+					v_MilesSampleSetSourceRaw((__int64)sample, reinterpret_cast<const __int64>(buf), len, rate, fmt, false);
+
+					Vector3D deltaPos = {
+						soundPos.x - g_listenerPosition.x,
+						soundPos.y - g_listenerPosition.y,
+						soundPos.z - g_listenerPosition.z
+					};
+					float distance = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y + deltaPos.z * deltaPos.z);
+
+					bool hasVB=false; float jVB=1.0f;
+					bool hasVM=false; float jVM=0.0f;
+					bool hasDS=false; float jDS=100.0f;
+					bool hasFP=false; float jFP=1.0f;
+					bool hasUR=false; float jUR=0.1f;
+					bool hasAS=false; bool jAS=true;
+					bool hasSC=false; float jSC=0.001f;
+					if (!wav_force_convars.GetBool())
+					{
+						GetAudioOverrideManager()->GetOverrideSettingsForEvent(
+							eventName,
+							hasVB, jVB,
+							hasVM, jVM,
+							hasDS, jDS,
+							hasFP, jFP,
+							hasUR, jUR,
+							hasAS, jAS,
+							hasSC, jSC);
+					}
+
+					float baseVolume = g_milesGlobals->soundMasterVolume * (hasVB ? jVB : wav_volume_base.GetFloat());
+					float distanceStart = hasDS ? jDS : wav_distance_start.GetFloat();
+					float falloffPower = hasFP ? jFP : wav_falloff_power.GetFloat();
+					float minVolume = hasVM ? jVM : wav_volume_min.GetFloat();
+					bool allowSilence = hasAS ? jAS : wav_allow_silence.GetBool();
+					float silenceCutoff = hasSC ? jSC : wav_silence_cutoff.GetFloat();
+
+					// Apply override to global update cadence if specified
+					if (hasUR)
+					{
+						// update cadence: just set convar so system-wide volume updates follow
+						wav_volume_update_rate.SetValue(jUR);
+					}
+
+					float initialVolume;
+					if (distance > distanceStart)
+					{
+						float falloffFactor = distanceStart / distance;
+						initialVolume = baseVolume * pow(falloffFactor, falloffPower);
+						if (allowSilence)
+						{
+							if (initialVolume < silenceCutoff) initialVolume = 0.0f;
+							else initialVolume = max(initialVolume, minVolume);
+						}
+						else
+						{
+							initialVolume = max(initialVolume, minVolume);
+						}
+					}
+					else
+					{
+						initialVolume = baseVolume;
+					}
+
+					if (v_MilesSampleSetVolumeLevel) v_MilesSampleSetVolumeLevel(sample, initialVolume);
+
+					int bytesPerSample = (bps / 8) * (int)ch;
+					int totalSamples = bytesPerSample > 0 ? (int)len / bytesPerSample : 0;
+					AddActiveWavSample(sample, soundPos, baseVolume, rate, totalSamples);
+
+					// Register this sample under the event for potential cancellation on replay
+					{
+						std::lock_guard<std::mutex> lg(s_eventSamplesMutex);
+						s_eventActiveSamples[eventName].push_back(sample);
+					}
+
+					v_MilesSamplePlay(sample);
 				}
-				else
-				{
-					initialVolume = baseVolume;
-				}
-
-				if (v_MilesSampleSetVolumeLevel) v_MilesSampleSetVolumeLevel(sample, initialVolume);
-
-				int bytesPerSample = (bps / 8) * (int)ch;
-				int totalSamples = bytesPerSample > 0 ? (int)len / bytesPerSample : 0;
-				AddActiveWavSample(sample, soundPos, baseVolume, rate, totalSamples);
-
-				v_MilesSamplePlay(sample);
 
 				v_CSOM_AddEventToQueue("");
 				return;
 			}
 		}
 	}
+
+	///////////////////////// OG FUNCTION //////////////////////////////////
+	// If the input string is null or empty, set the result to 1 and exit.
+	/*if (eventName == nullptr || *eventName == '\0') {
+		g_pFoundEventData = (void*)1;
+		return;
+	}
+
+	// Constants for 64-bit FNV-1a hashing algorithm
+	const uint64_t FNV_OFFSET_BASIS = 0xCBF29CE484222325;
+	const uint64_t FNV_PRIME = 0x100000001B3;
+
+	uint64_t hash = FNV_OFFSET_BASIS;
+	const char* currentChar = eventName;
+
+	// Loop through each character of the string to calculate the hash.
+	while (*currentChar != '\0') {
+		char processedChar = *currentChar;
+
+		// Normalize the character before hashing.
+		// 1. Convert uppercase letters to lowercase.
+		if (processedChar >= 'A' && processedChar <= 'Z') {
+			processedChar += 32; // ASCII difference between upper and lower
+		}
+		// 2. Replace periods with underscores.
+		else if (processedChar == '.') {
+			processedChar = '_';
+		}
+
+		// FNV-1a hash algorithm step: XOR with the character, then multiply by the prime.
+		hash ^= static_cast<uint8_t>(processedChar);
+		hash *= FNV_PRIME;
+
+		currentChar++;
+	}
+
+	// Use the lower 12 bits of the hash to find the initial bucket index.
+	uint32_t bucketIndex = g_EventTableBuckets[hash & 0xFFF];
+	if (bucketIndex == 0) { // Assuming 0 is an invalid index, meaning bucket is empty.
+		g_pFoundEventData = (void*)2; // Event not found
+		return;
+	}
+
+	// Get the first potential entry from the main table using the bucket index.
+	EventTableEntry* entry = &g_EventTableBase[bucketIndex];
+
+	// Traverse the linked list for this bucket to find the correct entry.
+	while (true) {
+		// Check if the full hash in the table entry matches our calculated hash.
+		if (entry->fullHash == hash) {
+			// Match found! Set the global pointer to the event's data portion.
+			g_pFoundEventData = &entry->eventData;
+			return;
+		}
+
+		// If hashes don't match and there's no next entry, the event is not in the table.
+		if (entry->nextEntryIndex == 0) {
+			break; // End of chain
+		}
+
+		// Move to the next entry in the collision chain.
+		entry = &g_EventTableBase[entry->nextEntryIndex];
+	}
+
+	// If the loop finishes without a match, the event was not found.
+	g_pFoundEventData = (void*)2;*/
 
 	v_CSOM_AddEventToQueue(eventName);
 

@@ -208,6 +208,16 @@ void CustomAudioManager::LoadFromMods()
 					dataPtr->hasSilenceCutoff = true;
 					dataPtr->silenceCutoff = JSON_GetNumberOrDefault(d, "SilenceCutoff", 0.001f);
 				}
+				if (JSON_HasMemberAndIsOfType(d, "CancelOnReplay", JSONFieldType_e::kBool))
+				{
+					dataPtr->hasCancelOnReplay = true;
+					dataPtr->cancelOnReplay = JSON_GetValueOrDefault(d, "CancelOnReplay", false);
+				}
+				if (JSON_HasMemberAndIsOfType(d, "FadeOnDestroy", JSONFieldType_e::kBool))
+				{
+					dataPtr->hasFadeOnDestroy = true;
+					dataPtr->fadeOnDestroy = JSON_GetValueOrDefault(d, "FadeOnDestroy", false);
+				}
 
 				// Load samples from sibling folder (same basename)
 				fs::path samplesFolder = entry.path(); samplesFolder.replace_extension();
@@ -439,6 +449,42 @@ bool CustomAudioManager::GetOverrideSettingsForEvent(const char* eventName,
     hasVolumeUpdateRate = ptr->hasVolumeUpdateRate; volumeUpdateRate = ptr->volumeUpdateRate;
     hasAllowSilence = ptr->hasAllowSilence; allowSilence = ptr->allowSilence;
     hasSilenceCutoff = ptr->hasSilenceCutoff; silenceCutoff = ptr->silenceCutoff;
+    return true;
+}
+
+bool CustomAudioManager::GetCancelOnReplayForEvent(const char* eventName, bool& cancelOnReplay)
+{
+    shared_lock lk(m_mutex);
+    std::shared_ptr<EventOverrideData> ptr;
+    if (auto it = m_overrides.find(eventName); it != m_overrides.end()) ptr = it->second;
+    else {
+        for (const auto& kv : m_overridesRegex) {
+            for (const auto& rx : kv.second->eventIdsRegex) {
+                if (std::regex_search(eventName, rx.second)) { ptr = kv.second; break; }
+            }
+            if (ptr) break;
+        }
+    }
+    if (!ptr) return false;
+    cancelOnReplay = ptr->hasCancelOnReplay ? ptr->cancelOnReplay : false;
+    return true;
+}
+
+bool CustomAudioManager::GetFadeOnDestroyForEvent(const char* eventName, bool& fadeOnDestroy)
+{
+    shared_lock lk(m_mutex);
+    std::shared_ptr<EventOverrideData> ptr;
+    if (auto it = m_overrides.find(eventName); it != m_overrides.end()) ptr = it->second;
+    else {
+        for (const auto& kv : m_overridesRegex) {
+            for (const auto& rx : kv.second->eventIdsRegex) {
+                if (std::regex_search(eventName, rx.second)) { ptr = kv.second; break; }
+            }
+            if (ptr) break;
+        }
+    }
+    if (!ptr) return false;
+    fadeOnDestroy = ptr->hasFadeOnDestroy ? ptr->fadeOnDestroy : false;
     return true;
 }
 
