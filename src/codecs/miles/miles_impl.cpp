@@ -17,9 +17,9 @@
 #include "ebisusdk/EbisuSDK.h"
 #include "miles_impl.h"
 #include "miles_overrides.h"
-#include "miles_pcm.h"
 #include "game/client/viewrender.h"
 #include "miles/src/sdk/shared/rrthreads2.h"
+#include "audio_overrides.h"
 
 //-----------------------------------------------------------------------------
 // Console variables
@@ -37,13 +37,10 @@ static ConVar wav_falloff_power("wav_falloff_power", "1.0", FCVAR_RELEASE, "Powe
 static ConVar wav_volume_update_rate("wav_volume_update_rate", "0.1", FCVAR_RELEASE, "How often to update WAV sample volumes in seconds (0.1 = 10 times per second)");
 static ConVar wav_allow_silence("wav_allow_silence", "1", FCVAR_RELEASE, "Allow sounds to fade to complete silence (1 = yes, 0 = no - always keep minimum volume)");
 static ConVar wav_silence_cutoff("wav_silence_cutoff", "0.001", FCVAR_RELEASE, "Volume threshold below which sounds become completely silent");
+static ConVar wav_force_convars("wav_force_convars", "0", FCVAR_RELEASE, "Force using convar audio params; ignore JSON per-override settings");
 
 // Level change detection
 static ConVar miles_wav_auto_stop_on_level_change("miles_wav_auto_stop_on_level_change", "1", FCVAR_RELEASE, "Automatically stop custom audio when level changes (1 = enabled, 0 = disabled)");
-
-// External level change handler
-extern void Mod_HandleLevelChanged();
-
 
 
 //-----------------------------------------------------------------------------
@@ -408,6 +405,15 @@ static bool CSOM_Initialize()
 	initTimer.End();
 
 	Msg(eDLL_T::AUDIO, "%s: %s (%f seconds)\n", __FUNCTION__, bResult ? "success" : "failure", initTimer.GetDuration().GetSeconds());
+
+	// Load custom audio overrides at init time
+	if (bResult && ModSystem()->IsEnabled())
+	{
+		GetAudioOverrideManager()->LoadFromMods();
+		if (wav_debug.GetBool())
+			Msg(eDLL_T::AUDIO, "Loaded %d audio overrides\n", GetAudioOverrideManager()->GetOverrideCount());
+	}
+
 	return bResult;
 }
 
@@ -585,122 +591,98 @@ static void CSOM_AddEventToQueue(const char* eventName)
 	if (miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
 
-	// Check for direct WAV override from mods using the requested event ID.
-	CUtlString wavPath;
-	if (MilesOverrides::FindWavForEvent(eventName, wavPath))
 	{
-		if (wav_debug.GetBool())
-			Msg(eDLL_T::AUDIO, "%s: replacing '%s' with WAV '%s'\n", __FUNCTION__, eventName, wavPath.String());
-		
-		if (MilesPcmOverrides::EnsureLoaded(eventName, wavPath.String()))
+		const void* buf = nullptr; unsigned len = 0; int rate = 0; unsigned short ch = 0; unsigned short bps = 0;
+		if (GetAudioOverrideManager()->TryGetOverrideForEventDetailed(eventName, buf, len, rate, ch, bps))
 		{
-			const MilesPcmData* pcm = MilesPcmOverrides::Get(eventName);
-			if (pcm)
+			void* sample = reinterpret_cast<void*>(v_MilesSampleCreate(reinterpret_cast<__int64>(g_milesGlobals->driver), 0, 0));
+			if (sample)
 			{
-				void* sample = reinterpret_cast<void*>(v_MilesSampleCreate(reinterpret_cast<__int64>(g_milesGlobals->driver), 0, 0));
-				if (sample)
+				Vector3D soundPos = g_milesGlobals->queuedSoundPosition;
+				Vector3D playerPos = {0.0f, 0.0f, 0.0f};
+				if (g_vecRenderOrigin)
 				{
-					// Get the sound position from Miles globals
-					Vector3D soundPos = g_milesGlobals->queuedSoundPosition;
-					
-					// Get the current player/camera position from the view system
-					Vector3D playerPos = {0.0f, 0.0f, 0.0f};
-					if (g_vecRenderOrigin)
+					playerPos = *g_vecRenderOrigin;
+					CSOM_UpdateListenerPosition(playerPos);
+				}
+				else
+				{
+					CSOM_UpdateListenerPosition({0.0f, 0.0f, 0.0f});
+				}
+
+				const unsigned __int16 fmt = (unsigned __int16)((bps << 8) | (ch & 0xFF));
+				v_MilesSampleSetSourceRaw((__int64)sample, reinterpret_cast<const __int64>(buf), len, rate, fmt, false);
+
+				Vector3D deltaPos = {
+					soundPos.x - g_listenerPosition.x,
+					soundPos.y - g_listenerPosition.y,
+					soundPos.z - g_listenerPosition.z
+				};
+				float distance = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y + deltaPos.z * deltaPos.z);
+
+				bool hasVB=false; float jVB=1.0f;
+				bool hasVM=false; float jVM=0.0f;
+				bool hasDS=false; float jDS=100.0f;
+				bool hasFP=false; float jFP=1.0f;
+				bool hasUR=false; float jUR=0.1f;
+				bool hasAS=false; bool jAS=true;
+				bool hasSC=false; float jSC=0.001f;
+				if (!wav_force_convars.GetBool())
+				{
+					GetAudioOverrideManager()->GetOverrideSettingsForEvent(
+						eventName,
+						hasVB, jVB,
+						hasVM, jVM,
+						hasDS, jDS,
+						hasFP, jFP,
+						hasUR, jUR,
+						hasAS, jAS,
+						hasSC, jSC);
+				}
+
+				float baseVolume = g_milesGlobals->soundMasterVolume * (hasVB ? jVB : wav_volume_base.GetFloat());
+				float distanceStart = hasDS ? jDS : wav_distance_start.GetFloat();
+				float falloffPower = hasFP ? jFP : wav_falloff_power.GetFloat();
+				float minVolume = hasVM ? jVM : wav_volume_min.GetFloat();
+				bool allowSilence = hasAS ? jAS : wav_allow_silence.GetBool();
+				float silenceCutoff = hasSC ? jSC : wav_silence_cutoff.GetFloat();
+
+				// Apply override to global update cadence if specified
+				if (hasUR)
+				{
+					// update cadence: just set convar so system-wide volume updates follow
+					wav_volume_update_rate.SetValue(jUR);
+				}
+
+				float initialVolume;
+				if (distance > distanceStart)
+				{
+					float falloffFactor = distanceStart / distance;
+					initialVolume = baseVolume * pow(falloffFactor, falloffPower);
+					if (allowSilence)
 					{
-						playerPos = *g_vecRenderOrigin;
-						
-						// Update the listener position and trigger volume updates for all active samples
-						CSOM_UpdateListenerPosition(playerPos);
+						if (initialVolume < silenceCutoff) initialVolume = 0.0f;
+						else initialVolume = max(initialVolume, minVolume);
 					}
 					else
 					{
-						// Fallback to origin if view system not available
-						CSOM_UpdateListenerPosition({0.0f, 0.0f, 0.0f});
-					}
-					
-					const void* dataPtr = pcm->samples.Base();
-					const unsigned int dataBytes = pcm->samples.Count();
-					const int sampleRate = pcm->sampleRate;
-					const unsigned __int16 fmt = (unsigned __int16)((pcm->bitsPerSample << 8) | (pcm->channels & 0xFF));
-					v_MilesSampleSetSourceRaw((__int64)sample, reinterpret_cast<const __int64>(dataPtr), dataBytes, sampleRate, fmt, false);
-
-					// SKIP 3D positioning entirely - let's do manual audio positioning
-					// Don't call v_MilesSampleSet3DPosition or any 3D functions
-					// This will make the sound play as a regular stereo sample that we can control manually
-
-					// Calculate distance from listener (player) to sound
-					Vector3D deltaPos = {
-						soundPos.x - g_listenerPosition.x,
-						soundPos.y - g_listenerPosition.y,
-						soundPos.z - g_listenerPosition.z
-					};
-					float distance = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y + deltaPos.z * deltaPos.z);
-					
-					// Apply initial volume and add to active tracking system
-					float baseVolume = g_milesGlobals->soundMasterVolume * wav_volume_base.GetFloat();
-					float distanceStart = wav_distance_start.GetFloat();
-					float falloffPower = wav_falloff_power.GetFloat();
-					float minVolume = wav_volume_min.GetFloat();
-					
-					// Calculate initial volume based on current distance
-					float initialVolume;
-					if (distance > distanceStart)
-					{
-						float falloffFactor = distanceStart / distance;
-						initialVolume = baseVolume * pow(falloffFactor, falloffPower);
-						
-						// Handle silence option for initial volume too
-						if (wav_allow_silence.GetBool())
-						{
-							// Allow complete silence if falloff makes volume very low
-							if (initialVolume < wav_silence_cutoff.GetFloat()) // Very low threshold
-							{
-								initialVolume = 0.0f; // Complete silence
-							}
-							else
-							{
-								initialVolume = max(initialVolume, minVolume);
-							}
-						}
-						else
-						{
-							// Always keep minimum volume
-							initialVolume = max(initialVolume, minVolume);
-						}
-					}
-					else
-					{
-						initialVolume = baseVolume;
-					}
-					
-					// Set initial volume
-					if (v_MilesSampleSetVolumeLevel)
-						v_MilesSampleSetVolumeLevel(sample, initialVolume);
-					
-					// Add to active tracking system for real-time volume updates
-					// Pass PCM data for accurate duration calculation
-					// Calculate total samples: bytes / (bits_per_sample / 8 * channels)
-					int bytesPerSample = (pcm->bitsPerSample / 8) * pcm->channels;
-					int totalSamples = bytesPerSample > 0 ? pcm->samples.Count() / bytesPerSample : 0;
-					AddActiveWavSample(sample, soundPos, baseVolume, sampleRate, totalSamples);
-					
-					if (wav_debug.GetBool())
-						Msg(eDLL_T::AUDIO, "Initial volume: distance=%.2f volume=%.4f (base=%.3f) silence=%s - added to tracking\n", 
-							distance, initialVolume, baseVolume, wav_allow_silence.GetBool() ? "enabled" : "disabled");
-
-
-
-					v_MilesSamplePlay(sample);
-					if (wav_debug.GetBool())
-					{
-						Msg(eDLL_T::AUDIO, "PCM play: bytes=%u rate=%d ch=%u bps=%u world_pos=(%.2f,%.2f,%.2f) distance=%.2f listener_pos=(%.2f,%.2f,%.2f)\n",
-							dataBytes, sampleRate, pcm->channels, pcm->bitsPerSample,
-							soundPos.x, soundPos.y, soundPos.z, distance,
-							g_listenerPosition.x, g_listenerPosition.y, g_listenerPosition.z);
+						initialVolume = max(initialVolume, minVolume);
 					}
 				}
+				else
+				{
+					initialVolume = baseVolume;
+				}
+
+				if (v_MilesSampleSetVolumeLevel) v_MilesSampleSetVolumeLevel(sample, initialVolume);
+
+				int bytesPerSample = (bps / 8) * (int)ch;
+				int totalSamples = bytesPerSample > 0 ? (int)len / bytesPerSample : 0;
+				AddActiveWavSample(sample, soundPos, baseVolume, rate, totalSamples);
+
+				v_MilesSamplePlay(sample);
 			}
-			// Queue a blank event to keep the state machine happy but avoid duplicating the sound
+
 			v_CSOM_AddEventToQueue("");
 			return;
 		}

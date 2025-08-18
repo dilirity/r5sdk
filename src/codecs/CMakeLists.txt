@@ -15,10 +15,10 @@ add_sources( SOURCE_GROUP "Miles"
     "miles/miles_shim.h"
     "miles/miles_types.h" # TODO[ AMOS ]: move to public!
     "miles/radshal_wasapi.h"
+    "miles/audio_overrides.cpp"
+    "miles/audio_overrides.h"
     "miles/miles_overrides.cpp"
     "miles/miles_overrides.h"
-    "miles/miles_pcm.cpp"
-    "miles/miles_pcm.h"
     "miles/wav_player.cpp"
     "miles/wav_player.h"
 )

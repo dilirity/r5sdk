@@ -2,6 +2,8 @@
 #include "pluginsystem/modsystem.h"
 #include "filesystem/filesystem.h"
 #include "tier1/cvar.h"
+#include "public/tier2/jsonutils.h"
+#include "thirdparty/rapidjson/document.h"
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -30,14 +32,18 @@ static void ReadFileAllBytes(const fs::path& path, vector<uint8_t>& out)
 	f.read(reinterpret_cast<char*>(out.data()), len);
 }
 
-// Minimal WAV parser: verify RIFF/WAVE and extract first 'data' chunk as PCM
-static bool ExtractPcmFromWave(const vector<uint8_t>& in, vector<uint8_t>& outPcm)
+// Minimal WAV parser: verify RIFF/WAVE, extract format and first 'data' chunk as PCM
+static bool ExtractPcmFromWave(const vector<uint8_t>& in, AudioSample& out)
 {
 	if (in.size() < 44) return false;
 	const uint8_t* p = in.data();
 	if (!(p[0]=='R'&&p[1]=='I'&&p[2]=='F'&&p[3]=='F'&&p[8]=='W'&&p[9]=='A'&&p[10]=='V'&&p[11]=='E'))
 		return false;
 	size_t pos = 12;
+	unsigned short audioFormat = 0;
+	unsigned short numChannels = 0;
+	unsigned int sampleRate = 0;
+	unsigned short bitsPerSample = 0;
 	while (pos + 8 <= in.size())
 	{
 		const uint8_t* h = p + pos;
@@ -45,9 +51,24 @@ static bool ExtractPcmFromWave(const vector<uint8_t>& in, vector<uint8_t>& outPc
 		const char id0 = (char)h[0], id1 = (char)h[1], id2 = (char)h[2], id3 = (char)h[3];
 		pos += 8;
 		if (pos + chunkSize > in.size()) break;
-		if (id0=='d' && id1=='a' && id2=='t' && id3=='a')
+		if (id0=='f' && id1=='m' && id2=='t' && id3==' ')
 		{
-			outPcm.assign(p + pos, p + pos + chunkSize);
+			if (chunkSize >= 16)
+			{
+				audioFormat   = *(const unsigned short*)(p + pos + 0);
+				numChannels   = *(const unsigned short*)(p + pos + 2);
+				sampleRate    = *(const unsigned int  *)(p + pos + 4);
+				bitsPerSample = *(const unsigned short*)(p + pos + 14);
+			}
+		}
+		else if (id0=='d' && id1=='a' && id2=='t' && id3=='a')
+		{
+			out.size = chunkSize;
+			out.data.reset(new uint8_t[out.size]);
+			memcpy(out.data.get(), p + pos, out.size);
+			out.sampleRate = (int)sampleRate;
+			out.channels = numChannels;
+			out.bitsPerSample = bitsPerSample;
 			return true;
 		}
 		// chunks are word-aligned
@@ -62,6 +83,7 @@ void CustomAudioManager::LoadFromMods()
 		return;
 
 	unordered_map<string, shared_ptr<EventOverrideData>> newOverrides;
+	vector<pair<string, shared_ptr<EventOverrideData>>> newOverridesRegex;
 
 	ModSystem()->LockModList();
 	FOR_EACH_VEC(ModSystem()->GetModList(), i)
@@ -71,9 +93,10 @@ void CustomAudioManager::LoadFromMods()
 			continue;
 
 		const CUtlString base = mod->GetBasePath();
-		// Support two layouts:
+		// Support layouts:
 		// 1) audio_override/<EventName>/**.wav
-		// 2) audio/<EventName>/**.wav  (Northstar-style without relying on JSON)
+		// 2) audio/<EventName>/**.wav                      (folder-only)
+		// 3) audio/<Name>.json + audio/<Name>/**.wav      (Northstar-style JSON)
 		auto loadEventFolder = [&newOverrides](const fs::path& eventFolder)
 		{
 			const string eventName = eventFolder.filename().string();
@@ -84,17 +107,13 @@ void CustomAudioManager::LoadFromMods()
 				if (!wav.is_regular_file() || wav.path().extension() != ".wav") continue;
 				vector<uint8_t> raw;
 				ReadFileAllBytes(wav.path(), raw);
-				vector<uint8_t> pcm;
-				if (raw.empty() || !ExtractPcmFromWave(raw, pcm)) continue;
+				AudioSample sample;
+				if (raw.empty() || !ExtractPcmFromWave(raw, sample)) continue;
 
 				auto& ptr = newOverrides[eventName];
 				if (!ptr) ptr = make_shared<EventOverrideData>();
 
-				AudioSample s;
-				s.size = pcm.size();
-				s.data.reset(new uint8_t[s.size]);
-				memcpy(s.data.get(), pcm.data(), s.size);
-				ptr->samples.emplace_back(std::move(s));
+				ptr->samples.emplace_back(std::move(sample));
 			}
 		};
 
@@ -105,17 +124,165 @@ void CustomAudioManager::LoadFromMods()
 			{
 				if (entry.is_directory())
 					loadEventFolder(entry.path());
+				// New: support single-file overrides at root: audio_override/<EventName>.wav
+				else if (entry.is_regular_file() && entry.path().extension() == ".wav")
+				{
+					const std::string eventName = entry.path().stem().string();
+					vector<uint8_t> raw;
+					ReadFileAllBytes(entry.path(), raw);
+					AudioSample sample;
+					if (raw.empty() || !ExtractPcmFromWave(raw, sample))
+						continue;
+					auto& ptr = newOverrides[eventName];
+					if (!ptr) ptr = make_shared<EventOverrideData>();
+					ptr->samples.emplace_back(std::move(sample));
+				}
 			}
 		}
 
 		fs::path audioDir = fs::path(base.String()) / "audio";
 		if (fs::exists(audioDir) && fs::is_directory(audioDir))
 		{
+			// 2) Folder-only per-event, and single-file .wav at root
 			for (auto& entry : fs::directory_iterator(audioDir))
 			{
-				// Only treat subdirectories as event folders; ignore json files
 				if (entry.is_directory())
 					loadEventFolder(entry.path());
+				else if (entry.is_regular_file() && entry.path().extension() == ".wav")
+				{
+					const std::string eventName = entry.path().stem().string();
+					vector<uint8_t> raw;
+					ReadFileAllBytes(entry.path(), raw);
+					AudioSample sample;
+					if (raw.empty() || !ExtractPcmFromWave(raw, sample))
+						continue;
+					auto& ptr = newOverrides[eventName];
+					if (!ptr) ptr = make_shared<EventOverrideData>();
+					ptr->samples.emplace_back(std::move(sample));
+				}
+			}
+
+			// 3) JSON + sibling folder
+			for (auto& entry : fs::directory_iterator(audioDir))
+			{
+				if (!entry.is_regular_file() || entry.path().extension() != ".json")
+					continue;
+
+				// Read JSON
+				std::ifstream jsonStream(entry.path());
+				if (jsonStream.fail())
+					continue;
+				std::stringstream ss; while (jsonStream.peek() != EOF) ss << (char)jsonStream.get(); jsonStream.close();
+
+				rapidjson::Document d;
+				d.Parse<rapidjson::kParseCommentsFlag | rapidjson::kParseTrailingCommasFlag>(ss.str().c_str());
+				if (d.HasParseError() || !d.IsObject())
+					continue;
+
+				// Build data object shared across all declared events/regexes
+				auto dataPtr = make_shared<EventOverrideData>();
+
+				// Strategy
+				if (JSON_HasMemberAndIsOfType(d, "AudioSelectionStrategy", JSONFieldType_e::kString))
+				{
+					std::string strat;
+					JSON_GetValue(d, "AudioSelectionStrategy", strat);
+					if (V_stricmp(strat.c_str(), "random") == 0)
+						dataPtr->strategy = AudioSelectionStrategy::RANDOM;
+				}
+
+				// Optional per-override audio params
+				if (JSON_HasMemberAndIsOfType(d, "VolumeBase", JSONFieldType_e::kNumber))
+				{
+					dataPtr->hasVolumeBase = true;
+					dataPtr->volumeBase = JSON_GetNumberOrDefault(d, "VolumeBase", 1.0f);
+				}
+				if (JSON_HasMemberAndIsOfType(d, "VolumeMin", JSONFieldType_e::kNumber))
+				{
+					dataPtr->hasVolumeMin = true;
+					dataPtr->volumeMin = JSON_GetNumberOrDefault(d, "VolumeMin", 0.0f);
+				}
+				if (JSON_HasMemberAndIsOfType(d, "DistanceStart", JSONFieldType_e::kNumber))
+				{
+					dataPtr->hasDistanceStart = true;
+					dataPtr->distanceStart = JSON_GetNumberOrDefault(d, "DistanceStart", 100.0f);
+				}
+				if (JSON_HasMemberAndIsOfType(d, "FalloffPower", JSONFieldType_e::kNumber))
+				{
+					dataPtr->hasFalloffPower = true;
+					dataPtr->falloffPower = JSON_GetNumberOrDefault(d, "FalloffPower", 1.0f);
+				}
+				if (JSON_HasMemberAndIsOfType(d, "VolumeUpdateRate", JSONFieldType_e::kNumber))
+				{
+					dataPtr->hasVolumeUpdateRate = true;
+					dataPtr->volumeUpdateRate = JSON_GetNumberOrDefault(d, "VolumeUpdateRate", 0.1f);
+				}
+				if (JSON_HasMemberAndIsOfType(d, "AllowSilence", JSONFieldType_e::kBool))
+				{
+					dataPtr->hasAllowSilence = true;
+					dataPtr->allowSilence = JSON_GetValueOrDefault(d, "AllowSilence", true);
+				}
+				if (JSON_HasMemberAndIsOfType(d, "SilenceCutoff", JSONFieldType_e::kNumber))
+				{
+					dataPtr->hasSilenceCutoff = true;
+					dataPtr->silenceCutoff = JSON_GetNumberOrDefault(d, "SilenceCutoff", 0.001f);
+				}
+
+				// Load samples from sibling folder (same basename)
+				fs::path samplesFolder = entry.path(); samplesFolder.replace_extension();
+				if (fs::exists(samplesFolder) && fs::is_directory(samplesFolder))
+				{
+					for (auto& wav : fs::recursive_directory_iterator(samplesFolder))
+					{
+						if (!wav.is_regular_file() || wav.path().extension() != ".wav") continue;
+						vector<uint8_t> raw;
+						ReadFileAllBytes(wav.path(), raw);
+						AudioSample sample;
+						if (raw.empty() || !ExtractPcmFromWave(raw, sample)) continue;
+						dataPtr->samples.emplace_back(std::move(sample));
+					}
+				}
+
+				// EventId (string or array)
+				if (d.HasMember("EventId"))
+				{
+					if (d["EventId"].IsString())
+					{
+						dataPtr->eventIds.push_back(d["EventId"].GetString());
+					}
+					else if (d["EventId"].IsArray())
+					{
+						for (auto& v : d["EventId"].GetArray())
+							if (v.IsString()) dataPtr->eventIds.push_back(v.GetString());
+					}
+				}
+
+				// EventIdRegex (string or array)
+				if (d.HasMember("EventIdRegex"))
+				{
+					if (d["EventIdRegex"].IsString())
+					{
+						std::string rx = d["EventIdRegex"].GetString();
+						try { dataPtr->eventIdsRegex.emplace_back(rx, std::regex(rx)); } catch (...) {}
+					}
+					else if (d["EventIdRegex"].IsArray())
+					{
+						for (auto& v : d["EventIdRegex"].GetArray())
+							if (v.IsString()) { std::string rx = v.GetString(); try { dataPtr->eventIdsRegex.emplace_back(rx, std::regex(rx)); } catch (...) {} }
+					}
+				}
+
+				// Fallback: if no ids were provided, infer from JSON basename
+				if (dataPtr->eventIds.empty() && dataPtr->eventIdsRegex.empty())
+				{
+					dataPtr->eventIds.push_back(entry.path().stem().string());
+				}
+
+				// Register
+				for (const auto& id : dataPtr->eventIds)
+					newOverrides[id] = dataPtr;
+				for (const auto& pr : dataPtr->eventIdsRegex)
+					newOverridesRegex.emplace_back(pr.first, dataPtr);
 			}
 		}
 	}
@@ -125,6 +292,7 @@ void CustomAudioManager::LoadFromMods()
 	{
 		unique_lock lk(m_mutex);
 		m_overrides.swap(newOverrides);
+		m_overridesRegex.swap(newOverridesRegex);
 	}
 
 	// Debug: list loaded override events and sample counts
@@ -143,14 +311,29 @@ void CustomAudioManager::Clear()
 	m_overrides.clear();
 }
 
-bool CustomAudioManager::TryGetOverrideForEvent(const char* eventName, const void*& outPtr, unsigned& outLen)
+bool CustomAudioManager::TryGetOverrideForEventDetailed(const char* eventName, const void*& outPtr, unsigned& outLen, int& outSampleRate, unsigned short& outChannels, unsigned short& outBitsPerSample)
 {
 	shared_lock lk(m_mutex);
+	std::shared_ptr<EventOverrideData> ptr;
 	auto it = m_overrides.find(eventName);
-	if (it == m_overrides.end())
-		return false;
+	if (it != m_overrides.end())
+	{
+		ptr = it->second;
+	}
+	else
+	{
+		for (const auto& kv : m_overridesRegex)
+		{
+			for (const auto& rx : kv.second->eventIdsRegex)
+			{
+				if (std::regex_search(eventName, rx.second)) { ptr = kv.second; break; }
+			}
+			if (ptr) break;
+		}
+		if (!ptr) return false;
+	}
 
-	auto& ov = *(it->second);
+	auto& ov = *(ptr);
 	if (ov.samples.empty())
 		return false;
 
@@ -158,8 +341,10 @@ bool CustomAudioManager::TryGetOverrideForEvent(const char* eventName, const voi
 	if (ov.strategy == AudioSelectionStrategy::SEQUENTIAL)
 	{
 		const size_t idx = ov.currentIndex % ov.samples.size();
-		outPtr = ov.samples[idx].data.get();
-		outLen = static_cast<unsigned>(ov.samples[idx].size);
+		const AudioSample& s = ov.samples[idx];
+		outPtr = s.data.get();
+		outLen = static_cast<unsigned>(s.size);
+		outSampleRate = s.sampleRate; outChannels = s.channels; outBitsPerSample = s.bitsPerSample;
 		ov.currentIndex = (idx + 1) % ov.samples.size();
 		return true;
 	}
@@ -168,9 +353,18 @@ bool CustomAudioManager::TryGetOverrideForEvent(const char* eventName, const voi
 	static thread_local std::mt19937 rng{ std::random_device{}() };
 	std::uniform_int_distribution<size_t> dist(0, ov.samples.size() - 1);
 	const size_t idx = dist(rng);
-	outPtr = ov.samples[idx].data.get();
-	outLen = static_cast<unsigned>(ov.samples[idx].size);
+	{
+		const AudioSample& s = ov.samples[idx];
+		outPtr = s.data.get();
+		outLen = static_cast<unsigned>(s.size);
+		outSampleRate = s.sampleRate; outChannels = s.channels; outBitsPerSample = s.bitsPerSample;
+	}
 	return true;
+}
+
+bool CustomAudioManager::TryGetOverrideForEvent(const char* eventName, const void*& outPtr, unsigned& outLen)
+{
+	int r=0; unsigned short c=0, b=0; return TryGetOverrideForEventDetailed(eventName, outPtr, outLen, r, c, b);
 }
 
 bool CustomAudioManager::HasOverride(const char* eventName)
@@ -209,6 +403,38 @@ const char* AudioOverride_GetCurrentEventName()
 {
 	AUTO_LOCK(g_CurrentEventMutex);
 	return g_CurrentEventName;
+}
+
+bool CustomAudioManager::GetOverrideSettingsForEvent(const char* eventName,
+    bool& hasVolumeBase, float& volumeBase,
+    bool& hasVolumeMin, float& volumeMin,
+    bool& hasDistanceStart, float& distanceStart,
+    bool& hasFalloffPower, float& falloffPower,
+    bool& hasVolumeUpdateRate, float& volumeUpdateRate,
+    bool& hasAllowSilence, bool& allowSilence,
+    bool& hasSilenceCutoff, float& silenceCutoff)
+{
+    shared_lock lk(m_mutex);
+    std::shared_ptr<EventOverrideData> ptr;
+    if (auto it = m_overrides.find(eventName); it != m_overrides.end()) ptr = it->second;
+    else {
+        for (const auto& kv : m_overridesRegex) {
+            for (const auto& rx : kv.second->eventIdsRegex) {
+                if (std::regex_search(eventName, rx.second)) { ptr = kv.second; break; }
+            }
+            if (ptr) break;
+        }
+    }
+    if (!ptr) return false;
+
+    hasVolumeBase = ptr->hasVolumeBase; volumeBase = ptr->volumeBase;
+    hasVolumeMin = ptr->hasVolumeMin; volumeMin = ptr->volumeMin;
+    hasDistanceStart = ptr->hasDistanceStart; distanceStart = ptr->distanceStart;
+    hasFalloffPower = ptr->hasFalloffPower; falloffPower = ptr->falloffPower;
+    hasVolumeUpdateRate = ptr->hasVolumeUpdateRate; volumeUpdateRate = ptr->volumeUpdateRate;
+    hasAllowSilence = ptr->hasAllowSilence; allowSilence = ptr->allowSilence;
+    hasSilenceCutoff = ptr->hasSilenceCutoff; silenceCutoff = ptr->silenceCutoff;
+    return true;
 }
 
 
