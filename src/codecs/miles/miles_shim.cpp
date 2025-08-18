@@ -11,7 +11,6 @@
 //=============================================================================//
 #include "miles_impl.h"
 #include "miles_shim.h"
-#include "miles_pcm.h"
 #include "tier1/cvar.h"
 
 // NOTE: when prototypes of API's change and one or more parameters reside on

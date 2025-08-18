@@ -7,10 +7,14 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <thread>
+#include <chrono>
 #include "audio_overrides.h"
 
 using namespace std;
 namespace fs = std::filesystem;
+
+static ConVar audio_override_debug("audio_override_debug", "0", FCVAR_RELEASE, "Logs detailed audio override resolution");
 
 static CustomAudioManager g_CustomAudioManagerInst;
 static char g_CurrentEventName[256] = {0};
@@ -94,7 +98,7 @@ void CustomAudioManager::LoadFromMods()
 
 		const CUtlString base = mod->GetBasePath();
 		// Support layouts:
-		// 1) audio_override/<EventName>/**.wav
+		// 1) audio/<EventName>.wav
 		// 2) audio/<EventName>/**.wav                      (folder-only)
 		// 3) audio/<Name>.json + audio/<Name>/**.wav      (Northstar-style JSON)
 		auto loadEventFolder = [&newOverrides](const fs::path& eventFolder)
@@ -116,29 +120,6 @@ void CustomAudioManager::LoadFromMods()
 				ptr->samples.emplace_back(std::move(sample));
 			}
 		};
-
-		fs::path audioOverrideDir = fs::path(base.String()) / "audio_override";
-		if (fs::exists(audioOverrideDir) && fs::is_directory(audioOverrideDir))
-		{
-			for (auto& entry : fs::directory_iterator(audioOverrideDir))
-			{
-				if (entry.is_directory())
-					loadEventFolder(entry.path());
-				// New: support single-file overrides at root: audio_override/<EventName>.wav
-				else if (entry.is_regular_file() && entry.path().extension() == ".wav")
-				{
-					const std::string eventName = entry.path().stem().string();
-					vector<uint8_t> raw;
-					ReadFileAllBytes(entry.path(), raw);
-					AudioSample sample;
-					if (raw.empty() || !ExtractPcmFromWave(raw, sample))
-						continue;
-					auto& ptr = newOverrides[eventName];
-					if (!ptr) ptr = make_shared<EventOverrideData>();
-					ptr->samples.emplace_back(std::move(sample));
-				}
-			}
-		}
 
 		fs::path audioDir = fs::path(base.String()) / "audio";
 		if (fs::exists(audioDir) && fs::is_directory(audioDir))
@@ -315,6 +296,7 @@ bool CustomAudioManager::TryGetOverrideForEventDetailed(const char* eventName, c
 {
 	shared_lock lk(m_mutex);
 	std::shared_ptr<EventOverrideData> ptr;
+
 	auto it = m_overrides.find(eventName);
 	if (it != m_overrides.end())
 	{
@@ -326,16 +308,36 @@ bool CustomAudioManager::TryGetOverrideForEventDetailed(const char* eventName, c
 		{
 			for (const auto& rx : kv.second->eventIdsRegex)
 			{
-				if (std::regex_search(eventName, rx.second)) { ptr = kv.second; break; }
+				if (std::regex_match(eventName, rx.second)) { ptr = kv.second; if (audio_override_debug.GetBool()) Msg(eDLL_T::AUDIO, "[AUDIO_OVR] regex match: %s\n", rx.first.c_str()); break; }
 			}
 			if (ptr) break;
 		}
-		if (!ptr) return false;
+		if (!ptr) 
+		{ 
+			std::atomic_thread_fence(std::memory_order_seq_cst);
+			std::this_thread::yield(); // or Sleep(0)
+			return false;
+		}
+	}
+
+	// Apply simple blacklist and wildcard gating
+	{
+		// Skip if explicitly blacklisted via '!EventName' in EventId list
+		for (const auto& id : ptr->eventIds)
+		{
+			if (!id.empty() && id[0] == '!' && id.c_str() + 1 && V_stricmp(id.c_str() + 1, eventName) == 0)
+			{
+				return false;
+			}
+		}
+		
 	}
 
 	auto& ov = *(ptr);
 	if (ov.samples.empty())
+	{
 		return false;
+	}
 
 	// For now, sequential only
 	if (ov.strategy == AudioSelectionStrategy::SEQUENTIAL)
@@ -346,6 +348,7 @@ bool CustomAudioManager::TryGetOverrideForEventDetailed(const char* eventName, c
 		outLen = static_cast<unsigned>(s.size);
 		outSampleRate = s.sampleRate; outChannels = s.channels; outBitsPerSample = s.bitsPerSample;
 		ov.currentIndex = (idx + 1) % ov.samples.size();
+		if (audio_override_debug.GetBool()) Msg(eDLL_T::AUDIO, "[AUDIO_OVR] use sample idx=%u (sequential), count=%u\n", (unsigned)idx, (unsigned)ov.samples.size());
 		return true;
 	}
 
@@ -358,7 +361,9 @@ bool CustomAudioManager::TryGetOverrideForEventDetailed(const char* eventName, c
 		outPtr = s.data.get();
 		outLen = static_cast<unsigned>(s.size);
 		outSampleRate = s.sampleRate; outChannels = s.channels; outBitsPerSample = s.bitsPerSample;
+		if (audio_override_debug.GetBool()) Msg(eDLL_T::AUDIO, "[AUDIO_OVR] use sample idx=%u (random), count=%u\n", (unsigned)idx, (unsigned)ov.samples.size());
 	}
+
 	return true;
 }
 
@@ -420,7 +425,7 @@ bool CustomAudioManager::GetOverrideSettingsForEvent(const char* eventName,
     else {
         for (const auto& kv : m_overridesRegex) {
             for (const auto& rx : kv.second->eventIdsRegex) {
-                if (std::regex_search(eventName, rx.second)) { ptr = kv.second; break; }
+                if (std::regex_match(eventName, rx.second)) { ptr = kv.second; break; }
             }
             if (ptr) break;
         }

@@ -66,8 +66,9 @@ public:
 	bool HasOverride(const char* eventName);
 	int GetOverrideCount();
 
-	// Fetch settings for an event (resolves regex as needed). Returns false if no override.
-	bool GetOverrideSettingsForEvent(const char* eventName,
+	// Fetch settings for an event (resolves regex if enabled). Returns false if no override.
+	bool GetOverrideSettingsForEvent(
+		const char* eventName,
 		bool& hasVolumeBase, float& volumeBase,
 		bool& hasVolumeMin, float& volumeMin,
 		bool& hasDistanceStart, float& distanceStart,

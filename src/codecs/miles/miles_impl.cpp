@@ -30,6 +30,7 @@ static ConVar miles_warnings("miles_warnings", "0", FCVAR_RELEASE, "Enables warn
 // Custom WAV override volume controls
 static ConVar wav_debug("wav_debug", "0", FCVAR_DEVELOPMENTONLY, "Enables warning prints for the Miles Sound System", "1 = print; 0 (zero) = no print");
 
+static ConVar enable_audio_mods("enable_audio_mods", "1", FCVAR_RELEASE, "Enables custom audio mods");
 static ConVar wav_volume_base("wav_volume_base", "1", FCVAR_RELEASE, "Base volume multiplier for custom WAV overrides (0.0 to 1.0)");
 static ConVar wav_volume_min("wav_volume_min", "0.0", FCVAR_RELEASE, "Minimum volume for custom WAV overrides (0.0 to 1.0, 0.0 = complete silence)");
 static ConVar wav_distance_start("wav_distance_start", "100.0", FCVAR_RELEASE, "Distance at which volume attenuation starts for custom WAV overrides");
@@ -591,6 +592,7 @@ static void CSOM_AddEventToQueue(const char* eventName)
 	if (miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
 
+	if(enable_audio_mods.GetBool())
 	{
 		const void* buf = nullptr; unsigned len = 0; int rate = 0; unsigned short ch = 0; unsigned short bps = 0;
 		if (GetAudioOverrideManager()->TryGetOverrideForEventDetailed(eventName, buf, len, rate, ch, bps))
@@ -681,10 +683,10 @@ static void CSOM_AddEventToQueue(const char* eventName)
 				AddActiveWavSample(sample, soundPos, baseVolume, rate, totalSamples);
 
 				v_MilesSamplePlay(sample);
-			}
 
-			v_CSOM_AddEventToQueue("");
-			return;
+				v_CSOM_AddEventToQueue("");
+				return;
+			}
 		}
 	}
 
