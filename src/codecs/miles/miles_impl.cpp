@@ -165,7 +165,7 @@ void CSOM_UpdateListenerPosition(const Vector3D& position)
 {
 	g_listenerPosition = position;
 	
-	if (g_milesGlobals && g_milesGlobals->driver && v_MilesListenerSet3DPosition)
+	/*if (g_milesGlobals && g_milesGlobals->driver && v_MilesListenerSet3DPosition)
 	{
 		v_MilesListenerSet3DPosition(
 			reinterpret_cast<__int64>(g_milesGlobals->driver),
@@ -180,7 +180,7 @@ void CSOM_UpdateListenerPosition(const Vector3D& position)
 			Msg(eDLL_T::AUDIO, "%s: Updated listener position to (%.2f, %.2f, %.2f)\n", 
 				__FUNCTION__, position.x, position.y, position.z);
 		}
-	}
+	}*/
 	
 	// Update volume for all active custom WAV samples based on new listener position
 	// Only update if enough time has passed to avoid excessive updates
