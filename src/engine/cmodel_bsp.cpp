@@ -31,6 +31,7 @@
 #include "client/clientstate.h"
 #include "client/community_party.h"
 #endif // !DEDICATED
+#include <codecs/miles/miles_impl.h>
 
 CUtlVector<CUtlString> g_InstalledMaps;
 static CustomPakData_s s_customPakData;
@@ -541,6 +542,8 @@ static void Mod_HandleLevelChanged(const char* const levelName)
         // all level changes).
         if (!s_customPakData.inLobby)
             s_customPakData.lastPrecachedLevel = levelName;
+
+        Miles_HandleLevelChanged();
     }
 
     // We should retain all paks in lobby, do not initiate a reprocess unless
