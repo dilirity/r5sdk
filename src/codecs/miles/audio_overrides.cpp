@@ -17,12 +17,18 @@ namespace fs = std::filesystem;
 static ConVar audio_override_debug("audio_override_debug", "0", FCVAR_RELEASE, "Logs detailed audio override resolution");
 
 static CustomAudioManager g_CustomAudioManagerInst;
+static CustomAudioManager g_FinalizerAudioManagerInst;
 static char g_CurrentEventName[256] = {0};
 static CThreadMutex g_CurrentEventMutex;
 
 CustomAudioManager* GetAudioOverrideManager()
 {
 	return &g_CustomAudioManagerInst;
+}
+
+CustomAudioManager* GetFinalizerOverrideManager()
+{
+	return &g_FinalizerAudioManagerInst;
 }
 
 static void ReadFileAllBytes(const fs::path& path, vector<uint8_t>& out)
@@ -293,6 +299,113 @@ void CustomAudioManager::LoadFromMods()
 		{
 			Msg(eDLL_T::AUDIO, "%s: override loaded for '%s' (%zu samples)\n", __FUNCTION__, eventName.c_str(), data ? data->samples.size() : 0);
 		}
+	}
+}
+
+void CustomAudioManager::LoadFromModsInDir(const char* subdirName)
+{
+	if (!ModSystem()->IsEnabled())
+		return;
+
+	unordered_map<string, shared_ptr<EventOverrideData>> newOverrides;
+	vector<pair<string, shared_ptr<EventOverrideData>>> newOverridesRegex;
+
+	ModSystem()->LockModList();
+	FOR_EACH_VEC(ModSystem()->GetModList(), i)
+	{
+		const CModSystem::ModInstance_t* mod = ModSystem()->GetModList()[i];
+		if (!mod->IsEnabled())
+			continue;
+
+		const CUtlString base = mod->GetBasePath();
+		fs::path audioDir = fs::path(base.String()) / subdirName;
+		if (!fs::exists(audioDir) || !fs::is_directory(audioDir))
+			continue;
+
+		// Per-event folders and single WAVs at root: read entire file bytes (including header)
+		auto loadEventFolder = [&newOverrides](const fs::path& eventFolder)
+		{
+			const string eventName = eventFolder.filename().string();
+			if (eventName.empty()) return;
+			for (auto& wav : fs::recursive_directory_iterator(eventFolder))
+			{
+				if (!wav.is_regular_file() || wav.path().extension() != ".wav") continue;
+				vector<uint8_t> raw; ReadFileAllBytes(wav.path(), raw);
+				AudioSample sample; if (raw.empty() || !ExtractPcmFromWave(raw, sample)) continue;
+				auto& ptr = newOverrides[eventName]; if (!ptr) ptr = make_shared<EventOverrideData>();
+				ptr->samples.emplace_back(std::move(sample));
+			}
+		};
+
+		for (auto& entry : fs::directory_iterator(audioDir))
+		{
+			if (entry.is_directory())
+				loadEventFolder(entry.path());
+			else if (entry.is_regular_file() && entry.path().extension() == ".wav")
+			{
+				const std::string eventName = entry.path().stem().string();
+				vector<uint8_t> raw; ReadFileAllBytes(entry.path(), raw);
+				AudioSample sample; if (raw.empty() || !ExtractPcmFromWave(raw, sample)) continue;
+				auto& ptr = newOverrides[eventName]; if (!ptr) ptr = make_shared<EventOverrideData>();
+				ptr->samples.emplace_back(std::move(sample));
+			}
+		}
+
+		// JSON + sibling folder
+		for (auto& entry : fs::directory_iterator(audioDir))
+		{
+			if (!entry.is_regular_file() || entry.path().extension() != ".json")
+				continue;
+			std::ifstream jsonStream(entry.path()); if (jsonStream.fail()) continue;
+			std::stringstream ss; while (jsonStream.peek() != EOF) ss << (char)jsonStream.get(); jsonStream.close();
+
+			rapidjson::Document d; d.Parse<rapidjson::kParseCommentsFlag | rapidjson::kParseTrailingCommasFlag>(ss.str().c_str());
+			if (d.HasParseError() || !d.IsObject()) continue;
+
+			auto dataPtr = make_shared<EventOverrideData>();
+			if (JSON_HasMemberAndIsOfType(d, "AudioSelectionStrategy", JSONFieldType_e::kString))
+			{
+				std::string strat; JSON_GetValue(d, "AudioSelectionStrategy", strat);
+				if (V_stricmp(strat.c_str(), "random") == 0) dataPtr->strategy = AudioSelectionStrategy::RANDOM;
+			}
+
+			fs::path samplesFolder = entry.path(); samplesFolder.replace_extension();
+			if (fs::exists(samplesFolder) && fs::is_directory(samplesFolder))
+			{
+				for (auto& wav : fs::recursive_directory_iterator(samplesFolder))
+				{
+					if (!wav.is_regular_file() || wav.path().extension() != ".wav") continue;
+					vector<uint8_t> raw; ReadFileAllBytes(wav.path(), raw);
+					AudioSample sample; if (raw.empty() || !ExtractPcmFromWave(raw, sample)) continue;
+					dataPtr->samples.emplace_back(std::move(sample));
+				}
+			}
+
+			if (d.HasMember("EventId"))
+			{
+				if (d["EventId"].IsString()) dataPtr->eventIds.push_back(d["EventId"].GetString());
+				else if (d["EventId"].IsArray())
+					for (auto& v : d["EventId"].GetArray()) if (v.IsString()) dataPtr->eventIds.push_back(v.GetString());
+			}
+			if (d.HasMember("EventIdRegex"))
+			{
+				if (d["EventIdRegex"].IsString()) { std::string rx = d["EventIdRegex"].GetString(); try { dataPtr->eventIdsRegex.emplace_back(rx, std::regex(rx)); } catch (...) {} }
+				else if (d["EventIdRegex"].IsArray())
+					for (auto& v : d["EventIdRegex"].GetArray()) if (v.IsString()) { std::string rx = v.GetString(); try { dataPtr->eventIdsRegex.emplace_back(rx, std::regex(rx)); } catch (...) {} }
+			}
+			if (dataPtr->eventIds.empty() && dataPtr->eventIdsRegex.empty())
+				dataPtr->eventIds.push_back(entry.path().stem().string());
+
+			for (const auto& id : dataPtr->eventIds) newOverrides[id] = dataPtr;
+			for (const auto& pr : dataPtr->eventIdsRegex) newOverridesRegex.emplace_back(pr.first, dataPtr);
+		}
+	}
+	ModSystem()->UnlockModList();
+
+	{
+		unique_lock lk(m_mutex);
+		m_overrides.swap(newOverrides);
+		m_overridesRegex.swap(newOverridesRegex);
 	}
 }
 

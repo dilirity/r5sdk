@@ -33,6 +33,7 @@ static ConVar miles_warnings("miles_warnings", "0", FCVAR_RELEASE, "Enables warn
 static ConVar wav_debug("wav_debug", "0", FCVAR_DEVELOPMENTONLY, "Enables warning prints for the Miles Sound System", "1 = print; 0 (zero) = no print");
 
 static ConVar enable_audio_mods("enable_audio_mods", "1", FCVAR_RELEASE, "Enables custom audio mods");
+static ConVar enable_audio_mods_finalizer("enable_audio_mods_finalizer", "1", FCVAR_RELEASE, "Enables custom audio overrides from mod/<mod>/audio_override using MilesSampleFinalizeSetSource");
 static ConVar wav_volume_base("wav_volume_base", "1", FCVAR_RELEASE, "Base volume multiplier for custom WAV overrides (0.0 to 1.0)");
 static ConVar wav_volume_min("wav_volume_min", "0.0", FCVAR_RELEASE, "Minimum volume for custom WAV overrides (0.0 to 1.0, 0.0 = complete silence)");
 static ConVar wav_distance_start("wav_distance_start", "100.0", FCVAR_RELEASE, "Distance at which volume attenuation starts for custom WAV overrides");
@@ -50,6 +51,7 @@ static void CC_reload_audio_mods(const CCommand& args)
 	if (ModSystem()->IsEnabled())
 	{
 		GetAudioOverrideManager()->LoadFromMods();
+		GetFinalizerOverrideManager()->LoadFromModsInDir("audio_override");
 		Msg(eDLL_T::AUDIO, "Loaded %d audio overrides\n", GetAudioOverrideManager()->GetOverrideCount());
 	}
 }
@@ -94,6 +96,16 @@ uint32_t g_EventTableBuckets[4096]; // Corresponds to dword_14D4E0AE8
 // Track active custom samples per event for CancelOnReplay behavior
 static std::unordered_map<std::string, std::vector<void*>> s_eventActiveSamples;
 static std::mutex s_eventSamplesMutex;
+
+// Mapping of decoder state (read-callback 'state' pointer) to override stream cursor
+struct OverrideStreamState
+{
+	const uint8_t* buffer = nullptr;
+	unsigned length = 0;
+	unsigned position = 0;
+};
+static std::unordered_map<__int64, OverrideStreamState> s_stateToOverride;
+static std::mutex s_stateMutex;
 
 //-----------------------------------------------------------------------------
 // Purpose: Stops and cleans up all active custom WAV samples
@@ -437,6 +449,7 @@ static bool CSOM_Initialize()
 	if (bResult && ModSystem()->IsEnabled())
 	{
 		GetAudioOverrideManager()->LoadFromMods();
+		GetFinalizerOverrideManager()->LoadFromModsInDir("audio_override");
 		if (wav_debug.GetBool())
 			Msg(eDLL_T::AUDIO, "Loaded %d audio overrides\n", GetAudioOverrideManager()->GetOverrideCount());
 	}
@@ -578,6 +591,9 @@ void MilesQueueEventRun(Miles::Queue* queue, const char* eventName)
 	if(miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: running event: '%s'\n", __FUNCTION__, eventName);
 
+	// Record current event for finalizer-based overrides
+	AudioOverride_OnEventRun(eventName);
+
 	v_MilesQueueEventRun(queue, eventName);
 }
 
@@ -617,6 +633,9 @@ static void CSOM_AddEventToQueue(const char* eventName)
 {
 	if (miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
+
+	// Ensure current event is recorded before we set sources so the finalizer can resolve it
+	AudioOverride_OnEventRun(eventName);
 
 	if(enable_audio_mods.GetBool())
 	{
@@ -1147,9 +1166,58 @@ static s32 CSOM_MilesAsync_FileCancel(MilesAsyncRead* const request)
 	return CSOM_MilesAsync_FileStatus(request, RR_WAIT_INFINITE);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: Event build hook — force raw and stage our PCM before decoder opens
+//-----------------------------------------------------------------------------
+static __int64 __fastcall MilesEventBuild_Hook(float* a1, __int64 a2, __int64 a3)
+{
+	//This dosnt work atm, not sure why
+	/*
+	// a3 points to a structure where +24 holds the sampleCtx, +32 holds a pointer to event metadata used later.
+	// We'll let the original build most of the state, but we record the event name first.
+	const char* ev = AudioOverride_GetCurrentEventName();
+	if (miles_debug.GetBool())
+		Msg(eDLL_T::AUDIO, "[EventBuild] ev='%s'\n", ev ? ev : "");
+
+	__int64 ret = v_MilesEventBuild(a1, a2, a3);
+
+	if (!enable_audio_mods_finalizer.GetBool() || !ev || !*ev || !v_MilesParamsStageRaw)
+		return ret;
+
+	// After original returned, sample object sits at [a3+24], params at [sample+176]
+	__int64 sample = *(__int64*)(a3 + 24);
+	if (!sample) return ret;
+	__int64 params = *(__int64*)(sample + 176);
+	if (!params) return ret;
+
+	const void* buf = nullptr; unsigned len = 0; int rate = 0; unsigned short ch = 0; unsigned short bps = 0;
+	if (GetFinalizerOverrideManager()->TryGetOverrideForEventDetailed(ev, buf, len, rate, ch, bps) && buf && len > 0)
+	{
+		// Safer path: stage raw into params ring and set metadata fields.
+		if (v_MilesParamsStageRaw)
+		{
+			// Fallback: stage raw into params ring and set metadata fields we know.
+			v_MilesParamsStageRaw(params, reinterpret_cast<__int64>(buf), (int)len);
+			*(uint8_t*)(params + 11) = 0;                 // raw
+			*(uint8_t*)(params + 8)  = (uint8_t)ch;       // channels
+			*(uint32_t*)(params + 44)= (uint32_t)rate;    // sampleRate
+			*(uint8_t*)(params + 33) = 0;                 // loop
+			const int bytesPerSample = ((int)bps / 8) * (int)ch;
+			*(uint32_t*)(params + 40)= bytesPerSample > 0 ? (uint32_t)(len / (uint32_t)bytesPerSample) : 0; // samples
+			if (miles_debug.GetBool())
+				Msg(eDLL_T::AUDIO, "[EventBuild] staged override pcm ev='%s' len=%u rate=%d ch=%u bps=%u\n", ev, len, rate, (unsigned)ch, (unsigned)bps);
+		}
+	}
+
+	return ret;*/
+
+	return v_MilesEventBuild(a1, a2, a3);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 void MilesCore::Detour(const bool bAttach) const
 {
+	DetourSetup(&v_MilesEventBuild, &MilesEventBuild_Hook, bAttach);
 	DetourSetup(&v_MilesQueueEventRun, &MilesQueueEventRun, bAttach);
 	//DetourSetup(&v_MilesBankPatch, &MilesBankPatch, bAttach);
 	DetourSetup(&v_CSOM_Initialize, &CSOM_Initialize, bAttach);

@@ -51,6 +51,8 @@ class CustomAudioManager
 {
 public:
 	void LoadFromMods();
+	// Load overrides from a specific subdirectory under each mod (e.g. "audio" or "audio_override").
+	void LoadFromModsInDir(const char* subdirName);
 	void Clear();
 
 	// Returns a buffer for the given event if overridden, along with format metadata.
@@ -90,6 +92,8 @@ private:
 
 // Global accessors used by Miles glue code
 CustomAudioManager* GetAudioOverrideManager();
+// Second manager dedicated to finalizer-based overrides (mod/<mod>/audio_override)
+CustomAudioManager* GetFinalizerOverrideManager();
 
 // Helpers used by the Miles event hook path
 void AudioOverride_OnEventRun(const char* eventName);

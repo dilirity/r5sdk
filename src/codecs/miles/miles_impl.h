@@ -70,6 +70,13 @@ inline s32(*v_CSOM_MilesAsync_FileRead)(MilesAsyncRead* const request);
 inline s32(*v_CSOM_MilesAsync_FileStatus)(MilesAsyncRead* const request, const u32 i_MS);
 inline s32(*v_CSOM_MilesAsync_FileCancel)(MilesAsyncRead* const request);
 
+inline void (*v_MilesSampleFinalizeSetSource)(void* sample, void* audioBuffer, unsigned int audioBufferLength, int audioType);
+
+
+inline __int64 (*v_MilesParamsStageRaw)(long long a1, long long a2, int a3);
+inline __int64 (*v_MilesEventBuild)(float* a1, __int64 a2, __int64 a3);
+
+
 inline void(*v_CSOM_AddEventToQueue)(const char* eventName);
 
 struct CSOM_GlobalState_s
@@ -167,6 +174,9 @@ class MilesCore : public IDetour
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 8B 81 ?? ?? ?? ?? 48 8B D9 83 F8 ?? 75 ?? B8").GetPtr(v_CSOM_MilesAsync_FileCancel);
 		Module_FindPattern(g_GameDll, "0F B6 11 4C 8B C1").GetPtr(v_CSOM_AddEventToQueue);
 		
+		Module_FindPattern(g_RadAudioSystemDll, "4C 8B C9 0F B6 49 0B").GetPtr(v_MilesParamsStageRaw);
+		Module_FindPattern(g_RadAudioSystemDll, "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 41 54 41 55 48 83 EC 50 49 8B 68 20 4C 8B 6A 38").GetPtr(v_MilesEventBuild);
+
 		g_RadAudioSystemDll.GetExportedSymbol("MilesAllocEx").GetPtr(v_MilesAllocEx);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesQueueEventRun").GetPtr(v_MilesQueueEventRun);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesBankPatch").GetPtr(v_MilesBankPatch);
