@@ -92,8 +92,6 @@ private:
 
 // Global accessors used by Miles glue code
 CustomAudioManager* GetAudioOverrideManager();
-// Second manager dedicated to finalizer-based overrides (mod/<mod>/audio_override)
-CustomAudioManager* GetFinalizerOverrideManager();
 
 // Helpers used by the Miles event hook path
 void AudioOverride_OnEventRun(const char* eventName);

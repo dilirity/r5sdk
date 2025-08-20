@@ -51,7 +51,6 @@ static void CC_reload_audio_mods(const CCommand& args)
 	if (ModSystem()->IsEnabled())
 	{
 		GetAudioOverrideManager()->LoadFromMods();
-		GetFinalizerOverrideManager()->LoadFromModsInDir("audio_override");
 		Msg(eDLL_T::AUDIO, "Loaded %d audio overrides\n", GetAudioOverrideManager()->GetOverrideCount());
 	}
 }
@@ -449,7 +448,6 @@ static bool CSOM_Initialize()
 	if (bResult && ModSystem()->IsEnabled())
 	{
 		GetAudioOverrideManager()->LoadFromMods();
-		GetFinalizerOverrideManager()->LoadFromModsInDir("audio_override");
 		if (wav_debug.GetBool())
 			Msg(eDLL_T::AUDIO, "Loaded %d audio overrides\n", GetAudioOverrideManager()->GetOverrideCount());
 	}
@@ -634,12 +632,30 @@ static void CSOM_AddEventToQueue(const char* eventName)
 	if (miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
 
-	// Ensure current event is recorded before we set sources so the finalizer can resolve it
-	AudioOverride_OnEventRun(eventName);
-
-	if(enable_audio_mods.GetBool())
+	if(OverrideEventName(eventName))
 	{
-		// New: Northstar-style override manager path (JSON or folder-based)
+		v_CSOM_AddEventToQueue("");
+		return;
+	}
+
+	v_CSOM_AddEventToQueue(eventName);
+
+	if (miles_warnings.GetBool())
+	{
+		if (g_milesGlobals->queuedEventHash == 1)
+			Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; invalid event name '%s'\n", __FUNCTION__, eventName);
+
+		if (g_milesGlobals->queuedEventHash == 2)
+			Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; event '%s' not found.\n", __FUNCTION__, eventName);
+	}
+};
+
+bool OverrideEventName(const char* eventName)
+{
+	if (enable_audio_mods.GetBool())
+	{
+		AudioOverride_OnEventRun(eventName);
+
 		{
 			const void* buf = nullptr; unsigned len = 0; int rate = 0; unsigned short ch = 0; unsigned short bps = 0;
 			if (GetAudioOverrideManager()->TryGetOverrideForEventDetailed(eventName, buf, len, rate, ch, bps))
@@ -685,7 +701,7 @@ static void CSOM_AddEventToQueue(const char* eventName)
 				if (sample)
 				{
 					Vector3D soundPos = g_milesGlobals->queuedSoundPosition;
-					Vector3D playerPos = {0.0f, 0.0f, 0.0f};
+					Vector3D playerPos = { 0.0f, 0.0f, 0.0f };
 					if (g_vecRenderOrigin)
 					{
 						playerPos = *g_vecRenderOrigin;
@@ -693,7 +709,7 @@ static void CSOM_AddEventToQueue(const char* eventName)
 					}
 					else
 					{
-						CSOM_UpdateListenerPosition({0.0f, 0.0f, 0.0f});
+						CSOM_UpdateListenerPosition({ 0.0f, 0.0f, 0.0f });
 					}
 
 					const unsigned __int16 fmt = (unsigned __int16)((bps << 8) | (ch & 0xFF));
@@ -706,13 +722,13 @@ static void CSOM_AddEventToQueue(const char* eventName)
 					};
 					float distance = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y + deltaPos.z * deltaPos.z);
 
-					bool hasVB=false; float jVB=1.0f;
-					bool hasVM=false; float jVM=0.0f;
-					bool hasDS=false; float jDS=100.0f;
-					bool hasFP=false; float jFP=1.0f;
-					bool hasUR=false; float jUR=0.1f;
-					bool hasAS=false; bool jAS=true;
-					bool hasSC=false; float jSC=0.001f;
+					bool hasVB = false; float jVB = 1.0f;
+					bool hasVM = false; float jVM = 0.0f;
+					bool hasDS = false; float jDS = 100.0f;
+					bool hasFP = false; float jFP = 1.0f;
+					bool hasUR = false; float jUR = 0.1f;
+					bool hasAS = false; bool jAS = true;
+					bool hasSC = false; float jSC = 0.001f;
 					if (!wav_force_convars.GetBool())
 					{
 						GetAudioOverrideManager()->GetOverrideSettingsForEvent(
@@ -775,89 +791,13 @@ static void CSOM_AddEventToQueue(const char* eventName)
 					v_MilesSamplePlay(sample);
 				}
 
-				v_CSOM_AddEventToQueue("");
-				return;
+				return true;
 			}
 		}
 	}
 
-	///////////////////////// OG FUNCTION //////////////////////////////////
-	// If the input string is null or empty, set the result to 1 and exit.
-	/*if (eventName == nullptr || *eventName == '\0') {
-		g_pFoundEventData = (void*)1;
-		return;
-	}
-
-	// Constants for 64-bit FNV-1a hashing algorithm
-	const uint64_t FNV_OFFSET_BASIS = 0xCBF29CE484222325;
-	const uint64_t FNV_PRIME = 0x100000001B3;
-
-	uint64_t hash = FNV_OFFSET_BASIS;
-	const char* currentChar = eventName;
-
-	// Loop through each character of the string to calculate the hash.
-	while (*currentChar != '\0') {
-		char processedChar = *currentChar;
-
-		// Normalize the character before hashing.
-		// 1. Convert uppercase letters to lowercase.
-		if (processedChar >= 'A' && processedChar <= 'Z') {
-			processedChar += 32; // ASCII difference between upper and lower
-		}
-		// 2. Replace periods with underscores.
-		else if (processedChar == '.') {
-			processedChar = '_';
-		}
-
-		// FNV-1a hash algorithm step: XOR with the character, then multiply by the prime.
-		hash ^= static_cast<uint8_t>(processedChar);
-		hash *= FNV_PRIME;
-
-		currentChar++;
-	}
-
-	// Use the lower 12 bits of the hash to find the initial bucket index.
-	uint32_t bucketIndex = g_EventTableBuckets[hash & 0xFFF];
-	if (bucketIndex == 0) { // Assuming 0 is an invalid index, meaning bucket is empty.
-		g_pFoundEventData = (void*)2; // Event not found
-		return;
-	}
-
-	// Get the first potential entry from the main table using the bucket index.
-	EventTableEntry* entry = &g_EventTableBase[bucketIndex];
-
-	// Traverse the linked list for this bucket to find the correct entry.
-	while (true) {
-		// Check if the full hash in the table entry matches our calculated hash.
-		if (entry->fullHash == hash) {
-			// Match found! Set the global pointer to the event's data portion.
-			g_pFoundEventData = &entry->eventData;
-			return;
-		}
-
-		// If hashes don't match and there's no next entry, the event is not in the table.
-		if (entry->nextEntryIndex == 0) {
-			break; // End of chain
-		}
-
-		// Move to the next entry in the collision chain.
-		entry = &g_EventTableBase[entry->nextEntryIndex];
-	}
-
-	// If the loop finishes without a match, the event was not found.
-	g_pFoundEventData = (void*)2;*/
-
-	v_CSOM_AddEventToQueue(eventName);
-
-	if (miles_warnings.GetBool())
-	{
-		if (g_milesGlobals->queuedEventHash == 1)
-			Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; invalid event name '%s'\n", __FUNCTION__, eventName);
-
-		if (g_milesGlobals->queuedEventHash == 2)
-			Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; event '%s' not found.\n", __FUNCTION__, eventName);
-	}
-};
+	return false;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: close and reset the CSOM async file instance
@@ -1167,50 +1107,10 @@ static s32 CSOM_MilesAsync_FileCancel(MilesAsyncRead* const request)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: Event build hook — force raw and stage our PCM before decoder opens
+// Purpose: Event build hook
 //-----------------------------------------------------------------------------
 static __int64 __fastcall MilesEventBuild_Hook(float* a1, __int64 a2, __int64 a3)
 {
-	//This dosnt work atm, not sure why
-	/*
-	// a3 points to a structure where +24 holds the sampleCtx, +32 holds a pointer to event metadata used later.
-	// We'll let the original build most of the state, but we record the event name first.
-	const char* ev = AudioOverride_GetCurrentEventName();
-	if (miles_debug.GetBool())
-		Msg(eDLL_T::AUDIO, "[EventBuild] ev='%s'\n", ev ? ev : "");
-
-	__int64 ret = v_MilesEventBuild(a1, a2, a3);
-
-	if (!enable_audio_mods_finalizer.GetBool() || !ev || !*ev || !v_MilesParamsStageRaw)
-		return ret;
-
-	// After original returned, sample object sits at [a3+24], params at [sample+176]
-	__int64 sample = *(__int64*)(a3 + 24);
-	if (!sample) return ret;
-	__int64 params = *(__int64*)(sample + 176);
-	if (!params) return ret;
-
-	const void* buf = nullptr; unsigned len = 0; int rate = 0; unsigned short ch = 0; unsigned short bps = 0;
-	if (GetFinalizerOverrideManager()->TryGetOverrideForEventDetailed(ev, buf, len, rate, ch, bps) && buf && len > 0)
-	{
-		// Safer path: stage raw into params ring and set metadata fields.
-		if (v_MilesParamsStageRaw)
-		{
-			// Fallback: stage raw into params ring and set metadata fields we know.
-			v_MilesParamsStageRaw(params, reinterpret_cast<__int64>(buf), (int)len);
-			*(uint8_t*)(params + 11) = 0;                 // raw
-			*(uint8_t*)(params + 8)  = (uint8_t)ch;       // channels
-			*(uint32_t*)(params + 44)= (uint32_t)rate;    // sampleRate
-			*(uint8_t*)(params + 33) = 0;                 // loop
-			const int bytesPerSample = ((int)bps / 8) * (int)ch;
-			*(uint32_t*)(params + 40)= bytesPerSample > 0 ? (uint32_t)(len / (uint32_t)bytesPerSample) : 0; // samples
-			if (miles_debug.GetBool())
-				Msg(eDLL_T::AUDIO, "[EventBuild] staged override pcm ev='%s' len=%u rate=%d ch=%u bps=%u\n", ev, len, rate, (unsigned)ch, (unsigned)bps);
-		}
-	}
-
-	return ret;*/
-
 	return v_MilesEventBuild(a1, a2, a3);
 }
 

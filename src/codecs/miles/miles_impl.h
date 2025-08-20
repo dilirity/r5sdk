@@ -135,6 +135,8 @@ void CSOM_UpdateListenerPosition(const Vector3D& position);
 void UpdateActiveWavSampleVolumes();
 void AddActiveWavSample(void* sample, const Vector3D& soundPosition, float baseVolume, int sampleRate, int totalSamples);
 
+bool OverrideEventName(const char* eventName);
+
 // Stop all custom audio (for level changes)
 void StopAllCustomAudio();
 
