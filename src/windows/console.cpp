@@ -96,7 +96,7 @@ bool Console_Init(const bool bAnsiColor)
 
 #ifndef _TOOLS
 	//-- Set the window title
-	SetConsoleTitleA("R5");
+	SetConsoleTitleA("R5Valkyrie");
 #endif // !_TOOLS
 
 	//-- Open input/output streams
