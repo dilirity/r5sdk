@@ -30,7 +30,7 @@ inline void(*v_MilesBankPatch)(Miles::Bank*, char*, char*);
 inline unsigned int (*v_MilesSampleSetSourceRaw)(__int64 a1, __int64 a2, unsigned int a3, int a4, unsigned __int16 a5, bool a6);
 inline unsigned int (*v_MilesEventGetDetails)(__int64 a1, __int64 a2, __int64 a3, __int64 a4, __int64 a5, __int64 a6, void* const releaseList);
 inline __int64 (*v_MilesSampleCreate)(__int64 a1, __int64 a2, unsigned __int8 a3);
-inline __int64 (*v_MilesSampleSet3DPosition)(__int64 a1);
+inline void (*v_MilesSampleSet3DPosition)(__int64 sample, float x, float y, float z);
 inline __int64 (*v_MilesSamplePlay)(void* sample);
 inline __int64 (*v_MilesSamplePause)(_BYTE* sample);
 inline __int64 (*v_MilesSamplePauseFade)(__int64 sample);
@@ -42,24 +42,24 @@ inline __int64 (*v_MilesSampleSetVolumeLevel)(void* sample, float volume);
 inline __int64 (*v_MilesSampleGetRouteCount)(__int64 a1);
 inline __int64 (*v_MilesSampleCreateRoute)(__int64 a1, __int64 a2, __int64 a3, unsigned __int8 a4);
 inline __int64 (*v_MilesSampleGetRoute)(__int64 a1, unsigned int a2);
-inline __int64 (*v_MilesRouteSetSpatialized)(__int64 a1, __int64 a2);
-inline __int64 (*v_MilesSampleSet3DAutoSpreadDistance)(__int64 a1);
-inline __int64 (*v_MilesSampleSetPanLeftRight)(__int64 a1);
-inline __int64 (*v_MilesSampleSet3DOrientation)(int a1, __int64 a2, __int64 a3, __int64 a4, int a5, int a6, int a7);
-inline __int64 (*v_MilesSampleSet3DVolumeCone)(int a1, int a2, __int64 a3, __int64 a4, int a5);
+inline void (*v_MilesRouteSetSpatialized)(__int64 route);
+inline void (*v_MilesSampleSet3DAutoSpreadDistance)(__int64 sample, float distance);
+inline void (*v_MilesSampleSetPanLeftRight)(__int64 sample, float panLeftRight);
+inline void (*v_MilesSampleSet3DOrientation)(__int64 sample, float fx, float fy, float fz, float upY, int unkMode, float upZ);
+inline void (*v_MilesSampleSet3DVolumeCone)(__int64 sample, int insideAngleDeg, float insideVolume, float outsideVolume, int outsideAngleDeg);
 
 // Listener position functions for proper 3D audio
-inline __int64 (*v_MilesListenerSet3DPosition)(int a1, unsigned __int16 a2, __int64 a3, __int64 a4, int a5);
+inline void (*v_MilesListenerSet3DPosition)(__int64 driver, unsigned __int16 listenerIndex, float x, float y, float z);
 inline __int64 (*v_MilesListenerGet3DPosition)(int a1, unsigned __int16 a2, int a3, int a4, __int64 a5);
 inline __int64 (*v_MilesListenerGet3DOrientation)(int a1, unsigned __int16 a2, int a3, int a4, __int64 a5, __int64 a6, __int64 a7, __int64 a8);
 inline __int64 (*v_MilesListenerSet3DOrientation)(int a1, unsigned __int16 a2, __int64 a3, __int64 a4, int a5, int a6, int a7, int a8);
-inline __int64 (*v_MilesSampleSet3DVolumeGraph)(__int64 a1, __int64 a2, unsigned int a3);
+inline void (*v_MilesSampleSet3DVolumeGraph)(__int64 sample, const void* graph, int graphPoints);
 inline void (*v_MilesTestDisable3DLFE)(char a1);
 
-inline __int64 (*v_MilesSampleSet3DSpreadGraph)(__int64 a1, __int64 a2, unsigned int a3);
-inline __int64 (*v_MilesSampleSet3DLowPassGraph)(__int64 a1, __int64 a2, unsigned int a3);
-inline __int64 (*v_MilesSampleSet3DMultiChannelPan)(__int64 a1);
-inline __int64 (*v_MilesSampleSetDopplerFactor)(int a1, __int64 a2, int a3, int a4, int a5);
+inline void (*v_MilesSampleSet3DSpreadGraph)(__int64 sample, const void* graph, int graphPoints);
+inline void (*v_MilesSampleSet3DLowPassGraph)(__int64 sample, const void* graph, int graphPoints);
+inline void (*v_MilesSampleSet3DMultiChannelPan)(__int64 sample, float panLeftRight, float panFrontBack);
+inline void (*v_MilesSampleSetDopplerFactor)(__int64 sample, float dopplerFactor, float* listenerVelocity, float* sourceVelocity, float speedOfSound);
 
 inline bool(*v_CSOM_Initialize)();
 inline void(*v_CSOM_InitializeBankList)(CSOM_BankList_s* const bankList);
