@@ -45,6 +45,39 @@ struct EventOverrideData
 	bool hasSilenceCutoff = false; float silenceCutoff = 0.001f;
 	bool hasCancelOnReplay = false; bool cancelOnReplay = false;
 	bool hasFadeOnDestroy = false; bool fadeOnDestroy = false;
+	
+	// Custom Doppler effect settings
+	bool hasDopplerEnabled = false; bool dopplerEnabled = false;
+	bool hasDopplerFactor = false; float dopplerFactor = 1.0f;
+	bool hasSpeedOfSound = false; float speedOfSound = 343.0f; // meters per second
+	bool hasListenerVelocity = false; float listenerVelocityX = 0.0f, listenerVelocityY = 0.0f, listenerVelocityZ = 0.0f;
+	bool hasSourceVelocity = false; float sourceVelocityX = 0.0f, sourceVelocityY = 0.0f, sourceVelocityZ = 0.0f;
+	
+	// Custom 3D volume cone settings
+	bool hasVolumeCone = false; bool volumeConeEnabled = false;
+	bool hasInsideAngle = false; int insideAngleDeg = 360;
+	bool hasInsideVolume = false; float insideVolume = 1.0f;
+	bool hasOutsideAngle = false; int outsideAngleDeg = 360;
+	bool hasOutsideVolume = false; float outsideVolume = 0.5f;
+	
+	// 3D audio positioning and spatialization settings
+	bool has3DAudioEnabled = false; bool audio3DEnabled = false;
+	bool hasUseRoutes = false; bool useRoutes = true;
+	bool hasAutoSpreadDistance = false; float autoSpreadDistance = 100.0f;
+	bool hasPosition3D = false; float position3DX = 0.0f, position3DY = 0.0f, position3DZ = 0.0f;
+	bool hasOrientation3D = false; float orientationFX = 0.0f, orientationFY = 0.0f, orientationFZ = 1.0f;
+	bool hasUpVector3D = false; float upVectorY = 1.0f, upVectorZ = 0.0f;
+	bool hasMultiChannelPan = false; float panLeftRight = 0.0f, panFrontBack = 0.0f;
+	
+	// Fake reverb effect settings
+	bool hasReverbEnabled = false; bool reverbEnabled = false;
+	bool hasReverbDecayTime = false; float reverbDecayTime = 2.0f; // seconds
+	bool hasReverbRoomSize = false; float reverbRoomSize = 0.5f; // 0.0 to 1.0 (small to large room)
+	bool hasReverbDamping = false; float reverbDamping = 0.3f; // 0.0 to 1.0 (low to high frequency absorption)
+	bool hasReverbWetLevel = false; float reverbWetLevel = 0.3f; // 0.0 to 1.0 (dry to wet mix)
+	bool hasReverbDryLevel = false; float reverbDryLevel = 0.8f; // 0.0 to 1.0 (original signal level)
+	bool hasReverbDelay = false; float reverbDelay = 0.05f; // seconds (initial reflection delay)
+	bool hasReverbDiffusion = false; float reverbDiffusion = 0.7f; // 0.0 to 1.0 (echo clarity)
 };
 
 class CustomAudioManager
@@ -83,6 +116,47 @@ public:
 
 	bool GetCancelOnReplayForEvent(const char* eventName, bool& cancelOnReplay);
 	bool GetFadeOnDestroyForEvent(const char* eventName, bool& fadeOnDestroy);
+	
+	// Get Doppler effect settings for an event
+	bool GetDopplerSettingsForEvent(
+		const char* eventName,
+		bool& hasDopplerEnabled, bool& dopplerEnabled,
+		bool& hasDopplerFactor, float& dopplerFactor,
+		bool& hasSpeedOfSound, float& speedOfSound,
+		bool& hasListenerVelocity, float& listenerVelocityX, float& listenerVelocityY, float& listenerVelocityZ,
+		bool& hasSourceVelocity, float& sourceVelocityX, float& sourceVelocityY, float& sourceVelocityZ);
+		
+	// Get volume cone settings for an event
+	bool GetVolumeConeSettingsForEvent(
+		const char* eventName,
+		bool& hasVolumeCone, bool& volumeConeEnabled,
+		bool& hasInsideAngle, int& insideAngleDeg,
+		bool& hasInsideVolume, float& insideVolume,
+		bool& hasOutsideAngle, int& outsideAngleDeg,
+		bool& hasOutsideVolume, float& outsideVolume);
+		
+	// Get 3D audio settings for an event
+	bool Get3DAudioSettingsForEvent(
+		const char* eventName,
+		bool& has3DAudioEnabled, bool& audio3DEnabled,
+		bool& hasUseRoutes, bool& useRoutes,
+		bool& hasAutoSpreadDistance, float& autoSpreadDistance,
+		bool& hasPosition3D, float& position3DX, float& position3DY, float& position3DZ,
+		bool& hasOrientation3D, float& orientationFX, float& orientationFY, float& orientationFZ,
+		bool& hasUpVector3D, float& upVectorY, float& upVectorZ,
+		bool& hasMultiChannelPan, float& panLeftRight, float& panFrontBack);
+		
+	// Get reverb effect settings for an event
+	bool GetReverbSettingsForEvent(
+		const char* eventName,
+		bool& hasReverbEnabled, bool& reverbEnabled,
+		bool& hasReverbDecayTime, float& reverbDecayTime,
+		bool& hasReverbRoomSize, float& reverbRoomSize,
+		bool& hasReverbDamping, float& reverbDamping,
+		bool& hasReverbWetLevel, float& reverbWetLevel,
+		bool& hasReverbDryLevel, float& reverbDryLevel,
+		bool& hasReverbDelay, float& reverbDelay,
+		bool& hasReverbDiffusion, float& reverbDiffusion);
 
 private:
 	std::unordered_map<std::string, std::shared_ptr<EventOverrideData>> m_overrides;
@@ -92,6 +166,7 @@ private:
 
 // Global accessors used by Miles glue code
 CustomAudioManager* GetAudioOverrideManager();
+CustomAudioManager* GetAudioOverrideManagerNorthstar(); // For audio_overrides directory
 
 // Helpers used by the Miles event hook path
 void AudioOverride_OnEventRun(const char* eventName);

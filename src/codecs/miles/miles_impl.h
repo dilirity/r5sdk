@@ -72,8 +72,12 @@ inline s32(*v_CSOM_MilesAsync_FileCancel)(MilesAsyncRead* const request);
 
 inline void (*v_MilesSampleFinalizeSetSource)(void* sample, void* audioBuffer, unsigned int audioBufferLength, int audioType);
 
+// Northstar-style audio hooks (original function pointers for pattern-matched functions)
+inline bool(*v_h_LoadSampleMetadata)(void* sample, void* audioBuffer, unsigned int audioBufferLength, int audioType);
+inline char(*v_h_Sub_18002AAF0)(__int64 a1, __int64 a2, __int64 a3, __int64 j);
+inline char*(*v_h_Sub_18003BC10)(void* a1, void* a2, void* a3, void* a4, void* a5, int a6);
 
-inline __int64 (*v_MilesParamsStageRaw)(long long a1, long long a2, int a3);
+inline __int64 (*v_MilesParamsStageRaw)(__int64 a1, __int64 a2, int a3);
 inline __int64 (*v_MilesEventBuild)(float* a1, __int64 a2, __int64 a3);
 
 
@@ -163,6 +167,9 @@ class MilesCore : public IDetour
 		LogFunAdr("CSOM_MilesAsync_FileStatus", v_CSOM_MilesAsync_FileStatus);
 		LogFunAdr("CSOM_MilesAsync_FileCancel", v_CSOM_MilesAsync_FileCancel);
 		LogFunAdr("CSOM_AddEventToQueue", v_CSOM_AddEventToQueue);
+		LogFunAdr("h_LoadSampleMetadata", v_h_LoadSampleMetadata);
+		LogFunAdr("h_Sub_18002AAF0", v_h_Sub_18002AAF0);
+		LogFunAdr("h_Sub_18003BC10", v_h_Sub_18003BC10);
 		LogVarAdr("g_milesGlobals", g_milesGlobals);
 	}
 	virtual void GetFun(void) const
@@ -220,6 +227,14 @@ class MilesCore : public IDetour
 	
         g_RadAudioSystemDll.GetExportedSymbol("MilesTestDisable3DLFE").GetPtr(v_MilesTestDisable3DLFE);
 
+		// Northstar-style audio hooks using pattern matching
+		// h_LoadSampleMetadata = sub_18000EFF0 (LoadSampleMetadata - Handles sample buffer finalization)
+		Module_FindPattern(g_RadAudioSystemDll, "48 89 5C 24 08 57 48 83 EC 20 41 8B F9").GetPtr(v_h_LoadSampleMetadata);
+		// h_Sub_18002AAF0 = Pre-EventBuild function - better event name capture point  
+		// Pattern: sub_18002AAF0 function signature
+		Module_FindPattern(g_RadAudioSystemDll, "40 55 56 41 57 48 8D AC 24 90 FE FF FF 48 81 EC").GetPtr(v_h_Sub_18002AAF0);
+		// h_Sub_18003BC10 = sub_18005F400 (Thread management function)
+		Module_FindPattern(g_RadAudioSystemDll, "48 8B C4 48 89 58 20 55 56 41 54 41 55").GetPtr(v_h_Sub_18003BC10);
 
 	}
 	virtual void GetVar(void) const

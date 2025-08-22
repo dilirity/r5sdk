@@ -17,12 +17,18 @@ namespace fs = std::filesystem;
 static ConVar audio_override_debug("audio_override_debug", "0", FCVAR_RELEASE, "Logs detailed audio override resolution");
 
 static CustomAudioManager g_CustomAudioManagerInst;
+static CustomAudioManager g_CustomAudioManagerNorthstarInst; // For audio_overrides directory
 static char g_CurrentEventName[256] = {0};
 static CThreadMutex g_CurrentEventMutex;
 
 CustomAudioManager* GetAudioOverrideManager()
 {
 	return &g_CustomAudioManagerInst;
+}
+
+CustomAudioManager* GetAudioOverrideManagerNorthstar()
+{
+	return &g_CustomAudioManagerNorthstarInst;
 }
 
 static void ReadFileAllBytes(const fs::path& path, vector<uint8_t>& out)
@@ -83,6 +89,12 @@ static bool ExtractPcmFromWave(const vector<uint8_t>& in, AudioSample& out)
 
 void CustomAudioManager::LoadFromMods()
 {
+	LoadFromModsInDir("audio");
+}
+
+// Load overrides from a specific subdirectory under each mod (e.g. "audio" or "audio_overrides").
+void CustomAudioManager::LoadFromModsInDir(const char* subdirName)
+{
 	if (!ModSystem()->IsEnabled())
 		return;
 
@@ -121,7 +133,7 @@ void CustomAudioManager::LoadFromMods()
 			}
 		};
 
-		fs::path audioDir = fs::path(base.String()) / "audio";
+		fs::path audioDir = fs::path(base.String()) / subdirName;
 		if (fs::exists(audioDir) && fs::is_directory(audioDir))
 		{
 			// 2) Folder-only per-event, and single-file .wav at root
@@ -219,6 +231,9 @@ void CustomAudioManager::LoadFromMods()
 					dataPtr->fadeOnDestroy = JSON_GetValueOrDefault(d, "FadeOnDestroy", false);
 				}
 
+				//EventID From File Name
+				dataPtr->eventIds.push_back(entry.path().stem().string());
+
 				// Load samples from sibling folder (same basename)
 				fs::path samplesFolder = entry.path(); samplesFolder.replace_extension();
 				if (fs::exists(samplesFolder) && fs::is_directory(samplesFolder))
@@ -232,41 +247,6 @@ void CustomAudioManager::LoadFromMods()
 						if (raw.empty() || !ExtractPcmFromWave(raw, sample)) continue;
 						dataPtr->samples.emplace_back(std::move(sample));
 					}
-				}
-
-				// EventId (string or array)
-				if (d.HasMember("EventId"))
-				{
-					if (d["EventId"].IsString())
-					{
-						dataPtr->eventIds.push_back(d["EventId"].GetString());
-					}
-					else if (d["EventId"].IsArray())
-					{
-						for (auto& v : d["EventId"].GetArray())
-							if (v.IsString()) dataPtr->eventIds.push_back(v.GetString());
-					}
-				}
-
-				// EventIdRegex (string or array)
-				if (d.HasMember("EventIdRegex"))
-				{
-					if (d["EventIdRegex"].IsString())
-					{
-						std::string rx = d["EventIdRegex"].GetString();
-						try { dataPtr->eventIdsRegex.emplace_back(rx, std::regex(rx)); } catch (...) {}
-					}
-					else if (d["EventIdRegex"].IsArray())
-					{
-						for (auto& v : d["EventIdRegex"].GetArray())
-							if (v.IsString()) { std::string rx = v.GetString(); try { dataPtr->eventIdsRegex.emplace_back(rx, std::regex(rx)); } catch (...) {} }
-					}
-				}
-
-				// Fallback: if no ids were provided, infer from JSON basename
-				if (dataPtr->eventIds.empty() && dataPtr->eventIdsRegex.empty())
-				{
-					dataPtr->eventIds.push_back(entry.path().stem().string());
 				}
 
 				// Register
@@ -467,24 +447,6 @@ bool CustomAudioManager::GetCancelOnReplayForEvent(const char* eventName, bool& 
     }
     if (!ptr) return false;
     cancelOnReplay = ptr->hasCancelOnReplay ? ptr->cancelOnReplay : false;
-    return true;
-}
-
-bool CustomAudioManager::GetFadeOnDestroyForEvent(const char* eventName, bool& fadeOnDestroy)
-{
-    shared_lock lk(m_mutex);
-    std::shared_ptr<EventOverrideData> ptr;
-    if (auto it = m_overrides.find(eventName); it != m_overrides.end()) ptr = it->second;
-    else {
-        for (const auto& kv : m_overridesRegex) {
-            for (const auto& rx : kv.second->eventIdsRegex) {
-                if (std::regex_search(eventName, rx.second)) { ptr = kv.second; break; }
-            }
-            if (ptr) break;
-        }
-    }
-    if (!ptr) return false;
-    fadeOnDestroy = ptr->hasFadeOnDestroy ? ptr->fadeOnDestroy : false;
     return true;
 }
 

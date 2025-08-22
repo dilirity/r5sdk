@@ -46,38 +46,377 @@ static ConVar wav_force_convars("wav_force_convars", "0", FCVAR_RELEASE, "Force 
 // Level change detection
 static ConVar miles_wav_auto_stop_on_level_change("miles_wav_auto_stop_on_level_change", "1", FCVAR_RELEASE, "Automatically stop custom audio when level changes (1 = enabled, 0 = disabled)");
 
-static void CC_reload_audio_mods(const CCommand& args)
-{
-	if (ModSystem()->IsEnabled())
-	{
-		GetAudioOverrideManager()->LoadFromMods();
-		Msg(eDLL_T::AUDIO, "Loaded %d audio overrides\n", GetAudioOverrideManager()->GetOverrideCount());
-	}
-}
-static ConCommand reload_audio_mods("reload_audio_mods", CC_reload_audio_mods, "", FCVAR_CLIENTDLL | FCVAR_RELEASE);
-
-
 //-----------------------------------------------------------------------------
 // Global listener position tracking
 //-----------------------------------------------------------------------------
 Vector3D g_listenerPosition = {0.0f, 0.0f, 0.0f};
 
-// Structure to track active custom WAV samples for volume updates
+//-----------------------------------------------------------------------------
+// Event position override system
+//-----------------------------------------------------------------------------
+static std::mutex s_eventPositionMutex;
+static std::unordered_map<std::string, Vector3D> s_eventPositionOverrides;
+
+void SetEventPositionOverride(const char* eventName, const Vector3D& position)
+{
+	std::lock_guard<std::mutex> lg(s_eventPositionMutex);
+	s_eventPositionOverrides[eventName] = position;
+	if (wav_debug.GetBool())
+		Msg(eDLL_T::AUDIO, "Set position override for event '%s': (%.1f, %.1f, %.1f)\n", 
+			eventName, position.x, position.y, position.z);
+}
+
+bool GetEventPositionOverride(const char* eventName, Vector3D& position)
+{
+	std::lock_guard<std::mutex> lg(s_eventPositionMutex);
+	auto it = s_eventPositionOverrides.find(eventName);
+	if (it != s_eventPositionOverrides.end())
+	{
+		position = it->second;
+		// Remove the override after using it (single-use)
+		s_eventPositionOverrides.erase(it);
+		return true;
+	}
+	return false;
+}
+
+// Enhanced sample tracking with unique IDs and better state management
 struct ActiveWavSample
 {
-	void* sample;
-	Vector3D soundPosition;
-	float baseVolume;
-	float startTime;
-	float durationMs;  // Actual audio duration in milliseconds
-	int sampleRate;    // PCM sample rate for duration calculation
-	int totalSamples;  // Total PCM samples for duration calculation
-	bool isActive;
+    uint64_t id;              // Unique identifier for this sample
+    void* sample;             // Miles sample pointer
+    Vector3D soundPosition;   // 3D position
+    float baseVolume;         // Base volume level
+    float startTime;          // When playback started
+    float durationMs;         // Expected duration in milliseconds
+    int sampleRate;           // PCM sample rate
+    int totalSamples;         // Total PCM samples
+    std::string eventName;    // Event name (using string for safety)
+    bool isActive;            // Active state
+    bool isPendingDestroy;    // Marked for destruction
+    
+    ActiveWavSample() : id(0), sample(nullptr), soundPosition{0,0,0}, 
+                       baseVolume(0), startTime(0), durationMs(0), 
+                       sampleRate(0), totalSamples(0), isActive(false), 
+                       isPendingDestroy(false) {}
 };
 
-#define MAX_ACTIVE_WAV_SAMPLES 32
-static ActiveWavSample s_activeWavSamples[MAX_ACTIVE_WAV_SAMPLES];
-static int s_numActiveWavSamples = 0;
+// Thread-safe sample management class
+class WavSampleManager
+{
+private:
+    static constexpr int MAX_ACTIVE_SAMPLES = 64;
+    static constexpr uint64_t INVALID_SAMPLE_ID = 0;
+    
+    std::vector<std::unique_ptr<ActiveWavSample>> m_activeSamples;
+    std::unordered_map<std::string, std::vector<uint64_t>> m_eventToSamples;
+    std::unordered_map<void*, uint64_t> m_ptrToId;
+    std::mutex m_mutex;
+    uint64_t m_nextId;
+    float m_lastCleanupTime;
+    
+public:
+    WavSampleManager() : m_nextId(1), m_lastCleanupTime(0.0f) 
+    {
+        m_activeSamples.reserve(MAX_ACTIVE_SAMPLES);
+    }
+    
+    // Add a new sample with automatic cleanup tracking
+    uint64_t AddSample(void* sample, const Vector3D& position, float baseVolume, 
+                      int sampleRate, int totalSamples, const char* eventName)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        if (!sample || !eventName) return INVALID_SAMPLE_ID;
+        
+        // Clean up expired samples first
+        PerformCleanupLocked();
+        
+        // Create new sample with unique ID
+        auto newSample = std::make_unique<ActiveWavSample>();
+        newSample->id = m_nextId++;
+        newSample->sample = sample;
+        newSample->soundPosition = position;
+        newSample->baseVolume = baseVolume;
+        newSample->startTime = (float)Plat_FloatTime();
+        newSample->sampleRate = sampleRate;
+        newSample->totalSamples = totalSamples;
+        newSample->eventName = eventName;
+        newSample->isActive = true;
+        newSample->isPendingDestroy = false;
+        
+        // Calculate duration
+        if (sampleRate > 0) {
+            newSample->durationMs = (float)(totalSamples) / (float)sampleRate * 1000.0f;
+        } else {
+            newSample->durationMs = 5000.0f; // Fallback
+        }
+        
+        uint64_t sampleId = newSample->id;
+        
+        // Add to tracking structures
+        m_activeSamples.push_back(std::move(newSample));
+        m_eventToSamples[eventName].push_back(sampleId);
+        m_ptrToId[sample] = sampleId;
+        
+        if (wav_debug.GetBool()) {
+            Msg(eDLL_T::AUDIO, "Added sample ID %llu for event '%s': pos=(%.2f,%.2f,%.2f) duration=%.1f ms\n", 
+                sampleId, eventName, position.x, position.y, position.z, 
+                m_activeSamples.back()->durationMs);
+        }
+        
+        return sampleId;
+    }
+    
+    // Stop and destroy a specific sample by ID
+    bool StopSample(uint64_t sampleId)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        auto it = std::find_if(m_activeSamples.begin(), m_activeSamples.end(),
+            [sampleId](const std::unique_ptr<ActiveWavSample>& sample) {
+                return sample && sample->id == sampleId && sample->isActive;
+            });
+            
+        if (it != m_activeSamples.end()) {
+            return DestroySampleLocked(it->get());
+        }
+        
+        return false;
+    }
+    
+    // Stop all samples for a specific event
+    int StopSamplesForEvent(const std::string& eventName)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        auto eventIt = m_eventToSamples.find(eventName);
+        if (eventIt == m_eventToSamples.end()) {
+            return 0;
+        }
+        
+        int stoppedCount = 0;
+        for (uint64_t sampleId : eventIt->second) {
+            auto sampleIt = std::find_if(m_activeSamples.begin(), m_activeSamples.end(),
+                [sampleId](const std::unique_ptr<ActiveWavSample>& sample) {
+                    return sample && sample->id == sampleId && sample->isActive;
+                });
+                
+            if (sampleIt != m_activeSamples.end()) {
+                if (DestroySampleLocked(sampleIt->get())) {
+                    stoppedCount++;
+                }
+            }
+        }
+        
+        // Clear the event entry
+        m_eventToSamples.erase(eventIt);
+        
+        if (wav_debug.GetBool()) {
+            Msg(eDLL_T::AUDIO, "Stopped %d samples for event '%s'\n", stoppedCount, eventName.c_str());
+        }
+        
+        return stoppedCount;
+    }
+    
+    // Stop all active samples
+    void StopAllSamples()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        int stoppedCount = 0;
+        for (auto& sample : m_activeSamples) {
+            if (sample && sample->isActive) {
+                if (DestroySampleLocked(sample.get())) {
+                    stoppedCount++;
+                }
+            }
+        }
+        
+        // Clear all tracking
+        m_activeSamples.clear();
+        m_eventToSamples.clear();
+        m_ptrToId.clear();
+        
+        if (wav_debug.GetBool()) {
+            Msg(eDLL_T::AUDIO, "Stopped all %d active samples\n", stoppedCount);
+        }
+    }
+    
+    // Update volumes for all active samples
+    void UpdateVolumes()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        if (!v_MilesSampleSetVolumeLevel) return;
+        
+        float currentTime = (float)Plat_FloatTime();
+        
+        // Perform cleanup periodically
+        if (currentTime - m_lastCleanupTime >= 1.0f) { // Every second
+            PerformCleanupLocked();
+            m_lastCleanupTime = currentTime;
+        }
+        
+        float distanceStart = wav_distance_start.GetFloat();
+        float falloffPower = wav_falloff_power.GetFloat();
+        float minVolume = wav_volume_min.GetFloat();
+        
+        for (auto& sample : m_activeSamples) {
+            if (!sample || !sample->isActive || sample->isPendingDestroy) continue;
+            
+            // Check if sample expired
+            float elapsed = (currentTime - sample->startTime) * 1000.0f;
+            if (elapsed > sample->durationMs + 1000.0f) { // 1 second buffer
+                sample->isPendingDestroy = true;
+                continue;
+            }
+            
+            // Calculate distance-based volume
+            bool isAttachedToPlayer = (sample->soundPosition.x == 0.0f && 
+                                     sample->soundPosition.y == 0.0f && 
+                                     sample->soundPosition.z == 0.0f);
+            
+            float distance = 0.0f;
+            if (!isAttachedToPlayer) {
+                Vector3D delta = {
+                    sample->soundPosition.x - g_listenerPosition.x,
+                    sample->soundPosition.y - g_listenerPosition.y,
+                    sample->soundPosition.z - g_listenerPosition.z
+                };
+                distance = sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
+            }
+            
+            float attenuatedVolume;
+            if (distance > distanceStart) {
+                float falloffFactor = distanceStart / distance;
+                attenuatedVolume = sample->baseVolume * pow(falloffFactor, falloffPower);
+                
+                if (wav_allow_silence.GetBool()) {
+                    if (attenuatedVolume < wav_silence_cutoff.GetFloat()) {
+                        attenuatedVolume = 0.0f;
+                    } else {
+                        attenuatedVolume = max(attenuatedVolume, minVolume);
+                    }
+                } else {
+                    attenuatedVolume = max(attenuatedVolume, minVolume);
+                }
+            } else {
+                attenuatedVolume = sample->baseVolume;
+            }
+            
+            v_MilesSampleSetVolumeLevel(sample->sample, attenuatedVolume);
+        }
+        
+        // Clean up samples marked for destruction
+        CleanupDestroyedSamplesLocked();
+    }
+    
+    // Get active sample count for debugging
+    size_t GetActiveSampleCount() const
+    {
+		//std::lock_guard<std::mutex> lock(m_mutex);
+        return std::count_if(m_activeSamples.begin(), m_activeSamples.end(),
+            [](const std::unique_ptr<ActiveWavSample>& sample) {
+                return sample && sample->isActive && !sample->isPendingDestroy;
+            });
+    }
+    
+    // Get samples for a specific event (for CancelOnReplay)
+    std::vector<uint64_t> GetSamplesForEvent(const std::string& eventName) const
+    {
+        //std::lock_guard<std::mutex> lock(m_mutex);
+        
+        auto it = m_eventToSamples.find(eventName);
+        if (it != m_eventToSamples.end()) {
+            return it->second;
+        }
+        return {};
+    }
+
+private:
+    // Safely destroy a sample (must be called with lock held)
+    bool DestroySampleLocked(ActiveWavSample* sample)
+    {
+        if (!sample || !sample->isActive) return false;
+        
+        void* samplePtr = sample->sample;
+        
+        // Stop playback immediately
+        if (v_MilesSampleSetVolumeLevel) {
+            v_MilesSampleSetVolumeLevel(samplePtr, 0.0f);
+        }
+        
+        if (v_MilesSamplePause) {
+            v_MilesSamplePause(reinterpret_cast<_BYTE*>(samplePtr));
+        }
+        
+        if (v_MilesSampleDestroy) {
+            v_MilesSampleDestroy(reinterpret_cast<__int64>(samplePtr));
+        }
+        
+        // Update tracking
+        sample->isActive = false;
+        sample->isPendingDestroy = true;
+        
+        // Remove from pointer mapping
+        m_ptrToId.erase(samplePtr);
+        
+        return true;
+    }
+    
+    // Clean up expired and destroyed samples (must be called with lock held)
+    void PerformCleanupLocked()
+    {
+        float currentTime = (float)Plat_FloatTime();
+        
+        // Mark expired samples for destruction
+        for (auto& sample : m_activeSamples) {
+            if (!sample || !sample->isActive || sample->isPendingDestroy) continue;
+            
+            float elapsed = (currentTime - sample->startTime) * 1000.0f;
+            if (elapsed > sample->durationMs + 1000.0f) {
+                if (wav_debug.GetBool()) {
+                    Msg(eDLL_T::AUDIO, "Sample ID %llu expired: elapsed=%.1f, duration=%.1f\n",
+                        sample->id, elapsed/1000.0f, sample->durationMs);
+                }
+                DestroySampleLocked(sample.get());
+            }
+        }
+        
+        CleanupDestroyedSamplesLocked();
+    }
+    
+    // Remove destroyed samples from all containers (must be called with lock held)
+    void CleanupDestroyedSamplesLocked()
+    {
+        // Remove destroyed samples from active list
+        m_activeSamples.erase(
+            std::remove_if(m_activeSamples.begin(), m_activeSamples.end(),
+                [this](const std::unique_ptr<ActiveWavSample>& sample) {
+                    if (sample && sample->isPendingDestroy) {
+                        // Remove from event mapping
+                        auto eventIt = m_eventToSamples.find(sample->eventName);
+                        if (eventIt != m_eventToSamples.end()) {
+                            auto& sampleIds = eventIt->second;
+                            sampleIds.erase(
+                                std::remove(sampleIds.begin(), sampleIds.end(), sample->id),
+                                sampleIds.end());
+                            
+                            if (sampleIds.empty()) {
+                                m_eventToSamples.erase(eventIt);
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
+                }),
+            m_activeSamples.end());
+    }
+};
+
+// Global instance
+static WavSampleManager g_wavSampleManager;
 
 // Timer for periodic volume updates
 static float s_lastVolumeUpdateTime = 0.0f;
@@ -91,10 +430,6 @@ EventTableEntry* g_EventTableBase; // Corresponds to qword_14D4E4AE8
 
 // An array of 4096 (0x1000) indices that maps a partial hash to the first entry in a bucket.
 uint32_t g_EventTableBuckets[4096]; // Corresponds to dword_14D4E0AE8
-
-// Track active custom samples per event for CancelOnReplay behavior
-static std::unordered_map<std::string, std::vector<void*>> s_eventActiveSamples;
-static std::mutex s_eventSamplesMutex;
 
 // Mapping of decoder state (read-callback 'state' pointer) to override stream cursor
 struct OverrideStreamState
@@ -111,45 +446,7 @@ static std::mutex s_stateMutex;
 //-----------------------------------------------------------------------------
 void StopAllCustomAudio()
 {
-	if (wav_debug.GetBool())
-	{
-		Msg(eDLL_T::AUDIO, "Stopping all custom audio samples (%d active)\n", s_numActiveWavSamples);
-	}
-	
-	for (int i = 0; i < s_numActiveWavSamples; i++)
-	{
-		ActiveWavSample& activeSample = s_activeWavSamples[i];
-		if (activeSample.isActive)
-		{
-			// Force volume to 0 first to stop audio immediately
-			if (v_MilesSampleSetVolumeLevel)
-			{
-				v_MilesSampleSetVolumeLevel(activeSample.sample, 0.0f);
-			}
-			
-			// Pause the sample to stop playback
-			if (v_MilesSamplePause)
-			{
-				v_MilesSamplePause(reinterpret_cast<_BYTE*>(activeSample.sample));
-			}
-			
-			// Finally destroy the sample
-			if (v_MilesSampleDestroy)
-			{
-				v_MilesSampleDestroy(reinterpret_cast<__int64>(activeSample.sample));
-			}
-			
-			// Mark as inactive
-			activeSample.isActive = false;
-		}
-	}
-	
-	s_numActiveWavSamples = 0;
-	
-	if (wav_debug.GetBool())
-	{
-		Msg(eDLL_T::AUDIO, "All custom audio samples stopped and cleaned up\n");
-	}
+	g_wavSampleManager.StopAllSamples();
 }
 
 //-----------------------------------------------------------------------------
@@ -208,172 +505,15 @@ void CSOM_UpdateListenerPosition(const Vector3D& position)
 //-----------------------------------------------------------------------------
 void UpdateActiveWavSampleVolumes()
 {
-	if (!v_MilesSampleSetVolumeLevel)
-		return;
-		
-	float distanceStart = wav_distance_start.GetFloat();
-	float falloffPower = wav_falloff_power.GetFloat();
-	float minVolume = wav_volume_min.GetFloat();
-	
-	// Clean up old samples based on actual audio duration
-	float currentTime = (float)Plat_FloatTime();
-	for (int i = 0; i < s_numActiveWavSamples; i++)
-	{
-		ActiveWavSample& activeSample = s_activeWavSamples[i];
-		if (activeSample.isActive)
-		{
-			// Calculate how long the sample should have been playing
-			float elapsedTime = (currentTime - activeSample.startTime) * 1000.0f; // Convert to milliseconds
-			float expectedDuration = activeSample.durationMs + 1000.0f; // Add 1 second buffer for safety
-			
-			if (elapsedTime > expectedDuration)
-			{
-				activeSample.isActive = false;
-				if (wav_debug.GetBool())
-					Msg(eDLL_T::AUDIO, "Cleaned up sample after %.1f seconds (duration: %.1f ms)\n", 
-						elapsedTime / 1000.0f, activeSample.durationMs);
-			}
-		}
-	} 
-	for (int i = 0; i < s_numActiveWavSamples; i++)
-	{
-		ActiveWavSample& activeSample = s_activeWavSamples[i];
-		if (!activeSample.isActive)
-			continue;
-			
-		// Check if this sound is attached to the player (position 0,0,0)
-		bool isAttachedToPlayer = (activeSample.soundPosition.x == 0.0f && 
-								  activeSample.soundPosition.y == 0.0f && 
-								  activeSample.soundPosition.z == 0.0f);
-		
-		// Calculate current distance from listener to sound
-		Vector3D deltaPos;
-		float distance;
-		
-		if (isAttachedToPlayer)
-		{
-			// Sound follows the player - always at listener position
-			deltaPos = {0.0f, 0.0f, 0.0f};
-			distance = 0.0f;
-		}
-		else
-		{
-			// Normal 3D positioned sound
-			deltaPos = {
-				activeSample.soundPosition.x - g_listenerPosition.x,
-				activeSample.soundPosition.y - g_listenerPosition.y,
-				activeSample.soundPosition.z - g_listenerPosition.z
-			};
-			distance = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y + deltaPos.z * deltaPos.z);
-		}
-		
-		// Apply distance-based volume attenuation
-		float attenuatedVolume;
-		if (distance > distanceStart)
-		{
-			float falloffFactor = distanceStart / distance;
-			attenuatedVolume = activeSample.baseVolume * pow(falloffFactor, falloffPower);
-			
-			// Handle silence option
-			if (wav_allow_silence.GetBool())
-			{
-				// Allow complete silence if falloff makes volume very low
-				if (attenuatedVolume < 0.001f) // Very low threshold
-				{
-					attenuatedVolume = 0.0f; // Complete silence
-				}
-				else
-				{
-					attenuatedVolume = max(attenuatedVolume, minVolume);
-				}
-			}
-			else
-			{
-				// Always keep minimum volume
-				attenuatedVolume = max(attenuatedVolume, minVolume);
-			}
-		}
-		else
-		{
-			attenuatedVolume = activeSample.baseVolume;
-		}
-		
-		// Update the sample volume
-		v_MilesSampleSetVolumeLevel(activeSample.sample, attenuatedVolume);
-		
-
-		
-		if (wav_debug.GetBool())
-		{
-			const char* soundType = isAttachedToPlayer ? "PLAYER-ATTACHED" : "3D-POSITIONED";
-			Msg(eDLL_T::AUDIO, "Updated sample: %s distance=%.2f volume=%.3f (silence=%s)\n", 
-				soundType, distance, attenuatedVolume,
-				wav_allow_silence.GetBool() ? "enabled" : "disabled");
-		}
-	}
+	g_wavSampleManager.UpdateVolumes();
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: Adds a custom WAV sample to the active tracking system
 //-----------------------------------------------------------------------------
-void AddActiveWavSample(void* sample, const Vector3D& soundPosition, float baseVolume, int sampleRate, int totalSamples)
+void AddActiveWavSample(void* sample, const Vector3D& soundPosition, float baseVolume, int sampleRate, int totalSamples, const char* eventName)
 {
-	// Find a free slot
-	int freeSlot = -1;
-	for (int i = 0; i < MAX_ACTIVE_WAV_SAMPLES; i++)
-	{
-		if (!s_activeWavSamples[i].isActive)
-		{
-			freeSlot = i;
-			break;
-		}
-	}
-	
-	if (freeSlot == -1)
-	{
-		// No free slots, remove the oldest one
-		freeSlot = 0;
-		for (int i = 1; i < MAX_ACTIVE_WAV_SAMPLES; i++)
-		{
-			if (s_activeWavSamples[i].startTime < s_activeWavSamples[freeSlot].startTime)
-				freeSlot = i;
-		}
-	}
-	
-	// Add the new sample
-	ActiveWavSample& newSample = s_activeWavSamples[freeSlot];
-	newSample.sample = sample;
-	newSample.soundPosition = soundPosition;
-	newSample.baseVolume = baseVolume;
-	newSample.startTime = (float)Plat_FloatTime();
-	
-	// Store PCM data for accurate duration calculation
-	newSample.sampleRate = sampleRate;
-	newSample.totalSamples = totalSamples;
-	
-	// Calculate duration from the actual WAV file PCM data
-	// Duration = total_samples / sample_rate (in seconds)
-	// Convert to milliseconds
-	if (sampleRate > 0)
-	{
-		newSample.durationMs = (float)(totalSamples) / (float)sampleRate * 1000.0f;
-	}
-	else
-	{
-		newSample.durationMs = 5000.0f; // Fallback if sample rate is invalid
-	}
-	
-	newSample.isActive = true;
-	
-	if (freeSlot >= s_numActiveWavSamples)
-		s_numActiveWavSamples = freeSlot + 1;
-		
-	if (wav_debug.GetBool())
-	{
-		Msg(eDLL_T::AUDIO, "Added active WAV sample: pos=(%.2f,%.2f,%.2f) volume=%.3f duration=%.1f ms (rate=%d samples=%d)\n", 
-			soundPosition.x, soundPosition.y, soundPosition.z, baseVolume, newSample.durationMs, 
-			newSample.sampleRate, newSample.totalSamples);
-	}
+	g_wavSampleManager.AddSample(sample, soundPosition, baseVolume, sampleRate, totalSamples, eventName);
 }
 
 //-----------------------------------------------------------------------------
@@ -448,8 +588,12 @@ static bool CSOM_Initialize()
 	if (bResult && ModSystem()->IsEnabled())
 	{
 		GetAudioOverrideManager()->LoadFromMods();
+		GetAudioOverrideManagerNorthstar()->LoadFromModsInDir("audio_overrides");
 		if (wav_debug.GetBool())
+		{
 			Msg(eDLL_T::AUDIO, "Loaded %d audio overrides\n", GetAudioOverrideManager()->GetOverrideCount());
+			Msg(eDLL_T::AUDIO, "Loaded %d Northstar-style audio overrides\n", GetAudioOverrideManagerNorthstar()->GetOverrideCount());
+		}
 	}
 
 	return bResult;
@@ -664,43 +808,29 @@ bool OverrideEventName(const char* eventName)
 				bool cancelOnReplay = false;
 				if (GetAudioOverrideManager()->GetCancelOnReplayForEvent(eventName, cancelOnReplay) && cancelOnReplay)
 				{
-					std::lock_guard<std::mutex> lg(s_eventSamplesMutex);
-					auto itSamples = s_eventActiveSamples.find(eventName);
-					if (itSamples != s_eventActiveSamples.end())
-					{
-						for (void* samplePtr : itSamples->second)
-						{
-							// Mark in active tracking as inactive
-							for (int i = 0; i < s_numActiveWavSamples; ++i)
-							{
-								if (s_activeWavSamples[i].isActive && s_activeWavSamples[i].sample == samplePtr)
-									s_activeWavSamples[i].isActive = false;
-							}
-							// Fade or mute and pause then destroy
-							bool fadeOnDestroy = false;
-							GetAudioOverrideManager()->GetFadeOnDestroyForEvent(eventName, fadeOnDestroy);
-							if (fadeOnDestroy && v_MilesSamplePauseFade)
-							{
-								v_MilesSamplePauseFade(reinterpret_cast<__int64>(samplePtr));
-							}
-							else
-							{
-								if (v_MilesSampleSetVolumeLevel)
-									v_MilesSampleSetVolumeLevel(samplePtr, 0.0f);
-								if (v_MilesSamplePause)
-									v_MilesSamplePause(reinterpret_cast<_BYTE*>(samplePtr));
-							}
-							if (v_MilesSampleDestroy)
-								v_MilesSampleDestroy(reinterpret_cast<__int64>(samplePtr));
-						}
-						itSamples->second.clear();
-					}
+					g_wavSampleManager.StopSamplesForEvent(eventName);
 				}
 
 				void* sample = reinterpret_cast<void*>(v_MilesSampleCreate(reinterpret_cast<__int64>(g_milesGlobals->driver), 0, 0));
 				if (sample)
 				{
-					Vector3D soundPos = g_milesGlobals->queuedSoundPosition;
+					Vector3D soundPos = { -1, -1, -1 };
+					
+					// Check for position override from wav_play_event command
+					Vector3D overridePos;
+					if (GetEventPositionOverride(eventName, overridePos))
+					{
+						soundPos = overridePos;
+						if (wav_debug.GetBool())
+							Msg(eDLL_T::AUDIO, "Using position override for '%s': (%.1f, %.1f, %.1f)\n", 
+								eventName, soundPos.x, soundPos.y, soundPos.z);
+					}
+					else
+					{
+						soundPos = g_milesGlobals->queuedSoundPosition;
+					}
+
+
 					Vector3D playerPos = { 0.0f, 0.0f, 0.0f };
 					if (g_vecRenderOrigin)
 					{
@@ -780,13 +910,7 @@ bool OverrideEventName(const char* eventName)
 
 					int bytesPerSample = (bps / 8) * (int)ch;
 					int totalSamples = bytesPerSample > 0 ? (int)len / bytesPerSample : 0;
-					AddActiveWavSample(sample, soundPos, baseVolume, rate, totalSamples);
-
-					// Register this sample under the event for potential cancellation on replay
-					{
-						std::lock_guard<std::mutex> lg(s_eventSamplesMutex);
-						s_eventActiveSamples[eventName].push_back(sample);
-					}
+					AddActiveWavSample(sample, soundPos, baseVolume, rate, totalSamples, eventName);
 
 					v_MilesSamplePlay(sample);
 				}
@@ -1106,18 +1230,181 @@ static s32 CSOM_MilesAsync_FileCancel(MilesAsyncRead* const request)
 	return CSOM_MilesAsync_FileStatus(request, RR_WAIT_INFINITE);
 }
 
-//-----------------------------------------------------------------------------
+/*//-----------------------------------------------------------------------------
 // Purpose: Event build hook
 //-----------------------------------------------------------------------------
+// Global event name for Northstar hooks
+// Event processing function - apply overrides after original function completes
+static char __fastcall h_Sub_18002AAF0(__int64 a1, __int64 a2, __int64 a3, __int64 j)
+{
+	// Call original function first to let Miles set up structures
+	char result = v_h_Sub_18002AAF0(a1, a2, a3, j);
+
+	// Now safely apply overrides after Miles has finished processing
+	__try
+	{
+		const char* name = **(const char***)(*(_QWORD*)(32i64 * *(unsigned __int16*)(a2 + 178) + *(_QWORD*)(a1 + 2216) + 8));
+
+		const void* overridePtr = nullptr;
+		unsigned overrideLen = 0;
+		if (GetAudioOverrideManagerNorthstar()->TryGetOverrideForEvent(name, overridePtr, overrideLen))
+		{
+			if (wav_debug.GetBool())
+				Msg(eDLL_T::AUDIO, "[NORTHSTAR] Applying override for event: %s (post-processing)\n", name);
+
+			// Apply override after original function completed - should be safer
+			__try
+			{
+				// Event structure cast (from decompiled code: v7 = (unsigned __int16 *)a2)
+				unsigned __int16* eventStruct = (unsigned __int16*)a2;
+				
+				// Get first sample index from event structure (from decompiled: i = *v7)
+				unsigned __int16 sampleIndex = *eventStruct;
+				
+				if (sampleIndex != 0xFFFF)  // Valid sample index
+				{
+					// Calculate sample structure address (from decompiled code)
+					__int64 sampleArrayBase = *(_QWORD*)(a1 + 1872);
+					__int64 sampleStructure = sampleArrayBase + 160i64 * sampleIndex;
+					
+					if (wav_debug.GetBool())
+						Msg(eDLL_T::AUDIO, "[NORTHSTAR] Applying to sample structure at: %p (index %u)\n", 
+							(void*)sampleStructure, sampleIndex);
+					
+					// Apply override after Miles processing is complete
+					__try
+					{
+						// Apply Northstar offsets to sample structure
+						*(void**)(sampleStructure + 0xE8) = const_cast<void*>(overridePtr);
+						*(unsigned int*)(sampleStructure + 0xF0) = overrideLen;
+						
+						if (wav_debug.GetBool())
+							Msg(eDLL_T::AUDIO, "[NORTHSTAR] Successfully applied override - Buffer: %p, Len: %u\n",
+								overridePtr, overrideLen);
+					}
+					__except(EXCEPTION_EXECUTE_HANDLER)
+					{
+						if (wav_debug.GetBool())
+							Msg(eDLL_T::AUDIO, "[NORTHSTAR] Failed to write to sample structure %p\n", 
+								(void*)sampleStructure);
+					}
+				}
+				else
+				{
+					if (wav_debug.GetBool())
+						Msg(eDLL_T::AUDIO, "[NORTHSTAR] No valid sample found in event structure\n");
+				}
+			}
+			__except(EXCEPTION_EXECUTE_HANDLER)
+			{
+				if (wav_debug.GetBool())
+					Msg(eDLL_T::AUDIO, "[NORTHSTAR] Failed to access event structure for override\n");
+			}
+		}
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		if (wav_debug.GetBool())
+			Msg(eDLL_T::AUDIO, "[NORTHSTAR] Exception during event name extraction\n");
+	}
+	
+	return result;
+}
+
 static __int64 __fastcall MilesEventBuild_Hook(float* a1, __int64 a2, __int64 a3)
 {
 	return v_MilesEventBuild(a1, a2, a3);
 }
+*/
+
+static void CC_wav_stop_event(const CCommand& args)
+{
+	if (args.ArgC() < 2)
+	{
+		Msg(eDLL_T::AUDIO, "Usage: wav_stop_event \"<event_name>\"\n");
+		return;
+	}
+
+	const char* eventName = args[1];
+	int stopped = g_wavSampleManager.StopSamplesForEvent(eventName);
+	
+	if (stopped > 0)
+	{
+		Msg(eDLL_T::AUDIO, "Stopped %d samples for event '%s'\n", stopped, eventName);
+	}
+	else
+	{
+		Msg(eDLL_T::AUDIO, "No active samples found for event '%s'\n", eventName);
+	}
+}
+static ConCommand wav_stop_event("wav_stop_event", CC_wav_stop_event, "Stop all active samples for a specific event", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+static void CC_wav_play_event_at_position(const CCommand& args)
+{
+	if (args.ArgC() < 5)
+	{
+		Msg(eDLL_T::AUDIO, "Usage: wav_play_event \"<event_name>\" <x> <y> <z>\n");
+		return;
+	}
+
+	const char* eventName = args[1];
+	float x = (float)atof(args[2]);
+	float y = (float)atof(args[3]);
+	float z = (float)atof(args[4]);
+
+	Vector3D position = { x, y, z };
+
+	// Set position override before queuing the event
+	SetEventPositionOverride(eventName, position);
+
+	if (v_CSOM_AddEventToQueue)
+	{
+		CSOM_AddEventToQueue(eventName);
+		Msg(eDLL_T::AUDIO, "Queued audio event '%s' at position (%.1f, %.1f, %.1f)\n",
+			eventName, x, y, z);
+	}
+	else
+	{
+		Msg(eDLL_T::AUDIO, "Error: CSOM_AddEventToQueue function not available\n");
+	}
+}
+static ConCommand wav_play_event_at_position("wav_play_event_at_position", CC_wav_play_event_at_position, "Play an audio event at a specific position", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+static void CC_reload_audio_mods(const CCommand& args)
+{
+	if (!ModSystem()->IsEnabled())
+	{
+		Msg(eDLL_T::AUDIO, "Mod system is not enabled\n");
+		return;
+	}
+
+	GetAudioOverrideManager()->LoadFromMods();
+	//GetAudioOverrideManagerNorthstar()->LoadFromModsInDir("audio_overrides");
+	
+	Msg(eDLL_T::AUDIO, "Successfully reloaded %d audio overrides\n", GetAudioOverrideManager()->GetOverrideCount());
+}
+static ConCommand reload_audio_mods("reload_audio_mods", CC_reload_audio_mods, "", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+static void CC_wav_stop_all(const CCommand& args)
+{
+	g_wavSampleManager.StopAllSamples();
+	Msg(eDLL_T::AUDIO, "Stopped all custom WAV samples\n");
+}
+
+static void CC_wav_list_active(const CCommand& args)
+{
+	size_t count = g_wavSampleManager.GetActiveSampleCount();
+	Msg(eDLL_T::AUDIO, "Active custom WAV samples: %zu\n", count);
+}
+
+// Register new commands
+static ConCommand wav_stop_all("wav_stop_all", CC_wav_stop_all, "Stop all active custom WAV samples", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+static ConCommand wav_list_active("wav_list_active", CC_wav_list_active, "List count of active custom WAV samples", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 
 ///////////////////////////////////////////////////////////////////////////////
 void MilesCore::Detour(const bool bAttach) const
 {
-	DetourSetup(&v_MilesEventBuild, &MilesEventBuild_Hook, bAttach);
+	//DetourSetup(&v_MilesEventBuild, &MilesEventBuild_Hook, bAttach);
 	DetourSetup(&v_MilesQueueEventRun, &MilesQueueEventRun, bAttach);
 	//DetourSetup(&v_MilesBankPatch, &MilesBankPatch, bAttach);
 	DetourSetup(&v_CSOM_Initialize, &CSOM_Initialize, bAttach);
@@ -1127,6 +1414,13 @@ void MilesCore::Detour(const bool bAttach) const
 	DetourSetup(&v_CSOM_MilesAsync_FileStatus, &CSOM_MilesAsync_FileStatus, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileCancel, &CSOM_MilesAsync_FileCancel, bAttach);
 	DetourSetup(&v_CSOM_AddEventToQueue, &CSOM_AddEventToQueue, bAttach);
+
+	// Northstar-style audio hooks
+	//DetourSetup(&v_h_LoadSampleMetadata, &h_LoadSampleMetadata, bAttach);  // Not called in this Miles build
+	//DetourSetup(&v_h_Sub_18002AAF0, &h_Sub_18002AAF0, bAttach);
+	//DetourSetup(&v_h_Sub_18003BC10, &h_Sub_18003BC10, bAttach);
+
+	//DetourSetup(&v_MilesParamsStageRaw, &MilesParamsStageRaw, bAttach);
 
 	if (bAttach)
 	{
