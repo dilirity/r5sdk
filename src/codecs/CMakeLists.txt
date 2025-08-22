@@ -17,10 +17,6 @@ add_sources( SOURCE_GROUP "Miles"
     "miles/radshal_wasapi.h"
     "miles/audio_overrides.cpp"
     "miles/audio_overrides.h"
-    "miles/miles_overrides.cpp"
-    "miles/miles_overrides.h"
-    "miles/wav_player.cpp"
-    "miles/wav_player.h"
 )
 
 add_sources( SOURCE_GROUP "Public"
