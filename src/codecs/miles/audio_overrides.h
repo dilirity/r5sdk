@@ -115,48 +115,6 @@ public:
 		bool& hasSilenceCutoff, float& silenceCutoff);
 
 	bool GetCancelOnReplayForEvent(const char* eventName, bool& cancelOnReplay);
-	bool GetFadeOnDestroyForEvent(const char* eventName, bool& fadeOnDestroy);
-	
-	// Get Doppler effect settings for an event
-	bool GetDopplerSettingsForEvent(
-		const char* eventName,
-		bool& hasDopplerEnabled, bool& dopplerEnabled,
-		bool& hasDopplerFactor, float& dopplerFactor,
-		bool& hasSpeedOfSound, float& speedOfSound,
-		bool& hasListenerVelocity, float& listenerVelocityX, float& listenerVelocityY, float& listenerVelocityZ,
-		bool& hasSourceVelocity, float& sourceVelocityX, float& sourceVelocityY, float& sourceVelocityZ);
-		
-	// Get volume cone settings for an event
-	bool GetVolumeConeSettingsForEvent(
-		const char* eventName,
-		bool& hasVolumeCone, bool& volumeConeEnabled,
-		bool& hasInsideAngle, int& insideAngleDeg,
-		bool& hasInsideVolume, float& insideVolume,
-		bool& hasOutsideAngle, int& outsideAngleDeg,
-		bool& hasOutsideVolume, float& outsideVolume);
-		
-	// Get 3D audio settings for an event
-	bool Get3DAudioSettingsForEvent(
-		const char* eventName,
-		bool& has3DAudioEnabled, bool& audio3DEnabled,
-		bool& hasUseRoutes, bool& useRoutes,
-		bool& hasAutoSpreadDistance, float& autoSpreadDistance,
-		bool& hasPosition3D, float& position3DX, float& position3DY, float& position3DZ,
-		bool& hasOrientation3D, float& orientationFX, float& orientationFY, float& orientationFZ,
-		bool& hasUpVector3D, float& upVectorY, float& upVectorZ,
-		bool& hasMultiChannelPan, float& panLeftRight, float& panFrontBack);
-		
-	// Get reverb effect settings for an event
-	bool GetReverbSettingsForEvent(
-		const char* eventName,
-		bool& hasReverbEnabled, bool& reverbEnabled,
-		bool& hasReverbDecayTime, float& reverbDecayTime,
-		bool& hasReverbRoomSize, float& reverbRoomSize,
-		bool& hasReverbDamping, float& reverbDamping,
-		bool& hasReverbWetLevel, float& reverbWetLevel,
-		bool& hasReverbDryLevel, float& reverbDryLevel,
-		bool& hasReverbDelay, float& reverbDelay,
-		bool& hasReverbDiffusion, float& reverbDiffusion);
 
 private:
 	std::unordered_map<std::string, std::shared_ptr<EventOverrideData>> m_overrides;
