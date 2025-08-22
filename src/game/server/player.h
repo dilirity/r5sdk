@@ -6,6 +6,9 @@
 
 #ifndef PLAYER_H
 #define PLAYER_H
+#ifdef CLIENT_DLL
+#error "game/server/player.h included in client build"
+#endif
 
 #include "baseentity.h"
 #include "mathlib/mathlib.h"

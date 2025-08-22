@@ -9,6 +9,9 @@
 #ifdef _WIN32
 #pragma once
 #endif
+#ifdef CLIENT_DLL
+#error "game/server/baseanimating.h included in client build"
+#endif
 #include "baseentity.h"
 #include "public/studio.h"
 #include "public/datacache/idatacache.h"

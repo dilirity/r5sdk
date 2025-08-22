@@ -7,6 +7,9 @@
 
 #ifndef BASECOMBATCHARACTER_H
 #define BASECOMBATCHARACTER_H
+#ifdef CLIENT_DLL
+#error "game/server/basecombatcharacter.h included in client build"
+#endif
 #include "baseanimatingoverlay.h"
 #include "game/server/ai_hull.h"
 

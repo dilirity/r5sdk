@@ -10,6 +10,9 @@
 #ifdef _WIN32
 #pragma once
 #endif
+#ifdef CLIENT_DLL
+#error "game/server/baseanimatingoverlay.h included in client build"
+#endif
 #include "baseanimating.h"
 
 class CBaseAnimatingOverlay : public CBaseAnimating

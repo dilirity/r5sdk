@@ -1,3 +1,4 @@
+#ifndef CLIENT_DLL
 //===========================================================================//
 //
 // Purpose:
@@ -432,3 +433,4 @@ void SV_BroadcastDurangoVoiceData(CClient* const cl, const int nBytes, char* con
 			pClient->SendNetMsgEx(&voiceData, false, !useVoiceStream, useVoiceStream);
 	}
 }
+#endif // !CLIENT_DLL
