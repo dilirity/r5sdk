@@ -30,7 +30,6 @@ inline void(*v_MilesBankPatch)(Miles::Bank*, char*, char*);
 inline unsigned int (*v_MilesSampleSetSourceRaw)(__int64 a1, __int64 a2, unsigned int a3, int a4, unsigned __int16 a5, bool a6);
 inline unsigned int (*v_MilesEventGetDetails)(__int64 a1, __int64 a2, __int64 a3, __int64 a4, __int64 a5, __int64 a6, void* const releaseList);
 inline __int64 (*v_MilesSampleCreate)(__int64 a1, __int64 a2, unsigned __int8 a3);
-inline void (*v_MilesSampleSet3DPosition)(__int64 sample, float x, float y, float z);
 inline __int64 (*v_MilesSamplePlay)(void* sample);
 inline __int64 (*v_MilesSamplePause)(_BYTE* sample);
 inline __int64 (*v_MilesSamplePauseFade)(__int64 sample);
@@ -42,24 +41,6 @@ inline __int64 (*v_MilesSampleSetVolumeLevel)(void* sample, float volume);
 inline __int64 (*v_MilesSampleGetRouteCount)(__int64 a1);
 inline __int64 (*v_MilesSampleCreateRoute)(__int64 a1, __int64 a2, __int64 a3, unsigned __int8 a4);
 inline __int64 (*v_MilesSampleGetRoute)(__int64 a1, unsigned int a2);
-inline void (*v_MilesRouteSetSpatialized)(__int64 route);
-inline void (*v_MilesSampleSet3DAutoSpreadDistance)(__int64 sample, float distance);
-inline void (*v_MilesSampleSetPanLeftRight)(__int64 sample, float panLeftRight);
-inline void (*v_MilesSampleSet3DOrientation)(__int64 sample, float fx, float fy, float fz, float upY, int unkMode, float upZ);
-inline void (*v_MilesSampleSet3DVolumeCone)(__int64 sample, int insideAngleDeg, float insideVolume, float outsideVolume, int outsideAngleDeg);
-
-// Listener position functions for proper 3D audio
-inline void (*v_MilesListenerSet3DPosition)(__int64 driver, unsigned __int16 listenerIndex, float x, float y, float z);
-inline __int64 (*v_MilesListenerGet3DPosition)(int a1, unsigned __int16 a2, int a3, int a4, __int64 a5);
-inline __int64 (*v_MilesListenerGet3DOrientation)(int a1, unsigned __int16 a2, int a3, int a4, __int64 a5, __int64 a6, __int64 a7, __int64 a8);
-inline __int64 (*v_MilesListenerSet3DOrientation)(int a1, unsigned __int16 a2, __int64 a3, __int64 a4, int a5, int a6, int a7, int a8);
-inline void (*v_MilesSampleSet3DVolumeGraph)(__int64 sample, const void* graph, int graphPoints);
-inline void (*v_MilesTestDisable3DLFE)(char a1);
-
-inline void (*v_MilesSampleSet3DSpreadGraph)(__int64 sample, const void* graph, int graphPoints);
-inline void (*v_MilesSampleSet3DLowPassGraph)(__int64 sample, const void* graph, int graphPoints);
-inline void (*v_MilesSampleSet3DMultiChannelPan)(__int64 sample, float panLeftRight, float panFrontBack);
-inline void (*v_MilesSampleSetDopplerFactor)(__int64 sample, float dopplerFactor, float* listenerVelocity, float* sourceVelocity, float speedOfSound);
 
 inline bool(*v_CSOM_Initialize)();
 inline void(*v_CSOM_InitializeBankList)(CSOM_BankList_s* const bankList);
@@ -70,18 +51,9 @@ inline s32(*v_CSOM_MilesAsync_FileRead)(MilesAsyncRead* const request);
 inline s32(*v_CSOM_MilesAsync_FileStatus)(MilesAsyncRead* const request, const u32 i_MS);
 inline s32(*v_CSOM_MilesAsync_FileCancel)(MilesAsyncRead* const request);
 
-inline void (*v_MilesSampleFinalizeSetSource)(void* sample, void* audioBuffer, unsigned int audioBufferLength, int audioType);
-
-// Northstar-style audio hooks (original function pointers for pattern-matched functions)
-inline bool(*v_h_LoadSampleMetadata)(void* sample, void* audioBuffer, unsigned int audioBufferLength, int audioType);
-inline char(*v_h_Sub_18002AAF0)(__int64 a1, __int64 a2, __int64 a3, __int64 j);
-inline char*(*v_h_Sub_18003BC10)(void* a1, void* a2, void* a3, void* a4, void* a5, int a6);
-
-inline __int64 (*v_MilesParamsStageRaw)(__int64 a1, __int64 a2, int a3);
-inline __int64 (*v_MilesEventBuild)(float* a1, __int64 a2, __int64 a3);
-
-
 inline void(*v_CSOM_AddEventToQueue)(const char* eventName);
+
+inline void(*v_ProcessClientAnimEvent)(__int64 a1, __int64 a2, __int64 a3, unsigned int a4, const char* a5, __int64 a6, __int64 a7);
 
 struct CSOM_GlobalState_s
 {
@@ -139,7 +111,8 @@ void CSOM_UpdateListenerPosition(const Vector3D& position);
 void UpdateActiveWavSampleVolumes();
 void AddActiveWavSample(void* sample, const Vector3D& soundPosition, float baseVolume, int sampleRate, int totalSamples);
 
-bool OverrideEventName(const char* eventName);
+void OverrideEventName(const char* eventName);
+bool DoesOverrideExist(const char* eventName);
 
 // Stop all custom audio (for level changes)
 void StopAllCustomAudio();
@@ -157,8 +130,6 @@ class MilesCore : public IDetour
 		LogFunAdr("MilesBankPatch", v_MilesBankPatch);
 		LogFunAdr("MilesSampleSetSourceRaw", v_MilesSampleSetSourceRaw);
 		LogFunAdr("MilesEventGetDetails", v_MilesEventGetDetails);
-		LogFunAdr("MilesListenerSet3DPosition", v_MilesListenerSet3DPosition);
-		LogFunAdr("MilesListenerGet3DPosition", v_MilesListenerGet3DPosition);
 		LogFunAdr("CSOM_Initialize", v_CSOM_Initialize);
 		LogFunAdr("CSOM_InitializeBankList", v_CSOM_InitializeBankList);
 		LogFunAdr("CSOM_LogFunc", v_CSOM_LogFunc);
@@ -167,9 +138,6 @@ class MilesCore : public IDetour
 		LogFunAdr("CSOM_MilesAsync_FileStatus", v_CSOM_MilesAsync_FileStatus);
 		LogFunAdr("CSOM_MilesAsync_FileCancel", v_CSOM_MilesAsync_FileCancel);
 		LogFunAdr("CSOM_AddEventToQueue", v_CSOM_AddEventToQueue);
-		LogFunAdr("h_LoadSampleMetadata", v_h_LoadSampleMetadata);
-		LogFunAdr("h_Sub_18002AAF0", v_h_Sub_18002AAF0);
-		LogFunAdr("h_Sub_18003BC10", v_h_Sub_18003BC10);
 		LogVarAdr("g_milesGlobals", g_milesGlobals);
 	}
 	virtual void GetFun(void) const
@@ -182,9 +150,9 @@ class MilesCore : public IDetour
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 57 48 83 EC ?? 8B B9 ?? ?? ?? ?? 48 8B D9 83 FF").GetPtr(v_CSOM_MilesAsync_FileStatus);
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC ?? 8B 81 ?? ?? ?? ?? 48 8B D9 83 F8 ?? 75 ?? B8").GetPtr(v_CSOM_MilesAsync_FileCancel);
 		Module_FindPattern(g_GameDll, "0F B6 11 4C 8B C1").GetPtr(v_CSOM_AddEventToQueue);
-		
-		Module_FindPattern(g_RadAudioSystemDll, "4C 8B C9 0F B6 49 0B").GetPtr(v_MilesParamsStageRaw);
-		Module_FindPattern(g_RadAudioSystemDll, "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 41 54 41 55 48 83 EC 50 49 8B 68 20 4C 8B 6A 38").GetPtr(v_MilesEventBuild);
+
+		Module_FindPattern(g_GameDll, "48 89 5C 24 18 57 41 56 41 57 48 83 EC 40 48 8B F9 41 8B D9 8B 89 D8 16").GetPtr(v_ProcessClientAnimEvent);
+
 
 		g_RadAudioSystemDll.GetExportedSymbol("MilesAllocEx").GetPtr(v_MilesAllocEx);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesQueueEventRun").GetPtr(v_MilesQueueEventRun);
@@ -200,41 +168,11 @@ class MilesCore : public IDetour
 		g_RadAudioSystemDll.GetExportedSymbol("MilesSamplePlay").GetPtr(v_MilesSamplePlay);
         g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSetListenerMask").GetPtr(v_MilesSampleSetListenerMask);
         g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSetVolumeLevel").GetPtr(v_MilesSampleSetVolumeLevel);
-        g_RadAudioSystemDll.GetExportedSymbol("MilesRouteSetSpatialized").GetPtr(v_MilesRouteSetSpatialized);
-        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSetPanLeftRight").GetPtr(v_MilesSampleSetPanLeftRight);
-		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSetDopplerFactor").GetPtr(v_MilesSampleSetDopplerFactor);
 		
 		//Miles Route
 		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleGetRouteCount").GetPtr(v_MilesSampleGetRouteCount);
         g_RadAudioSystemDll.GetExportedSymbol("MilesSampleCreateRoute").GetPtr(v_MilesSampleCreateRoute);
         g_RadAudioSystemDll.GetExportedSymbol("MilesSampleGetRoute").GetPtr(v_MilesSampleGetRoute);
-
-		//Miles 3D Audio
-		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DPosition").GetPtr(v_MilesSampleSet3DPosition);
-		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DOrientation").GetPtr(v_MilesSampleSet3DOrientation);
-        g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DVolumeCone").GetPtr(v_MilesSampleSet3DVolumeCone);
-		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DAutoSpreadDistance").GetPtr(v_MilesSampleSet3DAutoSpreadDistance);
-		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DMultiChannelPan").GetPtr(v_MilesSampleSet3DMultiChannelPan);
-		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DSpreadGraph").GetPtr(v_MilesSampleSet3DSpreadGraph);
-		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DLowPassGraph").GetPtr(v_MilesSampleSet3DLowPassGraph);
-		g_RadAudioSystemDll.GetExportedSymbol("MilesSampleSet3DVolumeGraph").GetPtr(v_MilesSampleSet3DVolumeGraph);
-
-		//Miles Listener
-		g_RadAudioSystemDll.GetExportedSymbol("MilesListenerSet3DPosition").GetPtr(v_MilesListenerSet3DPosition);
-        g_RadAudioSystemDll.GetExportedSymbol("MilesListenerGet3DPosition").GetPtr(v_MilesListenerGet3DPosition);
-		g_RadAudioSystemDll.GetExportedSymbol("MilesListenerGet3DOrientation").GetPtr(v_MilesListenerGet3DOrientation);
-        g_RadAudioSystemDll.GetExportedSymbol("MilesListenerSet3DOrientation").GetPtr(v_MilesListenerSet3DOrientation);
-	
-        g_RadAudioSystemDll.GetExportedSymbol("MilesTestDisable3DLFE").GetPtr(v_MilesTestDisable3DLFE);
-
-		// Northstar-style audio hooks using pattern matching
-		// h_LoadSampleMetadata = sub_18000EFF0 (LoadSampleMetadata - Handles sample buffer finalization)
-		Module_FindPattern(g_RadAudioSystemDll, "48 89 5C 24 08 57 48 83 EC 20 41 8B F9").GetPtr(v_h_LoadSampleMetadata);
-		// h_Sub_18002AAF0 = Pre-EventBuild function - better event name capture point  
-		// Pattern: sub_18002AAF0 function signature
-		Module_FindPattern(g_RadAudioSystemDll, "40 55 56 41 57 48 8D AC 24 90 FE FF FF 48 81 EC").GetPtr(v_h_Sub_18002AAF0);
-		// h_Sub_18003BC10 = sub_18005F400 (Thread management function)
-		Module_FindPattern(g_RadAudioSystemDll, "48 8B C4 48 89 58 20 55 56 41 54 41 55").GetPtr(v_h_Sub_18003BC10);
 
 	}
 	virtual void GetVar(void) const

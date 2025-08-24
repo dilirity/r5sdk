@@ -33,16 +33,7 @@ static ConVar fmod_debug("fmod_debug", "0", FCVAR_RELEASE, "Enables debug prints
 // Level change detection
 static ConVar miles_wav_auto_stop_on_level_change("miles_wav_auto_stop_on_level_change", "1", FCVAR_RELEASE, "Automatically stop custom audio when level changes (1 = enabled, 0 = disabled)");
 
-//-----------------------------------------------------------------------------
-// Global listener position tracking
-//-----------------------------------------------------------------------------
-Vector3D g_listenerPosition = {0.0f, 0.0f, 0.0f};
-
-//-----------------------------------------------------------------------------
-// Event position override system
-//-----------------------------------------------------------------------------
-static std::mutex s_eventPositionMutex;
-static std::unordered_map<std::string, Vector3D> s_eventPositionOverrides;
+static ICustomAudioBackend* be = nullptr;
 
 /*void SetEventPositionOverride(const char* eventName, const Vector3D& position)
 {
@@ -159,6 +150,7 @@ static bool CSOM_Initialize()
 			if (s_backend && s_backend->Initialize())
 			{
 				SetActiveCustomAudioBackend(s_backend);
+				be = s_backend;
 				if (fmod_debug.GetBool())
 					Msg(eDLL_T::AUDIO, "Initialized FMOD Studio backend for custom audio\n");
 			}
@@ -346,45 +338,88 @@ void MilesBankPatch(Miles::Bank* bank, char* streamPatch, char* localizedStreamP
 //-----------------------------------------------------------------------------
 static void CSOM_AddEventToQueue(const char* eventName)
 {
-	if (miles_debug.GetBool())
-		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
-
-	if(OverrideEventName(eventName))
+	bool override_exists = DoesOverrideExist(eventName);
+	bool isAnimEvent = be->isAnimEvent(eventName);
+	if (override_exists && !isAnimEvent)
 	{
+		OverrideEventName(eventName);
 		v_CSOM_AddEventToQueue("");
 		return;
 	}
 
 	v_CSOM_AddEventToQueue(eventName);
 
+	if (miles_debug.GetBool())
+	{
+		if(!override_exists)
+			Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
+	}
+
+	if(fmod_debug.GetBool())
+	{
+		if (override_exists && !isAnimEvent)
+			Msg(eDLL_T::AUDIO, "%s: queuing FMOD audio event '%s'\n", __FUNCTION__, eventName);
+	}
+
 	if (miles_warnings.GetBool())
 	{
-		if (g_milesGlobals->queuedEventHash == 1)
+		if (g_milesGlobals->queuedEventHash == 1 && !override_exists && !isAnimEvent)
 			Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; invalid event name '%s'\n", __FUNCTION__, eventName);
 
-		if (g_milesGlobals->queuedEventHash == 2)
+		if (g_milesGlobals->queuedEventHash == 2 && !override_exists && !isAnimEvent)
 			Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; event '%s' not found.\n", __FUNCTION__, eventName);
 	}
 };
 
-bool OverrideEventName(const char* eventName)
+static void ProcessClientAnimEvent(__int64 a1, __int64 a2, __int64 a3, unsigned int a4, const char* a5, __int64 a6, __int64 a7)
 {
-	if (ICustomAudioBackend* be = GetActiveCustomAudioBackend())
+	if (a4 == 35 || a4 == 5004)
 	{
-		Vector3D soundPos = g_milesGlobals->queuedSoundPosition;
-		Vector3D playerPos = g_vecRenderOrigin ? *g_vecRenderOrigin : Vector3D{ 0.0f, 0.0f, 0.0f };
-
-		if (soundPos == Vector3D{ 0.0f, 0.0f, 0.0f })
-			soundPos = playerPos;
-
-		if (be->EventExists(eventName))
+		if (DoesOverrideExist(a5))
 		{
-			if (be->PlayEvent3D(eventName, soundPos, 1.0f) != 0)
-				return true;
+			if (fmod_debug.GetBool())
+			{
+				Msg(eDLL_T::AUDIO, "AE_CL_PLAYSOUND: %s\n", a5);
+			}
+
+			OverrideEventName(a5);
+			return;
+		}
+	}
+	else if (a4 == 40)
+	{
+		if (fmod_debug.GetBool())
+		{
+			Msg(eDLL_T::AUDIO, "AE_CL_STOPSOUND: %s\n", a5);
 		}
 	}
 
-	return false;
+	v_ProcessClientAnimEvent(a1, a2, a3, a4, a5, a6, a7);
+}
+
+bool DoesOverrideExist(const char* eventName)
+{
+	if (be->EventExists(eventName))
+	{
+		return true;
+	}
+	else
+	{
+		std::atomic_thread_fence(std::memory_order_seq_cst);
+		std::this_thread::yield();
+		return false;
+	}
+}
+
+void OverrideEventName(const char* eventName)
+{
+	Vector3D soundPos = g_milesGlobals->queuedSoundPosition;
+	Vector3D playerPos = g_vecRenderOrigin ? *g_vecRenderOrigin : Vector3D{ 0.0f, 0.0f, 0.0f };
+
+	if (soundPos == Vector3D{ 0.0f, 0.0f, 0.0f })
+		soundPos = playerPos;
+
+	be->PlayEvent3D(eventName, soundPos, 1.0f);
 }
 
 //-----------------------------------------------------------------------------
@@ -781,46 +816,6 @@ static __int64 __fastcall MilesEventBuild_Hook(float* a1, __int64 a2, __int64 a3
 }
 */
 
-// FMOD Studio helpers
-static void CC_fmod_load_bank(const CCommand& args)
-{
-    if (args.ArgC() < 2)
-    {
-        Msg(eDLL_T::AUDIO, "Usage: fmod_load_bank <base_name>  (looks under %s)\n", fmod_bank_root.GetString());
-        return;
-    }
-    ICustomAudioBackend* be = GetActiveCustomAudioBackend();
-    if (!be)
-    {
-        Msg(eDLL_T::AUDIO, "No active custom audio backend\n");
-        return;
-    }
-    const char* name = args[1];
-    if (be->LoadBankFile(name))
-        Msg(eDLL_T::AUDIO, "FMOD bank loaded: %s\n", name);
-    else
-        Msg(eDLL_T::AUDIO, "Failed to load FMOD bank: %s\n", name);
-}
-static ConCommand fmod_load_bank("fmod_load_bank", CC_fmod_load_bank, "Load an FMOD Studio bank by base name (no extension)", FCVAR_CLIENTDLL | FCVAR_RELEASE);
-
-static void CC_fmod_event_exists(const CCommand& args)
-{
-    if (args.ArgC() < 2)
-    {
-        Msg(eDLL_T::AUDIO, "Usage: fmod_event_exists <event_path_or_name>\n");
-        return;
-    }
-    ICustomAudioBackend* be = GetActiveCustomAudioBackend();
-    if (!be)
-    {
-        Msg(eDLL_T::AUDIO, "No active custom audio backend\n");
-        return;
-    }
-    const char* path = args[1];
-    Msg(eDLL_T::AUDIO, "FMOD event '%s': %s\n", path, be->EventExists(path) ? "FOUND" : "NOT FOUND");
-}
-static ConCommand fmod_event_exists("fmod_event_exists", CC_fmod_event_exists, "Check if an FMOD Studio event exists in loaded banks", FCVAR_CLIENTDLL | FCVAR_RELEASE);
-
 ///////////////////////////////////////////////////////////////////////////////
 void MilesCore::Detour(const bool bAttach) const
 {
@@ -834,6 +829,7 @@ void MilesCore::Detour(const bool bAttach) const
 	DetourSetup(&v_CSOM_MilesAsync_FileStatus, &CSOM_MilesAsync_FileStatus, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileCancel, &CSOM_MilesAsync_FileCancel, bAttach);
 	DetourSetup(&v_CSOM_AddEventToQueue, &CSOM_AddEventToQueue, bAttach);
+	DetourSetup(&v_ProcessClientAnimEvent, &ProcessClientAnimEvent, bAttach);
 
 	if (bAttach)
 	{
