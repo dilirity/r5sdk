@@ -294,6 +294,9 @@ static void CSOM_LogFunc(int64_t nLogLevel, const char* pszMessage)
 	v_CSOM_LogFunc(nLogLevel, pszMessage);
 }
 
+// Capture flag to sniff the formatted Buffer string produced by sub_1405F2F60
+static thread_local bool g_captureBufferFrom_sub_1405F2F60 = false;
+
 //-----------------------------------------------------------------------------
 // Purpose: runs the event queue
 //-----------------------------------------------------------------------------
@@ -362,9 +365,19 @@ static void CSOM_AddEventToQueue(const char* eventName)
 	{
 		OverrideEventName(eventName);
 		v_CSOM_AddEventToQueue("");
+
+		if(fmod_debug.GetBool())
+		{
+			Msg(eDLL_T::AUDIO, "FMOD: queuing audio event '%s'\n", eventName);
+		}
 	}
 	else
 	{
+		if(fmod_debug.GetBool())
+		{
+			Msg(eDLL_T::AUDIO, "Something went wrong with event '%s'\n", eventName);
+		}
+
 		v_CSOM_AddEventToQueue("");
 	}
 };
@@ -929,6 +942,13 @@ static __int64 __fastcall MilesEventBuild_Hook(float* a1, __int64 a2, __int64 a3
 }
 */
 
+static __int64 sub_1409A7570_Hook(__int64 a1, char* a2)
+{
+	Msg(eDLL_T::AUDIO, "sub_1409A7570_Hook: %s\n", a2);
+	
+	return v_sub_1409A7570(a1, a2);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 void MilesCore::Detour(const bool bAttach) const
 {
@@ -948,6 +968,7 @@ void MilesCore::Detour(const bool bAttach) const
 	DetourSetup(&v_Charge_EmitSoundOnEntityForLocalPlayer, &Charge_EmitSoundOnEntityForLocalPlayer, bAttach);
 	DetourSetup(&v_EmitSoundOnEntity, &EmitSoundOnEntity, bAttach);
 	DetourSetup(&v_EmitSoundOnEntityImpl, &EmitSoundOnEntityImpl_Hook, bAttach);
+	DetourSetup(&v_sub_1409A7570, &sub_1409A7570_Hook, bAttach);
 
 	if (bAttach)
 	{

@@ -66,6 +66,8 @@ inline __int64(*v_EmitSoundOnEntityImpl)(__int64 v);
 inline __int64(*v_ResolveToEntity)(__int64 a1, __int64 a2, __int64 a3);
 inline void* g_VMEntityType;
 
+inline __int64(*v_sub_1409A7570)(__int64 a1, char* a2);
+
 struct CSOM_GlobalState_s
 {
 	char gap0[24];
@@ -115,18 +117,8 @@ inline CSOM_GlobalState_s* g_milesGlobals;
 // Global listener position tracking
 extern Vector3D g_listenerPosition;
 
-// Function to update listener position for proper 3D audio
-void CSOM_UpdateListenerPosition(const Vector3D& position);
-
-// Functions for active WAV sample volume tracking
-void UpdateActiveWavSampleVolumes();
-void AddActiveWavSample(void* sample, const Vector3D& soundPosition, float baseVolume, int sampleRate, int totalSamples);
-
 void OverrideEventName(const char* eventName);
 bool DoesOverrideExist(const char* eventName);
-
-// Stop all custom audio (for level changes)
-void StopAllCustomAudio();
 
 // Handle level changes (call from Mod_HandleLevelChanged)
 void Miles_HandleLevelChanged();
@@ -174,7 +166,7 @@ class MilesCore : public IDetour
 		Module_FindPattern(g_GameDll, "40 57 48 83 EC 30 48 8B F9 48 85 C9 75 0D 48 8D 05 C3 14 B7 00").GetPtr(v_sub_1407DC230);
 		Module_FindPattern(g_GameDll, "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 56 48 83 EC 20 4C 8B 74 24 50 48").GetPtr(v_EmitSoundOnEntity);
 		Module_FindPattern(g_GameDll, "40 53 48 83 EC 20 48 8B D9 48 8B 49 10 48 85 C9 0F 88 E7 00 00 00 4C 8B 43 08 4D 8D 0C 10 74 14 4D 8D 41 FF 49 8B C0 48 99 48 F7 F9 4C 2B C2 4C 03 C1 EB 19 4D 85 C0 B8 08 00 00 00 4C 0F 44 C0").GetPtr(v_sub_1401E9C50);
-
+		Module_FindPattern(g_GameDll, "48 83 EC 28 80 3A 00 75 51 48 85 C9 74 2A E8 AD").GetPtr(v_sub_1409A7570);
 
 		g_RadAudioSystemDll.GetExportedSymbol("MilesAllocEx").GetPtr(v_MilesAllocEx);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesQueueEventRun").GetPtr(v_MilesQueueEventRun);
