@@ -515,6 +515,8 @@ void OverrideEventName(const char* eventName)
 	if (soundPos == Vector3D{ 0.0f, 0.0f, 0.0f })
 		soundPos = playerPos;
 
+	Msg(eDLL_T::AUDIO, "Charge_EmitSoundOnEntityForLocalPlayer: %s soundPos=(%.2f, %.2f, %.2f)\n", eventName, soundPos.x, soundPos.y, soundPos.z);
+
 	be->PlayEvent3D(eventName, soundPos, 1.0f);
 }
 
