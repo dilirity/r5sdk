@@ -430,16 +430,16 @@ static __int64 EmitSoundOnEntity(const char *a1, unsigned int a2, __int64 a3, co
 			if (V_strstr(eventName, "1p"))
 			{
 				OverrideEventName(eventName);
+				return 0;
 			}
 			else if (V_strstr(eventName, "3p"))
 			{
 				if(lastEntityOriginValid)
 				{
 					be->PlayEvent3D(eventName, lastEntityOrigin, 1.0f);
+					return 0;
 				}
 			}
-
-			return 0;
 		}
 	}
 
