@@ -55,6 +55,17 @@ inline void(*v_CSOM_AddEventToQueue)(const char* eventName);
 
 inline void(*v_ProcessClientAnimEvent)(__int64 a1, __int64 a2, __int64 a3, unsigned int a4, const char* a5, __int64 a6, __int64 a7);
 
+inline int(*v_StopSoundOnEntityForLocalPlayer)(__int64 a1, const char* a2);
+inline int(*v_EmitSoundOnEntityForLocalPlayer)(__int64 a1, const char* a2);
+inline int(*v_Charge_EmitSoundOnEntityForLocalPlayer)(__int64 a1, const char *a2, float a3);
+inline const char*(*v_sub_1407DC230)(CHAR* a1);
+inline void(*v_sub_1401E9C50)(__int64 *a1, __int64 a2);
+
+inline __int64(*v_EmitSoundOnEntity)(const char *a1, unsigned int a2, __int64 a3, const char *a4, __int64 a5);
+inline __int64(*v_EmitSoundOnEntityImpl)(__int64 v);
+inline __int64(*v_ResolveToEntity)(__int64 a1, __int64 a2, __int64 a3);
+inline void* g_VMEntityType;
+
 struct CSOM_GlobalState_s
 {
 	char gap0[24];
@@ -138,6 +149,9 @@ class MilesCore : public IDetour
 		LogFunAdr("CSOM_MilesAsync_FileStatus", v_CSOM_MilesAsync_FileStatus);
 		LogFunAdr("CSOM_MilesAsync_FileCancel", v_CSOM_MilesAsync_FileCancel);
 		LogFunAdr("CSOM_AddEventToQueue", v_CSOM_AddEventToQueue);
+		LogFunAdr("EmitSoundOnEntityImpl", v_EmitSoundOnEntityImpl);
+		LogFunAdr("ResolveToEntity", v_ResolveToEntity);
+		LogVarAdr("g_VMEntityType", g_VMEntityType);
 		LogVarAdr("g_milesGlobals", g_milesGlobals);
 	}
 	virtual void GetFun(void) const
@@ -152,6 +166,14 @@ class MilesCore : public IDetour
 		Module_FindPattern(g_GameDll, "0F B6 11 4C 8B C1").GetPtr(v_CSOM_AddEventToQueue);
 
 		Module_FindPattern(g_GameDll, "48 89 5C 24 18 57 41 56 41 57 48 83 EC 40 48 8B F9 41 8B D9 8B 89 D8 16").GetPtr(v_ProcessClientAnimEvent);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 18 56 48 83 EC 40 8B 41 78 48 8B D9 2B 41 54 48 89 7C 24 58 83 F8 02 74 28 44 8D 48").GetPtr(v_EmitSoundOnEntityImpl);
+		Module_FindPattern(g_GameDll, "48 85 D2 75 16 8B 05 ?? ?? ?? ?? 83 F8 01 7D 08 FF C0 89 05 ?? ?? ?? ?? 33 C0 C3 F7 02 00 80 40").GetPtr(v_ResolveToEntity);
+		Module_FindPattern(g_GameDll, "48 83 EC 28 80 3A 00 75 3B 48 85 C9 74 1F E8 8D").GetPtr(v_StopSoundOnEntityForLocalPlayer);
+		Module_FindPattern(g_GameDll, "48 83 EC 28 80 3A 00 75 51 48 85 C9 74 2A E8 AD").GetPtr(v_EmitSoundOnEntityForLocalPlayer);
+		Module_FindPattern(g_GameDll, "48 83 EC 28 80 3A 00 75 51 48 85 C9 74 2A E8 1D").GetPtr(v_Charge_EmitSoundOnEntityForLocalPlayer);
+		Module_FindPattern(g_GameDll, "40 57 48 83 EC 30 48 8B F9 48 85 C9 75 0D 48 8D 05 C3 14 B7 00").GetPtr(v_sub_1407DC230);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 56 48 83 EC 20 4C 8B 74 24 50 48").GetPtr(v_EmitSoundOnEntity);
+		Module_FindPattern(g_GameDll, "40 53 48 83 EC 20 48 8B D9 48 8B 49 10 48 85 C9 0F 88 E7 00 00 00 4C 8B 43 08 4D 8D 0C 10 74 14 4D 8D 41 FF 49 8B C0 48 99 48 F7 F9 4C 2B C2 4C 03 C1 EB 19 4D 85 C0 B8 08 00 00 00 4C 0F 44 C0").GetPtr(v_sub_1401E9C50);
 
 
 		g_RadAudioSystemDll.GetExportedSymbol("MilesAllocEx").GetPtr(v_MilesAllocEx);
@@ -178,6 +200,7 @@ class MilesCore : public IDetour
 	virtual void GetVar(void) const
 	{
 		g_milesGlobals = CMemory(v_CSOM_Initialize).FindPatternSelf("48 8D", CMemory::Direction::DOWN, 0x50).ResolveRelativeAddressSelf(0x3, 0x7).RCast<CSOM_GlobalState_s*>();
+		g_VMEntityType = Module_FindPattern(g_GameDll, "4C 8D 05 68 BB 57 01").ResolveRelativeAddressSelf(0x3, 0x7).RCast<void*>();
 	}
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const;

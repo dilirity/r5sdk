@@ -11,6 +11,7 @@
 #include "thirdparty/fmod/inc/fmod.hpp"
 
 #include "../miles/miles_impl.h"
+#include "pluginsystem/modsystem.h"
 
 class FMODStudioBackend final : public ICustomAudioBackend
     {
@@ -262,42 +263,40 @@ class FMODStudioBackend final : public ICustomAudioBackend
 
         void LoadModBanks()
         {
-            // Enumerate mods/*/audio/fmod/*.bank
-            WIN32_FIND_DATAA modFindData{};
-            HANDLE modFind = FindFirstFileA("mods/*", &modFindData);
-            if (modFind == INVALID_HANDLE_VALUE)
+            if (!ModSystem()->IsEnabled())
                 return;
 
-            do
+            ModSystem()->LockModList();
+            FOR_EACH_VEC(ModSystem()->GetModList(), i)
             {
-                if ((modFindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+                const CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+                if (!mod->IsEnabled())
                     continue;
-                if (modFindData.cFileName[0] == '.')
-                    continue; // skip . and ..
 
-                char bankSearch[MAX_PATH];
-                V_snprintf(bankSearch, sizeof(bankSearch), "mods/%s/audio/fmod/*.bank", modFindData.cFileName);
+                // Build search pattern: <modBase>/audio/fmod/*.bank
+                char searchPattern[MAX_PATH];
+                V_snprintf(searchPattern, sizeof(searchPattern), "%s%s", mod->GetBasePath().String(), "audio/fmod/*.bank");
 
-                WIN32_FIND_DATAA bankFindData{};
-                HANDLE bankFind = FindFirstFileA(bankSearch, &bankFindData);
-                if (bankFind == INVALID_HANDLE_VALUE)
+                WIN32_FIND_DATAA findData{};
+                HANDLE hFind = FindFirstFileA(searchPattern, &findData);
+                if (hFind == INVALID_HANDLE_VALUE)
                     continue;
 
                 do
                 {
-                    if (bankFindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                    if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                         continue;
 
                     char fullPath[MAX_PATH];
-                    V_snprintf(fullPath, sizeof(fullPath), "mods/%s/audio/fmod/%s", modFindData.cFileName, bankFindData.cFileName);
+                    V_snprintf(fullPath, sizeof(fullPath), "%s%s%s", mod->GetBasePath().String(), "audio/fmod/", findData.cFileName);
 
-                    // Use a unique key per mod + filename to avoid clobbering base banks in the map
+                    // Unique key per mod + filename
                     char bankKey[260];
-                    V_snprintf(bankKey, sizeof(bankKey), "%s/%s", modFindData.cFileName, bankFindData.cFileName);
+                    V_snprintf(bankKey, sizeof(bankKey), "%s/%s", mod->name.String(), findData.cFileName);
                     if (m_loadedBanks.count(bankKey))
                         continue;
 
-                    Msg(eDLL_T::AUDIO, "Loading FMOD Studio bank file (mod): %s\n", fullPath);
+                    Msg(eDLL_T::AUDIO, "Loading FMOD Studio bank file (mod '%s'): %s\n", mod->name.String(), fullPath);
                     FMOD::Studio::Bank* bank = nullptr;
                     if (m_studioSystem->loadBankFile(fullPath, FMOD_STUDIO_LOAD_BANK_NORMAL, &bank) == FMOD_OK && bank)
                     {
@@ -305,15 +304,13 @@ class FMODStudioBackend final : public ICustomAudioBackend
                     }
                     else
                     {
-                        Msg(eDLL_T::AUDIO, "Failed to load FMOD Studio bank file (mod): %s\n", fullPath);
+                        Msg(eDLL_T::AUDIO, "Failed to load FMOD Studio bank file (mod '%s'): %s\n", mod->name.String(), fullPath);
                     }
-                } while (FindNextFileA(bankFind, &bankFindData));
+                } while (FindNextFileA(hFind, &findData));
 
-                FindClose(bankFind);
-
-            } while (FindNextFileA(modFind, &modFindData));
-
-            FindClose(modFind);
+                FindClose(hFind);
+            }
+            ModSystem()->UnlockModList();
         }
 
         FMOD::Studio::System* m_studioSystem = nullptr;
