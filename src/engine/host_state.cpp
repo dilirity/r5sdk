@@ -57,6 +57,7 @@
 #include "game/server/gameinterface.h"
 #endif // !CLIENT_DLL
 #include "game/shared/vscript_shared.h"
+#include <tier2/fileutils.h>
 
 #ifndef CLIENT_DLL
 static ConVar host_statusRefreshRate("host_statusRefreshRate", "0.5", FCVAR_RELEASE, "Host status refresh rate (seconds).", true, 0.f, false, 0.f);
@@ -348,7 +349,7 @@ void CHostState::Init(void)
 void CHostState::Setup(void) 
 {
 	g_pHostState->LoadConfig();
-	g_pHostState->LoadModConfigs();
+	LoadModConfigs();
 #ifndef CLIENT_DLL
 	g_BanSystem.LoadList();
 #endif // !CLIENT_DLL
@@ -493,8 +494,6 @@ void CHostState::LoadConfig(void) const
 
 void CHostState::LoadModConfigs()
 {
-	Msg(eDLL_T::MODSYSTEM, "Loading mod configs\n");
-	
 	if (ModSystem()->IsEnabled())
 	{
 		ModSystem()->LockModList();
@@ -504,86 +503,72 @@ void CHostState::LoadModConfigs()
 			if (!mod || !mod->IsEnabled())
 				continue;
 
-			char searchPattern[MAX_PATH];
-			Q_snprintf(searchPattern, sizeof(searchPattern), "%s%s", mod->basePath.String(), "cfg/autoload/*.cfg");
-
-			FileFindHandle_t hFind;
-			const char* pFoundFile = FileSystem()->FindFirstEx(searchPattern, "GAME", &hFind);
-			if (pFoundFile)
+			char dirPath[MAX_PATH];
+			Q_snprintf(dirPath, sizeof(dirPath), "%s%s", mod->basePath.String(), "cfg/autoload");
+			CUtlVector<CUtlString> cfgFiles;
+			AddFilesToList(cfgFiles, dirPath, "cfg", "GAME", '/');
+			FOR_EACH_VEC(cfgFiles, fidx)
 			{
-				do
+				const char* filePath = cfgFiles[fidx].String();
+				FileHandle_t f = FileSystem()->Open(filePath, "rt", "GAME");
+				if (!f)
+					continue;
+
+				const ssize_t fileSize = FileSystem()->Size(f);
+				if (fileSize <= 0)
 				{
-					if (FileSystem()->FindIsDirectory(hFind))
-						continue;
-
-					char execPath[MAX_PATH];
-					Q_snprintf(execPath, sizeof(execPath), "%s%s/%s", mod->basePath.String(), "cfg/autoload", pFoundFile);
-
-					// Read the cfg file and enqueue each line as a command, since 'exec'
-					// only searches the platform/cfg directory by default.
-					FileHandle_t f = FileSystem()->Open(execPath, "rt", "GAME");
-					if (f)
-					{
-						const ssize_t fileSize = FileSystem()->Size(f);
-						if (fileSize > 0)
-						{
-							char* const buffer = new char[size_t(fileSize) + 1];
-							const ssize_t bytesRead = FileSystem()->Read(buffer, fileSize, f);
-							buffer[bytesRead > 0 ? size_t(bytesRead) : 0] = '\0';
-
-							const char* p = buffer;
-							while (*p)
-							{
-								const char* lineStart = p;
-								// Find end of line
-								while (*p && *p != '\n')
-									++p;
-
-								const char* lineEnd = p;
-								// Trim trailing CR and whitespace
-								while (lineEnd > lineStart && (lineEnd[-1] == '\r' || lineEnd[-1] == ' ' || lineEnd[-1] == '\t'))
-									--lineEnd;
-
-								// Trim leading whitespace
-								while (lineStart < lineEnd && (*lineStart == ' ' || *lineStart == '\t'))
-									++lineStart;
-
-								const size_t lineLen = size_t(lineEnd - lineStart);
-								if (lineLen > 0)
-								{
-									// Skip comment lines starting with '//'
-									if (!(lineLen >= 2 && lineStart[0] == '/' && lineStart[1] == '/'))
-									{
-										char* const cmdLine = new char[lineLen + 2];
-										memcpy(cmdLine, lineStart, lineLen);
-										cmdLine[lineLen] = '\n';
-										cmdLine[lineLen + 1] = '\0';
-										Cbuf_AddText(Cbuf_GetCurrentPlayer(), cmdLine, cmd_source_t::kCommandSrcCode);
-										delete[] cmdLine;
-									}
-								}
-
-								if (*p == '\n')
-									++p; // Skip newline
-							}
-
-							Msg(eDLL_T::MODSYSTEM, "Executed mod config: %s\n", execPath);
-							delete[] buffer;
-						}
-
-						FileSystem()->Close(f);
-					}
-					else
-					{
-						// Fallback to exec if file couldn't be opened through filesystem
-						char cmd[MAX_PATH + 16];
-						Q_snprintf(cmd, sizeof(cmd), "exec %s\n", execPath);
-						Cbuf_AddText(Cbuf_GetCurrentPlayer(), cmd, cmd_source_t::kCommandSrcCode);
-					}
+					FileSystem()->Close(f);
+					continue;
 				}
-				while ((pFoundFile = FileSystem()->FindNext(hFind)) != nullptr);
 
-				FileSystem()->FindClose(hFind);
+				char* const buffer = new char[size_t(fileSize) + 1];
+				const ssize_t bytesRead = FileSystem()->Read(buffer, fileSize, f);
+				buffer[bytesRead > 0 ? size_t(bytesRead) : 0] = '\0';
+				FileSystem()->Close(f);
+
+				const char* p = buffer;
+				while (*p)
+				{
+					const char* lineStart = p;
+					while (*p && *p != '\n') ++p;
+					const char* lineEnd = p;
+					while (lineEnd > lineStart && (lineEnd[-1] == '\r' || lineEnd[-1] == ' ' || lineEnd[-1] == '\t')) --lineEnd;
+					while (lineStart < lineEnd && (*lineStart == ' ' || *lineStart == '\t')) ++lineStart;
+					const size_t lineLen = size_t(lineEnd - lineStart);
+					
+					std::string cmd;
+					cmd.assign(lineStart, lineLen);
+					cmd.push_back('\n');
+
+						const char* s = cmd.c_str();
+						while (*s == ' ' || *s == '\t') ++s;
+						const char* e = s;
+						while (*e && *e != ' ' && *e != '\t' && *e != '\n' && *e != '\r') ++e;
+						std::string name(s, size_t(e - s));
+
+						ConCommandBase* pBase = g_pCVar->FindCommandBase(name.c_str());
+						if (pBase)
+						{
+							CCommand args;
+							args.Tokenize(cmd.c_str(), cmd_source_t::kCommandSrcCode);
+							v_Cmd_Dispatch(Cbuf_GetCurrentPlayer(), pBase, &args, false);
+						}
+						
+					if (*p == '\n') ++p;
+				}
+
+				char relBuf[MAX_PATH];
+				const char* relPtr = filePath;
+				const char* basePathStr = mod->basePath.String();
+				const size_t baseLen = Q_strlen(basePathStr);
+				if (!Q_strnicmp(filePath, basePathStr, baseLen))
+					relPtr = filePath + baseLen;
+				V_strncpy(relBuf, relPtr, sizeof(relBuf));
+				V_FixSlashes(relBuf, '\\');
+				const char* autoloadPos = V_stristr(relBuf, "cfg\\autoload\\");
+				const char* finalRel = autoloadPos ? autoloadPos : relBuf;
+				Msg(eDLL_T::MODSYSTEM, "Autoloaded config: %s (%s)\n", (string)mod->name, finalRel);
+				delete[] buffer;
 			}
 		}
 		ModSystem()->UnlockModList();
