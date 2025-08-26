@@ -155,7 +155,7 @@ class FMODStudioBackend final : public ICustomAudioBackend
             return false;
         }
 
-        bool isAnimEvent(const char* eventPathOrName) override
+        bool GetUserPropertyBool(const char* eventPathOrName, const char* propertyName) override
         {
             if (!m_studioSystem || !eventPathOrName)
                 return false;
@@ -174,7 +174,7 @@ class FMODStudioBackend final : public ICustomAudioBackend
                 return false;
 
             FMOD_STUDIO_USER_PROPERTY prop{};
-            if (desc->getUserProperty("isAnimEvent", &prop) != FMOD_OK)
+            if (desc->getUserProperty(propertyName, &prop) != FMOD_OK)
                 return false;
 
             if (prop.type == FMOD_STUDIO_USER_PROPERTY_TYPE_FLOAT)

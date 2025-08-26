@@ -37,6 +37,7 @@
 #include "engine/server/server.h"
 #include "rtech/liveapi/liveapi.h"
 #endif // !CLIENT_DLL
+#include "pluginsystem/modsystem.h"
 #include "rtech/stryder/stryder.h"
 #include "rtech/playlists/playlists.h"
 #ifndef DEDICATED
@@ -347,6 +348,7 @@ void CHostState::Init(void)
 void CHostState::Setup(void) 
 {
 	g_pHostState->LoadConfig();
+	g_pHostState->LoadModConfigs();
 #ifndef CLIENT_DLL
 	g_BanSystem.LoadList();
 #endif // !CLIENT_DLL
@@ -486,6 +488,105 @@ void CHostState::LoadConfig(void) const
 #ifndef DEDICATED
 		Cbuf_AddText(Cbuf_GetCurrentPlayer(), "exec bind.cfg\n", cmd_source_t::kCommandSrcCode);
 #endif // !DEDICATED
+	}
+}
+
+void CHostState::LoadModConfigs()
+{
+	Msg(eDLL_T::MODSYSTEM, "Loading mod configs\n");
+	
+	if (ModSystem()->IsEnabled())
+	{
+		ModSystem()->LockModList();
+		FOR_EACH_VEC(ModSystem()->GetModList(), i)
+		{
+			CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+			if (!mod || !mod->IsEnabled())
+				continue;
+
+			char searchPattern[MAX_PATH];
+			Q_snprintf(searchPattern, sizeof(searchPattern), "%s%s", mod->basePath.String(), "cfg/autoload/*.cfg");
+
+			FileFindHandle_t hFind;
+			const char* pFoundFile = FileSystem()->FindFirstEx(searchPattern, "GAME", &hFind);
+			if (pFoundFile)
+			{
+				do
+				{
+					if (FileSystem()->FindIsDirectory(hFind))
+						continue;
+
+					char execPath[MAX_PATH];
+					Q_snprintf(execPath, sizeof(execPath), "%s%s/%s", mod->basePath.String(), "cfg/autoload", pFoundFile);
+
+					// Read the cfg file and enqueue each line as a command, since 'exec'
+					// only searches the platform/cfg directory by default.
+					FileHandle_t f = FileSystem()->Open(execPath, "rt", "GAME");
+					if (f)
+					{
+						const ssize_t fileSize = FileSystem()->Size(f);
+						if (fileSize > 0)
+						{
+							char* const buffer = new char[size_t(fileSize) + 1];
+							const ssize_t bytesRead = FileSystem()->Read(buffer, fileSize, f);
+							buffer[bytesRead > 0 ? size_t(bytesRead) : 0] = '\0';
+
+							const char* p = buffer;
+							while (*p)
+							{
+								const char* lineStart = p;
+								// Find end of line
+								while (*p && *p != '\n')
+									++p;
+
+								const char* lineEnd = p;
+								// Trim trailing CR and whitespace
+								while (lineEnd > lineStart && (lineEnd[-1] == '\r' || lineEnd[-1] == ' ' || lineEnd[-1] == '\t'))
+									--lineEnd;
+
+								// Trim leading whitespace
+								while (lineStart < lineEnd && (*lineStart == ' ' || *lineStart == '\t'))
+									++lineStart;
+
+								const size_t lineLen = size_t(lineEnd - lineStart);
+								if (lineLen > 0)
+								{
+									// Skip comment lines starting with '//'
+									if (!(lineLen >= 2 && lineStart[0] == '/' && lineStart[1] == '/'))
+									{
+										char* const cmdLine = new char[lineLen + 2];
+										memcpy(cmdLine, lineStart, lineLen);
+										cmdLine[lineLen] = '\n';
+										cmdLine[lineLen + 1] = '\0';
+										Cbuf_AddText(Cbuf_GetCurrentPlayer(), cmdLine, cmd_source_t::kCommandSrcCode);
+										delete[] cmdLine;
+									}
+								}
+
+								if (*p == '\n')
+									++p; // Skip newline
+							}
+
+							Msg(eDLL_T::MODSYSTEM, "Executed mod config: %s\n", execPath);
+							delete[] buffer;
+						}
+
+						FileSystem()->Close(f);
+					}
+					else
+					{
+						// Fallback to exec if file couldn't be opened through filesystem
+						char cmd[MAX_PATH + 16];
+						Q_snprintf(cmd, sizeof(cmd), "exec %s\n", execPath);
+						Cbuf_AddText(Cbuf_GetCurrentPlayer(), cmd, cmd_source_t::kCommandSrcCode);
+					}
+				}
+				while ((pFoundFile = FileSystem()->FindNext(hFind)) != nullptr);
+
+				FileSystem()->FindClose(hFind);
+			}
+		}
+		ModSystem()->UnlockModList();
 	}
 }
 

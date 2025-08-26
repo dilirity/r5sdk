@@ -48,8 +48,8 @@ public:
     // Optional: check if an event exists in loaded content (FMOD Studio). Default false.
     virtual bool EventExists(const char* /*eventPathOrName*/) { return false; }
 
-    // Optional: check if an event has a boolean user property named "isWeapon" set to true. Default false.
-    virtual bool isAnimEvent(const char* /*eventPathOrName*/) { return false; }
+    // Optional: check if an event has a boolean user property. Default false.
+    virtual bool GetUserPropertyBool(const char* /*eventPathOrName*/, const char* /*propertyName*/) { return false; }
 };
 
 // Active backend singleton accessors

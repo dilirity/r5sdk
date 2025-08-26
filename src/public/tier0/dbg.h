@@ -38,14 +38,15 @@ enum class eDLL_T : int
 	AUDIO  = 7, // binkawin64/mileswin64.dll (AudioSystem API)
 	VIDEO  = 8, // bink2w64                  (VideoSystem API)
 	NETCON = 9, // netconsole impl           (RCON wire)
+	MODSYSTEM = 10, // modsystem impl          (ModSystem API)
 
 	//-------------------------------------------------------------------------
 	// Common enumerants
 	//-------------------------------------------------------------------------
-	COMMON         = 10, // general         (No specific subsystem)
-	SYSTEM_WARNING = 11, // general warning (No specific subsystem)
-	SYSTEM_ERROR   = 12, // general error   (No specific subsystem)
-	NONE           = 13  // no context
+	COMMON         = 11, // general         (No specific subsystem)
+	SYSTEM_WARNING = 12, // general warning (No specific subsystem)
+	SYSTEM_ERROR   = 13, // general error   (No specific subsystem)
+	NONE           = 14  // no context
 };
 //-----------------------------------------------------------------------------
 enum class LogType_t
@@ -69,7 +70,7 @@ constexpr const char s_CommonAnsiColor[]  = "\033[38;2;255;204;153m";
 constexpr const char s_WarningAnsiColor[] = "\033[38;2;255;255;000m";
 constexpr const char s_ErrorAnsiColor[]   = "\033[38;2;255;000;000m";
 constexpr const char s_DefaultAnsiColor[] = "\033[38;2;204;204;204m";
-constexpr const char* s_DllAnsiColor[14]  =
+constexpr const char* s_DllAnsiColor[15]  =
 {
 	"\033[38;2;059;120;218mNative(S):",
 	"\033[38;2;118;118;118mNative(C):",
@@ -81,6 +82,7 @@ constexpr const char* s_DllAnsiColor[14]  =
 	"\033[38;2;238;108;030mNative(A):",
 	"\033[38;2;185;000;235mNative(V):",
 	"\033[38;2;204;204;204mNetcon(X):",
+	"\033[38;2;255;205;000mNative(M):",
 	s_CommonAnsiColor,
 	s_WarningAnsiColor,
 	s_ErrorAnsiColor,

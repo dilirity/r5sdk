@@ -123,6 +123,8 @@ bool DoesOverrideExist(const char* eventName);
 // Handle level changes (call from Mod_HandleLevelChanged)
 void Miles_HandleLevelChanged();
 
+void FmodDebugEventPrint(const char* eventType, const char* eventName);
+
 ///////////////////////////////////////////////////////////////////////////////
 class MilesCore : public IDetour
 {

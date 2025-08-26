@@ -360,103 +360,118 @@ static void CSOM_AddEventToQueue(const char* eventName)
 			if (g_milesGlobals->queuedEventHash == 2)
 				Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; event '%s' not found.\n", __FUNCTION__, eventName);
 		}
+
+		return;
 	}
-	else if (DoesOverrideExist(eventName) && !V_strstr(eventName, "diag"))
+
+	if (DoesOverrideExist(eventName) && !V_strstr(eventName, "diag") && !be->GetUserPropertyBool(eventName, "dont_override"))
 	{
+		FmodDebugEventPrint("CSOM_AddEventToQueue Override", eventName);
 		OverrideEventName(eventName);
 		v_CSOM_AddEventToQueue("");
-
-		if(fmod_debug.GetBool())
-		{
-			Msg(eDLL_T::AUDIO, "FMOD: queuing audio event '%s'\n", eventName);
-		}
+		return;
 	}
-	else
-	{
-		if(fmod_debug.GetBool())
-		{
-			Msg(eDLL_T::AUDIO, "Something went wrong with event '%s'\n", eventName);
-		}
 
-		v_CSOM_AddEventToQueue("");
-	}
+
+	if(!be->GetUserPropertyBool(eventName, "dont_override"))
+		FmodDebugEventPrint("CSOM_AddEventToQueue Error", eventName);
+
+	v_CSOM_AddEventToQueue("");
+
 };
 
 static void ProcessClientAnimEvent(__int64 a1, __int64 a2, __int64 a3, unsigned int a4, const char* a5, __int64 a6, __int64 a7)
 {
-	if (fmod_debug.GetBool())
-	{
+	//if (fmod_debug.GetBool())
+	//{
 		//Msg(eDLL_T::AUDIO, "ProcessClientAnimEvent: a4 = %d || a5 = %s\n", a4, a5);
-	}
+	//}
 
 	v_ProcessClientAnimEvent(a1, a2, a3, a4, a5, a6, a7);
-}
-
-static int StopSoundOnEntityForLocalPlayer(__int64 a1, const char* a2)
-{
-	if (fmod_debug.GetBool())
-	{
-		Msg(eDLL_T::AUDIO, "StopSoundOnEntityForLocalPlayer: %s\n", a2);
-	}
-
-	if (be->EventExists(a2))
-	{
-		be->StopSamplesForEvent(a2);
-		return 0;
-	}
-
-	return v_StopSoundOnEntityForLocalPlayer(a1, a2);
-}
-
-static int EmitSoundOnEntityForLocalPlayer(__int64 a1, const char* a2)
-{
-	if (fmod_debug.GetBool())
-	{
-		Msg(eDLL_T::AUDIO, "EmitSoundOnEntityForLocalPlayer: %s\n", a2);
-	}
-
-	if (be->EventExists(a2))
-	{
-		OverrideEventName(a2);
-		return 0;
-	}
-
-	return v_EmitSoundOnEntityForLocalPlayer(a1, a2);
 }
 
 Vector3D lastEntityOrigin = Vector3D{ 0.0f, 0.0f, 0.0f };
 bool lastEntityOriginValid = false;
 
-static __int64 EmitSoundOnEntity(const char *a1, unsigned int a2, __int64 a3, const char *eventName, __int64 a5)
+static int StopSoundOnEntityForLocalPlayer(__int64 a1, const char* eventName)
 {
-	if (fmod_debug.GetBool())
+	if (be->EventExists(eventName))
 	{
-		Msg(eDLL_T::AUDIO, "%s: %s\n", a1, eventName);
+		FmodDebugEventPrint("StopSoundOnEntityForLocalPlayer", eventName);
+		//be->StopSamplesForEvent(eventName);
 	}
 
-	//if a1 == "EmitSoundOnEntity"
-	if (V_strcmp(a1, "EmitSoundOnEntity") == 0)
+	return v_StopSoundOnEntityForLocalPlayer(a1, eventName);
+}
+
+static int EmitSoundOnEntityForLocalPlayer(__int64 a1, const char* eventName)
+{
+	if (be->EventExists(eventName))
 	{
-		if(be->EventExists(eventName))
+		if (V_strstr(eventName, "3p") || V_strstr(eventName, "3P"))
 		{
-			//if eventName contains 1p
-			if (V_strstr(eventName, "1p"))
+			if (lastEntityOriginValid)
 			{
-				OverrideEventName(eventName);
+				FmodDebugEventPrint("EmitSoundOnEntityForLocalPlayer 3P", eventName);
+				be->PlayEvent3D(eventName, lastEntityOrigin, 1.0f);
 				return 0;
 			}
-			else if (V_strstr(eventName, "3p"))
+			else
 			{
-				if(lastEntityOriginValid)
+				FmodDebugEventPrint("EmitSoundOnEntityForLocalPlayer 3P No Origin", eventName);
+				be->PlayEvent3D(eventName, { 0,0,0 }, 0.0f);
+			}
+		}
+		else
+		{
+			FmodDebugEventPrint("EmitSoundOnEntityForLocalPlayer 1P", eventName);
+			OverrideEventName(eventName);
+			return 0;
+		}
+	}
+
+	return v_EmitSoundOnEntityForLocalPlayer(a1, eventName);
+}
+
+static __int64 EmitSoundOnEntity(const char *a1, unsigned int a2, __int64 a3, const char *eventName, __int64 a5)
+{
+	if (V_strcmp(a1, "EmitSoundOnEntity") == 0)
+	{
+		if (be->EventExists(eventName))
+		{
+			if (V_strstr(eventName, "3p") || V_strstr(eventName, "3P"))
+			{
+				if (lastEntityOriginValid)
 				{
+					FmodDebugEventPrint("EmitSoundOnEntity 3P", eventName);
 					be->PlayEvent3D(eventName, lastEntityOrigin, 1.0f);
 					return 0;
 				}
+				else
+				{
+					FmodDebugEventPrint("EmitSoundOnEntity 3P No Origin", eventName);
+					be->PlayEvent3D(eventName, { 0,0,0 }, 0.0f);
+				}
+			}
+			else
+			{
+				FmodDebugEventPrint("EmitSoundOnEntity 1P", eventName);
+				OverrideEventName(eventName);
+				return 0;
 			}
 		}
 	}
 
+	FmodDebugEventPrint("EmitSoundOnEntity Default Call", eventName);
 	return v_EmitSoundOnEntity(a1, a2, a3, eventName, a5);
+}
+
+void FmodDebugEventPrint(const char* eventType, const char* eventName)
+{
+	if(fmod_debug.GetBool())
+	{
+		Msg(eDLL_T::AUDIO, "FMOD: %s: '%s'\n", eventType, eventName);
+	}
 }
 
 static __int64 EmitSoundOnEntityImpl_Hook(__int64 a1)
@@ -486,19 +501,10 @@ static __int64 EmitSoundOnEntityImpl_Hook(__int64 a1)
 		const Vector3D& origin = ent->GetAbsOrigin();
 		lastEntityOrigin = origin;
 		lastEntityOriginValid = true;
-		if (fmod_debug.GetBool())
-		{
-			Msg(eDLL_T::AUDIO, "EmitSoundOnEntityImpl: entity=%p origin=(%.2f, %.2f, %.2f)\n", (void*)entityPtr, origin.x, origin.y, origin.z);
-		}
 	}
 	else
 	{
 		lastEntityOriginValid = false;
-	}
-
-	if (fmod_debug.GetBool())
-	{
-		Msg(eDLL_T::AUDIO, "EmitSoundOnEntityImpl: entity=%p\n", (void*)entityPtr);
 	}
 
 	return v_EmitSoundOnEntityImpl(a1);
@@ -506,17 +512,14 @@ static __int64 EmitSoundOnEntityImpl_Hook(__int64 a1)
 
 static int Charge_EmitSoundOnEntityForLocalPlayer(__int64 a1, const char* a2, float a3)
 {
-	if (fmod_debug.GetBool())
-	{
-		Msg(eDLL_T::AUDIO, "Charge_EmitSoundOnEntityForLocalPlayer: %s\n", a2);
-	}
-
 	if (be->EventExists(a2))
 	{
+		FmodDebugEventPrint("Charge_EmitSoundOnEntityForLocalPlayer Override", a2);
 		OverrideEventName(a2);
 		return 0;
 	}
 
+	FmodDebugEventPrint("Charge_EmitSoundOnEntityForLocalPlayer Default Call", a2);
 	return v_Charge_EmitSoundOnEntityForLocalPlayer(a1, a2, a3);
 }
 
@@ -527,8 +530,6 @@ void OverrideEventName(const char* eventName)
 
 	if (soundPos == Vector3D{ 0.0f, 0.0f, 0.0f })
 		soundPos = playerPos;
-
-	Msg(eDLL_T::AUDIO, "Charge_EmitSoundOnEntityForLocalPlayer: %s soundPos=(%.2f, %.2f, %.2f)\n", eventName, soundPos.x, soundPos.y, soundPos.z);
 
 	be->PlayEvent3D(eventName, soundPos, 1.0f);
 }

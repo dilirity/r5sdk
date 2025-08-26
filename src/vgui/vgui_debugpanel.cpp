@@ -346,6 +346,8 @@ Color CTextOverlay::GetLogColorForType(const eDLL_T context) const
 		return { 180, 180, 20, 255 };
 	case eDLL_T::SYSTEM_ERROR:
 		return { 225, 20, 20, 255 };
+	case eDLL_T::MODSYSTEM:
+		return { 255, 205, 0, 255 };
 	default:
 		return { 255, 255, 255, 255 };
 	}
