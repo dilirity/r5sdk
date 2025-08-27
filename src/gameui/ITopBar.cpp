@@ -115,6 +115,7 @@ void CTopBar::DrawMenuRecursive(const vector<PresetCommand_t>& commands)
 			if (ImGui::MenuItem(command.m_svLabel.c_str()))
 			{
 				Cbuf_AddText(Cbuf_GetCurrentPlayer(), command.m_svCommand.c_str(), cmd_source_t::kCommandSrcCode);
+				Msg(eDLL_T::CLIENT, "(DevMenu) Executed command: %s\n", command.m_svCommand.c_str());
 			}
 			if (ImGui::IsItemHovered() && !command.m_svTooltip.empty())
 			{

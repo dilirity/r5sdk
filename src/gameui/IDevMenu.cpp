@@ -124,7 +124,10 @@ bool CDevMenu::DrawSurface()
 								ImGui::PushID(&node);
 								const float execWidth = 90.0f;
 								if (ImGui::Button("Exec", ImVec2(execWidth, 0)))
+								{
 									Cbuf_AddText(Cbuf_GetCurrentPlayer(), node.m_svCommand.c_str(), cmd_source_t::kCommandSrcCode);
+									Msg(eDLL_T::CLIENT, "(DevMenu) Executed command: %s\n", node.m_svCommand.c_str());
+								}
 								ImGui::PopID();
 
 								if (!node.m_svTooltip.empty() && ImGui::IsItemHovered())
@@ -165,7 +168,10 @@ void CDevMenu::DrawMenuRecursive(const vector<PresetCommand_t>& commands)
 			ImGui::PushID(&command);
 			bool clicked = ImGui::Selectable(command.m_svLabel.c_str(), false, ImGuiSelectableFlags_SpanAvailWidth);
 			if (clicked && !command.m_svCommand.empty())
+			{
 				Cbuf_AddText(Cbuf_GetCurrentPlayer(), command.m_svCommand.c_str(), cmd_source_t::kCommandSrcCode);
+				Msg(eDLL_T::CLIENT, "(DevMenu) Executed command: %s\n", command.m_svCommand.c_str());
+			}
 			ImGui::PopID();
 			if (ImGui::IsItemHovered() && !command.m_svTooltip.empty())
 			{

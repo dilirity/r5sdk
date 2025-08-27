@@ -43,7 +43,7 @@ else()
     set(FMOD_ARCH_DIR "x64")
 endif()
 
-set(FMOD_LIB_DIR "${ENGINE_SOURCE_DIR}/thirdparty/fmod/lib/${FMOD_ARCH_DIR}")
+set(FMOD_LIB_DIR "${ENGINE_SOURCE_DIR}/thirdparty/fmod/libs/${FMOD_ARCH_DIR}")
 find_library(FMOD_LIB NAMES fmod_vc PATHS ${FMOD_LIB_DIR} NO_DEFAULT_PATH)
 if (FMOD_LIB)
     target_link_libraries(${PROJECT_NAME} PRIVATE ${FMOD_LIB})

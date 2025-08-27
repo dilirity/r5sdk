@@ -44,6 +44,73 @@ History:
 
 static ConCommand togglebrowser("togglebrowser", CBrowser::ToggleBrowser_f, "Show/hide the server browser", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 
+// Helper: check required mods against local enabled mods; returns false and a missing list if any missing
+static bool Browser_HasRequiredMods(const NetGameServer_t& server, std::string& outMissing)
+{
+	outMissing.clear();
+	if (server.requiredMods.empty())
+		return true;
+	if (!ModSystem()->IsEnabled())
+	{
+		// If mod system disabled, any required list means missing
+		for (size_t i = 0; i < server.requiredMods.size(); ++i)
+		{
+			if (i) outMissing.append(", ");
+			outMissing.append(server.requiredMods[i]);
+		}
+		return false;
+	}
+
+	CUtlVector<CUtlString> haveIds;
+	CUtlVector<CUtlString> haveNormIds;
+	ModSystem()->LockModList();
+	const CUtlVector<CModSystem::ModInstance_t*>& mods = ModSystem()->GetModList();
+	FOR_EACH_VEC(mods, i)
+	{
+		const CModSystem::ModInstance_t* mod = mods[i];
+		if (!mod || !mod->IsEnabled())
+			continue;
+		haveIds.AddToTail(mod->id);
+		haveNormIds.AddToTail(ModSystem()->GetNormalizedModID(mod));
+	}
+	ModSystem()->UnlockModList();
+
+	auto eq = [](const CUtlString& a, const char* b)
+	{
+		return V_stricmp(a.String(), b) == 0;
+	};
+
+	CUtlVector<CUtlString> missing;
+	for (const std::string& req : server.requiredMods)
+	{
+		bool found = false;
+		FOR_EACH_VEC(haveIds, i)
+		{
+			if (eq(haveIds[i], req.c_str())) { found = true; break; }
+		}
+		if (!found)
+		{
+			FOR_EACH_VEC(haveNormIds, j)
+			{
+				if (eq(haveNormIds[j], req.c_str())) { found = true; break; }
+			}
+		}
+		if (!found)
+			missing.AddToTail(req.c_str());
+	}
+
+	if (missing.Count() > 0)
+	{
+		for (int i = 0; i < missing.Count(); ++i)
+		{
+			if (i) outMissing.append(", ");
+			outMissing.append(missing[i].String());
+		}
+		return false;
+	}
+	return true;
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -383,7 +450,15 @@ void CBrowser::DrawBrowserPanel(void)
                     }
                     else
                     {
-                        g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, "");
+                        std::string missing;
+                        if (!Browser_HasRequiredMods(*server, missing))
+                        {
+                            m_serverListMessage = Format("Missing required mods: %s", missing.c_str());
+                        }
+                        else
+                        {
+                            g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, "");
+                        }
                     }
                 }
 
@@ -397,8 +472,16 @@ void CBrowser::DrawBrowserPanel(void)
                     ImGui::Spacing();
                     if (ImGui::Button("Connect", ImVec2(120, 0)))
                     {
-                        g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, s_passwordBuf);
-                        ImGui::CloseCurrentPopup();
+                        std::string missing;
+                        if (!Browser_HasRequiredMods(*server, missing))
+                        {
+                            m_serverListMessage = Format("Missing required mods: %s", missing.c_str());
+                        }
+                        else
+                        {
+                            g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, s_passwordBuf);
+                            ImGui::CloseCurrentPopup();
+                        }
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Cancel", ImVec2(120, 0)))
@@ -561,10 +644,19 @@ void CBrowser::HiddenServersModal(void)
 
                 if (result && !server.name.empty())
                 {
-                    g_ServerListManager.ConnectToServer(server.address, server.port, server.netKey, ""); // Connect to the server
-                    m_hiddenServerRequestMessage = Format("Found server: %s", server.name.c_str());
-                    m_hiddenServerMessageColor = ImVec4(0.00f, 1.00f, 0.00f, 1.00f);
-                    ImGui::CloseCurrentPopup();
+                    std::string missing;
+                    if (!Browser_HasRequiredMods(server, missing))
+                    {
+                        m_hiddenServerRequestMessage = Format("Missing required mods: %s", missing.c_str());
+                        m_hiddenServerMessageColor = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+                    }
+                    else
+                    {
+                        g_ServerListManager.ConnectToServer(server.address, server.port, server.netKey, ""); // Connect to the server
+                        m_hiddenServerRequestMessage = Format("Found server: %s", server.name.c_str());
+                        m_hiddenServerMessageColor = ImVec4(0.00f, 1.00f, 0.00f, 1.00f);
+                        ImGui::CloseCurrentPopup();
+                    }
                 }
                 else
                 {
