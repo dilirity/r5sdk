@@ -58,11 +58,6 @@ public:
     const vector<string>& GetHistory(void) const;
     void ClearHistory(void);
 
-    // Preset command management
-    void AddPresetCommand(const char* const szPath, const char* const szCommand, const char* const szTooltip);
-    void RemovePresetCommand(const char* const szPath);
-    void ClearPresetCommands(void);
-
 public:
     // Console command callbacks
     static void ToggleConsole_f();

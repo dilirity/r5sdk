@@ -494,85 +494,89 @@ void CHostState::LoadConfig(void) const
 
 void CHostState::LoadModConfigs()
 {
-	if (ModSystem()->IsEnabled())
+	if (!ModSystem()->IsEnabled())
+		return;
+
+	ModSystem()->LockModList();
+	FOR_EACH_VEC(ModSystem()->GetModList(), i)
 	{
-		ModSystem()->LockModList();
-		FOR_EACH_VEC(ModSystem()->GetModList(), i)
+		CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+		if (!mod || !mod->IsEnabled())
+			continue;
+
+		char dirPath[MAX_PATH];
+		Q_snprintf(dirPath, sizeof(dirPath), "%s%s", mod->basePath.String(), "cfg/autoload");
+		CUtlVector<CUtlString> cfgFiles;
+		AddFilesToList(cfgFiles, dirPath, "cfg", "GAME", '/');
+
+		FOR_EACH_VEC(cfgFiles, fidx)
 		{
-			CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
-			if (!mod || !mod->IsEnabled())
+			const char* filePath = cfgFiles[fidx].String();
+			FileHandle_t file = FileSystem()->Open(filePath, "rt", "GAME");
+			if (!file)
 				continue;
 
-			char dirPath[MAX_PATH];
-			Q_snprintf(dirPath, sizeof(dirPath), "%s%s", mod->basePath.String(), "cfg/autoload");
-			CUtlVector<CUtlString> cfgFiles;
-			AddFilesToList(cfgFiles, dirPath, "cfg", "GAME", '/');
-			FOR_EACH_VEC(cfgFiles, fidx)
+			const ssize_t fileSize = FileSystem()->Size(file);
+			if (fileSize <= 0)
 			{
-				const char* filePath = cfgFiles[fidx].String();
-				FileHandle_t f = FileSystem()->Open(filePath, "rt", "GAME");
-				if (!f)
-					continue;
-
-				const ssize_t fileSize = FileSystem()->Size(f);
-				if (fileSize <= 0)
-				{
-					FileSystem()->Close(f);
-					continue;
-				}
-
-				char* const buffer = new char[size_t(fileSize) + 1];
-				const ssize_t bytesRead = FileSystem()->Read(buffer, fileSize, f);
-				buffer[bytesRead > 0 ? size_t(bytesRead) : 0] = '\0';
-				FileSystem()->Close(f);
-
-				const char* p = buffer;
-				while (*p)
-				{
-					const char* lineStart = p;
-					while (*p && *p != '\n') ++p;
-					const char* lineEnd = p;
-					while (lineEnd > lineStart && (lineEnd[-1] == '\r' || lineEnd[-1] == ' ' || lineEnd[-1] == '\t')) --lineEnd;
-					while (lineStart < lineEnd && (*lineStart == ' ' || *lineStart == '\t')) ++lineStart;
-					const size_t lineLen = size_t(lineEnd - lineStart);
-					
-					std::string cmd;
-					cmd.assign(lineStart, lineLen);
-					cmd.push_back('\n');
-
-						const char* s = cmd.c_str();
-						while (*s == ' ' || *s == '\t') ++s;
-						const char* e = s;
-						while (*e && *e != ' ' && *e != '\t' && *e != '\n' && *e != '\r') ++e;
-						std::string name(s, size_t(e - s));
-
-						ConCommandBase* pBase = g_pCVar->FindCommandBase(name.c_str());
-						if (pBase)
-						{
-							CCommand args;
-							args.Tokenize(cmd.c_str(), cmd_source_t::kCommandSrcCode);
-							v_Cmd_Dispatch(Cbuf_GetCurrentPlayer(), pBase, &args, false);
-						}
-						
-					if (*p == '\n') ++p;
-				}
-
-				char relBuf[MAX_PATH];
-				const char* relPtr = filePath;
-				const char* basePathStr = mod->basePath.String();
-				const size_t baseLen = Q_strlen(basePathStr);
-				if (!Q_strnicmp(filePath, basePathStr, baseLen))
-					relPtr = filePath + baseLen;
-				V_strncpy(relBuf, relPtr, sizeof(relBuf));
-				V_FixSlashes(relBuf, '\\');
-				const char* autoloadPos = V_stristr(relBuf, "cfg\\autoload\\");
-				const char* finalRel = autoloadPos ? autoloadPos : relBuf;
-				Msg(eDLL_T::MODSYSTEM, "Autoloaded config: %s (%s)\n", (string)mod->name, finalRel);
-				delete[] buffer;
+				FileSystem()->Close(file);
+				continue;
 			}
+
+			std::string buffer;
+			buffer.resize(size_t(fileSize));
+			const ssize_t bytesRead = FileSystem()->Read(&buffer[0], fileSize, file);
+			FileSystem()->Close(file);
+			buffer.resize(bytesRead > 0 ? size_t(bytesRead) : 0);
+
+			auto dispatchLine = [&](const char* lineBegin, const char* lineEnd)
+			{
+				while (lineBegin < lineEnd && (*lineBegin == ' ' || *lineBegin == '\t' || *lineBegin == '\r')) ++lineBegin;
+				while (lineEnd > lineBegin && (lineEnd[-1] == '\r' || lineEnd[-1] == ' ' || lineEnd[-1] == '\t')) --lineEnd;
+				if (lineBegin >= lineEnd) return;
+
+				std::string cmd(lineBegin, size_t(lineEnd - lineBegin));
+
+				const char* s = cmd.c_str();
+				while (*s == ' ' || *s == '\t') ++s;
+				const char* e = s;
+				while (*e && *e != ' ' && *e != '\t' && *e != '\n' && *e != '\r') ++e;
+				std::string name(s, size_t(e - s));
+
+				ConCommandBase* pBase = g_pCVar->FindCommandBase(name.c_str());
+				if (!pBase) return;
+
+				cmd.push_back('\n');
+				CCommand args;
+				args.Tokenize(cmd.c_str(), cmd_source_t::kCommandSrcCode);
+				v_Cmd_Dispatch(Cbuf_GetCurrentPlayer(), pBase, &args, false);
+			};
+
+			const char* p = buffer.c_str();
+			const char* end = p + buffer.size();
+			while (p < end)
+			{
+				const char* lineStart = p;
+				const void* newlinePtr = memchr(p, '\n', size_t(end - p));
+				const char* lineEnd = newlinePtr ? static_cast<const char*>(newlinePtr) : end;
+				dispatchLine(lineStart, lineEnd);
+				p = newlinePtr ? lineEnd + 1 : end;
+			}
+
+			char relBuf[MAX_PATH];
+			const char* relPtr = filePath;
+			const char* basePathStr = mod->basePath.String();
+			const size_t baseLen = Q_strlen(basePathStr);
+			if (!Q_strnicmp(filePath, basePathStr, baseLen))
+				relPtr = filePath + baseLen;
+			V_strncpy(relBuf, relPtr, sizeof(relBuf));
+			V_FixSlashes(relBuf, '\\');
+			const char* autoloadPos = V_stristr(relBuf, "cfg\\autoload\\");
+			const char* finalRel = autoloadPos ? autoloadPos : relBuf;
+			Msg(eDLL_T::MODSYSTEM, "Autoloaded config: %s (%s)\n", mod->name.String(), finalRel);
 		}
-		ModSystem()->UnlockModList();
 	}
+	ModSystem()->UnlockModList();
 }
 
 //-----------------------------------------------------------------------------
