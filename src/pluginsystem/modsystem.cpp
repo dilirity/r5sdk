@@ -191,6 +191,7 @@ void CModSystem::Init()
 	}
 
 	UpdateModStatusList();
+	LoadRequiredMods();
 	UnlockModList(); // Unlock after to make sure nothing uses it during init.
 }
 
@@ -276,6 +277,26 @@ void CModSystem::LoadModStatusList(CUtlMap<CUtlString, bool>& enabledList)
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: loads required mods from a separate file
+//-----------------------------------------------------------------------------
+void CModSystem::LoadRequiredMods()
+{
+	m_RequiredMods.RemoveAll();
+	if (!FileSystem()->FileExists(MOD_REQUIRED_LIST_FILE, "GAME"))
+		return;
+
+	const KeyValues* pReqList = FileSystem()->LoadKeyValues(
+		IFileSystem::TYPE_COMMON, MOD_REQUIRED_LIST_FILE, "GAME");
+
+	for (KeyValues* pSubKey = pReqList->GetFirstSubKey(); pSubKey != nullptr; pSubKey = pSubKey->GetNextKey())
+	{
+		const char* id = pSubKey->GetName();
+		if (id && *id)
+			m_RequiredMods.AddToTail(id);
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: writes the mod status file to the disk
 //-----------------------------------------------------------------------------
 void CModSystem::WriteModStatusList()
@@ -301,6 +322,24 @@ void CModSystem::WriteModStatusList()
 
 	if (!FileSystem()->WriteFile(MOD_STATUS_LIST_FILE, "GAME", buf))
 		Error(eDLL_T::ENGINE, NO_ERROR, "Failed to write mod status list '%s'.\n", MOD_STATUS_LIST_FILE);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: writes required mods to the separate file
+//-----------------------------------------------------------------------------
+void CModSystem::WriteRequiredMods() const
+{
+	KeyValues kv("RequiredMods");
+	FOR_EACH_VEC(m_RequiredMods, i)
+	{
+		kv.SetBool(m_RequiredMods[i].String(), true);
+	}
+
+	CUtlBuffer buf = CUtlBuffer(ssize_t(0), 0, CUtlBuffer::TEXT_BUFFER);
+	kv.RecursiveSaveToFile(buf, 0);
+
+	if (!FileSystem()->WriteFile(MOD_REQUIRED_LIST_FILE, "GAME", buf))
+		Error(eDLL_T::ENGINE, NO_ERROR, "Failed to write required mod list '%s'.\n", MOD_REQUIRED_LIST_FILE);
 }
 
 //-----------------------------------------------------------------------------
@@ -632,3 +671,4 @@ void CModSystem::ModInstance_t::ParseLocalizationFiles()
 }
 
 CModSystem g_ModSystem;
+

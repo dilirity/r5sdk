@@ -101,8 +101,22 @@ static void HostState_KeepAlive()
 		gpGlobals->maxClients,
 		std::chrono::duration_cast<std::chrono::milliseconds>(
 			std::chrono::system_clock::now().time_since_epoch()
-			).count()
+			).count(),
+		// requiredMods (filled below after struct init)
+		{}
 	};
+
+	// Populate required mods from ModSystem
+	if (ModSystem()->IsEnabled())
+	{
+		ModSystem()->LockModList();
+		const CUtlVector<CUtlString>& req = ModSystem()->GetRequiredMods();
+		for (int i = 0; i < req.Count(); ++i)
+		{
+			const_cast<NetGameServer_t&>(gameServer).requiredMods.emplace_back(req[i].String());
+		}
+		ModSystem()->UnlockModList();
+	}
 
 	std::thread request([&, gameServer]
 		{

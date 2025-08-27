@@ -8,6 +8,7 @@
 
 #define MOD_BASE_DIRECTORY "mods"
 #define MOD_STATUS_LIST_FILE MOD_BASE_DIRECTORY"/mods.vdf"
+#define MOD_REQUIRED_LIST_FILE MOD_BASE_DIRECTORY"/required_mods.vdf"
 #define MOD_SETTINGS_FILE "mod.vdf"
 #define MAX_MODS_TO_LOAD 1024
 
@@ -83,11 +84,19 @@ public:
 	void LoadModStatusList(CUtlMap<CUtlString, bool>& enabledList);
 	void WriteModStatusList();
 
+	// required mods list lives in a separate file
+	void LoadRequiredMods();
+	void WriteRequiredMods() const;
+
 	bool IsEnabled() const;
 
 	const inline CUtlVector<ModInstance_t*>& GetModList() { return m_ModList; };
 	const void LockModList() { m_ModListMutex.Lock(); }
 	const void UnlockModList() { m_ModListMutex.Unlock(); }
+
+	// Required mods (read from MOD_REQUIRED_LIST_FILE)
+	const inline CUtlVector<CUtlString>& GetRequiredMods() const { return m_RequiredMods; }
+	inline void SetRequiredMods(const CUtlVector<CUtlString>& mods) { m_RequiredMods = mods; }
 
 	const CUtlString& GetNormalizedModID(const ModInstance_t* const mod) const;
 
@@ -95,6 +104,7 @@ private:
 	CUtlVector<ModInstance_t*> m_ModList;
 	CUtlHash<CUtlString> m_ModIdHashMap;
 	CThreadMutex m_ModListMutex;
+	CUtlVector<CUtlString> m_RequiredMods;
 };
 
 extern CModSystem g_ModSystem;

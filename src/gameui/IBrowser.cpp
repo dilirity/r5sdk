@@ -40,6 +40,7 @@ History:
 #include "game/shared/vscript_shared.h"
 #include "game/server/gameinterface.h"
 #include <engine/server/sv_main.cpp>
+#include "pluginsystem/modsystem.h"
 
 static ConCommand togglebrowser("togglebrowser", CBrowser::ToggleBrowser_f, "Show/hide the server browser", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 
@@ -256,7 +257,7 @@ void CBrowser::DrawBrowserPanel(void)
 
     const float fFooterHeight = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
 
-    if (ImGui::BeginTable("##ServerBrowser_DrawBrowserPanel_ServerListTable", 7, ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY, { 0, -fFooterHeight }))
+    if (ImGui::BeginTable("##ServerBrowser_DrawBrowserPanel_ServerListTable", 8, ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY, { 0, -fFooterHeight }))
     {
         if (m_surfaceStyle == ImGuiStyle_t::MODERN)
         {
@@ -271,6 +272,7 @@ void CBrowser::DrawBrowserPanel(void)
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 25);
         ImGui::TableSetupColumn("Map", ImGuiTableColumnFlags_WidthStretch, 20);
         ImGui::TableSetupColumn("Playlist", ImGuiTableColumnFlags_WidthStretch, 10);
+        ImGui::TableSetupColumn("Required Mods", ImGuiTableColumnFlags_WidthStretch, 15);
         ImGui::TableSetupColumn("Players", ImGuiTableColumnFlags_WidthStretch, 5);
         ImGui::TableSetupColumn("Port", ImGuiTableColumnFlags_WidthStretch, 5);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch, 5);
@@ -336,6 +338,25 @@ void CBrowser::DrawBrowserPanel(void)
 
                 const char* const pszPlaylist = server->playlist.c_str();
                 ImGui::TextEx(pszPlaylist, &pszPlaylist[server->playlist.length()], textFlags);
+
+                // Mods column
+                ImGui::TableNextColumn();
+                if (!server->requiredMods.empty())
+                {
+                    std::string modsJoined;
+                    modsJoined.reserve(64);
+                    for (size_t m = 0; m < server->requiredMods.size(); ++m)
+                    {
+                        if (m) modsJoined.append(", ");
+                        modsJoined.append(server->requiredMods[m]);
+                    }
+                    const char* const pszMods = modsJoined.c_str();
+                    ImGui::TextEx(pszMods, &pszMods[modsJoined.length()], textFlags);
+                }
+                else
+                {
+                    ImGui::TextUnformatted("-");
+                }
 
                 ImGui::TableNextColumn();
 
@@ -919,6 +940,18 @@ void CBrowser::UpdateHostingStatus(void)
                 std::chrono::system_clock::now().time_since_epoch()
                 ).count()
         };
+
+        // Populate required mods from ModSystem
+        if (ModSystem()->IsEnabled())
+        {
+            ModSystem()->LockModList();
+            const CUtlVector<CUtlString>& req = ModSystem()->GetRequiredMods();
+            for (int i = 0; i < req.Count(); ++i)
+            {
+                netGameServer.requiredMods.emplace_back(req[i].String());
+            }
+            ModSystem()->UnlockModList();
+        }
 
         SendHostingPostRequest(netGameServer);
         break;

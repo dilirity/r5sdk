@@ -40,4 +40,7 @@ struct NetGameServer_t
 
 	// the issue time of this listing
 	int64_t timeStamp = -1;
+
+	// required mod ids for clients to join this server
+	vector<string> requiredMods;
 };

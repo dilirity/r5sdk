@@ -44,6 +44,21 @@ static bool GetServerListingFromJSON(const rapidjson::Value& value, NetGameServe
         // Optional fields
         JSON_GetValue(value, "hasPassword", outGameServer.hasPassword);
         JSON_GetValue(value, "password",    outGameServer.netPassword);
+
+        // requiredMods (optional): parse manually from array of strings
+        rapidjson::Document::ConstMemberIterator itReq;
+        if (JSON_GetIterator(value, "requiredMods", JSONFieldType_e::kArray, itReq))
+        {
+            outGameServer.requiredMods.clear();
+            const rapidjson::Value& arr = itReq->value;
+            for (const rapidjson::Value& item : arr.GetArray())
+            {
+                if (item.IsString())
+                {
+                    outGameServer.requiredMods.emplace_back(std::string(item.GetString(), item.GetStringLength()));
+                }
+            }
+        }
         return true;
     }
 
@@ -192,6 +207,17 @@ bool CPylon::PostServerHost(string& outMessage, string& outToken, string& outHos
     requestJson.AddMember("maxPlayers",  netGameServer.maxPlayers,                           allocator);
     requestJson.AddMember("timeStamp",   netGameServer.timeStamp,                            allocator);
     requestJson.AddMember("password", rapidjson::Value(netGameServer.netPassword.c_str(), netGameServer.netPassword.length(), allocator), allocator);
+
+    // required mods array
+    if (!netGameServer.requiredMods.empty())
+    {
+        rapidjson::Value mods(rapidjson::kArrayType);
+        for (const string& m : netGameServer.requiredMods)
+        {
+            mods.PushBack(rapidjson::Value(m.c_str(), (rapidjson::SizeType)m.length(), allocator), allocator);
+        }
+        requestJson.AddMember("requiredMods", mods, allocator);
+    }
 
     rapidjson::Document responseJson;
     CURLINFO status;
