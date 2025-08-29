@@ -378,7 +378,7 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
                 ? reason
                 : "#DISCONNECT_BANNED";
 
-            //Default to a connection ban
+            // Default to a connection ban
             CBanSystem::Banned_t::BanType_e banType = CBanSystem::Banned_t::CONNECT;
             JSON_GetValue(responseJson, "banType", (uint32_t&)banType);
 
@@ -389,6 +389,36 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
             }
 
             outBanType = banType;
+
+            // Build a polished message for display/logging
+            const char* typeLabel = "User";
+            switch (banType)
+            {
+            case CBanSystem::Banned_t::CONNECT: typeLabel = "User"; break;
+            case CBanSystem::Banned_t::COMMUNICATION:    typeLabel = "Chat";       break;
+            default:                            typeLabel = "Restriction"; break;
+            }
+
+            if (!outExpiryTimestamp.empty())
+            {
+                std::string dateOnly = outExpiryTimestamp;
+                size_t tPos = dateOnly.find('T');
+                if (tPos != std::string::npos)
+                {
+                    dateOnly.erase(tPos);
+                }
+                else if (dateOnly.size() > 10)
+                {
+                    dateOnly = dateOnly.substr(0, 10);
+                }
+
+                outReason = Format("\n--> This account is banned <--\n\nReason: %s\n\nExpires: %s", outReason.c_str(), dateOnly.c_str());
+            }
+            else
+            {
+                outReason = Format("\n--> This account is banned <-- \n\nReason: %s\n\nExpires: Permanent", outReason.c_str());
+            }
+
             return true;
         }
     }
@@ -567,51 +597,54 @@ bool CPylon::SendRequest(const char* endpoint, const rapidjson::Document& reques
 // Output : True on success, false on failure.
 //-----------------------------------------------------------------------------
 bool CPylon::QueryServer(const char* endpoint, const char* request,
-    string& outResponse, string& outMessage, CURLINFO& outStatus) const
+	string& outResponse, string& outMessage, CURLINFO& outStatus) const
 {
-    const bool showDebug = pylon_showdebuginfo.GetBool();
-    const char* hostName = pylon_matchmaking_hostname.GetString();
+	const bool showDebug = pylon_showdebuginfo.GetBool();
+	const char* hostName = pylon_matchmaking_hostname.GetString();
 
-    if (showDebug)
-    {
-        Msg(eDLL_T::ENGINE, "Sending request to '%s' with endpoint '%s':\n%s\n",
-            hostName, endpoint, request);
-    }
+	if (showDebug)
+	{
+		Msg(eDLL_T::ENGINE, "Sending request to '%s' with endpoint '%s':\n%s\n",
+			hostName, endpoint, request);
+	}
 
-    string finalUrl;
-    CURLFormatUrl(finalUrl, hostName, endpoint);
-    finalUrl += Format("?language=%s", this->GetLanguage().c_str());
+	string finalUrl;
+	CURLFormatUrl(finalUrl, hostName, endpoint);
+	finalUrl += Format("?language=%s", this->GetLanguage().c_str());
 
-    CURLParams params;
+	CURLParams params;
 
-    params.writeFunction = CURLWriteStringCallback;
-    params.timeout = curl_timeout.GetInt();
-    params.verifyPeer = ssl_verify_peer.GetBool();
-    params.verbose = curl_debug.GetBool();
+	params.writeFunction = CURLWriteStringCallback;
+	params.timeout = curl_timeout.GetInt();
+	params.verifyPeer = ssl_verify_peer.GetBool();
+	params.verbose = curl_debug.GetBool();
 
-    curl_slist* sList = nullptr;
-    CURL* curl = CURLInitRequest(finalUrl.c_str(), request, outResponse, sList, params);
-    if (!curl)
-    {
-        return false;
-    }
+	curl_slist* sList = nullptr;
+	CURL* curl = CURLInitRequest(finalUrl.c_str(), request, outResponse, sList, params);
+	if (!curl)
+	{
+		return false;
+	}
 
-    CURLcode res = CURLSubmitRequest(curl, sList);
-    if (!CURLHandleError(curl, res, outMessage,
-        !IsDedicated(/* Errors are already shown for dedicated! */)))
-    {
-        return false;
-    }
+	// Force IPv4 resolution for this request
+	curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 
-    outStatus = CURLRetrieveInfo(curl);
+	CURLcode res = CURLSubmitRequest(curl, sList);
+	if (!CURLHandleError(curl, res, outMessage,
+		!IsDedicated(/* Errors are already shown for dedicated! */)))
+	{
+		return false;
+	}
 
-    if (showDebug)
-    {
-        Msg(eDLL_T::ENGINE, "Host '%s' replied with status: '%d'\n",
-            hostName, outStatus);
-    }
+	outStatus = CURLRetrieveInfo(curl);
 
-    return true;
+	if (showDebug)
+	{
+		Msg(eDLL_T::ENGINE, "Host '%s' replied with status: '%d'\n",
+			hostName, outStatus);
+	}
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------
