@@ -450,6 +450,84 @@ void Capsule_f(const CCommand& args)
 	const float radius = float(atof(args[7]));
 	g_pDebugOverlay->AddCapsuleOverlay(start, end, radius, 141, 233, 135, 200, true, 100);
 }
+
+/*
+=====================
+Box_f
+
+  Draws a material box at 
+  origin<x y z> rotation<pitch yaw roll> size<x y z> [material] [r g b a].
+=====================
+*/
+void Box_f(const CCommand& args)
+{
+	if (args.ArgC() < 10)
+	{
+		Msg(eDLL_T::CLIENT, "Usage 'box': origin(x y z) rotation(pitch yaw roll) size(x y z) [r g b a]\n");
+		return;
+	}
+
+	Vector3D origin, size;
+	QAngle rotation;
+
+	// Parse origin
+	for (int i = 0; i < 3; ++i)
+	{
+		origin[i] = float(atof(args[i + 1]));
+	}
+
+	// Parse rotation (pitch, yaw, roll)
+	for (int i = 0; i < 3; ++i)
+	{
+		rotation[i] = float(atof(args[i + 4]));
+	}
+
+	// Parse size
+	for (int i = 0; i < 3; ++i)
+	{
+		size[i] = float(atof(args[i + 7]));
+	}
+
+	// Create transform matrix from rotation and origin
+	matrix3x4_t transform;
+	AngleMatrix(rotation, origin, transform);
+
+	// Calculate mins/maxs from size (centered around origin)
+	Vector3D mins = -size * 0.5f;
+	Vector3D maxs = size * 0.5f;
+
+	
+	// No custom material specified, use default debug overlay
+	// Parse optional color (default to yellow)
+	int r = 255, g = 255, b = 0, a = 100;
+	int colorStartArg = 10;
+
+	// Check if the 10th argument is a color value (starts with digit)
+	if (args.ArgC() >= colorStartArg + 4)
+	{
+		r = atoi(args[colorStartArg]);
+		g = atoi(args[colorStartArg + 1]);
+		b = atoi(args[colorStartArg + 2]);
+		a = atoi(args[colorStartArg + 3]);
+	}
+
+	g_pDebugOverlay->AddTransformedBoxOverlay(transform, mins, maxs, r, g, b, a, true, 999999999.0f);
+	
+}
+
+/*
+=====================
+ClearBoxes_f
+
+  Clears all debug overlays and rendered boxes.
+=====================
+*/
+void ClearBoxes_f(const CCommand& args)
+{
+	// Clear all debug overlays
+	g_pDebugOverlay->ClearAllOverlays();
+	Msg(eDLL_T::CLIENT, "Cleared all boxes and debug overlays\n");
+}
 #endif // !DEDICATED
 
 // TODO: move to other file?

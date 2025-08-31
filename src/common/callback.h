@@ -40,6 +40,8 @@ void Triangle_f(const CCommand& args);
 void Sphere_f(const CCommand& args);
 void Capsule_f(const CCommand& args);
 #endif // !DEDICATED
+void Box_f(const CCommand& args);
+void ClearBoxes_f(const CCommand& args);
 void BHit_f(const CCommand& args);
 
 void CVHelp_f(const CCommand& args);

@@ -412,7 +412,9 @@ static ConCommand bhit("bhit", BHit_f, "Bullet-hit trajectory debug", FCVAR_DEVE
 static ConCommand line("line", Line_f, "Draw a debug line", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT);
 static ConCommand triangle("triangle", Triangle_f, "Draw a debug triangle", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT);
 static ConCommand sphere("sphere", Sphere_f, "Draw a debug sphere", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT);
-static ConCommand capsule("capsule", Capsule_f, "Draw a debug capsule", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT);
+static ConCommand capsule("capsule", Capsule_f, "Draw a debug capsule", FCVAR_REPLICATED | FCVAR_CHEAT);
+static ConCommand box("createbox", Box_f, "Draw a permanent solid box for map making", FCVAR_RELEASE | FCVAR_GAMEDLL);
+static ConCommand clearboxes("clearboxes", ClearBoxes_f, "Clear all boxes and debug overlays", FCVAR_RELEASE | FCVAR_GAMEDLL);
 #endif //!DEDICATED
 
 // TODO: move VPK building code to separate file and place this in 'packedstore.cpp'
