@@ -118,7 +118,7 @@ static SQRESULT ClientScript_CreateBox(HSQUIRRELVM v)
     Vector3D vOrigin(origin->x, origin->y, origin->z);
     QAngle qAngles(angles->x, angles->y, angles->z);
     Vector3D vSize(size->x, size->y, size->z);
-    Color color((int)(colorVec->x * 255), (int)(colorVec->y * 255), (int)(colorVec->z * 255), (int)(alpha * 255));
+    Color color((int)(colorVec->x), (int)(colorVec->y), (int)(colorVec->z), (int)(alpha));
 
     // Create transform matrix from rotation and origin
     matrix3x4_t transform;

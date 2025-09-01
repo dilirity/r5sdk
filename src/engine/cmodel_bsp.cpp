@@ -545,7 +545,9 @@ static void Mod_HandleLevelChanged(const char* const levelName)
         if (!s_customPakData.inLobby)
             s_customPakData.lastPrecachedLevel = levelName;
 
+#ifndef DEDICATED
         Miles_HandleLevelChanged();
+#endif // !DEDICATED
     }
 
     // We should retain all paks in lobby, do not initiate a reprocess unless

@@ -12,42 +12,11 @@
 #include "engine/client/client.h"
 #include "networksystem/pylon.h"
 #include "networksystem/bansystem.h"
-#include "engine/client/client.h"
 #include "server.h"
 #include "game/server/gameinterface.h"
 #include "game/server/util_server.h"
 
-// Simple non-reversible tag for equality check without leaking plaintext
-static string SV_HashPasswordTag(const char* const pszPassword)
-{
-	if (!pszPassword || !pszPassword[0])
-		return string();
-	uint64_t h = 1469598103934665603ULL; // FNV-1a 64-bit
-	for (const unsigned char* p = reinterpret_cast<const unsigned char*>(pszPassword); *p; ++p)
-	{
-		h ^= *p;
-		h *= 1099511628211ULL;
-	}
-	return Format("pw:%016llx", h);
-}
 
-static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOldValue, ChangeUserData_t pUserData)
-{
-	ConVar* const pPassword = g_pCVar->FindVar(pConVar->GetName());
-	ConVar* const pFilter   = g_pCVar->FindVar("serverFilter");
-	if (!pPassword || !pFilter)
-		return;
-
-	const char* const newPw = pPassword->GetString();
-	// Skip if value hasn't actually changed.
-	if (pOldString && strcmp(pOldString, newPw) == 0)
-		return;
-
-	const string tagged = SV_HashPasswordTag(newPw);
-	pFilter->SetValue(tagged.c_str());
-}
-
-static ConVar sv_password("sv_password", "", FCVAR_RELEASE, "Server password for entry.", false, 0.f, false, 0.f, &SV_ServerPasswordChanged_f, nullptr);
 static ConVar sv_applyGlobalCommsBans("sv_applyGlobalCommsBans", "3", FCVAR_RELEASE, "Determines whether or not to use the global chat ban list, 0 = None, 1 = Text, 2 = Voice, 3 = Both.", false, 0.f, true, 3.f);
 static ConVar sv_commsBansAreGameBans("sv_commsBansAreGameBans", "0", FCVAR_RELEASE, "If set chat bans will be applied as game bans", false, 0.f, true, 1.f);
 
@@ -263,6 +232,19 @@ void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec /*= 
 	}
 }
 
+static string SV_HashPasswordTag(const char* const pszPassword)
+{
+	if (!pszPassword || !pszPassword[0])
+		return string();
+	uint64_t h = 1469598103934665603ULL; // FNV-1a 64-bit
+	for (const unsigned char* p = reinterpret_cast<const unsigned char*>(pszPassword); *p; ++p)
+	{
+		h ^= *p;
+		h *= 1099511628211ULL;
+	}
+	return Format("pw:%016llx", h);
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: loads the game .dll
 //-----------------------------------------------------------------------------
@@ -271,7 +253,10 @@ void SV_InitGameDLL()
 	// Mirror current password into the server filter used by the engine's connect validation (hashed tag).
 	if (ConVar* const pFilter = g_pCVar->FindVar("serverFilter"))
 	{
-		const string tagged = SV_HashPasswordTag(sv_password.GetString());
+		const char* pw = "";
+		if (ConVar* const pPw = g_pCVar->FindVar("sv_password"))
+			pw = pPw->GetString();
+		const string tagged = SV_HashPasswordTag(pw);
 		pFilter->SetValue(tagged.c_str());
 	}
 	v_SV_InitGameDLL();

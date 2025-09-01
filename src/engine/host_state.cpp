@@ -59,6 +59,9 @@
 #include "game/shared/vscript_shared.h"
 #include <tier2/fileutils.h>
 
+static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOldValue, ChangeUserData_t pUserData);
+static string SV_HashPasswordTag(const char* const pszPassword);
+
 #ifndef CLIENT_DLL
 static ConVar host_statusRefreshRate("host_statusRefreshRate", "0.5", FCVAR_RELEASE, "Host status refresh rate (seconds).", true, 0.f, false, 0.f);
 
@@ -68,6 +71,36 @@ static ConVar host_autoReloadRespectGameState("host_autoReloadRespectGameState",
 
 static ConVar host_sessionId("host_sessionId", "", FCVAR_REPLICATED|FCVAR_DEVELOPMENTONLY, "Host session ID.");
 ConVar hostdesc("hostdesc", "", FCVAR_RELEASE, "Host game server description.");
+static ConVar sv_password("sv_password", "", FCVAR_RELEASE, "Server password for entry.", false, 0.f, false, 0.f, &SV_ServerPasswordChanged_f, nullptr);
+
+static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOldValue, ChangeUserData_t pUserData)
+{
+	ConVar* const pPassword = g_pCVar->FindVar(pConVar->GetName());
+	ConVar* const pFilter   = g_pCVar->FindVar("serverFilter");
+	if (!pPassword || !pFilter)
+		return;
+
+	const char* const newPw = pPassword->GetString();
+	// Skip if value hasn't actually changed.
+	if (pOldString && strcmp(pOldString, newPw) == 0)
+		return;
+
+	const string tagged = SV_HashPasswordTag(newPw);
+	pFilter->SetValue(tagged.c_str());
+}
+
+static string SV_HashPasswordTag(const char* const pszPassword)
+{
+	if (!pszPassword || !pszPassword[0])
+		return string();
+	uint64_t h = 1469598103934665603ULL; // FNV-1a 64-bit
+	for (const unsigned char* p = reinterpret_cast<const unsigned char*>(pszPassword); *p; ++p)
+	{
+		h ^= *p;
+		h *= 1099511628211ULL;
+	}
+	return Format("pw:%016llx", h);
+}
 
 #ifdef DEDICATED
 //-----------------------------------------------------------------------------
