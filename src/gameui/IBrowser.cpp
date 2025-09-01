@@ -1010,7 +1010,11 @@ void CBrowser::UpdateHostingStatus(void)
             break;
         }
 
-        string password = sv_password.GetString();
+        const char* pw = "";
+        if (ConVar* const pPw = g_pCVar->FindVar("sv_password"))
+            pw = pPw->GetString();
+
+        string password = pw;
 
         NetGameServer_t netGameServer
         {
