@@ -461,48 +461,49 @@ Box_f
 */
 void Box_f(const CCommand& args)
 {
-	if (args.ArgC() < 10)
+	// The command now requires 12 arguments: origin(3) + rotation(3) + mins(3) + maxs(3)
+	if (args.ArgC() < 13)
 	{
-		Msg(eDLL_T::CLIENT, "Usage 'box': origin(x y z) rotation(pitch yaw roll) size(x y z) [r g b a]\n");
+		Msg(eDLL_T::CLIENT, "Usage 'box': origin(x y z) rotation(p y r) mins(x y z) maxs(x y z) [r g b a]\n");
 		return;
 	}
 
-	Vector3D origin, size;
+	Vector3D origin, mins, maxs;
 	QAngle rotation;
 
-	// Parse origin
+	// Parse origin (args 1, 2, 3)
 	for (int i = 0; i < 3; ++i)
 	{
 		origin[i] = float(atof(args[i + 1]));
 	}
 
-	// Parse rotation (pitch, yaw, roll)
+	// Parse rotation (pitch, yaw, roll) (args 4, 5, 6)
 	for (int i = 0; i < 3; ++i)
 	{
 		rotation[i] = float(atof(args[i + 4]));
 	}
 
-	// Parse size
+	// Parse mins (args 7, 8, 9)
 	for (int i = 0; i < 3; ++i)
 	{
-		size[i] = float(atof(args[i + 7]));
+		mins[i] = float(atof(args[i + 7]));
+	}
+
+	// Parse maxs (args 10, 11, 12)
+	for (int i = 0; i < 3; ++i)
+	{
+		maxs[i] = float(atof(args[i + 10]));
 	}
 
 	// Create transform matrix from rotation and origin
 	matrix3x4_t transform;
 	AngleMatrix(rotation, origin, transform);
 
-	// Calculate mins/maxs from size (centered around origin)
-	Vector3D mins = -size * 0.5f;
-	Vector3D maxs = size * 0.5f;
-
-	
-	// No custom material specified, use default debug overlay
 	// Parse optional color (default to yellow)
 	int r = 255, g = 255, b = 0, a = 100;
-	int colorStartArg = 10;
+	int colorStartArg = 13; // Color arguments now start after mins and maxs
 
-	// Check if the 10th argument is a color value (starts with digit)
+	// Check if color arguments are provided
 	if (args.ArgC() >= colorStartArg + 4)
 	{
 		r = atoi(args[colorStartArg]);
@@ -511,8 +512,8 @@ void Box_f(const CCommand& args)
 		a = atoi(args[colorStartArg + 3]);
 	}
 
+	// Add the transformed box overlay using the provided mins and maxs
 	g_pDebugOverlay->AddTransformedBoxOverlay(transform, mins, maxs, r, g, b, a, true, 999999999.0f);
-	
 }
 
 /*
