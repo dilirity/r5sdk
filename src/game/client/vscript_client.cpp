@@ -96,53 +96,13 @@ static SQRESULT ClientScript_DebugDrawCapsule(HSQUIRRELVM v)
 {
     return SharedScript_DebugDrawCapsule(v);
 }
-
-//-----------------------------------------------------------------------------
-// Purpose: create a permanent box for map making
-//-----------------------------------------------------------------------------
 static SQRESULT ClientScript_CreateBox(HSQUIRRELVM v)
 {
-    const SQVector3D* origin;
-    const SQVector3D* angles;
-    const SQVector3D* size;
-    const SQVector3D* colorVec;
-    SQFloat alpha;
-
-    sq_getvector(v, 2, &origin);
-    sq_getvector(v, 3, &angles);
-    sq_getvector(v, 4, &size);
-    sq_getvector(v, 5, &colorVec);
-    sq_getfloat(v, 6, &alpha);
-
-    // Convert script vectors to engine types
-    Vector3D vOrigin(origin->x, origin->y, origin->z);
-    QAngle qAngles(angles->x, angles->y, angles->z);
-    Vector3D vSize(size->x, size->y, size->z);
-    Color color((int)(colorVec->x), (int)(colorVec->y), (int)(colorVec->z), (int)(alpha));
-
-    // Create transform matrix from rotation and origin
-    matrix3x4_t transform;
-    AngleMatrix(qAngles, vOrigin, transform);
-
-    // Calculate mins/maxs from size (centered around origin)
-    Vector3D mins = -vSize * 0.5f;
-    Vector3D maxs = vSize * 0.5f;
-
-    // Create the permanent box
-    g_pDebugOverlay->AddTransformedBoxOverlay(transform, mins, maxs, 
-                                            color.r(), color.g(), color.b(), color.a(), 
-                                            true, 999999999.0f);
-
-    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    return SharedScript_CreateBox(v);
 }
-
-//-----------------------------------------------------------------------------
-// Purpose: clear all debug overlays and boxes
-//-----------------------------------------------------------------------------
 static SQRESULT ClientScript_ClearBoxes(HSQUIRRELVM v)
 {
-    g_pDebugOverlay->ClearAllOverlays();
-    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    return SharedScript_ClearBoxes(v);
 }
 
 //-----------------------------------------------------------------------------
@@ -726,7 +686,7 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, DebugDrawSolidSphere, "Draw a debug overlay solid sphere", "void", "vector origin, float radius, int theta, int phi, vector color, float alpha, bool drawThroughWorld, float duration", false);
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, DebugDrawCapsule, "Draw a debug overlay capsule", "void", "vector start, vector end, float radius, vector color, float alpha, bool drawThroughWorld, float duration", false);
 
-    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, CreateBox, "Create a permanent box for map making", "void", "vector origin, vector angles, vector size, vector color, float alpha", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, CreateBox, "Create a permanent box for map making", "void", "vector origin, vector angles, vector mins, vector maxs, vector color, float alpha", false);
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, ClearBoxes, "Clear all debug overlays and boxes", "void", "", false);
 
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetServerID, "Gets the ID of the most recent server", "string", "", false);

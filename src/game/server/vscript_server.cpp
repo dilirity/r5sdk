@@ -72,6 +72,14 @@ static SQRESULT ServerScript_DebugDrawCapsule(HSQUIRRELVM v)
 {
     return SharedScript_DebugDrawCapsule(v);
 }
+static SQRESULT ServerScript_CreateBox(HSQUIRRELVM v)
+{
+    return SharedScript_CreateBox(v);
+}
+static SQRESULT ServerScript_ClearBoxes(HSQUIRRELVM v)
+{
+    return SharedScript_ClearBoxes(v);
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: calculates the duration for the debug text overlay
@@ -742,6 +750,9 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, DebugDrawTriangle, "Draw a debug overlay triangle", "void", "vector p1, vector p2, vector p3, vector color, float alpha, bool drawThroughWorld, float duration", false);
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, DebugDrawSolidSphere, "Draw a debug overlay solid sphere", "void", "vector origin, float radius, int theta, int phi, vector color, float alpha, bool drawThroughWorld, float duration", false);
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, DebugDrawCapsule, "Draw a debug overlay capsule", "void", "vector start, vector end, float radius, vector color, float alpha, bool drawThroughWorld, float duration", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, CreateBox, "Create a permanent box for map making", "void", "vector origin, vector angles, vector mins, vector maxs, vector color, float alpha", false);
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, ClearBoxes, "Clear all debug overlays and boxes", "void", "", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SetAutoReloadState, "Set whether we can auto-reload the server", "void", "bool canAutoReload", false);
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, GetSessionID, "Gets our current session ID", "string", "", false);

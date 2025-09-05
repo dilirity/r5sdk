@@ -140,3 +140,49 @@ SQRESULT SharedScript_DebugDrawCapsule(HSQUIRRELVM v)
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
+
+//-----------------------------------------------------------------------------
+// Purpose: create a permanent box for map making
+//-----------------------------------------------------------------------------
+
+SQRESULT SharedScript_CreateBox(HSQUIRRELVM v)
+{
+    const SQVector3D* origin;
+    const SQVector3D* angles;
+    const SQVector3D* mins;
+    const SQVector3D* maxs;
+    const SQVector3D* colorVec;
+    SQFloat alpha;
+
+    sq_getvector(v, 2, &origin);
+    sq_getvector(v, 3, &angles);
+    sq_getvector(v, 4, &mins);      
+    sq_getvector(v, 5, &maxs);      
+    sq_getvector(v, 6, &colorVec);
+    sq_getfloat(v, 7, &alpha);
+
+    Vector3D vOrigin(origin->x, origin->y, origin->z);
+    QAngle qAngles(angles->x, angles->y, angles->z);
+    Vector3D vMins(mins->x, mins->y, mins->z);
+    Vector3D vMaxs(maxs->x, maxs->y, maxs->z);
+    Color color((int)(colorVec->x), (int)(colorVec->y), (int)(colorVec->z), (int)(alpha));
+
+    matrix3x4_t transform;
+    AngleMatrix(qAngles, vOrigin, transform);
+
+    g_pDebugOverlay->AddTransformedBoxOverlay(transform, vMins, vMaxs,
+        color.r(), color.g(), color.b(), color.a(),
+        false, 999999999.0f);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: clear all debug overlays and boxes
+//-----------------------------------------------------------------------------
+
+SQRESULT SharedScript_ClearBoxes(HSQUIRRELVM v)
+{
+    g_pDebugOverlay->ClearAllOverlays();
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
