@@ -509,12 +509,22 @@ bool CPylon::GetEULA(MSEulaData_t& outData, string& outMessage) const
     const rapidjson::Value& data = serversIt->value;
 
     // check if the EULA response fields are valid.
-    if (!JSON_GetValue(data, "version", outData.version) ||
-        !JSON_GetValue(data, "language", outData.language) ||
-        !JSON_GetValue(data, "contents", outData.contents))
+    if (!JSON_GetValue(data, "contents", outData.contents))
     {
         outMessage = "schema is invalid";
         return false;
+    }
+
+    // Version can be null in new schema, so make it optional
+    if (!JSON_GetValue(data, "version", outData.version))
+    {
+        outData.version = 0; // Default version if not provided
+    }
+
+    // Language field changed from "language" to "lang" in new schema
+    if (!JSON_GetValue(data, "lang", outData.language))
+    {
+        outData.language = "english"; // Default language if not provided
     }
 
     return true;

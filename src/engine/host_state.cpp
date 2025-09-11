@@ -397,6 +397,7 @@ void CHostState::Setup(void)
 {
 	g_pHostState->LoadConfig();
 	LoadModConfigs();
+	MergeModPlaylistsIntoFile(); // Merge mod playlists into base file
 #ifndef CLIENT_DLL
 	g_BanSystem.LoadList();
 #endif // !CLIENT_DLL
