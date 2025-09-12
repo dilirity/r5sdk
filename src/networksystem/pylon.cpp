@@ -435,8 +435,8 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
 //          &outMessage - 
 // Output : true on success, false on failure.
 //-----------------------------------------------------------------------------
-bool CPylon::AuthForConnection(const uint64_t nucleusId, const char* ipAddress,
-    const char* authCode, string& outToken, string& outMessage) const
+bool CPylon::AuthForConnection(const uint64_t steamUserId, const char* ipAddress,
+    const char* authCode, string& outToken, string& outMessage, const char* steamTicket, const char* steamUsername) const
 {
     if (!IsEnabled())
     {
@@ -449,9 +449,26 @@ bool CPylon::AuthForConnection(const uint64_t nucleusId, const char* ipAddress,
 
     rapidjson::Document::AllocatorType& allocator = requestJson.GetAllocator();
 
-    requestJson.AddMember("id", nucleusId, allocator);
+    // Use Steam User ID instead of Nucleus ID - send as string to avoid precision loss
+    char steamIdStr[32];
+    V_snprintf(steamIdStr, sizeof(steamIdStr), "%llu", steamUserId);
+    requestJson.AddMember("id", rapidjson::Value(steamIdStr, allocator), allocator);
+    
+    // Debug logging
+    Msg(eDLL_T::ENGINE, "[PYLON] DEBUG: Adding Steam User ID to request: %llu (as string: %s)\n", steamUserId, steamIdStr);
     requestJson.AddMember("ip", rapidjson::Value(ipAddress, allocator), allocator);
-    requestJson.AddMember("code", rapidjson::Value(authCode, allocator), allocator);
+    // Steam authentication - authCode is no longer used
+    requestJson.AddMember("code", rapidjson::Value("", allocator), allocator);
+    
+    // Always include Steam data
+    if (steamTicket && *steamTicket)
+    {
+        requestJson.AddMember("steamTicket", rapidjson::Value(steamTicket, allocator), allocator);
+    }
+    if (steamUsername && *steamUsername)
+    {
+        requestJson.AddMember("steamUsername", rapidjson::Value(steamUsername, allocator), allocator);
+    }
 
     rapidjson::Document responseJson;
 
@@ -547,6 +564,12 @@ bool CPylon::SendRequest(const char* endpoint, const rapidjson::Document& reques
 
     rapidjson::StringBuffer stringBuffer;
     JSON_DocumentToBufferDeserialize(requestJson, stringBuffer);
+    
+    // Debug: Log the actual JSON being sent for auth requests
+    if (strcmp(endpoint, "/api/client/auth") == 0)
+    {
+        Msg(eDLL_T::ENGINE, "[PYLON] DEBUG: Sending JSON payload: %s\n", stringBuffer.GetString());
+    }
 
     string responseBody;
     if (!QueryServer(endpoint, stringBuffer.GetString(), responseBody, outMessage, status))

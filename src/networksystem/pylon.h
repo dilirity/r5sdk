@@ -28,7 +28,7 @@ public:
 	bool GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSystem::BannedList_t** outBannedVec) const;
 	bool CheckForBan(const string& ipAddress, const uint64_t nucleusId, const string& personaName, string& outReason, CBanSystem::Banned_t::BanType_e& outBanType, string& outExpiryTimestamp) const;
 
-	bool AuthForConnection(const uint64_t nucleusId, const char* ipAddress, const char* authCode, string& outToken, string& outMessage) const;
+	bool AuthForConnection(const uint64_t steamUserId, const char* ipAddress, const char* authCode, string& outToken, string& outMessage, const char* steamTicket = nullptr, const char* steamUsername = nullptr) const;
 
 	bool GetEULA(MSEulaData_t& outData, string& outMessage) const;
 	bool IsEnabled() const;

@@ -9,6 +9,12 @@
 #include "tier0/commandline.h"
 #include "tier2/crashreporter.h"
 #include "rtech/pak/pakstate.h"
+#ifndef DEDICATED
+#include "engine/client/steam_integration.h"
+#include "engine/client/clientstate.h"
+#include "ebisusdk/EbisuSDK.h"
+#include "common/global.h"
+#endif
 /*****************************************************************************/
 #ifndef DEDICATED
 #include "windows/id3dx.h"
@@ -156,6 +162,120 @@ void SDK_Init()
     Pak_SetWritePath("paks\\Win64_server_temp\\");
 #endif
 
+#ifndef DEDICATED
+    // Force enable noorigin mode for Steam-only authentication (if enabled)
+    if (ShouldForceSteamOnly() && !CommandLine()->CheckParm("-noorigin"))
+    {
+        CommandLine()->AppendParm("-noorigin", "");
+        Msg(eDLL_T::ENGINE, "[STEAM_INIT] Forced -noorigin mode for Steam-only authentication\n");
+    }
+    
+    // Check if we're in offline mode first
+    if (Steam_IsOfflineMode())
+    {
+#ifndef USE_STEAMWORKS
+        Msg(eDLL_T::ENGINE, "[STEAM_INIT] Steam offline mode FORCED - compiled without Steamworks support\n");
+#else
+        Msg(eDLL_T::ENGINE, "[STEAM_INIT] Steam offline mode detected\n");
+#endif
+        
+        // Get offline Steam data (Steam functions handle offline mode internally)
+        uint64_t steamUserID = Steam_GetUserID(); // Returns offline ID in offline mode
+        std::string steamUsername;
+        Steam_GetUsername(steamUsername); // Returns offline username in offline mode
+        
+        Msg(eDLL_T::ENGINE, "[STEAM_INIT] Using offline Steam data: %s (ID: %llu)\n", steamUsername.c_str(), steamUserID);
+        
+        // Set platform_user_id and g_NucleusID to offline Steam ID
+        if (steamUserID != 0)
+        {
+            if (platform_user_id)
+            {
+                platform_user_id->SetValue(Format("%llu", steamUserID).c_str());
+                Msg(eDLL_T::ENGINE, "[STEAM_INIT] Set platform_user_id to offline Steam ID: %llu\n", steamUserID);
+            }
+            
+            if (g_SteamUserID)
+            {
+                *g_SteamUserID = steamUserID;
+                Msg(eDLL_T::ENGINE, "[STEAM_INIT] Set g_SteamUserID to offline Steam ID: %llu\n", steamUserID);
+            }
+        }
+        
+        // Set offline username as default persona name
+        SetSteamPersonaName();
+    }
+    else
+    {
+#ifndef USE_STEAMWORKS
+        // Steamworks not available - force offline mode
+        Msg(eDLL_T::ENGINE, "[STEAM_INIT] Steamworks not compiled in - falling back to offline mode\n");
+        
+        // Use offline Steam data
+        uint64_t steamUserID = Steam_GetUserID(); // Returns offline ID when no Steamworks
+        std::string steamUsername;
+        Steam_GetUsername(steamUsername); // Returns offline username when no Steamworks
+        
+        Msg(eDLL_T::ENGINE, "[STEAM_INIT] Using offline Steam data: %s (ID: %llu)\n", steamUsername.c_str(), steamUserID);
+        
+        // Set platform_user_id and g_SteamUserID to offline Steam ID
+        if (platform_user_id && steamUserID != 0)
+        {
+            platform_user_id->SetValue(Format("%llu", steamUserID).c_str());
+            Msg(eDLL_T::ENGINE, "[STEAM_INIT] Set platform_user_id to offline Steam ID: %llu\n", steamUserID);
+        }
+        
+        if (g_SteamUserID && steamUserID != 0)
+        {
+            *g_SteamUserID = steamUserID;
+            Msg(eDLL_T::ENGINE, "[STEAM_INIT] Set g_SteamUserID to offline Steam ID: %llu\n", steamUserID);
+        }
+        
+        // Set offline username as default persona name
+        SetSteamPersonaName();
+#else
+        // Initialize Steam for online authentication
+        Msg(eDLL_T::ENGINE, "[STEAM_INIT] Attempting to initialize Steam API during SDK startup...\n");
+        if (Steam_EnsureInitialized())
+        {
+            Msg(eDLL_T::ENGINE, "[STEAM_INIT] Steam API is available and ready for authentication\n");
+            
+            // Log Steam user information for debugging first
+            uint64_t steamUserID = Steam_GetUserID();
+            std::string steamUsername;
+            if (Steam_GetUsername(steamUsername) && !steamUsername.empty())
+            {
+                Msg(eDLL_T::ENGINE, "[STEAM_INIT] Steam User: %s (ID: %llu)\n", steamUsername.c_str(), steamUserID);
+            }
+            
+            // Set platform_user_id and g_NucleusID to Steam user ID for consistency
+            if (steamUserID != 0)
+            {
+                if (platform_user_id)
+                {
+                    platform_user_id->SetValue(Format("%llu", steamUserID).c_str());
+                    Msg(eDLL_T::ENGINE, "[STEAM_INIT] Set platform_user_id to Steam ID: %llu\n", steamUserID);
+                }
+                
+                if (g_SteamUserID)
+                {
+                    *g_SteamUserID = steamUserID;
+                    Msg(eDLL_T::ENGINE, "[STEAM_INIT] Set g_SteamUserID to Steam ID: %llu\n", steamUserID);
+                }
+            }
+            
+            // Set Steam username as default persona name (may need retry later)
+            SetSteamPersonaName();
+        }
+        else
+        {
+            Msg(eDLL_T::ENGINE, "[STEAM_INIT] Steam API initialization failed - Steam auth will not be available\n");
+            Msg(eDLL_T::ENGINE, "[STEAM_INIT] Make sure Steam is running\n");
+        }
+#endif
+    }
+#endif
+
     g_bSdkInitialized = true;
 }
 
@@ -189,6 +309,10 @@ void SDK_Shutdown()
     Msg(eDLL_T::NONE, "GameSDK shutdown initiated\n");
 
 #ifndef DEDICATED
+    // Shutdown Steam FIRST to avoid conflicts with other systems
+    Msg(eDLL_T::ENGINE, "[STEAM_SHUTDOWN] Shutting down Steam API...\n");
+    Steam_Shutdown();
+    
     Input_Shutdown();
 #endif // !DEDICATED
 

@@ -24,6 +24,7 @@
 #include "rtech/playlists/playlists.h"
 #include <ebisusdk/EbisuSDK.h>
 #include <engine/cmd.h>
+#include "steam_integration.h"
 
 //------------------------------------------------------------------------------
 // Purpose: console command callbacks
@@ -392,6 +393,232 @@ static ConVar cl_onlineAuthToken("cl_onlineAuthToken", "", FCVAR_HIDDEN | FCVAR_
 static ConVar cl_onlineAuthTokenSignature1("cl_onlineAuthTokenSignature1", "", FCVAR_HIDDEN | FCVAR_USERINFO | FCVAR_DONTRECORD | FCVAR_SERVER_CANNOT_QUERY | FCVAR_PLATFORM_SYSTEM, "The client's online authentication token signature", false, 0.f, false, 0.f, "Primary");
 static ConVar cl_onlineAuthTokenSignature2("cl_onlineAuthTokenSignature2", "", FCVAR_HIDDEN | FCVAR_USERINFO | FCVAR_DONTRECORD | FCVAR_SERVER_CANNOT_QUERY | FCVAR_PLATFORM_SYSTEM, "The client's online authentication token signature", false, 0.f, false, 0.f, "Secondary");
 
+// Steam authentication - the client uses Steam session tickets for authentication.
+// The Steam ticket can be provided via the 'cl_steamTicket' convar or generated automatically.
+static ConVar cl_steamTicket("cl_steamTicket", "", FCVAR_HIDDEN | FCVAR_USERINFO | FCVAR_DONTRECORD | FCVAR_SERVER_CANNOT_QUERY | FCVAR_PLATFORM_SYSTEM, "Steam session ticket for master server authentication");
+static ConVar cl_useSteamName("cl_useSteamName", "1", FCVAR_RELEASE, "Automatically use Steam username as in-game name");
+static ConVar cl_forceSteamOnly("cl_forceSteamOnly", "1", FCVAR_RELEASE, "Force Steam-only mode (disables EA/Origin)");
+static ConVar cl_sanitizeSteamName("cl_sanitizeSteamName", "1", FCVAR_RELEASE, "Sanitize Steam username to be compatible with server validation");
+
+// Steam debug ConVar is declared in steam_integration.h
+
+//------------------------------------------------------------------------------
+// Purpose: Sanitize Steam username to be compatible with EA persona name rules
+// Input  : steamUsername - original Steam username
+// Output : sanitized username that only contains allowed characters
+//------------------------------------------------------------------------------
+std::string SanitizeSteamUsername(const std::string& steamUsername)
+{
+    std::string sanitized;
+    sanitized.reserve(steamUsername.length());
+    
+    for (char c : steamUsername)
+    {
+        // Only allow letters, numbers, hyphens, and underscores (EA criteria)
+        if ((c >= 'A' && c <= 'Z') || 
+            (c >= 'a' && c <= 'z') || 
+            (c >= '0' && c <= '9') || 
+            c == '-' || c == '_')
+        {
+            sanitized += c;
+        }
+        else if (c == ' ')
+        {
+            // Replace spaces with underscores
+            sanitized += '_';
+        }
+        // Skip all other special characters
+    }
+    
+    // Ensure minimum length (pad with underscores if needed)
+    while (sanitized.length() < 4)
+    {
+        sanitized += '_';
+    }
+    
+    // Ensure maximum length
+    if (sanitized.length() > 16)
+    {
+        sanitized = sanitized.substr(0, 16);
+    }
+    
+    return sanitized;
+}
+
+//------------------------------------------------------------------------------
+// Purpose: Set Steam username as persona name if enabled
+//------------------------------------------------------------------------------
+void SetSteamPersonaName()
+{
+    if (!cl_useSteamName.GetBool() || !g_PersonaName)
+        return;
+        
+    std::string steamUsername;
+    if (Steam_GetUsername(steamUsername) && !steamUsername.empty())
+    {
+        std::string finalName = steamUsername;
+        
+        if (cl_sanitizeSteamName.GetBool())
+        {
+            finalName = SanitizeSteamUsername(steamUsername);
+            if (finalName != steamUsername)
+            {
+                Msg(eDLL_T::ENGINE, "[STEAM] Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
+            }
+        }
+        
+        strncpy(g_PersonaName, finalName.c_str(), MAX_PERSONA_NAME_LEN - 1);
+        g_PersonaName[MAX_PERSONA_NAME_LEN - 1] = '\0';
+        
+        if (finalName == steamUsername)
+        {
+            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Set persona name to Steam username: %s\n", g_PersonaName);
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+// Purpose: Check if Steam-only mode should be forced
+//------------------------------------------------------------------------------
+bool ShouldForceSteamOnly()
+{
+    return cl_forceSteamOnly.GetBool();
+}
+
+//------------------------------------------------------------------------------
+// Purpose: Steam info console command
+//------------------------------------------------------------------------------
+static void SteamInfo_f(const CCommand& args)
+{
+    if (!Steam_EnsureInitialized())
+    {
+        Msg(eDLL_T::ENGINE, "Steam is not initialized\n");
+        return;
+    }
+    
+    uint64_t steamUserID = Steam_GetUserID();
+    std::string steamUsername;
+    
+    if (Steam_GetUsername(steamUsername) && !steamUsername.empty())
+    {
+        Msg(eDLL_T::ENGINE, "=== Steam Information ===\n");
+        Msg(eDLL_T::ENGINE, "Steam Username: %s\n", steamUsername.c_str());
+        Msg(eDLL_T::ENGINE, "Steam User ID: %llu\n", steamUserID);
+        Msg(eDLL_T::ENGINE, "Steam ID (hex): 0x%llX\n", steamUserID);
+        
+        if (g_PersonaName && strlen(g_PersonaName) > 0)
+        {
+            Msg(eDLL_T::ENGINE, "Current in-game name: %s\n", g_PersonaName);
+        }
+        
+        Msg(eDLL_T::ENGINE, "Steam name auto-set: %s\n", cl_useSteamName.GetBool() ? "enabled" : "disabled");
+        Msg(eDLL_T::ENGINE, "Steam name sanitization: %s\n", cl_sanitizeSteamName.GetBool() ? "enabled" : "disabled");
+        
+        // Show platform user ID and nucleus ID for debugging
+        if (platform_user_id)
+        {
+            Msg(eDLL_T::ENGINE, "platform_user_id: %llu\n", (uint64_t)platform_user_id->GetInt());
+        }
+        else
+        {
+            Msg(eDLL_T::ENGINE, "platform_user_id: null\n");
+        }
+        
+        if (g_SteamUserID)
+        {
+            Msg(eDLL_T::ENGINE, "g_SteamUserID: %llu\n", *g_SteamUserID);
+        }
+        else
+        {
+            Msg(eDLL_T::ENGINE, "g_SteamUserID: null\n");
+        }
+        
+        // Show current Steam ticket status
+        const char* currentTicket = cl_steamTicket.GetString();
+        if (currentTicket && *currentTicket)
+        {
+            Msg(eDLL_T::ENGINE, "Steam ticket: Present (length: %zu)\n", strlen(currentTicket));
+            Msg(eDLL_T::ENGINE, "Ticket preview: %.64s...\n", currentTicket);
+        }
+        else
+        {
+            Msg(eDLL_T::ENGINE, "Steam ticket: Not set\n");
+        }
+        
+        // Test generating a fresh ticket if requested
+        if (args.ArgC() > 1 && V_strcmp(args.Arg(1), "test") == 0)
+        {
+            Msg(eDLL_T::ENGINE, "=== Testing Fresh Ticket Generation ===\n");
+            std::string testTicket;
+            if (Steam_GetAuthSessionTicketBase64(testTicket) && !testTicket.empty())
+            {
+                Msg(eDLL_T::ENGINE, "Fresh ticket generated successfully (length: %zu)\n", testTicket.length());
+                Msg(eDLL_T::ENGINE, "Fresh ticket preview: %.64s...\n", testTicket.c_str());
+            }
+            else
+            {
+                Msg(eDLL_T::ENGINE, "Failed to generate fresh ticket\n");
+            }
+        }
+    }
+    else
+    {
+        Msg(eDLL_T::ENGINE, "Failed to get Steam username\n");
+    }
+}
+
+//------------------------------------------------------------------------------
+// Purpose: Refresh Steam user data (for console command)
+//------------------------------------------------------------------------------
+static void RefreshSteamData_f(const CCommand& args)
+{
+    if (!Steam_EnsureInitialized())
+    {
+        Msg(eDLL_T::ENGINE, "Steam is not initialized\n");
+        return;
+    }
+    
+    Msg(eDLL_T::ENGINE, "Refreshing Steam user data...\n");
+    
+    // Force re-set Steam persona name even if it's already set
+    std::string steamUsername;
+    if (Steam_GetUsername(steamUsername) && !steamUsername.empty() && g_PersonaName)
+    {
+        std::string finalName = steamUsername;
+        
+        if (cl_sanitizeSteamName.GetBool())
+        {
+            finalName = SanitizeSteamUsername(steamUsername);
+            if (finalName != steamUsername)
+            {
+                Msg(eDLL_T::ENGINE, "[STEAM] Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
+            }
+        }
+        
+        strncpy(g_PersonaName, finalName.c_str(), MAX_PERSONA_NAME_LEN - 1);
+        g_PersonaName[MAX_PERSONA_NAME_LEN - 1] = '\0';
+        
+        Msg(eDLL_T::ENGINE, "[STEAM] Force updated persona name to: %s\n", g_PersonaName);
+    }
+    
+    // Show updated info
+    SteamInfo_f(args);
+}
+
+//------------------------------------------------------------------------------
+// Purpose: Steam console commands
+//------------------------------------------------------------------------------
+// Clear Steam ticket cache (useful for debugging authentication issues)
+static void ClearSteamTicket_f(const CCommand& args)
+{
+    cl_steamTicket.SetValue("");
+    Msg(eDLL_T::ENGINE, "Steam ticket cache cleared. Next connection will generate a fresh ticket.\n");
+}
+
+static ConCommand steam_info("steam_info", SteamInfo_f, "Shows Steam user information (use 'steam_info test' to test fresh ticket generation)", FCVAR_RELEASE);
+static ConCommand steam_refresh("steam_refresh", RefreshSteamData_f, "Refreshes Steam user data and persona name", FCVAR_RELEASE);
+static ConCommand steam_clear_ticket("steam_clear_ticket", ClearSteamTicket_f, "Clears cached Steam ticket to force fresh generation", FCVAR_RELEASE);
+
 //------------------------------------------------------------------------------
 // Purpose: get authentication token for current connection context
 // Input  : *connectParams - 
@@ -409,11 +636,124 @@ bool CClientState::Authenticate(connectparams_t* connectParams, char* const reas
     // verify that the client is not lying about their account identity
     // code is immediately discarded upon verification
 
-    const bool ret = g_MasterServer.AuthForConnection(*g_NucleusID, connectParams->netAdr, g_OriginAuthCode, msToken, message);
+    // Get Steam user data - with extensive debugging
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: About to call Steam_GetUserID()...\n");
+    uint64_t steamUserID = Steam_GetUserID();
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: Steam_GetUserID() returned: %llu\n", steamUserID);
+    
+    std::string steamUsername;
+    Steam_GetUsername(steamUsername);
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: Steam_GetUsername() returned: '%s'\n", steamUsername.c_str());
+    
+    // Double-check by calling Steam_GetUserID again
+    uint64_t directUserID = Steam_GetUserID();
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: Second Steam_GetUserID() call returned: %llu\n", directUserID);
+    
+    if (steamUserID != directUserID)
+    {
+        Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] ERROR: Steam ID mismatch between multiple calls!\n");
+    }
+    
+    // Check if g_SteamUserID is somehow being used
+    if (g_SteamUserID && *g_SteamUserID != 0)
+    {
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: g_SteamUserID is set to: %llu\n", *g_SteamUserID);
+    }
+    else
+    {
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: g_SteamUserID is null or 0\n");
+    }
+    
+    // Set platform_user_id to the Steam user ID to ensure consistency
+    if (platform_user_id && steamUserID != 0)
+    {
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: Current platform_user_id value: %llu\n", (uint64_t)platform_user_id->GetInt());
+        platform_user_id->SetValue(Format("%llu", steamUserID).c_str());
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: Set platform_user_id to Steam ID: %llu\n", steamUserID);
+    }
+    else if (platform_user_id)
+    {
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: platform_user_id exists but Steam ID is 0, not updating\n");
+    }
+    else
+    {
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: platform_user_id ConVar is null\n");
+    }
+    
+    // Also update g_SteamUserID to match Steam ID for consistency
+    if (g_SteamUserID && steamUserID != 0)
+    {
+        *g_SteamUserID = steamUserID;
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] DEBUG: Updated g_SteamUserID to Steam ID: %llu\n", steamUserID);
+    }
+    
+    // Set Steam username as the in-game persona name (if enabled)
+    SetSteamPersonaName();
+    
+    const char* steamTicket = nullptr;
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Using Steam authentication\n");
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam Username: %s\n", steamUsername.c_str());
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam User ID: %llu\n", steamUserID);
+    
+    // Additional Steam validation checks
+    if (steamUserID == 0)
+    {
+        Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] ERROR: Steam User ID is 0, this indicates Steam is not properly initialized or user is not logged in\n");
+        FORMAT_ERROR_REASON("Steam authentication failed: Invalid Steam user ID");
+        return false;
+    }
+    
+    // Log the Steam ID in different formats for debugging
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam ID verification - Raw: %llu, Hex: 0x%llX\n", steamUserID, steamUserID);
+    
+    const char* const existing = cl_steamTicket.GetString();
+    if (!(existing && *existing))
+    {
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] No existing Steam ticket, generating new one...\n");
+        std::string newTicket;
+        if (Steam_GetAuthSessionTicketBase64(newTicket) && !newTicket.empty())
+        {
+            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Generated Steam ticket, setting cl_steamTicket\n");
+            cl_steamTicket.SetValue(newTicket.c_str());
+            steamTicket = cl_steamTicket.GetString();
+            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam ticket set, length: %zu\n", newTicket.length());
+        }
+        else
+        {
+            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Failed to generate Steam ticket\n");
+            return false; // Can't proceed without Steam ticket
+        }
+    }
+    else
+    {
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Using existing Steam ticket from cl_steamTicket\n");
+        steamTicket = existing;
+    }
+
+    Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Calling master server AuthForConnection...\n");
+    Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam User ID: %llu, ServerIP: %s\n", steamUserID, connectParams->netAdr);
+    Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Has Steam ticket: %s\n", steamTicket ? "yes" : "no");
+    if (steamTicket)
+    {
+        Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam ticket length: %zu\n", strlen(steamTicket));
+        Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam ticket preview: %.64s...\n", steamTicket);
+    }
+    
+    Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] About to send to master server: UserID=%llu, Username='%s'\n", steamUserID, steamUsername.c_str());
+    
+    // Use Steam User ID instead of NucleusID, and pass Steam username
+    const bool ret = g_MasterServer.AuthForConnection(steamUserID, connectParams->netAdr, "", msToken, message, steamTicket, steamUsername.c_str());
+    
+    Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Master server returned: %s\n", ret ? "success" : "failure");
     if (!ret)
     {
+        Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Error message: %s\n", message.c_str());
         FORMAT_ERROR_REASON("%s", message.c_str());
         return false;
+    }
+    else
+    {
+        Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Received token from master server\n");
     }
 
     // get full token
@@ -461,7 +801,17 @@ bool IsLocalHost(connectparams_t* connectParams)
 
 void CClientState::VConnect(CClientState* thisptr, connectparams_t* connectParams)
 {
-    if (cl_onlineAuthEnable.GetBool() && !IsLocalHost(connectParams))
+    // Check if we should authenticate (online mode and not localhost)
+    bool shouldAuthenticate = cl_onlineAuthEnable.GetBool() && !IsLocalHost(connectParams);
+    
+    // Also check for Steam offline mode
+    if (shouldAuthenticate && Steam_IsOfflineMode())
+    {
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam offline mode detected, skipping online authentication\n");
+        shouldAuthenticate = false;
+    }
+    
+    if (shouldAuthenticate)
     {
         char authFailReason[512];
 
@@ -469,6 +819,28 @@ void CClientState::VConnect(CClientState* thisptr, connectparams_t* connectParam
         {
             COM_ExplainDisconnection(true, "Failed to authenticate for online play: %s", authFailReason);
             return;
+        }
+    }
+    else if (Steam_IsOfflineMode())
+    {
+        // In Steam offline mode, still set up user data locally
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Setting up offline Steam user data\n");
+        
+        // Set Steam persona name for offline mode
+        SetSteamPersonaName();
+        
+        // Set platform_user_id and g_SteamUserID to offline Steam ID
+        uint64_t offlineUserID = Steam_GetUserID(); // This will return offline ID in offline mode
+        if (platform_user_id && offlineUserID != 0)
+        {
+            platform_user_id->SetValue(Format("%llu", offlineUserID).c_str());
+            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Set offline platform_user_id: %llu\n", offlineUserID);
+        }
+        
+        if (g_SteamUserID && offlineUserID != 0)
+        {
+            *g_SteamUserID = offlineUserID;
+            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Set offline g_SteamUserID: %llu\n", offlineUserID);
         }
     }
 

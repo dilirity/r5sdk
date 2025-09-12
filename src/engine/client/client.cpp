@@ -22,6 +22,18 @@
 #include "game/server/util_server.h"
 #include "tier1/fmtstr.h"
 #endif
+#ifndef CLIENT_DLL
+// Steam integration is only available in client builds, not dedicated server
+#ifdef USE_STEAMWORKS
+#include "steam_integration.h"
+#define STEAM_DEBUG_ENABLED() (steam_debug_auth.GetBool())
+#else
+#define STEAM_DEBUG_ENABLED() (false) // No Steam debug in dedicated server
+#endif
+#else
+#include "steam_integration.h"
+#define STEAM_DEBUG_ENABLED() (steam_debug_auth.GetBool())
+#endif
 #include "game/server/gameinterface.h"
 
 // Absolute max string cmd length, any character past this will be NULLED.
@@ -184,24 +196,43 @@ bool CClient::Authenticate(const char* const playerName, char* const reasonBuf, 
 		if (!strcmp(claim.key, "sessionId"))
 		{
 			const char* const sessionId = claim.value;
+			
+			// Steam debug ConVar is declared in steam_integration.h
+			
+			// DEBUG: Log what userData contains during JWT validation
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] m_DataBlock.userData contains: %llu\n", (NucleusID_t)this->m_DataBlock.userData);
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] playerName: %s\n", playerName);
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] serverIP: %s\n", g_ServerHostManager.GetHostIP().c_str());
 
 			char newId[256];
 			const int idLen = snprintf(newId, sizeof(newId), "%llu-%s-%s",
 				(NucleusID_t)this->m_DataBlock.userData,
 				playerName,
 				g_ServerHostManager.GetHostIP().c_str());
+				
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] Game server session string: %s\n", newId);
 
 			if (idLen < 0)
 				ERROR_AND_RETURN("Session ID stitching failed");
 
 			uint8_t sessionHash[32]; // hash decoded from JWT token
 			V_hextobinary(sessionId, claim.value_length, sessionHash, sizeof(sessionHash));
+			
+			// DEBUG: Log JWT session hash
+			char jwtHashHex[65];
+			V_binarytohex(sessionHash, sizeof(sessionHash), jwtHashHex, sizeof(jwtHashHex));
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] JWT session hash: %s\n", jwtHashHex);
 
 			uint8_t oobHash[32]; // hash of data collected from out of band packet
 			const int shRet = mbedtls_sha256((const uint8_t*)newId, idLen, oobHash, NULL);
 
 			if (shRet != NULL)
 				ERROR_AND_RETURN("Session ID hashing failed");
+				
+			// DEBUG: Log computed session hash
+			char computedHashHex[65];
+			V_binarytohex(oobHash, sizeof(oobHash), computedHashHex, sizeof(computedHashHex));
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] Computed session hash: %s\n", computedHashHex);
 
 			if (memcmp(oobHash, sessionHash, sizeof(sessionHash)) != 0)
 				ERROR_AND_RETURN("Token is not authorized for the connecting client");

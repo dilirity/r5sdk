@@ -13,6 +13,13 @@ add_sources( SOURCE_GROUP "Resource"
     "${ENGINE_SOURCE_DIR}/resource/r5dev.rc"
     "${PNG_SOURCES}"
 )
+
+# Add Steam integration for non-dedicated builds
+add_sources( SOURCE_GROUP "Steam"
+    "${ENGINE_SOURCE_DIR}/engine/client/steam_integration.cpp"
+    "${ENGINE_SOURCE_DIR}/engine/client/steam_integration.h"
+    "${ENGINE_SOURCE_DIR}/engine/client/steam_api_wrapper.cpp"
+)
 endif()
 
 add_sources( SOURCE_GROUP "Core"
@@ -218,6 +225,44 @@ endif()
 set_target_properties( ${PROJECT_NAME} PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "$(ProjectDir)../../../${BUILD_OUTPUT_DIR}/"
 )
+
+# Optional Steamworks support (define USE_STEAMWORKS and set STEAM_SDK_DIR)
+if( DEFINED ENV{STEAM_SDK_DIR} )
+    set(STEAM_SDK_DIR $ENV{STEAM_SDK_DIR})
+endif()
+
+if( NOT STEAM_SDK_DIR AND EXISTS "${THIRDPARTY_SOURCE_DIR}/steamworks/sdk" )
+    set(STEAM_SDK_DIR "${THIRDPARTY_SOURCE_DIR}/steamworks/sdk")
+endif()
+
+if( USE_STEAMWORKS AND STEAM_SDK_DIR )
+    message(STATUS "Building with Steamworks from: ${STEAM_SDK_DIR}")
+    if( NOT ${PROJECT_NAME} STREQUAL "dedicated" )
+        # Add Steam includes and definitions only to the wrapper file
+        set_source_files_properties(
+            "${ENGINE_SOURCE_DIR}/engine/client/steam_api_wrapper.cpp"
+            PROPERTIES
+            COMPILE_DEFINITIONS "USE_STEAMWORKS"
+            INCLUDE_DIRECTORIES "${STEAM_SDK_DIR}/public;${STEAM_SDK_DIR}/public/steam"
+        )
+        if( WIN32 )
+            if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
+                set(_STEAM_IMP "${STEAM_SDK_DIR}/redistributable_bin/win64/steam_api64.lib")
+            else()
+                set(_STEAM_IMP "${STEAM_SDK_DIR}/redistributable_bin/steam_api.lib")
+            endif()
+            if( EXISTS "${_STEAM_IMP}" )
+                if( NOT TARGET steamworks_api )
+                    add_library(steamworks_api SHARED IMPORTED GLOBAL)
+                    set_target_properties(steamworks_api PROPERTIES IMPORTED_IMPLIB "${_STEAM_IMP}")
+                endif()
+                target_link_libraries( ${PROJECT_NAME} PRIVATE steamworks_api )
+            else()
+                message(WARNING "Steamworks library not found at: ${_STEAM_IMP}")
+            endif()
+        endif()
+    endif()
+endif()
 
 endmacro()
 

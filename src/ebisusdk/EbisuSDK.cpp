@@ -16,14 +16,17 @@ void HEbisuSDK_Init()
 	// to be set for the game to function, else stuff like the "map" command
 	// won't run as 'IsOriginInitialized()' returns false (which got inlined in
 	// every place this was called in the game's executable).
+	// Steam-only mode: bypass EA/Origin requirement and use placeholder values
+	// The g_SteamUserID will be replaced with the actual Steam ID during authentication
 	if (isDedicated || noOrigin)
 	{
 		*g_EbisuSDKInit = true;
 		*g_EbisuProfileInit = true;
-		*g_NucleusID = FAKE_BASE_NUCLEUD_ID;
+		*g_SteamUserID = FAKE_BASE_NUCLEUD_ID; // Placeholder - replaced with Steam ID later
 
-		Q_snprintf(g_OriginAuthCode, 256, "%s", "INVALID_OAUTH_CODE");
-		Q_snprintf(g_NucleusToken, 1024, "%s", "INVALID_NUCLEUS_TOKEN");
+		// EA/Origin authentication tokens are no longer needed with Steam authentication
+		// Q_snprintf(g_OriginAuthCode, 256, "%s", "INVALID_OAUTH_CODE"); // REMOVED: No longer needed with Steam auth
+		Q_snprintf(g_LegacyAuthToken, 1024, "%s", "INVALID_LEGACY_TOKEN"); // Legacy compatibility (renamed from g_NucleusToken)
 
 		if (!isDedicated)
 		{
@@ -101,16 +104,16 @@ bool IsOriginInitialized()
 	{
 		return true;
 	}
-	else if ((!(*g_OriginErrorLevel)
+	else if ((!(*g_PlatformErrorLevel)
 		&& (*g_EbisuSDKInit)
-		&& (*g_NucleusID)
+		&& (*g_SteamUserID)
 		&& (*g_EbisuProfileInit)))
-	// Note(amos): checks on these are disabled because we should be able to
-	// load into the game without an origin or nucleus token. There won't be
+	// Note(amos): checks on legacy auth tokens are disabled because we should be able to
+	// load into the game without legacy EA/Origin tokens. There won't be
 	// a token if the game is launched with -offline for example, these are
-	// only used for the platform system and online server authentication.
-	//	&& (*g_OriginAuthCode)
-	//	&& (g_NucleusToken[0])))
+	// only used for legacy platform system compatibility.
+	//	&& (*g_OriginAuthCode)     [REMOVED - no longer needed]
+	//	&& (g_LegacyAuthToken[0])  [DISABLED - legacy compatibility only]))
 	{
 		return true;
 	}
