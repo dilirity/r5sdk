@@ -76,6 +76,9 @@ extern "C" {
 #endif
     }
 
+    // Store the current auth ticket handle for invalidation
+    static HAuthTicket g_CurrentAuthTicket = k_HAuthTicketInvalid;
+    
     int Steam_GetAuthTicketHex(char* outBuffer, int bufferSize) {
 #ifdef USE_STEAMWORKS
         
@@ -87,14 +90,22 @@ extern "C" {
             return 0;
         }
         
+        // Invalidate any existing ticket first to ensure fresh ticket generation
+        if (g_CurrentAuthTicket != k_HAuthTicketInvalid) {
+            SteamUser()->CancelAuthTicket(g_CurrentAuthTicket);
+            g_CurrentAuthTicket = k_HAuthTicketInvalid;
+        }
+        
         uint8 ticketBuf[4096];
         uint32 ticketLen = 0;
         HAuthTicket h = SteamUser()->GetAuthSessionTicket(ticketBuf, (int)sizeof(ticketBuf), &ticketLen, nullptr);
         
-        
         if (h == k_HAuthTicketInvalid || ticketLen == 0) {
             return 0;
         }
+        
+        // Store the handle for later invalidation
+        g_CurrentAuthTicket = h;
         
         // Need space for hex encoding (2 chars per byte) + null terminator
         if (bufferSize < (int)(ticketLen * 2 + 1)) {
@@ -111,6 +122,15 @@ extern "C" {
         return (int)(ticketLen * 2);
 #else
         return 0;
+#endif
+    }
+    
+    void Steam_CancelAuthTicket() {
+#ifdef USE_STEAMWORKS
+        if (g_CurrentAuthTicket != k_HAuthTicketInvalid && SteamUser()) {
+            SteamUser()->CancelAuthTicket(g_CurrentAuthTicket);
+            g_CurrentAuthTicket = k_HAuthTicketInvalid;
+        }
 #endif
     }
 }
@@ -144,21 +164,3 @@ extern "C" void Steam_SetOverlayNotificationPosition(int position)
 #endif
 }
 
-extern "C" int Steam_SetRichPresenceC(const char* key, const char* value) {
-#ifdef USE_STEAMWORKS
-    if (!SteamFriends()) {
-        return 0;
-    }
-    return SteamFriends()->SetRichPresence(key, value) ? 1 : 0;
-#else
-    return 0;
-#endif
-}
-
-extern "C" void Steam_ClearRichPresenceC() {
-#ifdef USE_STEAMWORKS
-    if (SteamFriends()) {
-        SteamFriends()->ClearRichPresence();
-    }
-#endif
-}

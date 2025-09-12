@@ -180,8 +180,6 @@ bool CClientState::VConnectionStart(CClientState* pClient, CNetChan* pChan)
 //------------------------------------------------------------------------------
 void CClientState::VConnectionClosing(CClientState* thisptr, const char* szReason)
 {
-    // Clear Steam Rich Presence when disconnecting
-    Steam_ClearRichPresence();
     
     CClientState__ConnectionClosing(thisptr, szReason);
 
@@ -397,8 +395,8 @@ static ConVar cl_onlineAuthTokenSignature1("cl_onlineAuthTokenSignature1", "", F
 static ConVar cl_onlineAuthTokenSignature2("cl_onlineAuthTokenSignature2", "", FCVAR_HIDDEN | FCVAR_USERINFO | FCVAR_DONTRECORD | FCVAR_SERVER_CANNOT_QUERY | FCVAR_PLATFORM_SYSTEM, "The client's online authentication token signature", false, 0.f, false, 0.f, "Secondary");
 
 // Steam authentication - the client uses Steam session tickets for authentication.
-// The Steam ticket can be provided via the 'cl_steamTicket' convar or generated automatically.
-static ConVar cl_steamTicket("cl_steamTicket", "", FCVAR_HIDDEN | FCVAR_USERINFO | FCVAR_DONTRECORD | FCVAR_SERVER_CANNOT_QUERY | FCVAR_PLATFORM_SYSTEM, "Steam session ticket for master server authentication");
+// Fresh tickets are generated per connection for security. cl_steamTicket shows the last used ticket for debugging only.
+static ConVar cl_steamTicket("cl_steamTicket", "", FCVAR_HIDDEN | FCVAR_USERINFO | FCVAR_DONTRECORD | FCVAR_SERVER_CANNOT_QUERY | FCVAR_PLATFORM_SYSTEM, "Steam session ticket (debug display only - fresh tickets generated per connection)");
 static ConVar cl_useSteamName("cl_useSteamName", "1", FCVAR_RELEASE, "Automatically use Steam username as in-game name");
 static ConVar cl_forceSteamOnly("cl_forceSteamOnly", "1", FCVAR_RELEASE, "Force Steam-only mode (disables EA/Origin)");
 static ConVar cl_sanitizeSteamName("cl_sanitizeSteamName", "0", FCVAR_RELEASE, "Sanitize Steam username to be compatible with legacy server validation (disabled by default since validation is now lenient)");
@@ -710,28 +708,22 @@ bool CClientState::Authenticate(connectparams_t* connectParams, char* const reas
     // Log the Steam ID in different formats for debugging
     if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam ID verification - Raw: %llu, Hex: 0x%llX\n", steamUserID, steamUserID);
     
-    const char* const existing = cl_steamTicket.GetString();
-    if (!(existing && *existing))
+    // SECURITY FIX: Always generate a fresh ticket per connection to prevent ticket theft/reuse
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Generating fresh Steam ticket for this connection...\n");
+    
+    std::string newTicket;
+    if (Steam_GetAuthSessionTicketBase64(newTicket) && !newTicket.empty())
     {
-        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] No existing Steam ticket, generating new one...\n");
-        std::string newTicket;
-        if (Steam_GetAuthSessionTicketBase64(newTicket) && !newTicket.empty())
-        {
-            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Generated Steam ticket, setting cl_steamTicket\n");
-            cl_steamTicket.SetValue(newTicket.c_str());
-            steamTicket = cl_steamTicket.GetString();
-            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam ticket set, length: %zu\n", newTicket.length());
-        }
-        else
-        {
-            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Failed to generate Steam ticket\n");
-            return false; // Can't proceed without Steam ticket
-        }
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Generated fresh Steam ticket (length: %zu)\n", newTicket.length());
+        steamTicket = newTicket.c_str();
+        
+        // Store in ConVar for debugging purposes only - not used for reuse
+        cl_steamTicket.SetValue(newTicket.c_str());
     }
     else
     {
-        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Using existing Steam ticket from cl_steamTicket\n");
-        steamTicket = existing;
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Failed to generate fresh Steam ticket\n");
+        return false; // Can't proceed without Steam ticket
     }
 
     Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Calling master server AuthForConnection...\n");
@@ -747,6 +739,11 @@ bool CClientState::Authenticate(connectparams_t* connectParams, char* const reas
     
     // Use Steam User ID instead of NucleusID, and pass Steam username
     const bool ret = g_MasterServer.AuthForConnection(steamUserID, connectParams->netAdr, "", msToken, message, steamTicket, steamUsername.c_str());
+    
+    // SECURITY FIX: Invalidate the Steam ticket after authentication attempt (success or failure)
+    // This prevents ticket reuse even if network traffic is intercepted
+    Steam_CancelCurrentAuthTicket();
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Steam ticket invalidated after authentication\n");
     
     Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Master server returned: %s\n", ret ? "success" : "failure");
     if (!ret)
@@ -794,15 +791,6 @@ bool CClientState::Authenticate(connectparams_t* connectParams, char* const reas
         }
     }
 
-    // Set Steam Rich Presence now that we've successfully authenticated
-    if (connectParams && connectParams->netAdr)
-    {
-        if (steam_debug_auth.GetBool()) 
-        {
-            Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Setting Rich Presence for server: %s\n", connectParams->netAdr);
-        }
-        Steam_SetServerStatus("Server", connectParams->netAdr);
-    }
 
     return true;
 #undef REJECT_CONNECTION

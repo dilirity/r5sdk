@@ -11,10 +11,9 @@ extern "C" {
     int Steam_GetUsernameC(char* outBuffer, int bufferSize);
     unsigned long long Steam_GetUserIDC();
     int Steam_GetAuthTicketHex(char* outBuffer, int bufferSize);
+    void Steam_CancelAuthTicket();
     int Steam_IsOverlayEnabled();
     void Steam_SetOverlayNotificationPosition(int position);
-    int Steam_SetRichPresenceC(const char* key, const char* value);
-    void Steam_ClearRichPresenceC();
 }
 
 static bool g_SteamInitialized = false;
@@ -120,6 +119,26 @@ bool Steam_GetAuthSessionTicketBase64(std::string& outTicket)
     
     Msg(eDLL_T::ENGINE, "[STEAM] Failed to get auth ticket\n");
     return false;
+}
+
+void Steam_CancelCurrentAuthTicket()
+{
+    if (g_SteamShuttingDown)
+    {
+        return; // Don't cancel tickets during shutdown
+    }
+    
+#ifdef USE_STEAMWORKS
+    if (!Steam_EnsureInitialized())
+    {
+        return;
+    }
+    
+    Steam_CancelAuthTicket();
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Cancelled current auth ticket\n");
+#else
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Ticket cancellation not available - compiled without Steamworks\n");
+#endif
 }
 
 bool Steam_GetUsername(std::string& outUsername)
@@ -391,105 +410,6 @@ static void Steam_OverlayInfo_f(const CCommand& args)
 
 static ConCommand steam_status("steam_status", Steam_OverlayInfo_f, "Display comprehensive Steam status and configuration");
 
-// Console command to test overlay freeze protection
-static void Steam_TestOverlayProtection_f(const CCommand& args)
-{
-    if (args.ArgC() < 2)
-    {
-        Msg(eDLL_T::ENGINE, "[STEAM] Usage: steam_test_overlay_protection <0|1>\n");
-        Msg(eDLL_T::ENGINE, "[STEAM] 0 = Simulate overlay closing, 1 = Reset protection state\n");
-        return;
-    }
-
-    int mode = atoi(args.Arg(1));
-    if (mode == 0)
-    {
-        // Simulate overlay closing transition
-        g_SteamOverlayTransitioning = true;
-        g_OverlayTransitionTime = g_LastCallbackTime; // Use last known time
-        Msg(eDLL_T::ENGINE, "[STEAM] Simulating overlay transition (protection always active for 1 second)\n");
-    }
-    else
-    {
-        // Reset protection state
-        g_SteamOverlayTransitioning = false;
-        Msg(eDLL_T::ENGINE, "[STEAM] Reset overlay protection state\n");
-    }
-}
-
-static ConCommand steam_test_overlay_protection("steam_test_overlay_protection", Steam_TestOverlayProtection_f, "Test overlay freeze protection system");
-
-// Emergency recovery command
-static void Steam_EmergencyRecovery_f(const CCommand& args)
-{
-    Msg(eDLL_T::ENGINE, "[STEAM] EMERGENCY RECOVERY - Resetting all overlay protection states\n");
-    
-    // Force reset all overlay states
-    g_SteamOverlayActive = false;
-    g_SteamOverlayTransitioning = false;
-    g_OverlayTimeoutProtection = false;
-    g_OverlayActiveStartTime = 0.0f;
-    g_OverlayTransitionTime = 0.0f;
-    
-    // Force a callback run to help recover
-    if (g_SteamInitialized && !g_SteamShuttingDown)
-    {
-        Steam_RunCallbacksAPI();
-        g_LastCallbackTime = 0.0f; // Reset timing
-    }
-    
-    Msg(eDLL_T::ENGINE, "[STEAM] Recovery complete - overlay protection reset\n");
-    Msg(eDLL_T::ENGINE, "[STEAM] If game is still frozen, try closing Steam overlay manually\n");
-}
-
-static ConCommand steam_emergency_recovery("steam_emergency_recovery", Steam_EmergencyRecovery_f, "Emergency recovery from overlay freeze (resets all protection states)");
-
-// Console commands for Rich Presence testing
-static void Steam_SetStatus_f(const CCommand& args)
-{
-    if (args.ArgC() < 3)
-    {
-        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Usage: steam_set_status <key> <value>\n");
-        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Example: steam_set_status status \"Playing on my server\"\n");
-        return;
-    }
-
-    const char* key = args.Arg(1);
-    const char* value = args.Arg(2);
-    
-    bool result = Steam_SetRichPresence(key, value);
-    Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Set Rich Presence '%s' = '%s': %s\n", 
-        key, value, result ? "SUCCESS" : "FAILED");
-}
-
-static void Steam_SetServer_f(const CCommand& args)
-{
-    if (args.ArgC() < 3)
-    {
-        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Usage: steam_set_server <name> <ip> [playerCount] [maxPlayers]\n");
-        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Example: steam_set_server \"Zee's Server\" \"192.168.1.100:37015\" 5 10\n");
-        return;
-    }
-
-    const char* serverName = args.Arg(1);
-    const char* serverIP = args.Arg(2);
-    int playerCount = args.ArgC() > 3 ? atoi(args.Arg(3)) : -1;
-    int maxPlayers = args.ArgC() > 4 ? atoi(args.Arg(4)) : -1;
-    
-    bool result = Steam_SetServerStatus(serverName, serverIP, playerCount, maxPlayers);
-    Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Set server status: %s\n", result ? "SUCCESS" : "FAILED");
-}
-
-static void Steam_ClearPresence_f(const CCommand& args)
-{
-    Steam_ClearRichPresence();
-    Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Cleared Rich Presence\n");
-}
-
-static ConCommand steam_set_status("steam_set_status", Steam_SetStatus_f, "Set Steam Rich Presence key/value pair");
-static ConCommand steam_set_server("steam_set_server", Steam_SetServer_f, "Set Steam Rich Presence server status");
-static ConCommand steam_clear_presence("steam_clear_presence", Steam_ClearPresence_f, "Clear Steam Rich Presence");
-
 void Steam_Shutdown()
 {
     g_SteamShuttingDown = true; // Mark as shutting down first
@@ -502,109 +422,4 @@ void Steam_Shutdown()
     }
 }
 
-//-----------------------------------------------------------------------------
-// Steam Rich Presence Functions
-//-----------------------------------------------------------------------------
-
-bool Steam_SetRichPresence(const char* key, const char* value)
-{
-    if (g_SteamShuttingDown)
-    {
-        return false; // Don't set presence during shutdown
-    }
-
-#ifdef USE_STEAMWORKS
-    if (!Steam_EnsureInitialized())
-    {
-        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Cannot set Rich Presence - Steam not initialized\n");
-        return false;
-    }
-
-    bool result = Steam_SetRichPresenceC(key, value) != 0;
-    if (steam_debug_auth.GetBool()) 
-    {
-        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Set Rich Presence: '%s' = '%s' (result: %s)\n", 
-            key, value ? value : "NULL", result ? "success" : "failed");
-    }
-    return result;
-#else
-    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Rich Presence not available - compiled without Steamworks\n");
-    return false;
-#endif
-}
-
-void Steam_ClearRichPresence()
-{
-    if (g_SteamShuttingDown)
-    {
-        return; // Don't clear presence during shutdown
-    }
-
-#ifdef USE_STEAMWORKS
-    if (!Steam_EnsureInitialized())
-    {
-        return;
-    }
-
-    Steam_ClearRichPresenceC();
-    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Cleared Rich Presence\n");
-#else
-    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Rich Presence not available - compiled without Steamworks\n");
-#endif
-}
-
-bool Steam_SetServerStatus(const char* serverName, const char* serverIP, int playerCount, int maxPlayers)
-{
-    if (g_SteamShuttingDown)
-    {
-        return false;
-    }
-
-#ifdef USE_STEAMWORKS
-    if (!Steam_EnsureInitialized())
-    {
-        return false;
-    }
-
-    // Set the main status display
-    bool success = true;
-    if (serverName && serverName[0])
-    {
-        success &= Steam_SetRichPresence("status", Format("Playing on %s", serverName).c_str());
-    }
-    else
-    {
-        success &= Steam_SetRichPresence("status", "In a multiplayer game");
-    }
-
-    // Set connect command for friends to join
-    if (serverIP && serverIP[0])
-    {
-        success &= Steam_SetRichPresence("connect", Format("+connect %s", serverIP).c_str());
-    }
-
-    // Set player count if provided
-    if (playerCount >= 0 && maxPlayers > 0)
-    {
-        success &= Steam_SetRichPresence("steam_player_group", Format("%d", playerCount).c_str());
-        success &= Steam_SetRichPresence("steam_player_group_size", Format("%d", maxPlayers).c_str());
-    }
-
-    // Set display template (this tells Steam how to format the status)
-    success &= Steam_SetRichPresence("steam_display", "#StatusWithServer");
-
-    if (steam_debug_auth.GetBool())
-    {
-        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Set server status: '%s' at '%s' (%d/%d players)\n", 
-            serverName ? serverName : "Unknown Server", 
-            serverIP ? serverIP : "Unknown IP",
-            playerCount, maxPlayers);
-    }
-
-    return success;
-#else
-    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Rich Presence not available - compiled without Steamworks\n");
-    return false;
-#endif
-}
 
