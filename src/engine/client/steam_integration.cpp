@@ -32,6 +32,23 @@ static ConVar steam_overlay_pos("steam_overlay_pos", "1", FCVAR_ARCHIVE, "Steam 
 ConVar steam_debug_auth("steam_debug_auth", "0", FCVAR_ARCHIVE, "Enable detailed Steam authentication debug logging (0=disabled, 1=enabled)"); // Non-static so other files can access it
 static ConVar steam_offline_username("steam_offline_username", "unnamed", FCVAR_ARCHIVE, "Username to use when Steam is unavailable in offline mode");
 static ConVar steam_offline_userid("steam_offline_userid", "7656119800000000", FCVAR_ARCHIVE, "Steam ID to use when Steam is unavailable in offline mode (must be valid Steam ID format)");
+static ConVar steam_enabled("steam_enabled", "0", FCVAR_RELEASE, "Shows whether Steam is enabled and available (1=enabled, 0=disabled/offline)");
+
+// Update steam_enabled ConVar based on current status
+static void UpdateSteamEnabledStatus()
+{
+    bool isEnabled = false;
+    
+#ifdef USE_STEAMWORKS
+    // Steam is enabled if Steamworks is compiled in and we're not in offline mode and Steam is initialized
+    if (!Steam_IsOfflineMode() && g_SteamInitialized)
+    {
+        isEnabled = true;
+    }
+#endif
+    
+    steam_enabled.SetValue(isEnabled ? "1" : "0");
+}
 
 // Check if we should use offline mode for Steam
 bool Steam_IsOfflineMode()
@@ -64,6 +81,7 @@ bool Steam_EnsureInitialized()
     if (Steam_InitAPI())
     {
         g_SteamInitialized = true;
+        UpdateSteamEnabledStatus();
         if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Steam API initialized successfully\n");
         
         // Configure overlay settings to reduce crash risk
@@ -81,9 +99,11 @@ bool Steam_EnsureInitialized()
     }
     
     Msg(eDLL_T::ENGINE, "[STEAM] Failed to initialize Steam API\n"); // Keep this one as it's an error
+    UpdateSteamEnabledStatus(); // Update status after failed init
     return false;
 #else
     // If Steamworks is not available, we're always in offline mode
+    UpdateSteamEnabledStatus(); // Update status for offline mode
     if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Steamworks not available - using offline mode\n");
     return false; // Return false to indicate no Steam API available
 #endif
@@ -373,6 +393,7 @@ static void Steam_OverlayInfo_f(const CCommand& args)
     Msg(eDLL_T::ENGINE, "[STEAM] Offline mode: %s\n", Steam_IsOfflineMode() ? "YES" : "NO");
 #endif
     Msg(eDLL_T::ENGINE, "[STEAM] Steam initialized: %s\n", g_SteamInitialized ? "YES" : "NO");
+    Msg(eDLL_T::ENGINE, "[STEAM] Steam enabled: %s\n", steam_enabled.GetBool() ? "YES" : "NO");
     
     if (Steam_IsOfflineMode())
     {
@@ -419,6 +440,7 @@ void Steam_Shutdown()
         Msg(eDLL_T::ENGINE, "[STEAM] Shutting down Steam API\n");
         Steam_ShutdownAPI();
         g_SteamInitialized = false;
+        UpdateSteamEnabledStatus(); // Update status after shutdown
     }
 }
 
