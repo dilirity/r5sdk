@@ -256,11 +256,13 @@ endif()
 if( USE_STEAMWORKS AND STEAM_SDK_DIR )
     message(STATUS "Building with Steamworks from: ${STEAM_SDK_DIR}")
     if( NOT ${PROJECT_NAME} STREQUAL "engine_ds" )
-        # Add Steam includes and definitions only to the wrapper file
+        # Add USE_STEAMWORKS define to all files in the target
+        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_STEAMWORKS)
+        
+        # Add Steam includes and definitions to the wrapper file
         set_source_files_properties(
             "client/steam_api_wrapper.cpp"
             PROPERTIES
-            COMPILE_DEFINITIONS "USE_STEAMWORKS"
             INCLUDE_DIRECTORIES "${STEAM_SDK_DIR}/public;${STEAM_SDK_DIR}/public/steam"
         )
         if( WIN32 )

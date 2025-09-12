@@ -13,18 +13,23 @@ extern "C" {
     int Steam_GetAuthTicketHex(char* outBuffer, int bufferSize);
     int Steam_IsOverlayEnabled();
     void Steam_SetOverlayNotificationPosition(int position);
+    int Steam_SetRichPresenceC(const char* key, const char* value);
+    void Steam_ClearRichPresenceC();
 }
 
 static bool g_SteamInitialized = false;
 static bool g_SteamShuttingDown = false;
 static bool g_SteamOverlayActive = false;
+static bool g_SteamOverlayTransitioning = false;
 static float g_LastCallbackTime = 0.0f;
+static float g_OverlayTransitionTime = 0.0f;
+static float g_OverlayActiveStartTime = 0.0f;
+static bool g_OverlayTimeoutProtection = false;
 
 // ConVars for overlay control and debugging
 #include "tier1/convar.h"
 #include "tier0/commandline.h"
 static ConVar steam_overlay_pos("steam_overlay_pos", "1", FCVAR_ARCHIVE, "Steam overlay notification position (0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right)");
-static ConVar steam_safe_callbacks("steam_safe_callbacks", "1", FCVAR_ARCHIVE, "Use safer Steam callback processing to avoid overlay crashes (1=enabled)");
 ConVar steam_debug_auth("steam_debug_auth", "0", FCVAR_ARCHIVE, "Enable detailed Steam authentication debug logging (0=disabled, 1=enabled)"); // Non-static so other files can access it
 static ConVar steam_offline_username("steam_offline_username", "unnamed", FCVAR_ARCHIVE, "Username to use when Steam is unavailable in offline mode");
 static ConVar steam_offline_userid("steam_offline_userid", "7656119800000000", FCVAR_ARCHIVE, "Steam ID to use when Steam is unavailable in offline mode (must be valid Steam ID format)");
@@ -204,19 +209,59 @@ void Steam_RunFrame()
     frameCount++;
     double currentTime = frameCount * 0.016; // Assume ~60 FPS
     
-    // Limit callback frequency to avoid conflicts with overlay
-    if (steam_safe_callbacks.GetBool())
+    // Enhanced callback processing with always-active overlay freeze protection
+    bool shouldProcessCallbacks = true;
+    
+    // Always use safe mode with overlay protection
+    if (g_SteamOverlayTransitioning)
     {
-        // Safe mode: Reduce callback frequency and avoid during overlay
-        if (frameCount % 3 == 0 && !g_SteamOverlayActive) // Every 3rd frame when overlay inactive
+        // During transition, skip callbacks to prevent freeze
+        shouldProcessCallbacks = false;
+        if (steam_debug_auth.GetBool() && frameCount % 60 == 0)
         {
-            Steam_RunCallbacksAPI();
-            g_LastCallbackTime = (float)currentTime;
+            Msg(eDLL_T::ENGINE, "[STEAM] Skipping callbacks during overlay transition\n");
         }
+    }
+    else if (g_SteamOverlayActive)
+    {
+        // While overlay is open, significantly reduce callback frequency
+        if (frameCount % 10 == 0) // Every 10th frame when overlay active
+        {
+            shouldProcessCallbacks = true;
+        }
+        else
+        {
+            shouldProcessCallbacks = false;
+        }
+        
+        if (steam_debug_auth.GetBool() && frameCount % 180 == 0) // Every 3 seconds
+        {
+            Msg(eDLL_T::ENGINE, "[STEAM] Reduced callbacks while overlay active\n");
+        }
+    }
+    else if (g_OverlayTimeoutProtection)
+    {
+        // Emergency protection mode - minimal callbacks
+        if (frameCount % 20 == 0) // Every 20th frame in emergency mode
+        {
+            shouldProcessCallbacks = true;
+        }
+        else
+        {
+            shouldProcessCallbacks = false;
+        }
+    }
+    else if (frameCount % 3 == 0) // Every 3rd frame when overlay inactive
+    {
+        shouldProcessCallbacks = true;
     }
     else
     {
-        // Normal mode: Run callbacks every frame
+        shouldProcessCallbacks = false;
+    }
+    
+    if (shouldProcessCallbacks)
+    {
         Steam_RunCallbacksAPI();
         g_LastCallbackTime = (float)currentTime;
     }
@@ -237,15 +282,62 @@ void Steam_RunFrame()
         }
     }
     
-    // Check overlay state periodically to avoid conflicts
-    if (frameCount % 60 == 0) // Every second
+    // Enhanced overlay state checking with transition and timeout detection
+    if (frameCount % 30 == 0) // Check twice per second for faster detection
     {
         bool overlayEnabled = Steam_IsOverlayEnabled();
         if (overlayEnabled != g_SteamOverlayActive)
         {
+            // Overlay state changed - enter transition period
+            bool wasActive = g_SteamOverlayActive;
             g_SteamOverlayActive = overlayEnabled;
-            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Overlay state changed: %s\n", 
-                g_SteamOverlayActive ? "ACTIVE" : "INACTIVE");
+            g_SteamOverlayTransitioning = true;
+            g_OverlayTransitionTime = (float)currentTime;
+            
+            // Track when overlay becomes active
+            if (g_SteamOverlayActive)
+            {
+                g_OverlayActiveStartTime = (float)currentTime;
+                g_OverlayTimeoutProtection = false; // Reset timeout protection
+            }
+            else
+            {
+                g_OverlayActiveStartTime = 0.0f;
+                g_OverlayTimeoutProtection = false;
+            }
+            
+            if (steam_debug_auth.GetBool()) 
+            {
+                Msg(eDLL_T::ENGINE, "[STEAM] Overlay transition: %s -> %s (protection: ALWAYS ON)\n", 
+                    wasActive ? "ACTIVE" : "INACTIVE",
+                    g_SteamOverlayActive ? "ACTIVE" : "INACTIVE");
+            }
+        }
+        
+        // Check for overlay timeout (stuck open) - always use 30 second timeout
+        const float OVERLAY_TIMEOUT_SECONDS = 30.0f;
+        if (g_SteamOverlayActive && !g_OverlayTimeoutProtection)
+        {
+            float overlayActiveTime = (float)currentTime - g_OverlayActiveStartTime;
+            if (overlayActiveTime > OVERLAY_TIMEOUT_SECONDS)
+            {
+                g_OverlayTimeoutProtection = true;
+                if (steam_debug_auth.GetBool())
+                {
+                    Msg(eDLL_T::ENGINE, "[STEAM] Overlay timeout protection activated (%.1fs > %.1fs)\n", 
+                        overlayActiveTime, OVERLAY_TIMEOUT_SECONDS);
+                }
+            }
+        }
+    }
+    
+    // Clear transition state after a safe period
+    if (g_SteamOverlayTransitioning && (currentTime - g_OverlayTransitionTime) > 1.0) // 1 second
+    {
+        g_SteamOverlayTransitioning = false;
+        if (steam_debug_auth.GetBool())
+        {
+            Msg(eDLL_T::ENGINE, "[STEAM] Overlay transition complete\n");
         }
     }
 }
@@ -273,7 +365,16 @@ static void Steam_OverlayInfo_f(const CCommand& args)
         bool overlayEnabled = Steam_IsOverlayEnabled();
         Msg(eDLL_T::ENGINE, "[STEAM] Overlay enabled: %s\n", overlayEnabled ? "YES" : "NO");
         Msg(eDLL_T::ENGINE, "[STEAM] Overlay currently active: %s\n", g_SteamOverlayActive ? "YES" : "NO");
-        Msg(eDLL_T::ENGINE, "[STEAM] Safe callbacks: %s\n", steam_safe_callbacks.GetBool() ? "ENABLED" : "DISABLED");
+        Msg(eDLL_T::ENGINE, "[STEAM] Overlay transitioning: %s\n", g_SteamOverlayTransitioning ? "YES" : "NO");
+        Msg(eDLL_T::ENGINE, "[STEAM] Timeout protection: %s\n", g_OverlayTimeoutProtection ? "ACTIVE" : "INACTIVE");
+        Msg(eDLL_T::ENGINE, "[STEAM] Freeze protection: ALWAYS ENABLED\n");
+        Msg(eDLL_T::ENGINE, "[STEAM] Active protection: ALWAYS ENABLED\n");
+        Msg(eDLL_T::ENGINE, "[STEAM] Timeout threshold: 30.0s\n");
+        if (g_SteamOverlayActive && g_OverlayActiveStartTime > 0.0f)
+        {
+            float activeTime = g_LastCallbackTime - g_OverlayActiveStartTime;
+            Msg(eDLL_T::ENGINE, "[STEAM] Overlay active for: %.1fs\n", activeTime);
+        }
         Msg(eDLL_T::ENGINE, "[STEAM] Overlay position: %d\n", steam_overlay_pos.GetInt());
         Msg(eDLL_T::ENGINE, "[STEAM] Last callback time: %.2f\n", g_LastCallbackTime);
     }
@@ -290,6 +391,105 @@ static void Steam_OverlayInfo_f(const CCommand& args)
 
 static ConCommand steam_status("steam_status", Steam_OverlayInfo_f, "Display comprehensive Steam status and configuration");
 
+// Console command to test overlay freeze protection
+static void Steam_TestOverlayProtection_f(const CCommand& args)
+{
+    if (args.ArgC() < 2)
+    {
+        Msg(eDLL_T::ENGINE, "[STEAM] Usage: steam_test_overlay_protection <0|1>\n");
+        Msg(eDLL_T::ENGINE, "[STEAM] 0 = Simulate overlay closing, 1 = Reset protection state\n");
+        return;
+    }
+
+    int mode = atoi(args.Arg(1));
+    if (mode == 0)
+    {
+        // Simulate overlay closing transition
+        g_SteamOverlayTransitioning = true;
+        g_OverlayTransitionTime = g_LastCallbackTime; // Use last known time
+        Msg(eDLL_T::ENGINE, "[STEAM] Simulating overlay transition (protection always active for 1 second)\n");
+    }
+    else
+    {
+        // Reset protection state
+        g_SteamOverlayTransitioning = false;
+        Msg(eDLL_T::ENGINE, "[STEAM] Reset overlay protection state\n");
+    }
+}
+
+static ConCommand steam_test_overlay_protection("steam_test_overlay_protection", Steam_TestOverlayProtection_f, "Test overlay freeze protection system");
+
+// Emergency recovery command
+static void Steam_EmergencyRecovery_f(const CCommand& args)
+{
+    Msg(eDLL_T::ENGINE, "[STEAM] EMERGENCY RECOVERY - Resetting all overlay protection states\n");
+    
+    // Force reset all overlay states
+    g_SteamOverlayActive = false;
+    g_SteamOverlayTransitioning = false;
+    g_OverlayTimeoutProtection = false;
+    g_OverlayActiveStartTime = 0.0f;
+    g_OverlayTransitionTime = 0.0f;
+    
+    // Force a callback run to help recover
+    if (g_SteamInitialized && !g_SteamShuttingDown)
+    {
+        Steam_RunCallbacksAPI();
+        g_LastCallbackTime = 0.0f; // Reset timing
+    }
+    
+    Msg(eDLL_T::ENGINE, "[STEAM] Recovery complete - overlay protection reset\n");
+    Msg(eDLL_T::ENGINE, "[STEAM] If game is still frozen, try closing Steam overlay manually\n");
+}
+
+static ConCommand steam_emergency_recovery("steam_emergency_recovery", Steam_EmergencyRecovery_f, "Emergency recovery from overlay freeze (resets all protection states)");
+
+// Console commands for Rich Presence testing
+static void Steam_SetStatus_f(const CCommand& args)
+{
+    if (args.ArgC() < 3)
+    {
+        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Usage: steam_set_status <key> <value>\n");
+        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Example: steam_set_status status \"Playing on my server\"\n");
+        return;
+    }
+
+    const char* key = args.Arg(1);
+    const char* value = args.Arg(2);
+    
+    bool result = Steam_SetRichPresence(key, value);
+    Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Set Rich Presence '%s' = '%s': %s\n", 
+        key, value, result ? "SUCCESS" : "FAILED");
+}
+
+static void Steam_SetServer_f(const CCommand& args)
+{
+    if (args.ArgC() < 3)
+    {
+        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Usage: steam_set_server <name> <ip> [playerCount] [maxPlayers]\n");
+        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Example: steam_set_server \"Zee's Server\" \"192.168.1.100:37015\" 5 10\n");
+        return;
+    }
+
+    const char* serverName = args.Arg(1);
+    const char* serverIP = args.Arg(2);
+    int playerCount = args.ArgC() > 3 ? atoi(args.Arg(3)) : -1;
+    int maxPlayers = args.ArgC() > 4 ? atoi(args.Arg(4)) : -1;
+    
+    bool result = Steam_SetServerStatus(serverName, serverIP, playerCount, maxPlayers);
+    Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Set server status: %s\n", result ? "SUCCESS" : "FAILED");
+}
+
+static void Steam_ClearPresence_f(const CCommand& args)
+{
+    Steam_ClearRichPresence();
+    Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Cleared Rich Presence\n");
+}
+
+static ConCommand steam_set_status("steam_set_status", Steam_SetStatus_f, "Set Steam Rich Presence key/value pair");
+static ConCommand steam_set_server("steam_set_server", Steam_SetServer_f, "Set Steam Rich Presence server status");
+static ConCommand steam_clear_presence("steam_clear_presence", Steam_ClearPresence_f, "Clear Steam Rich Presence");
+
 void Steam_Shutdown()
 {
     g_SteamShuttingDown = true; // Mark as shutting down first
@@ -302,4 +502,109 @@ void Steam_Shutdown()
     }
 }
 
+//-----------------------------------------------------------------------------
+// Steam Rich Presence Functions
+//-----------------------------------------------------------------------------
+
+bool Steam_SetRichPresence(const char* key, const char* value)
+{
+    if (g_SteamShuttingDown)
+    {
+        return false; // Don't set presence during shutdown
+    }
+
+#ifdef USE_STEAMWORKS
+    if (!Steam_EnsureInitialized())
+    {
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Cannot set Rich Presence - Steam not initialized\n");
+        return false;
+    }
+
+    bool result = Steam_SetRichPresenceC(key, value) != 0;
+    if (steam_debug_auth.GetBool()) 
+    {
+        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Set Rich Presence: '%s' = '%s' (result: %s)\n", 
+            key, value ? value : "NULL", result ? "success" : "failed");
+    }
+    return result;
+#else
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Rich Presence not available - compiled without Steamworks\n");
+    return false;
+#endif
+}
+
+void Steam_ClearRichPresence()
+{
+    if (g_SteamShuttingDown)
+    {
+        return; // Don't clear presence during shutdown
+    }
+
+#ifdef USE_STEAMWORKS
+    if (!Steam_EnsureInitialized())
+    {
+        return;
+    }
+
+    Steam_ClearRichPresenceC();
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Cleared Rich Presence\n");
+#else
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Rich Presence not available - compiled without Steamworks\n");
+#endif
+}
+
+bool Steam_SetServerStatus(const char* serverName, const char* serverIP, int playerCount, int maxPlayers)
+{
+    if (g_SteamShuttingDown)
+    {
+        return false;
+    }
+
+#ifdef USE_STEAMWORKS
+    if (!Steam_EnsureInitialized())
+    {
+        return false;
+    }
+
+    // Set the main status display
+    bool success = true;
+    if (serverName && serverName[0])
+    {
+        success &= Steam_SetRichPresence("status", Format("Playing on %s", serverName).c_str());
+    }
+    else
+    {
+        success &= Steam_SetRichPresence("status", "In a multiplayer game");
+    }
+
+    // Set connect command for friends to join
+    if (serverIP && serverIP[0])
+    {
+        success &= Steam_SetRichPresence("connect", Format("+connect %s", serverIP).c_str());
+    }
+
+    // Set player count if provided
+    if (playerCount >= 0 && maxPlayers > 0)
+    {
+        success &= Steam_SetRichPresence("steam_player_group", Format("%d", playerCount).c_str());
+        success &= Steam_SetRichPresence("steam_player_group_size", Format("%d", maxPlayers).c_str());
+    }
+
+    // Set display template (this tells Steam how to format the status)
+    success &= Steam_SetRichPresence("steam_display", "#StatusWithServer");
+
+    if (steam_debug_auth.GetBool())
+    {
+        Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Set server status: '%s' at '%s' (%d/%d players)\n", 
+            serverName ? serverName : "Unknown Server", 
+            serverIP ? serverIP : "Unknown IP",
+            playerCount, maxPlayers);
+    }
+
+    return success;
+#else
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM_PRESENCE] Rich Presence not available - compiled without Steamworks\n");
+    return false;
+#endif
+}
 

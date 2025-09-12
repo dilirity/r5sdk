@@ -14,6 +14,9 @@
 #include "engine/client/clientstate.h"
 #include "ebisusdk/EbisuSDK.h"
 #include "common/global.h"
+#include "tier0/frametask.h"
+#include "engine/host.h"
+#include "engine/host_cmd.h"
 #endif
 /*****************************************************************************/
 #ifndef DEDICATED
@@ -28,6 +31,7 @@
 #ifndef DEDICATED
 #include "gameui/imgui_system.h"
 #endif // !DEDICATED
+#include <engine/cmd.h>
 
 #ifndef DEDICATED
 #define SDK_DEFAULT_CFG "cfg/system/startup_default.cfg"
@@ -275,6 +279,25 @@ void SDK_Init()
 #endif
     }
 #endif
+
+#ifndef DEDICATED
+    // Handle Steam join command line parameters (e.g., +connect from Rich Presence)
+    const char* connectParam = CommandLine()->CheckParm("+connect");
+    if (connectParam)
+    {
+        Msg(eDLL_T::ENGINE, "[STEAM_JOIN] Processing +connect command line parameter: %s\n", connectParam);
+        
+        // Schedule connection for next frame to ensure all systems are initialized
+        g_TaskQueue.Dispatch([connectParam]()
+        {
+            Msg(eDLL_T::ENGINE, "[STEAM_JOIN] Executing delayed connection to: %s\n", connectParam);
+            
+            // Execute the connect command
+            // Note: This uses the engine's command system to connect
+            Cbuf_AddText(Cbuf_GetCurrentPlayer(), Format("connect %s", connectParam).c_str(), cmd_source_t::kCommandSrcCode);
+        }, 1000); // 1 second delay to ensure game is fully loaded
+    }
+#endif // !DEDICATED
 
     g_bSdkInitialized = true;
 }

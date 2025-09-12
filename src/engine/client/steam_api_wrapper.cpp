@@ -143,3 +143,22 @@ extern "C" void Steam_SetOverlayNotificationPosition(int position)
     }
 #endif
 }
+
+extern "C" int Steam_SetRichPresenceC(const char* key, const char* value) {
+#ifdef USE_STEAMWORKS
+    if (!SteamFriends()) {
+        return 0;
+    }
+    return SteamFriends()->SetRichPresence(key, value) ? 1 : 0;
+#else
+    return 0;
+#endif
+}
+
+extern "C" void Steam_ClearRichPresenceC() {
+#ifdef USE_STEAMWORKS
+    if (SteamFriends()) {
+        SteamFriends()->ClearRichPresence();
+    }
+#endif
+}

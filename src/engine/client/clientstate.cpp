@@ -180,6 +180,9 @@ bool CClientState::VConnectionStart(CClientState* pClient, CNetChan* pChan)
 //------------------------------------------------------------------------------
 void CClientState::VConnectionClosing(CClientState* thisptr, const char* szReason)
 {
+    // Clear Steam Rich Presence when disconnecting
+    Steam_ClearRichPresence();
+    
     CClientState__ConnectionClosing(thisptr, szReason);
 
     // Delay execution to the next frame; this is required to avoid a rare crash.
@@ -398,14 +401,15 @@ static ConVar cl_onlineAuthTokenSignature2("cl_onlineAuthTokenSignature2", "", F
 static ConVar cl_steamTicket("cl_steamTicket", "", FCVAR_HIDDEN | FCVAR_USERINFO | FCVAR_DONTRECORD | FCVAR_SERVER_CANNOT_QUERY | FCVAR_PLATFORM_SYSTEM, "Steam session ticket for master server authentication");
 static ConVar cl_useSteamName("cl_useSteamName", "1", FCVAR_RELEASE, "Automatically use Steam username as in-game name");
 static ConVar cl_forceSteamOnly("cl_forceSteamOnly", "1", FCVAR_RELEASE, "Force Steam-only mode (disables EA/Origin)");
-static ConVar cl_sanitizeSteamName("cl_sanitizeSteamName", "1", FCVAR_RELEASE, "Sanitize Steam username to be compatible with server validation");
+static ConVar cl_sanitizeSteamName("cl_sanitizeSteamName", "0", FCVAR_RELEASE, "Sanitize Steam username to be compatible with legacy server validation (disabled by default since validation is now lenient)");
 
 // Steam debug ConVar is declared in steam_integration.h
 
 //------------------------------------------------------------------------------
-// Purpose: Sanitize Steam username to be compatible with EA persona name rules
+// Purpose: Sanitize Steam username to be compatible with legacy server validation
+//          NOTE: This is now disabled by default since server validation is lenient
 // Input  : steamUsername - original Steam username
-// Output : sanitized username that only contains allowed characters
+// Output : sanitized username that only contains legacy-allowed characters
 //------------------------------------------------------------------------------
 std::string SanitizeSteamUsername(const std::string& steamUsername)
 {
@@ -788,6 +792,16 @@ bool CClientState::Authenticate(connectparams_t* connectParams, char* const reas
 
             cl_onlineAuthTokenSignature2.SetValue(tokenSignaturePart2);
         }
+    }
+
+    // Set Steam Rich Presence now that we've successfully authenticated
+    if (connectParams && connectParams->netAdr)
+    {
+        if (steam_debug_auth.GetBool()) 
+        {
+            Msg(eDLL_T::ENGINE, "[CLIENT_AUTH] Setting Rich Presence for server: %s\n", connectParams->netAdr);
+        }
+        Steam_SetServerStatus("Server", connectParams->netAdr);
     }
 
     return true;

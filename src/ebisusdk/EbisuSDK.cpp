@@ -122,7 +122,7 @@ bool IsOriginInitialized()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: validates if client's persona name meets EA's criteria
+// Purpose: validates if client's persona name meets Steam-friendly criteria (much more lenient than EA)
 // Input  : *pszName -
 // Output : true on success, false on failure
 //-----------------------------------------------------------------------------
@@ -136,9 +136,18 @@ bool IsValidPersonaName(const char* const pszName, const int nMinLen, const int 
 		return false;
 	}
 
-	// Check if the name contains any special characters.
-	const size_t pos = strspn(pszName, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_");
-	return pszName[pos] == '\0';
+	// Allow most printable characters including symbols and spaces (Steam-friendly validation)
+	// Only block control characters (0x00-0x1F) and DEL (0x7F)
+	for (size_t i = 0; i < len; i++)
+	{
+		unsigned char c = (unsigned char)pszName[i];
+		if (c < 0x20 || c == 0x7F) // Block control characters and DEL
+		{
+			return false;
+		}
+	}
+	
+	return true;
 }
 
 void VEbisuSDK::Detour(const bool bAttach) const
