@@ -127,6 +127,7 @@ static ConVar sv_overrideTeamChatRestriction("sv_overrideTeamChatRestriction", "
 	"When enabled this allows sv_forceChatToTeamOnly to take control of the team chat restriction.",
 	"0: Default, 1: Forces the value from sv_forceChatToTeamOnly."
 );
+static ConVar sv_allowAnyChatChars("sv_allowAnyChatChars", "0", FCVAR_RELEASE, "Allow any characters in chat messages (disables server-side ASCII sanitization)");
 
 void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int senderId, const char* text, bool isTeamChat)
 {
@@ -137,6 +138,22 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 		return;
 
 	const bool bIsTeamChat = sv_overrideTeamChatRestriction.GetBool() ? sv_forceChatToTeamOnly->GetBool()  : isTeamChat;
+
+	// Sanitize chat text if configured: allow printable ASCII only (32-126). Drop disallowed bytes.
+	std::string chatText;
+	if (!sv_allowAnyChatChars.GetBool() && text)
+	{
+		chatText.reserve(strlen(text));
+		for (const unsigned char* p = reinterpret_cast<const unsigned char*>(text); *p; ++p)
+		{
+			if (*p >= 32 && *p <= 126)
+				chatText += static_cast<char>(*p);
+		}
+	}
+	else
+	{
+		chatText = text ? text : "";
+	}
 	const int nMaxClients = gpGlobals->maxClients;
 	const bool bShouldApplyGlobalCommsMutes = SV_ShouldApplyTextChatGlobalMutes();
 
@@ -165,7 +182,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 
 	for (auto& cb : !PluginSystem()->GetChatMessageCallbacks())
 	{
-		if (!cb.Function()(pSenderPlayer, text, sv_forceChatToTeamOnly->GetBool()))
+		if (!cb.Function()(pSenderPlayer, chatText.c_str(), sv_forceChatToTeamOnly->GetBool()))
 		{
 			if (chat_debug.GetBool())
 			{
@@ -173,7 +190,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 
 				V_UnicodeToUTF8(V_UnqualifiedFileName(cb.ModuleName()), moduleName, MAX_PATH);
 
-				Msg(eDLL_T::SERVER, "[%s] Plugin blocked chat message from '%s' (%llu): \"%s\"\n", moduleName, pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId(), text);
+				Msg(eDLL_T::SERVER, "[%s] Plugin blocked chat message from '%s' (%llu): \"%s\"\n", moduleName, pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId(), chatText.c_str());
 			}
 
 			return;
@@ -212,7 +229,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 		v_UserMessageBegin(&filter, "SayText", 2);
 
 		MessageWriteByte(pSenderPlayer->GetEdict());
-		MessageWriteString(text);
+		MessageWriteString(chatText.c_str());
 		MessageWriteBool(bIsTeamChat);
 
 		MessageEnd();

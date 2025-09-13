@@ -30,9 +30,10 @@ ConVar sv_showconnecting("sv_showconnecting", "1", FCVAR_RELEASE, "Logs informat
 ConVar sv_globalBanlist("sv_globalBanlist", "1", FCVAR_RELEASE, "Determines whether or not to use the global banned list.", false, 0.f, false, 0.f, "0 = Disable, 1 = Enable.");
 ConVar sv_banlistRefreshRate("sv_banlistRefreshRate", "30.0", FCVAR_DEVELOPMENTONLY, "Banned list refresh rate (seconds).", true, 1.f, false, 0.f);
 
-static ConVar sv_validatePersonaName("sv_validatePersonaName", "1", FCVAR_RELEASE, "Validate the client's textual persona name on connect. Note: Steam usernames are auto-sanitized by default.");
+static ConVar sv_validatePersonaName("sv_validatePersonaName", "1", FCVAR_RELEASE, "Validate the client's textual persona name on connect.");
 static ConVar sv_minPersonaNameLength("sv_minPersonaNameLength", "1", FCVAR_RELEASE, "The minimum length of the client's textual persona name.", true, 0.f, false, 0.f);
 static ConVar sv_maxPersonaNameLength("sv_maxPersonaNameLength", "32", FCVAR_RELEASE, "The maximum length of the client's textual persona name.", true, 0.f, false, 0.f);
+static ConVar sv_allowAnyNameChars("sv_allowAnyNameChars", "0", FCVAR_RELEASE, "Allow any characters in client persona names (disables server-side ASCII sanitization)");
 
 //---------------------------------------------------------------------------------
 // Purpose: Gets the number of human players on the server
@@ -128,6 +129,30 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 
 		Msg(eDLL_T::SERVER, "Processing connectionless challenge for '[%s]:%i' ('%llu')\n",
 			pszAddresBuffer, nPort, nSteamID);
+	}
+
+	// Validate persona name server-side (do not mutate before auth). Reject if it contains non-printable/non-ASCII chars.
+	if (!sv_allowAnyNameChars.GetBool() && VALID_CHARSTAR(pszPersonaName))
+	{
+		for (const char* p = pszPersonaName; *p; ++p)
+		{
+			const unsigned char ch = static_cast<unsigned char>(*p);
+			if (ch < 32 || ch > 126)
+			{
+				pServer->RejectConnection(pServer->m_Socket, &pChallenge->netAdr, "#Valve_Reject_Invalid_Name");
+				if (bEnableLogging)
+				{
+					if (!pszAddresBuffer)
+					{
+						pChallenge->netAdr.ToString(szAddresBuffer, sizeof(szAddresBuffer), true);
+						pszAddresBuffer = szAddresBuffer;
+					}
+					Warning(eDLL_T::SERVER, "Connection rejected for '[%s]:%i' ('%llu' has an invalid name: non-ASCII characters)\n",
+						pszAddresBuffer, nPort, nSteamID);
+				}
+				return nullptr;
+			}
+		}
 	}
 
 	bool bValidName = false;

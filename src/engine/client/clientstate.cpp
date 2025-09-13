@@ -29,6 +29,8 @@
 //------------------------------------------------------------------------------
 // Purpose: console command callbacks
 //------------------------------------------------------------------------------
+static std::string SanitizeSteamUsername(const std::string& steamUsername); // forward
+
 static void SetName_f(const CCommand& args)
 {
     if (args.ArgC() < 2)
@@ -42,14 +44,15 @@ static void SetName_f(const CCommand& args)
     if (!pszName[0])
         pszName = "unnamed";
 
-    const size_t nLen = strlen(pszName);
-
-    if (nLen >= MAX_PERSONA_NAME_LEN)
-        return;
+    // Sanitize to allowed ASCII set before applying
+    std::string sanitized = SanitizeSteamUsername(pszName);
+    if (sanitized.empty())
+        sanitized = "_";
 
     // Update Steam persona name.
-    strncpy(g_PersonaName, pszName, nLen+1);
-    name_cvar->SetValue(pszName);
+    strncpy(g_PersonaName, sanitized.c_str(), MAX_PERSONA_NAME_LEN - 1);
+    g_PersonaName[MAX_PERSONA_NAME_LEN - 1] = '\0';
+    name_cvar->SetValue(g_PersonaName);
 }
 static void Reconnect_f(const CCommand& args)
 {
@@ -397,9 +400,7 @@ static ConVar cl_onlineAuthTokenSignature2("cl_onlineAuthTokenSignature2", "", F
 // Steam authentication - the client uses Steam session tickets for authentication.
 // Fresh tickets are generated per connection for security. cl_steamTicket shows the last used ticket for debugging only.
 static ConVar cl_steamTicket("cl_steamTicket", "", FCVAR_HIDDEN | FCVAR_USERINFO | FCVAR_DONTRECORD | FCVAR_SERVER_CANNOT_QUERY | FCVAR_PLATFORM_SYSTEM, "Steam session ticket (debug display only - fresh tickets generated per connection)");
-static ConVar cl_useSteamName("cl_useSteamName", "1", FCVAR_RELEASE, "Automatically use Steam username as in-game name");
-static ConVar cl_forceSteamOnly("cl_forceSteamOnly", "1", FCVAR_RELEASE, "Force Steam-only mode (disables EA/Origin)");
-static ConVar cl_sanitizeSteamName("cl_sanitizeSteamName", "0", FCVAR_RELEASE, "Sanitize Steam username to be compatible with legacy server validation (disabled by default since validation is now lenient)");
+static ConVar cl_sanitizeSteamName("cl_sanitizeSteamName", "1", FCVAR_RELEASE, "Sanitize Steam username to printable ASCII (32-126); non-printable -> '_'");
 
 // Steam debug ConVar is declared in steam_integration.h
 
@@ -413,37 +414,24 @@ std::string SanitizeSteamUsername(const std::string& steamUsername)
 {
     std::string sanitized;
     sanitized.reserve(steamUsername.length());
-    
-    for (char c : steamUsername)
+
+    auto isAllowed = [](unsigned char ch) -> bool { return ch >= 32 && ch <= 126; };
+
+    for (unsigned char c : steamUsername)
     {
-        // Only allow letters, numbers, hyphens, and underscores (EA criteria)
-        if ((c >= 'A' && c <= 'Z') || 
-            (c >= 'a' && c <= 'z') || 
-            (c >= '0' && c <= '9') || 
-            c == '-' || c == '_')
+        if (isAllowed(c))
         {
-            sanitized += c;
+            sanitized += static_cast<char>(c);
         }
-        else if (c == ' ')
-        {
-            // Replace spaces with underscores
-            sanitized += '_';
-        }
-        // Skip all other special characters
+        // else: drop disallowed char
     }
-    
-    // Ensure minimum length (pad with underscores if needed)
-    while (sanitized.length() < 4)
+
+    // Trim to engine max (leave room for terminator in caller)
+    if (sanitized.length() >= (size_t)MAX_PERSONA_NAME_LEN)
     {
-        sanitized += '_';
+        sanitized.resize(MAX_PERSONA_NAME_LEN - 1);
     }
-    
-    // Ensure maximum length
-    if (sanitized.length() > 16)
-    {
-        sanitized = sanitized.substr(0, 16);
-    }
-    
+
     return sanitized;
 }
 
@@ -452,30 +440,23 @@ std::string SanitizeSteamUsername(const std::string& steamUsername)
 //------------------------------------------------------------------------------
 void SetSteamPersonaName()
 {
-    if (!cl_useSteamName.GetBool() || !g_PersonaName)
+    if (!g_PersonaName)
         return;
         
     std::string steamUsername;
     if (Steam_GetUsername(steamUsername) && !steamUsername.empty())
     {
-        std::string finalName = steamUsername;
-        
-        if (cl_sanitizeSteamName.GetBool())
+        std::string finalName = cl_sanitizeSteamName.GetBool() ? SanitizeSteamUsername(steamUsername) : steamUsername;
+        if (finalName != steamUsername)
         {
-            finalName = SanitizeSteamUsername(steamUsername);
-            if (finalName != steamUsername)
-            {
-                Msg(eDLL_T::ENGINE, "Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
-            }
+            Msg(eDLL_T::STEAM, "Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
         }
         
         strncpy(g_PersonaName, finalName.c_str(), MAX_PERSONA_NAME_LEN - 1);
         g_PersonaName[MAX_PERSONA_NAME_LEN - 1] = '\0';
         
-        if (finalName == steamUsername)
-        {
-            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "Set persona name to Steam username: %s\n", g_PersonaName);
-        }
+        if (finalName == steamUsername && steam_debug_auth.GetBool())
+            Msg(eDLL_T::STEAM, "Set persona name to Steam username: %s\n", g_PersonaName);
     }
 }
 
@@ -484,7 +465,7 @@ void SetSteamPersonaName()
 //------------------------------------------------------------------------------
 bool ShouldForceSteamOnly()
 {
-    return cl_forceSteamOnly.GetBool();
+    return true;
 }
 
 //------------------------------------------------------------------------------
@@ -513,7 +494,6 @@ static void SteamInfo_f(const CCommand& args)
             Msg(eDLL_T::ENGINE, "Current in-game name: %s\n", g_PersonaName);
         }
         
-        Msg(eDLL_T::ENGINE, "Steam name auto-set: %s\n", cl_useSteamName.GetBool() ? "enabled" : "disabled");
         Msg(eDLL_T::ENGINE, "Steam name sanitization: %s\n", cl_sanitizeSteamName.GetBool() ? "enabled" : "disabled");
         
         // Show platform user ID and Steam ID for debugging
@@ -586,21 +566,16 @@ static void RefreshSteamData_f(const CCommand& args)
     std::string steamUsername;
     if (Steam_GetUsername(steamUsername) && !steamUsername.empty() && g_PersonaName)
     {
-        std::string finalName = steamUsername;
-        
-        if (cl_sanitizeSteamName.GetBool())
+        std::string finalName = cl_sanitizeSteamName.GetBool() ? SanitizeSteamUsername(steamUsername) : steamUsername;
+        if (finalName != steamUsername)
         {
-            finalName = SanitizeSteamUsername(steamUsername);
-            if (finalName != steamUsername)
-            {
-                Msg(eDLL_T::ENGINE, "Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
-            }
+            Msg(eDLL_T::STEAM, "Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
         }
         
         strncpy(g_PersonaName, finalName.c_str(), MAX_PERSONA_NAME_LEN - 1);
         g_PersonaName[MAX_PERSONA_NAME_LEN - 1] = '\0';
         
-        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "Force updated persona name to: %s\n", g_PersonaName);
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::STEAM, "Force updated persona name to: %s\n", g_PersonaName);
     }
     
     // Show updated info
