@@ -12,6 +12,8 @@
 #include "gameui/IBrowser.h"
 #include "gameui/IParticleOverlay.h"
 #include "gameui/IStreamOverlay.h"
+#include "gameui/ITopBar.h"
+#include "gameui/IDevMenu.h"
 #include "gameui/imgui_system.h"
 #include "engine/framelimit.h"
 #include "engine/sys_mainwind.h"
@@ -352,6 +354,8 @@ void DirectX_Init()
 			ImguiSystem()->AddSurface(&g_Browser);
 			ImguiSystem()->AddSurface(&g_particleOverlay);
 			ImguiSystem()->AddSurface(&g_streamOverlay);
+			ImguiSystem()->AddSurface(&g_TopBar);
+			ImguiSystem()->AddSurface(&g_DevMenu);
 		}
 		else
 		{

@@ -44,6 +44,21 @@ static bool GetServerListingFromJSON(const rapidjson::Value& value, NetGameServe
         // Optional fields
         JSON_GetValue(value, "hasPassword", outGameServer.hasPassword);
         JSON_GetValue(value, "password",    outGameServer.netPassword);
+
+        // requiredMods (optional): parse manually from array of strings
+        rapidjson::Document::ConstMemberIterator itReq;
+        if (JSON_GetIterator(value, "requiredMods", JSONFieldType_e::kArray, itReq))
+        {
+            outGameServer.requiredMods.clear();
+            const rapidjson::Value& arr = itReq->value;
+            for (const rapidjson::Value& item : arr.GetArray())
+            {
+                if (item.IsString())
+                {
+                    outGameServer.requiredMods.emplace_back(std::string(item.GetString(), item.GetStringLength()));
+                }
+            }
+        }
         return true;
     }
 
@@ -193,6 +208,17 @@ bool CPylon::PostServerHost(string& outMessage, string& outToken, string& outHos
     requestJson.AddMember("timeStamp",   netGameServer.timeStamp,                            allocator);
     requestJson.AddMember("password", rapidjson::Value(netGameServer.netPassword.c_str(), netGameServer.netPassword.length(), allocator), allocator);
 
+    // required mods array
+    if (!netGameServer.requiredMods.empty())
+    {
+        rapidjson::Value mods(rapidjson::kArrayType);
+        for (const string& m : netGameServer.requiredMods)
+        {
+            mods.PushBack(rapidjson::Value(m.c_str(), (rapidjson::SizeType)m.length(), allocator), allocator);
+        }
+        requestJson.AddMember("requiredMods", mods, allocator);
+    }
+
     rapidjson::Document responseJson;
     CURLINFO status;
 
@@ -250,7 +276,7 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
         const CBanSystem::Banned_t& banned = inBannedVec[i];
         rapidjson::Value player(rapidjson::kObjectType);
 
-        player.AddMember("id", banned.m_NucleusID, allocator);
+        player.AddMember("id", banned.m_SteamID, allocator);
         player.AddMember("ip", rapidjson::Value(banned.m_Address.String(), banned.m_Address.Length(), allocator), allocator);
 
         playersArray.PushBack(player, allocator);
@@ -289,8 +315,8 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
         const char* reason = nullptr;
         JSON_GetValue(obj, "reason", reason);
 
-        NucleusID_t nuc = NULL;
-        JSON_GetValue(obj, "id", nuc);
+        SteamID_t steamId = NULL;
+        JSON_GetValue(obj, "id", steamId);
 
         //Default to a connection ban
         CBanSystem::Banned_t::BanType_e banType = CBanSystem::Banned_t::CONNECT;
@@ -299,7 +325,7 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
         const char* pszExpiryTimestamp = nullptr;
         JSON_GetValue(obj, "banExpires", pszExpiryTimestamp);
 
-        CBanSystem::Banned_t banned(reason ? reason : "#DISCONNECT_BANNED", nuc, banType, pszExpiryTimestamp);
+        CBanSystem::Banned_t banned(reason ? reason : "#DISCONNECT_BANNED", steamId, banType, pszExpiryTimestamp);
         (*outBannedVec)->AddToTail(banned);
     }
 
@@ -309,12 +335,12 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
 //-----------------------------------------------------------------------------
 // Purpose: Checks if client is banned on the comp server.
 // Input  : &ipAddress - 
-//			nucleusId  - 
+//			steamId  - 
 //			&personaName - 
 //			&outReason - <- contains banned reason if any.
 // Output : True if banned, false if not banned.
 //-----------------------------------------------------------------------------
-bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, const string& personaName, string& outReason, CBanSystem::Banned_t::BanType_e& outBanType, string& outExpiryTimestamp) const
+bool CPylon::CheckForBan(const string& ipAddress, const uint64_t steamId, const string& personaName, string& outReason, CBanSystem::Banned_t::BanType_e& outBanType, string& outExpiryTimestamp) const
 {
     if (!IsEnabled())
     {
@@ -328,7 +354,7 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
     rapidjson::Document::AllocatorType& allocator = requestJson.GetAllocator();
 
     requestJson.AddMember("name", rapidjson::Value(personaName.c_str(), allocator), allocator);
-    requestJson.AddMember("id", nucleusId, allocator);
+    requestJson.AddMember("id", steamId, allocator);
     requestJson.AddMember("ip", rapidjson::Value(ipAddress.c_str(), allocator), allocator);
 
     rapidjson::Document responseJson;
@@ -352,7 +378,7 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
                 ? reason
                 : "#DISCONNECT_BANNED";
 
-            //Default to a connection ban
+            // Default to a connection ban
             CBanSystem::Banned_t::BanType_e banType = CBanSystem::Banned_t::CONNECT;
             JSON_GetValue(responseJson, "banType", (uint32_t&)banType);
 
@@ -363,6 +389,36 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
             }
 
             outBanType = banType;
+
+            // Build a polished message for display/logging
+            const char* typeLabel = "User";
+            switch (banType)
+            {
+            case CBanSystem::Banned_t::CONNECT: typeLabel = "User"; break;
+            case CBanSystem::Banned_t::COMMUNICATION:    typeLabel = "Chat";       break;
+            default:                            typeLabel = "Restriction"; break;
+            }
+
+            if (!outExpiryTimestamp.empty())
+            {
+                std::string dateOnly = outExpiryTimestamp;
+                size_t tPos = dateOnly.find('T');
+                if (tPos != std::string::npos)
+                {
+                    dateOnly.erase(tPos);
+                }
+                else if (dateOnly.size() > 10)
+                {
+                    dateOnly = dateOnly.substr(0, 10);
+                }
+
+                outReason = Format("\n--> This account is banned <--\n\nReason: %s\n\nExpires: %s", outReason.c_str(), dateOnly.c_str());
+            }
+            else
+            {
+                outReason = Format("\n--> This account is banned <-- \n\nReason: %s\n\nExpires: Permanent", outReason.c_str());
+            }
+
             return true;
         }
     }
@@ -372,15 +428,15 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
 
 //-----------------------------------------------------------------------------
 // Purpose: authenticate for 'this' particular connection.
-// Input  : nucleusId   - 
+// Input  : steamId   - 
 //          *ipAddress  - 
 //          *authCode   - 
 //          &outToken   - 
 //          &outMessage - 
 // Output : true on success, false on failure.
 //-----------------------------------------------------------------------------
-bool CPylon::AuthForConnection(const uint64_t nucleusId, const char* ipAddress,
-    const char* authCode, string& outToken, string& outMessage) const
+bool CPylon::AuthForConnection(const uint64_t steamUserId, const char* ipAddress,
+    const char* authCode, string& outToken, string& outMessage, const char* steamTicket, const char* steamUsername) const
 {
     if (!IsEnabled())
     {
@@ -393,15 +449,32 @@ bool CPylon::AuthForConnection(const uint64_t nucleusId, const char* ipAddress,
 
     rapidjson::Document::AllocatorType& allocator = requestJson.GetAllocator();
 
-    requestJson.AddMember("id", nucleusId, allocator);
+    // Use Steam User ID instead of legacy ID - send as string to avoid precision loss
+    char steamIdStr[32];
+    V_snprintf(steamIdStr, sizeof(steamIdStr), "%llu", steamUserId);
+    requestJson.AddMember("id", rapidjson::Value(steamIdStr, allocator), allocator);
+    
+    // Debug logging
+    Msg(eDLL_T::ENGINE, "[PYLON] DEBUG: Adding Steam User ID to request: %llu (as string: %s)\n", steamUserId, steamIdStr);
     requestJson.AddMember("ip", rapidjson::Value(ipAddress, allocator), allocator);
-    requestJson.AddMember("code", rapidjson::Value(authCode, allocator), allocator);
+    // Steam authentication - authCode is no longer used
+    requestJson.AddMember("code", rapidjson::Value("", allocator), allocator);
+    
+    // Always include Steam data
+    if (steamTicket && *steamTicket)
+    {
+        requestJson.AddMember("steamTicket", rapidjson::Value(steamTicket, allocator), allocator);
+    }
+    if (steamUsername && *steamUsername)
+    {
+        requestJson.AddMember("steamUsername", rapidjson::Value(steamUsername, allocator), allocator);
+    }
 
     rapidjson::Document responseJson;
 
     CURLINFO status;
 
-    if (!SendRequest("/api/client/auth", requestJson, responseJson, outMessage, status, "origin auth error"))
+    if (!SendRequest("/api/client/auth", requestJson, responseJson, outMessage, status, "platform auth error"))
     {
         return false;
     }
@@ -453,12 +526,22 @@ bool CPylon::GetEULA(MSEulaData_t& outData, string& outMessage) const
     const rapidjson::Value& data = serversIt->value;
 
     // check if the EULA response fields are valid.
-    if (!JSON_GetValue(data, "version", outData.version) ||
-        !JSON_GetValue(data, "language", outData.language) ||
-        !JSON_GetValue(data, "contents", outData.contents))
+    if (!JSON_GetValue(data, "contents", outData.contents))
     {
         outMessage = "schema is invalid";
         return false;
+    }
+
+    // Version can be null in new schema, so make it optional
+    if (!JSON_GetValue(data, "version", outData.version))
+    {
+        outData.version = 0; // Default version if not provided
+    }
+
+    // Language field changed from "language" to "lang" in new schema
+    if (!JSON_GetValue(data, "lang", outData.language))
+    {
+        outData.language = "english"; // Default language if not provided
     }
 
     return true;
@@ -481,6 +564,12 @@ bool CPylon::SendRequest(const char* endpoint, const rapidjson::Document& reques
 
     rapidjson::StringBuffer stringBuffer;
     JSON_DocumentToBufferDeserialize(requestJson, stringBuffer);
+    
+    // Debug: Log the actual JSON being sent for auth requests
+    if (strcmp(endpoint, "/api/client/auth") == 0)
+    {
+        Msg(eDLL_T::ENGINE, "[PYLON] DEBUG: Sending JSON payload: %s\n", stringBuffer.GetString());
+    }
 
     string responseBody;
     if (!QueryServer(endpoint, stringBuffer.GetString(), responseBody, outMessage, status))
@@ -541,51 +630,54 @@ bool CPylon::SendRequest(const char* endpoint, const rapidjson::Document& reques
 // Output : True on success, false on failure.
 //-----------------------------------------------------------------------------
 bool CPylon::QueryServer(const char* endpoint, const char* request,
-    string& outResponse, string& outMessage, CURLINFO& outStatus) const
+	string& outResponse, string& outMessage, CURLINFO& outStatus) const
 {
-    const bool showDebug = pylon_showdebuginfo.GetBool();
-    const char* hostName = pylon_matchmaking_hostname.GetString();
+	const bool showDebug = pylon_showdebuginfo.GetBool();
+	const char* hostName = pylon_matchmaking_hostname.GetString();
 
-    if (showDebug)
-    {
-        Msg(eDLL_T::ENGINE, "Sending request to '%s' with endpoint '%s':\n%s\n",
-            hostName, endpoint, request);
-    }
+	if (showDebug)
+	{
+		Msg(eDLL_T::ENGINE, "Sending request to '%s' with endpoint '%s':\n%s\n",
+			hostName, endpoint, request);
+	}
 
-    string finalUrl;
-    CURLFormatUrl(finalUrl, hostName, endpoint);
-    finalUrl += Format("?language=%s", this->GetLanguage().c_str());
+	string finalUrl;
+	CURLFormatUrl(finalUrl, hostName, endpoint);
+	finalUrl += Format("?language=%s", this->GetLanguage().c_str());
 
-    CURLParams params;
+	CURLParams params;
 
-    params.writeFunction = CURLWriteStringCallback;
-    params.timeout = curl_timeout.GetInt();
-    params.verifyPeer = ssl_verify_peer.GetBool();
-    params.verbose = curl_debug.GetBool();
+	params.writeFunction = CURLWriteStringCallback;
+	params.timeout = curl_timeout.GetInt();
+	params.verifyPeer = ssl_verify_peer.GetBool();
+	params.verbose = curl_debug.GetBool();
 
-    curl_slist* sList = nullptr;
-    CURL* curl = CURLInitRequest(finalUrl.c_str(), request, outResponse, sList, params);
-    if (!curl)
-    {
-        return false;
-    }
+	curl_slist* sList = nullptr;
+	CURL* curl = CURLInitRequest(finalUrl.c_str(), request, outResponse, sList, params);
+	if (!curl)
+	{
+		return false;
+	}
 
-    CURLcode res = CURLSubmitRequest(curl, sList);
-    if (!CURLHandleError(curl, res, outMessage,
-        !IsDedicated(/* Errors are already shown for dedicated! */)))
-    {
-        return false;
-    }
+	// Force IPv4 resolution for this request
+	curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 
-    outStatus = CURLRetrieveInfo(curl);
+	CURLcode res = CURLSubmitRequest(curl, sList);
+	if (!CURLHandleError(curl, res, outMessage,
+		!IsDedicated(/* Errors are already shown for dedicated! */)))
+	{
+		return false;
+	}
 
-    if (showDebug)
-    {
-        Msg(eDLL_T::ENGINE, "Host '%s' replied with status: '%d'\n",
-            hostName, outStatus);
-    }
+	outStatus = CURLRetrieveInfo(curl);
 
-    return true;
+	if (showDebug)
+	{
+		Msg(eDLL_T::ENGINE, "Host '%s' replied with status: '%d'\n",
+			hostName, outStatus);
+	}
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------

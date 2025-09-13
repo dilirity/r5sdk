@@ -6,6 +6,9 @@
 
 #ifndef PLAYER_H
 #define PLAYER_H
+#ifdef CLIENT_DLL
+#error "game/server/player.h included in client build"
+#endif
 
 #include "baseentity.h"
 #include "mathlib/mathlib.h"
@@ -202,7 +205,7 @@ public:
 
 	inline bool IsBot() const { return (GetFlags() & FL_FAKECLIENT) != 0; }
 
-	inline NucleusID_t GetPlatformUserId() const { return m_platformUserId; };
+	inline SteamID_t GetPlatformUserId() const { return m_platformUserId; };
 
 	inline const char* GetNetName() const { return m_szNetname; }
 	inline bool IsZooming() { return m_bZooming; }
@@ -238,7 +241,7 @@ private:
 	char m_hardwareIcon[16];
 	bool m_happyHourActive;
 	char gap_5ee6[2];
-	NucleusID_t m_platformUserId;
+	SteamID_t m_platformUserId;
 	char m_hardware;
 	char gap_5ef1[7];
 	i64 m_classModsActive;

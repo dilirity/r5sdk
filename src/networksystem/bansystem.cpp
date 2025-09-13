@@ -78,15 +78,15 @@ void CBanSystem::LoadList(void)
 
 		if (entry.IsUint64())
 		{
-			const NucleusID_t nuc = entry.GetUint64();
+			const SteamID_t steamId = entry.GetUint64();
 
-			if (nuc == 0)
+			if (steamId == 0)
 			{
-				Warning(eDLL_T::SERVER, "%s: Nucleus ID (%d) at index #%zd is zero!\n", __FUNCTION__, currIdx, nuc);
+				Warning(eDLL_T::SERVER, "%s: Steam ID (%llu) at index #%zd is zero!\n", __FUNCTION__, steamId, currIdx);
 				continue;
 			}
 
-			m_bannedIdList.insert(entry.GetUint64());
+			m_bannedIdList.insert(steamId);
 			continue;
 		}
 
@@ -127,7 +127,7 @@ void CBanSystem::SaveList(void) const
 
 	rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
 
-	for (const NucleusID_t id : m_bannedIdList)
+	for (const SteamID_t id : m_bannedIdList)
 	{
 		document.PushBack(id, allocator);
 	}
@@ -164,67 +164,67 @@ void CBanSystem::Clear()
 //-----------------------------------------------------------------------------
 // Purpose: adds a banned player entry to the banned list
 // Input  : *ipAddress - 
-//			nucleusId - 
+//			steamId - 
 //-----------------------------------------------------------------------------
-bool CBanSystem::AddEntry(const netadr_t* const adr, const NucleusID_t nuc)
+bool CBanSystem::AddEntry(const netadr_t* const adr, const SteamID_t steamId)
 {
-	return AddEntry(adr->GetIP(), nuc);
+	return AddEntry(adr->GetIP(), steamId);
 }
 
-bool CBanSystem::AddEntry(const in6_addr* const adr, const NucleusID_t nuc)
+bool CBanSystem::AddEntry(const in6_addr* const adr, const SteamID_t steamId)
 {
-	bool nucAdded = false;
+	bool steamIdAdded = false;
 
-	if (nuc)
-		nucAdded = m_bannedIdList.insert(nuc).second;
+	if (steamId)
+		steamIdAdded = m_bannedIdList.insert(steamId).second;
 
 	bool adrAdded = false;
 
 	if (adr)
 		adrAdded = m_bannedIpList.insert(adr).second;
 
-	return nucAdded || adrAdded;
+	return steamIdAdded || adrAdded;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: deletes an entry in the banned list
 // Input  : *ipAddress - 
-//			nucleusId - 
+//			steamId - 
 //-----------------------------------------------------------------------------
-bool CBanSystem::DeleteEntry(const netadr_t* const adr, const NucleusID_t nuc)
+bool CBanSystem::DeleteEntry(const netadr_t* const adr, const SteamID_t steamId)
 {
-	return DeleteEntry(adr->GetIP(), nuc);
+	return DeleteEntry(adr->GetIP(), steamId);
 }
 
-bool CBanSystem::DeleteEntry(const in6_addr* const adr, const NucleusID_t nuc)
+bool CBanSystem::DeleteEntry(const in6_addr* const adr, const SteamID_t steamId)
 {
-	bool nucRemoved = false;
+	bool steamIdRemoved = false;
 
-	if (nuc)
-		nucRemoved = m_bannedIdList.erase(nuc) != 0;
+	if (steamId)
+		steamIdRemoved = m_bannedIdList.erase(steamId) != 0;
 
 	bool adrRemoved = false;
 
 	if (adr)
 		adrRemoved = m_bannedIpList.erase(adr) != 0;
 
-	return nucRemoved || adrRemoved;
+	return steamIdRemoved || adrRemoved;
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: checks if specified ip address or nucleus id is banned
+// Purpose: checks if specified ip address or Steam ID is banned
 // Input  : *ipAddress - 
-//			nucleusId - 
+//			steamId - 
 // Output : true if banned, false if not banned
 //-----------------------------------------------------------------------------
-bool CBanSystem::IsBanned(const netadr_t* const adr, const NucleusID_t nuc) const
+bool CBanSystem::IsBanned(const netadr_t* const adr, const SteamID_t steamId) const
 {
-	return IsBanned(adr->GetIP(), nuc);
+	return IsBanned(adr->GetIP(), steamId);
 }
 
-bool CBanSystem::IsBanned(const in6_addr* const adr, const NucleusID_t nuc) const
+bool CBanSystem::IsBanned(const in6_addr* const adr, const SteamID_t steamId) const
 {
-	if (nuc && m_bannedIdList.find(nuc) != m_bannedIdList.end())
+	if (steamId && m_bannedIdList.find(steamId) != m_bannedIdList.end())
 		return true;
 
 	if (adr && m_bannedIpList.find(adr) != m_bannedIpList.end())
@@ -300,14 +300,14 @@ static bool BanSystem_ConvertAddress(const char* const address, in6_addr* const 
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: unbans a player by given nucleus id or ip address
+// Purpose: unbans a player by given Steam ID or ip address
 // Input  : *criteria - 
 //-----------------------------------------------------------------------------
 void CBanSystem::UnbanPlayer(const char* criteria)
 {
 	bool bSave = false;
 
-	if (V_IsAllDigit(criteria)) // Check if we have an ip address or nucleus id.
+	if (V_IsAllDigit(criteria)) // Check if we have an ip address or Steam ID.
 	{
 		char* pEnd = nullptr;
 		const uint64_t nTargetID = strtoull(criteria, &pEnd, 10);
@@ -364,7 +364,7 @@ void CBanSystem::AuthorPlayerByName(const char* playerName, const bool shouldBan
 		{
 			if (strcmp(playerName, pNetChan->GetName()) == NULL) // Our wanted name?
 			{
-				if (shouldBan && AddEntry(&pNetChan->GetRemoteAddress(), pClient->GetNucleusID()) && !bSave)
+				if (shouldBan && AddEntry(&pNetChan->GetRemoteAddress(), pClient->GetSteamID()) && !bSave)
 					bSave = true;
 
 				pClient->Disconnect(REP_MARK_BAD, reason);
@@ -390,7 +390,7 @@ static bool BanSystem_CompareAddress(const in6_addr* const a, const in6_addr* co
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: authors player by given nucleus id or ip address
+// Purpose: authors player by given Steam ID or ip address
 // Input  : *playerHandle - 
 //			shouldBan     - (only kicks if false)
 //			*reason       - 
@@ -427,12 +427,12 @@ void CBanSystem::AuthorPlayerById(const char* playerHandle, const bool shouldBan
 			char* pEnd = nullptr;
 			const uint64_t nTargetID = strtoull(playerHandle, &pEnd, 10);
 
-			if (nTargetID >= MAX_PLAYERS) // Is it a possible nucleusID?
-			{
-				const NucleusID_t nNucleusID = pClient->GetNucleusID();
+		if (nTargetID >= MAX_PLAYERS) // Is it a possible SteamID?
+		{
+			const SteamID_t nSteamID = pClient->GetSteamID();
 
-				if (nNucleusID != nTargetID)
-					continue;
+			if (nSteamID != nTargetID)
+				continue;
 			}
 			else // If its not try by handle.
 			{
@@ -442,7 +442,7 @@ void CBanSystem::AuthorPlayerById(const char* playerHandle, const bool shouldBan
 					continue;
 			}
 
-			if (shouldBan && AddEntry(&pNetChan->GetRemoteAddress(), pClient->GetNucleusID()) && !bSave)
+			if (shouldBan && AddEntry(&pNetChan->GetRemoteAddress(), pClient->GetSteamID()) && !bSave)
 				bSave = true;
 
 			pClient->Disconnect(REP_MARK_BAD, reason);
@@ -453,7 +453,7 @@ void CBanSystem::AuthorPlayerById(const char* playerHandle, const bool shouldBan
 			if (!BanSystem_CompareAddress(pNetChan->GetRemoteAddress().GetIP(), &playerAdr))
 				continue;
 
-			if (shouldBan && AddEntry(&pNetChan->GetRemoteAddress(), pClient->GetNucleusID()) && !bSave)
+			if (shouldBan && AddEntry(&pNetChan->GetRemoteAddress(), pClient->GetSteamID()) && !bSave)
 				bSave = true;
 
 			pClient->Disconnect(REP_MARK_BAD, reason);
@@ -554,10 +554,10 @@ static void Host_ReloadBanList_f()
 }
 
 static ConCommand kick("kick", Host_Kick_f, "Kick a client from the server by user name", FCVAR_RELEASE, nullptr, "kick \"<userId>\"");
-static ConCommand kickid("kickid", Host_KickID_f, "Kick a client from the server by handle, nucleus id or ip address", FCVAR_RELEASE, nullptr, "kickid \"<handle>\"/\"<nucleusId>/<ipAddress>\"");
+static ConCommand kickid("kickid", Host_KickID_f, "Kick a client from the server by handle, Steam ID or ip address", FCVAR_RELEASE, nullptr, "kickid \"<handle>\"/\"<steamId>/<ipAddress>\"");
 static ConCommand ban("ban", Host_Ban_f, "Bans a client from the server by user name", FCVAR_RELEASE, nullptr, "ban <userId>");
-static ConCommand banid("banid", Host_BanID_f, "Bans a client from the server by handle, nucleus id or ip address", FCVAR_RELEASE, nullptr, "banid \"<handle>\"/\"<nucleusId>/<ipAddress>\"");
-static ConCommand unban("unban", Host_Unban_f, "Unbans a client from the server by nucleus id or ip address", FCVAR_RELEASE, nullptr, "unban \"<nucleusId>\"/\"<ipAddress>\"");
+static ConCommand banid("banid", Host_BanID_f, "Bans a client from the server by handle, Steam ID or ip address", FCVAR_RELEASE, nullptr, "banid \"<handle>\"/\"<steamId>/<ipAddress>\"");
+static ConCommand unban("unban", Host_Unban_f, "Unbans a client from the server by Steam ID or ip address", FCVAR_RELEASE, nullptr, "unban \"<steamId>\"/\"<ipAddress>\"");
 static ConCommand reload_banlist("banlist_reload", Host_ReloadBanList_f, "Reloads the banned list", FCVAR_RELEASE);
 
 ///////////////////////////////////////////////////////////////////////////////

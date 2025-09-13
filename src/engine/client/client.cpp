@@ -22,6 +22,18 @@
 #include "game/server/util_server.h"
 #include "tier1/fmtstr.h"
 #endif
+#ifndef CLIENT_DLL
+// Steam integration is only available in client builds, not dedicated server
+#ifdef USE_STEAMWORKS
+#include "steam_integration.h"
+#define STEAM_DEBUG_ENABLED() (steam_debug_auth.GetBool())
+#else
+#define STEAM_DEBUG_ENABLED() (false) // No Steam debug in dedicated server
+#endif
+#else
+#include "steam_integration.h"
+#define STEAM_DEBUG_ENABLED() (steam_debug_auth.GetBool())
+#endif
 #include "game/server/gameinterface.h"
 
 // Absolute max string cmd length, any character past this will be NULLED.
@@ -38,11 +50,11 @@ void CClient::Clear(void)
 	CClient__Clear(this);
 
 	// CClient::Clear() doesn't null this for some reason so we have to do it here,
-	// else when fake clients (bots) get created, they will reuse the last nucleus
-	// id that was assigned to this CClient instance. This happens because CClient
+	// else when fake clients (bots) get created, they will reuse the last Steam
+	// ID that was assigned to this CClient instance. This happens because CClient
 	// instances are persistent as they originate from a static array within a
 	// static object of type CServer.
-	m_nNucleusID = 0;
+	m_nSteamID = 0;
 }
 
 //---------------------------------------------------------------------------------
@@ -59,14 +71,14 @@ void CClient::VClear(CClient* pClient)
 // Purpose: gets the extended client data
 // Output  : CClientExtended* - 
 //---------------------------------------------------------------------------------
-CClientExtended* CClient::GetClientExtended(void) const 
+CClientExtended* CClient::GetClientExtended(void) const
 {
 	return m_pServer->GetClientExtended(m_nUserID);
 }
 #endif // !CLIENT_DLL
 
 
-static const char JWT_PUBLIC_KEY[] = 
+static const char JWT_PUBLIC_KEY[] =
 "-----BEGIN PUBLIC KEY-----\n"
 "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2/335exIZ6LE8pYi6e50\n"
 "7tH19tXaeeEJVF5XXpTCXpndXIIWVimvg6xQ381eajySDw93wvG1DzW3U/6LHzyt\n"
@@ -97,7 +109,7 @@ static ConVar sv_quota_stringCmdsPerSecond("sv_quota_stringCmdsPerSecond", "32",
 bool CClient::Authenticate(const char* const playerName, char* const reasonBuf, const size_t reasonBufLen)
 {
 #ifndef CLIENT_DLL
-	// don't bother checking origin auth on bots or local clients
+	// don't bother checking platform auth on bots or local clients
 	if (IsFakeClient() || GetNetChan()->GetRemoteAddress().IsLoopback())
 		return true;
 
@@ -138,7 +150,7 @@ bool CClient::Authenticate(const char* const playerName, char* const reasonBuf, 
 	const char* const onlineAuthTokenSignature2 = cl_onlineAuthTokenSignature2Kv->GetString();
 
 	char fullToken[1024]; // enough buffer for 3x255, which is cvar count * userinfo str limit.
-	const int tokenLen = snprintf(fullToken, sizeof(fullToken), "%s.%s%s", 
+	const int tokenLen = snprintf(fullToken, sizeof(fullToken), "%s.%s%s",
 		onlineAuthToken, onlineAuthTokenSignature1, onlineAuthTokenSignature2);
 
 	if (tokenLen < 0)
@@ -185,11 +197,20 @@ bool CClient::Authenticate(const char* const playerName, char* const reasonBuf, 
 		{
 			const char* const sessionId = claim.value;
 
+			// Steam debug ConVar is declared in steam_integration.h
+
+			// DEBUG: Log what userData contains during JWT validation
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] m_DataBlock.userData contains: %llu\n", (SteamID_t)this->m_DataBlock.userData);
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] playerName: %s\n", playerName);
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] serverIP: %s\n", g_ServerHostManager.GetHostIP().c_str());
+
 			char newId[256];
 			const int idLen = snprintf(newId, sizeof(newId), "%llu-%s-%s",
-				(NucleusID_t)this->m_DataBlock.userData,
+				(SteamID_t)this->m_DataBlock.userData,
 				playerName,
 				g_ServerHostManager.GetHostIP().c_str());
+
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] Game server session string: %s\n", newId);
 
 			if (idLen < 0)
 				ERROR_AND_RETURN("Session ID stitching failed");
@@ -197,11 +218,21 @@ bool CClient::Authenticate(const char* const playerName, char* const reasonBuf, 
 			uint8_t sessionHash[32]; // hash decoded from JWT token
 			V_hextobinary(sessionId, claim.value_length, sessionHash, sizeof(sessionHash));
 
+			// DEBUG: Log JWT session hash
+			char jwtHashHex[65];
+			V_binarytohex(sessionHash, sizeof(sessionHash), jwtHashHex, sizeof(jwtHashHex));
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] JWT session hash: %s\n", jwtHashHex);
+
 			uint8_t oobHash[32]; // hash of data collected from out of band packet
 			const int shRet = mbedtls_sha256((const uint8_t*)newId, idLen, oobHash, NULL);
 
 			if (shRet != NULL)
 				ERROR_AND_RETURN("Session ID hashing failed");
+
+			// DEBUG: Log computed session hash
+			char computedHashHex[65];
+			V_binarytohex(oobHash, sizeof(oobHash), computedHashHex, sizeof(computedHashHex));
+			if (STEAM_DEBUG_ENABLED()) Msg(eDLL_T::SERVER, "[JWT_DEBUG] Computed session hash: %s\n", computedHashHex);
 
 			if (memcmp(oobHash, sessionHash, sizeof(sessionHash)) != 0)
 				ERROR_AND_RETURN("Token is not authorized for the connecting client");
@@ -258,7 +289,7 @@ bool CClient::Connect(const char* szName, CNetChan* pNetChan, bool bFakePlayer,
 				const char* const netAdr = pNetChan ? pNetChan->GetAddress() : "<unknown>";
 
 				Warning(eDLL_T::SERVER, "Client '%s' ('%llu') failed online authentication! [%s]\n",
-					netAdr, (NucleusID_t)m_DataBlock.userData, authFailReason);
+					netAdr, (SteamID_t)m_DataBlock.userData, authFailReason);
 			}
 
 			return false;
@@ -342,7 +373,7 @@ void CClient::VActivatePlayer(CClient* pClient)
 	if (pNetChan && sv_showconnecting.GetBool())
 	{
 		Msg(eDLL_T::SERVER, "Activated player #%d; channel %s(%s) ('%llu')\n",
-			pClient->GetUserID(), pNetChan->GetName(), pNetChan->GetAddress(), pClient->GetNucleusID());
+			pClient->GetUserID(), pNetChan->GetName(), pNetChan->GetAddress(), pClient->GetSteamID());
 	}
 #endif // !CLIENT_DLL
 }
@@ -485,7 +516,7 @@ bool CClient::VProcessStringCmd(CClient* pClient, NET_StringCmd* pMsg)
 		if (!V_IsValidUTF8(pCmd))
 		{
 			Warning(eDLL_T::SERVER, "Removing client '%s' from slot #%i ('%llu' sent invalid string command!)\n",
-				pClient_Adj->GetNetChan()->GetAddress(), pClient_Adj->GetUserID(), pClient_Adj->GetNucleusID());
+				pClient_Adj->GetNetChan()->GetAddress(), pClient_Adj->GetUserID(), pClient_Adj->GetSteamID());
 
 			pClient_Adj->Disconnect(Reputation_t::REP_MARK_BAD, "#DISCONNECT_INVALID_STRINGCMD");
 			return true;
@@ -502,7 +533,7 @@ bool CClient::VProcessStringCmd(CClient* pClient, NET_StringCmd* pMsg)
 	if (pSlot->m_nStringCommandQuotaCount > nCmdQuotaLimit)
 	{
 		Warning(eDLL_T::SERVER, "Removing client '%s' from slot #%i ('%llu' exceeded string command quota!)\n",
-			pClient_Adj->GetNetChan()->GetAddress(), pClient_Adj->GetUserID(), pClient_Adj->GetNucleusID());
+			pClient_Adj->GetNetChan()->GetAddress(), pClient_Adj->GetUserID(), pClient_Adj->GetSteamID());
 
 		pClient_Adj->Disconnect(Reputation_t::REP_MARK_BAD, "#DISCONNECT_STRINGCMD_OVERFLOW");
 		return true;
@@ -586,7 +617,7 @@ static void InformClientAboutCommsBanTriggeredByVoice(CClient* const pClient)
 		CPlayer* const pPlayer = UTIL_PlayerByIndex(pClient->GetHandle());
 
 		if (!pPlayer || !pPlayer->IsConnected())
-			return;	
+			return;
 
 		CSingleUserRecipientFilter filter(pPlayer);
 		v_UserMessageBegin(&filter, "SayText", 2);
@@ -621,7 +652,7 @@ void CClientExtended::BuildCommsBanDisplayMessage(const char* pszReasonStr, cons
 		}
 	}
 
-	fmt.Format("You have an active %s communications ban.\nReason: %s\n", 
+	fmt.Format("You have an active %s communications ban.\nReason: %s\n",
 		pszExpiryTimestamp ? "temporary" : "permanent",
 		pszReasonStr ? pszReasonStr : "None"
 	);
@@ -651,7 +682,7 @@ bool CClient::VProcessVoiceData(CClient* pClient, CLC_VoiceData* pMsg)
 		return false;
 
 	CClient* const pAdj = AdjustShiftedThisPointer(pClient);
-	
+
 	//Is our client communication banned
 	if (pAdj->GetClientExtended()->IsClientCommsBanned())
 	{

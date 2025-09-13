@@ -13,6 +13,8 @@
 #include "gameui/IConsole.h"
 #include "gameui/IBrowser.h"
 #include "gameui/imgui_system.h"
+#include <gameui/ITopBar.h>
+#include <gameui/IDevMenu.h>
 
 //-----------------------------------------------------------------------------
 // Purpose: plays the startup video's
@@ -61,6 +63,22 @@ LRESULT CGame::ImguiWindowProc(HWND hWnd, UINT& uMsg, WPARAM wParam, LPARAM lPar
 		{
 			g_Browser.ToggleActive();
 			ResetInput(); // Disable input to game when browser is drawn.
+		}
+
+		if (imParam == g_ImGuiConfig.m_DevMenuConfig.m_nBind0 ||
+			imParam == g_ImGuiConfig.m_DevMenuConfig.m_nBind1)
+		{
+			// Repurpose old TopBar binds to toggle the Dev Menu instead
+			ConVar* const cvDev = g_pCVar->FindVar("ui_devmenu_enable");
+			if (cvDev)
+			{
+				const bool newEnable = !cvDev->GetBool();
+				cvDev->SetValue(newEnable);
+				// Ensure surface activation matches visibility for proper input handling
+				if (g_DevMenu.IsActivated() != newEnable)
+					g_DevMenu.ToggleActive();
+			}
+			ResetInput();
 		}
 	}
 

@@ -11,6 +11,7 @@
 //=============================================================================//
 #include "miles_impl.h"
 #include "miles_shim.h"
+#include "tier1/cvar.h"
 
 // NOTE: when prototypes of API's change and one or more parameters reside on
 // the stack, optimization must be turned OFF as the compiler will otherwise
@@ -18,15 +19,20 @@
 // not incur a performance penalty as this is just a proxy, the actual logic
 // within the Miles Sound System library remains unmodified.
 
+#pragma region ConVars
+static ConVar miles_pcm_log("miles_pcm_log", "0", FCVAR_RELEASE, "Log MilesSampleSetSourceRaw args and injection");
+#pragma endregion
+
 #pragma optimize( "", off )
 static unsigned int MilesSampleSetSourceRaw(__int64 a1, __int64 a2, unsigned int a3, int a4, unsigned __int16 a5, bool a6)
 {
 	NOTE_UNUSED(a6);
-	// interface fix from 10.0.42 --> 10.0.47. As of version (10.0.43 ?) the
-	// export 'MilesSampleSetSourceRaw' has a newly added bool parameter. The
-	// purpose of this is unknown, but we need to set it to false as they
-	// otherwise would distort the voice comm bus.
-	return v_MilesSampleSetSourceRaw(a1, a2, a3, a4, a5, false);
+
+	if (miles_pcm_log.GetBool())
+	{
+		Msg(eDLL_T::AUDIO, "MilesSampleSetSourceRaw pass-through: a3=%u a4=%d a5=0x%04x a6=%d\n", a3, a4, a5, (int)a6);
+	}
+	return v_MilesSampleSetSourceRaw(a1, a2, a3, a4, a5, a6);
 }
 
 #pragma optimize( "", off )

@@ -1,4 +1,4 @@
-//===== Copyright © 1999-2024, Kawe Mazidjatari, All rights reserved. =======//
+//===== Copyright ï¿½ 1999-2024, Kawe Mazidjatari, All rights reserved. =======//
 //
 // Purpose: A set of utilities for RapidJSON
 //
@@ -185,6 +185,8 @@ inline JSONFieldType_e JSON_GetTypeForType()
         return JSONFieldType_e::kString;
     else if constexpr (std::is_same<T, std::string>::value)
         return JSONFieldType_e::kString;
+    else if constexpr (std::is_same<T, vector<string>>::value)
+        return JSONFieldType_e::kArray;
     else
         static_assert(std::is_same_v<T, void>, "Cannot classify data type; unsupported.");
 }

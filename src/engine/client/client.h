@@ -68,7 +68,7 @@ public:
 	inline int64_t GetTeamNum() const { return m_iTeamNum; }
 	inline edict_t GetHandle(void) const { return m_nHandle; }
 	inline int GetUserID(void) const { return m_nUserID; }
-	inline NucleusID_t GetNucleusID(void) const { return m_nNucleusID; }
+	inline SteamID_t GetSteamID(void) const { return m_nSteamID; }
 	inline int GetXPlatID(void) const { return m_XPlatID; }
 
 	inline SIGNONSTATE GetSignonState(void) const { return m_nSignonState; }
@@ -90,7 +90,7 @@ public:
 
 	inline void SetHandle(edict_t nHandle) { m_nHandle = nHandle; }
 	inline void SetUserID(uint32_t nUserID) { m_nUserID = nUserID; }
-	inline void SetNucleusID(NucleusID_t nNucleusID) { m_nNucleusID = nNucleusID; }
+	inline void SetSteamID(SteamID_t nSteamID) { m_nSteamID = nSteamID; }
 
 	inline void SetSignonState(SIGNONSTATE nSignonState) { m_nSignonState = nSignonState; }
 	inline void SetPersistenceState(PERSISTENCE nPersistenceState) { m_nPersistenceState = nPersistenceState; }
@@ -193,7 +193,7 @@ private:
 	char pad_03A8[8];
 	SIGNONSTATE m_nSignonState;
 	int unk0;
-	NucleusID_t m_nNucleusID;
+	SteamID_t m_nSteamID;
 	int unk1;
 	int unk2;
 	int m_nDeltaTick;

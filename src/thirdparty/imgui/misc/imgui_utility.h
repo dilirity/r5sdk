@@ -6,33 +6,38 @@ constexpr char IMGUI_BIND_FILE[] = "keymap.vdf";
 class ImGuiConfig
 {
 public:
-    ImGuiConfig()
-    {
-        m_ConsoleConfig.m_nBind0 = ImGuiKey_GraveAccent;
-        m_ConsoleConfig.m_nBind1 = ImGuiKey_F10;
+	ImGuiConfig()
+	{
+		m_ConsoleConfig.m_nBind0 = ImGuiKey_GraveAccent;
+		m_ConsoleConfig.m_nBind1 = ImGuiKey_F10;
 
-        m_BrowserConfig.m_nBind0 = ImGuiKey_Insert;
-        m_BrowserConfig.m_nBind1 = ImGuiKey_F11;
-    }
+		m_BrowserConfig.m_nBind0 = ImGuiKey_Insert;
+		m_BrowserConfig.m_nBind1 = ImGuiKey_F11;
 
-    struct BindPair_s
-    {
-        int m_nBind0;
-        int m_nBind1;
-    };
-    
-    BindPair_s m_ConsoleConfig;
-    BindPair_s m_BrowserConfig;
+		m_DevMenuConfig.m_nBind0 = ImGuiKey_F3;
+		m_DevMenuConfig.m_nBind1 = ImGuiKey_Delete;
+	}
 
-    void Load();
-    void Save() const;
-    ImGuiStyle_t InitStyle() const;
+	struct BindPair_s
+	{
+		int m_nBind0;
+		int m_nBind1;
+	};
+	
+	BindPair_s m_ConsoleConfig;
+	BindPair_s m_BrowserConfig;
+	BindPair_s m_DevMenuConfig;
 
-    inline bool KeyUsed(const int key) const
-    {
-        return (key == m_ConsoleConfig.m_nBind0 || key == m_ConsoleConfig.m_nBind1)
-            || (key == m_BrowserConfig.m_nBind0 || key == m_BrowserConfig.m_nBind1);
-    };
+	void Load();
+	void Save() const;
+	ImGuiStyle_t InitStyle() const;
+
+	inline bool KeyUsed(const int key) const
+	{
+		return (key == m_ConsoleConfig.m_nBind0 || key == m_ConsoleConfig.m_nBind1)
+			|| (key == m_BrowserConfig.m_nBind0 || key == m_BrowserConfig.m_nBind1)
+			|| (key == m_DevMenuConfig.m_nBind0 || key == m_DevMenuConfig.m_nBind1);
+	};
 };
 
 extern ImGuiConfig g_ImGuiConfig;

@@ -12,6 +12,8 @@
 #include "cdll_engine_int.h"
 #include "windows/id3dx.h"
 #include "geforce/reflex.h"
+#include <game/client/viewrender.h>
+#include "codecs/fmod/audio_backend.h"
 
 static float s_lastMovementCall = 0.0;
 static float s_LastFrameTime = 0.0;
@@ -28,6 +30,15 @@ void CL_MoveEx()
 
 	if (!v_Host_ShouldRun())
 		return;
+
+	// Update listener position for custom WAV audio system
+	if (g_vecRenderOrigin && g_vecRenderAngles)
+	{
+		if (auto* be = GetActiveCustomAudioBackend()) { 
+			be->SetListenerPosition(*g_vecRenderOrigin, *g_vecRenderAngles);
+			be->Update(0.0f); 
+		}
+	}
 
 	const int commandTick = cl->m_CurrFrameSnapshot
 		? cl->m_CurrFrameSnapshot->m_TickUpdate.m_nCommandTick

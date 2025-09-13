@@ -40,8 +40,76 @@ History:
 #include "game/shared/vscript_shared.h"
 #include "game/server/gameinterface.h"
 #include <engine/server/sv_main.cpp>
+#include "pluginsystem/modsystem.h"
 
 static ConCommand togglebrowser("togglebrowser", CBrowser::ToggleBrowser_f, "Show/hide the server browser", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+// Helper: check required mods against local enabled mods; returns false and a missing list if any missing
+static bool Browser_HasRequiredMods(const NetGameServer_t& server, std::string& outMissing)
+{
+	outMissing.clear();
+	if (server.requiredMods.empty())
+		return true;
+	if (!ModSystem()->IsEnabled())
+	{
+		// If mod system disabled, any required list means missing
+		for (size_t i = 0; i < server.requiredMods.size(); ++i)
+		{
+			if (i) outMissing.append(", ");
+			outMissing.append(server.requiredMods[i]);
+		}
+		return false;
+	}
+
+	CUtlVector<CUtlString> haveIds;
+	CUtlVector<CUtlString> haveNormIds;
+	ModSystem()->LockModList();
+	const CUtlVector<CModSystem::ModInstance_t*>& mods = ModSystem()->GetModList();
+	FOR_EACH_VEC(mods, i)
+	{
+		const CModSystem::ModInstance_t* mod = mods[i];
+		if (!mod || !mod->IsEnabled())
+			continue;
+		haveIds.AddToTail(mod->id);
+		haveNormIds.AddToTail(ModSystem()->GetNormalizedModID(mod));
+	}
+	ModSystem()->UnlockModList();
+
+	auto eq = [](const CUtlString& a, const char* b)
+	{
+		return V_stricmp(a.String(), b) == 0;
+	};
+
+	CUtlVector<CUtlString> missing;
+	for (const std::string& req : server.requiredMods)
+	{
+		bool found = false;
+		FOR_EACH_VEC(haveIds, i)
+		{
+			if (eq(haveIds[i], req.c_str())) { found = true; break; }
+		}
+		if (!found)
+		{
+			FOR_EACH_VEC(haveNormIds, j)
+			{
+				if (eq(haveNormIds[j], req.c_str())) { found = true; break; }
+			}
+		}
+		if (!found)
+			missing.AddToTail(req.c_str());
+	}
+
+	if (missing.Count() > 0)
+	{
+		for (int i = 0; i < missing.Count(); ++i)
+		{
+			if (i) outMissing.append(", ");
+			outMissing.append(missing[i].String());
+		}
+		return false;
+	}
+	return true;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -256,7 +324,7 @@ void CBrowser::DrawBrowserPanel(void)
 
     const float fFooterHeight = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
 
-    if (ImGui::BeginTable("##ServerBrowser_DrawBrowserPanel_ServerListTable", 7, ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY, { 0, -fFooterHeight }))
+    if (ImGui::BeginTable("##ServerBrowser_DrawBrowserPanel_ServerListTable", 8, ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY, { 0, -fFooterHeight }))
     {
         if (m_surfaceStyle == ImGuiStyle_t::MODERN)
         {
@@ -271,6 +339,7 @@ void CBrowser::DrawBrowserPanel(void)
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 25);
         ImGui::TableSetupColumn("Map", ImGuiTableColumnFlags_WidthStretch, 20);
         ImGui::TableSetupColumn("Playlist", ImGuiTableColumnFlags_WidthStretch, 10);
+        ImGui::TableSetupColumn("Required Mods", ImGuiTableColumnFlags_WidthStretch, 15);
         ImGui::TableSetupColumn("Players", ImGuiTableColumnFlags_WidthStretch, 5);
         ImGui::TableSetupColumn("Port", ImGuiTableColumnFlags_WidthStretch, 5);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch, 5);
@@ -337,6 +406,25 @@ void CBrowser::DrawBrowserPanel(void)
                 const char* const pszPlaylist = server->playlist.c_str();
                 ImGui::TextEx(pszPlaylist, &pszPlaylist[server->playlist.length()], textFlags);
 
+                // Mods column
+                ImGui::TableNextColumn();
+                if (!server->requiredMods.empty())
+                {
+                    std::string modsJoined;
+                    modsJoined.reserve(64);
+                    for (size_t m = 0; m < server->requiredMods.size(); ++m)
+                    {
+                        if (m) modsJoined.append(", ");
+                        modsJoined.append(server->requiredMods[m]);
+                    }
+                    const char* const pszMods = modsJoined.c_str();
+                    ImGui::TextEx(pszMods, &pszMods[modsJoined.length()], textFlags);
+                }
+                else
+                {
+                    ImGui::TextUnformatted("-");
+                }
+
                 ImGui::TableNextColumn();
 
                 const std::string playerNums = Format("%3d/%3d", server->numPlayers, server->maxPlayers);
@@ -362,7 +450,15 @@ void CBrowser::DrawBrowserPanel(void)
                     }
                     else
                     {
-                        g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, "");
+                        std::string missing;
+                        if (!Browser_HasRequiredMods(*server, missing))
+                        {
+                            m_serverListMessage = Format("Missing required mods: %s", missing.c_str());
+                        }
+                        else
+                        {
+                            g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, "");
+                        }
                     }
                 }
 
@@ -376,8 +472,16 @@ void CBrowser::DrawBrowserPanel(void)
                     ImGui::Spacing();
                     if (ImGui::Button("Connect", ImVec2(120, 0)))
                     {
-                        g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, s_passwordBuf);
-                        ImGui::CloseCurrentPopup();
+                        std::string missing;
+                        if (!Browser_HasRequiredMods(*server, missing))
+                        {
+                            m_serverListMessage = Format("Missing required mods: %s", missing.c_str());
+                        }
+                        else
+                        {
+                            g_ServerListManager.ConnectToServer(server->address, server->port, server->netKey, s_passwordBuf);
+                            ImGui::CloseCurrentPopup();
+                        }
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Cancel", ImVec2(120, 0)))
@@ -540,10 +644,19 @@ void CBrowser::HiddenServersModal(void)
 
                 if (result && !server.name.empty())
                 {
-                    g_ServerListManager.ConnectToServer(server.address, server.port, server.netKey, ""); // Connect to the server
-                    m_hiddenServerRequestMessage = Format("Found server: %s", server.name.c_str());
-                    m_hiddenServerMessageColor = ImVec4(0.00f, 1.00f, 0.00f, 1.00f);
-                    ImGui::CloseCurrentPopup();
+                    std::string missing;
+                    if (!Browser_HasRequiredMods(server, missing))
+                    {
+                        m_hiddenServerRequestMessage = Format("Missing required mods: %s", missing.c_str());
+                        m_hiddenServerMessageColor = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+                    }
+                    else
+                    {
+                        g_ServerListManager.ConnectToServer(server.address, server.port, server.netKey, ""); // Connect to the server
+                        m_hiddenServerRequestMessage = Format("Found server: %s", server.name.c_str());
+                        m_hiddenServerMessageColor = ImVec4(0.00f, 1.00f, 0.00f, 1.00f);
+                        ImGui::CloseCurrentPopup();
+                    }
                 }
                 else
                 {
@@ -897,7 +1010,11 @@ void CBrowser::UpdateHostingStatus(void)
             break;
         }
 
-        string password = sv_password.GetString();
+        const char* pw = "";
+        if (ConVar* const pPw = g_pCVar->FindVar("sv_password"))
+            pw = pPw->GetString();
+
+        string password = pw;
 
         NetGameServer_t netGameServer
         {
@@ -919,6 +1036,18 @@ void CBrowser::UpdateHostingStatus(void)
                 std::chrono::system_clock::now().time_since_epoch()
                 ).count()
         };
+
+        // Populate required mods from ModSystem
+        if (ModSystem()->IsEnabled())
+        {
+            ModSystem()->LockModList();
+            const CUtlVector<CUtlString>& req = ModSystem()->GetRequiredMods();
+            for (int i = 0; i < req.Count(); ++i)
+            {
+                netGameServer.requiredMods.emplace_back(req[i].String());
+            }
+            ModSystem()->UnlockModList();
+        }
 
         SendHostingPostRequest(netGameServer);
         break;

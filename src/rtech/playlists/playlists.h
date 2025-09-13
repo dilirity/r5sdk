@@ -6,6 +6,7 @@
 void Playlists_SDKInit(void);
 bool Playlists_Load(const char* pszPlaylist);
 bool Playlists_Parse(const char* pszPlaylist);
+void MergeModPlaylistsIntoFile(void);
 
 ///////////////////////////////////////////////////////////////////////////////
 inline bool(*v_Playlists_Load)(const char* pszPlaylist);

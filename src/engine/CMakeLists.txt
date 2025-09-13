@@ -159,6 +159,9 @@ add_sources( SOURCE_GROUP "Client" # Client only.
     "client/datablock_receiver.h"
     "client/community_party.cpp"
     "client/community_party.h"
+    "client/steam_integration.cpp"
+    "client/steam_integration.h"
+    "client/steam_api_wrapper.cpp"
 )
 
 add_sources( SOURCE_GROUP "GameUI"
@@ -170,6 +173,10 @@ add_sources( SOURCE_GROUP "GameUI"
     "${ENGINE_SOURCE_DIR}/gameui/IParticleOverlay.h"
     "${ENGINE_SOURCE_DIR}/gameui/IStreamOverlay.cpp"
     "${ENGINE_SOURCE_DIR}/gameui/IStreamOverlay.h"
+	"${ENGINE_SOURCE_DIR}/gameui/ITopBar.cpp"
+	"${ENGINE_SOURCE_DIR}/gameui/ITopBar.h"
+	"${ENGINE_SOURCE_DIR}/gameui/IDevMenu.cpp"
+	"${ENGINE_SOURCE_DIR}/gameui/IDevMenu.h"
 
     "${ENGINE_SOURCE_DIR}/gameui/imgui_system.cpp"
     "${ENGINE_SOURCE_DIR}/gameui/imgui_system.h"
@@ -235,6 +242,47 @@ elseif( ${PROJECT_NAME} STREQUAL "engine_cl" )
 target_compile_definitions( ${PROJECT_NAME} PRIVATE
     "CLIENT_DLL"
 )
+endif()
+
+# Optional Steamworks support (define USE_STEAMWORKS and set STEAM_SDK_DIR)
+if( DEFINED ENV{STEAM_SDK_DIR} )
+    set(STEAM_SDK_DIR $ENV{STEAM_SDK_DIR})
+endif()
+
+if( NOT STEAM_SDK_DIR AND EXISTS "${THIRDPARTY_SOURCE_DIR}/steamworks/sdk" )
+    set(STEAM_SDK_DIR "${THIRDPARTY_SOURCE_DIR}/steamworks/sdk")
+endif()
+
+if( USE_STEAMWORKS AND STEAM_SDK_DIR )
+    message(STATUS "Building with Steamworks from: ${STEAM_SDK_DIR}")
+    if( NOT ${PROJECT_NAME} STREQUAL "engine_ds" )
+        # Add USE_STEAMWORKS define to all files in the target
+        target_compile_definitions(${PROJECT_NAME} PRIVATE USE_STEAMWORKS)
+        
+        # Add Steam includes and definitions to the wrapper file
+        set_source_files_properties(
+            "client/steam_api_wrapper.cpp"
+            PROPERTIES
+            INCLUDE_DIRECTORIES "${STEAM_SDK_DIR}/public;${STEAM_SDK_DIR}/public/steam"
+        )
+        if( WIN32 )
+            if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
+                set(_STEAM_IMP "${STEAM_SDK_DIR}/redistributable_bin/win64/steam_api64.lib")
+            else()
+                set(_STEAM_IMP "${STEAM_SDK_DIR}/redistributable_bin/steam_api.lib")
+            endif()
+            if( EXISTS "${_STEAM_IMP}" )
+                if( NOT TARGET steamworks_api )
+                    add_library(steamworks_api SHARED IMPORTED GLOBAL)
+                    set_target_properties(steamworks_api PROPERTIES IMPORTED_IMPLIB "${_STEAM_IMP}")
+                endif()
+                # PUBLIC so dependents (e.g., gamesdk) pick up the absolute path to the import lib
+                target_link_libraries( ${PROJECT_NAME} PUBLIC steamworks_api )
+            else()
+                message(WARNING "Steamworks library not found at: ${_STEAM_IMP}")
+            endif()
+        endif()
+    endif()
 endif()
 
 target_include_directories( ${PROJECT_NAME} PRIVATE

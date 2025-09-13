@@ -17,6 +17,45 @@ Steps:
     1. All binaries and symbols are compiled to the `game` folder.
     2. Run `launcher.exe`, toggle and set the desired options and hit the `Launch Game` button.
 
+## Steamworks Integration [OPTIONAL]
+The SDK includes optional Steam integration for features like authentication, user profiles, and overlay support. **This is completely optional** - the SDK works without Steam.
+
+### Setting up Steamworks (Optional)
+Due to licensing restrictions, the Steamworks SDK is not included in this repository. If you want Steam features:
+
+1. **Download the Steamworks SDK:**
+   - Visit [Steamworks SDK](https://partner.steamgames.com/) (requires Steam partner account)
+   - Download the latest Steamworks SDK
+
+2. **Install the SDK:**
+   - Extract the SDK to `src/thirdparty/steamworks/sdk/`
+   - The folder structure should look like:
+     ```
+     src/thirdparty/steamworks/sdk/
+     ├── public/steam/
+     ├── redistributable_bin/
+     └── Readme.txt
+     ```
+
+3. **Enable Steam features:**
+   - Add `#define USE_STEAMWORKS` to your project or compiler flags
+   - The build system will automatically link against Steam libraries when available
+
+### Steam Features
+When Steamworks is enabled, the SDK provides:
+- **Steam Authentication**: Session tickets for server authentication
+- **User Profiles**: Access to Steam username and user ID
+- **Steam Overlay**: Integration with Steam's in-game overlay
+- **Safe Integration**: Automatic fallbacks when Steam is unavailable
+
+### Console Commands (with Steam)
+- `steam_overlay_info` - Display Steam overlay status and settings
+- `steam_overlay_pos <0-3>` - Set overlay notification position
+- `steam_safe_callbacks <0/1>` - Enable/disable safe callback processing
+
+### Building without Steam
+The SDK compiles and runs perfectly without Steamworks. All Steam-related code is conditionally compiled and safely disabled when the SDK is not available.
+
 ## Debugging
 The tools and libraries offered by the SDK could be debugged right after they are compiled.
 

@@ -9,25 +9,28 @@
 void HEbisuSDK_Init()
 {
 	const bool isDedicated = IsDedicated();
-	const bool noOrigin = IsOriginDisabled();
+	const bool steamMode = IsSteamMode();
 
 	// Fill with default data if this is a dedicated server, or if the game was
 	// launched with the platform system disabled. Engine code requires these
 	// to be set for the game to function, else stuff like the "map" command
-	// won't run as 'IsOriginInitialized()' returns false (which got inlined in
+	// won't run as 'IsPlatformInitialized()' returns false (which got inlined in
 	// every place this was called in the game's executable).
-	if (isDedicated || noOrigin)
+	// Steam-only mode: bypass EA/Origin requirement and use placeholder values
+	// The g_SteamUserID will be replaced with the actual Steam ID during authentication
+	if (isDedicated || steamMode)
 	{
 		*g_EbisuSDKInit = true;
 		*g_EbisuProfileInit = true;
-		*g_NucleusID = FAKE_BASE_NUCLEUD_ID;
+		*g_SteamUserID = FAKE_BASE_STEAM_ID; // Placeholder - replaced with Steam ID later
 
-		Q_snprintf(g_OriginAuthCode, 256, "%s", "INVALID_OAUTH_CODE");
-		Q_snprintf(g_NucleusToken, 1024, "%s", "INVALID_NUCLEUS_TOKEN");
+		// EA/Origin authentication tokens are no longer needed with Steam authentication
+		// Q_snprintf(g_OriginAuthCode, 256, "%s", "INVALID_OAUTH_CODE"); // REMOVED: No longer needed with Steam auth
+		Q_snprintf(g_LegacyAuthToken, 1024, "%s", "INVALID_LEGACY_TOKEN"); // Legacy compatibility (renamed from legacy EA token)
 
 		if (!isDedicated)
 		{
-			platform_user_id->SetValue(FAKE_BASE_NUCLEUD_ID);
+			platform_user_id->SetValue(FAKE_BASE_STEAM_ID);
 		}
 	}
 }
@@ -37,7 +40,7 @@ void HEbisuSDK_Init()
 //-----------------------------------------------------------------------------
 void HEbisuSDK_RunFrame()
 {
-	if (IsOriginDisabled())
+	if (IsSteamMode())
 	{
 		return;
 	}
@@ -85,32 +88,32 @@ const char* HEbisuSDK_GetLanguage()
 // Purpose: checks if the EbisuSDK is disabled
 // Output : true on success, false on failure
 //-----------------------------------------------------------------------------
-bool IsOriginDisabled()
+bool IsSteamMode()
 {
-	const static bool isDisabled = CommandLine()->CheckParm("-noorigin");
-	return isDisabled;
+	const static bool steamMode = CommandLine()->CheckParm("-noorigin");
+	return steamMode;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: checks if the EbisuSDK is initialized
 // Output : true on success, false on failure
 //-----------------------------------------------------------------------------
-bool IsOriginInitialized()
+bool IsPlatformInitialized()
 {
 	if (IsDedicated())
 	{
 		return true;
 	}
-	else if ((!(*g_OriginErrorLevel)
+	else if ((!(*g_PlatformErrorLevel)
 		&& (*g_EbisuSDKInit)
-		&& (*g_NucleusID)
+		&& (*g_SteamUserID)
 		&& (*g_EbisuProfileInit)))
-	// Note(amos): checks on these are disabled because we should be able to
-	// load into the game without an origin or nucleus token. There won't be
+	// Note(amos): checks on legacy auth tokens are disabled because we should be able to
+	// load into the game without legacy EA/Origin tokens. There won't be
 	// a token if the game is launched with -offline for example, these are
-	// only used for the platform system and online server authentication.
-	//	&& (*g_OriginAuthCode)
-	//	&& (g_NucleusToken[0])))
+	// only used for legacy platform system compatibility.
+	//	&& (*g_OriginAuthCode)     [REMOVED - no longer needed]
+	//	&& (g_LegacyAuthToken[0])  [DISABLED - legacy compatibility only]))
 	{
 		return true;
 	}
@@ -119,7 +122,7 @@ bool IsOriginInitialized()
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: validates if client's persona name meets EA's criteria
+// Purpose: validates if client's persona name meets Steam-friendly criteria (much more lenient than EA)
 // Input  : *pszName -
 // Output : true on success, false on failure
 //-----------------------------------------------------------------------------
@@ -133,9 +136,18 @@ bool IsValidPersonaName(const char* const pszName, const int nMinLen, const int 
 		return false;
 	}
 
-	// Check if the name contains any special characters.
-	const size_t pos = strspn(pszName, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_");
-	return pszName[pos] == '\0';
+	// Allow most printable characters including symbols and spaces (Steam-friendly validation)
+	// Only block control characters (0x00-0x1F) and DEL (0x7F)
+	for (size_t i = 0; i < len; i++)
+	{
+		unsigned char c = (unsigned char)pszName[i];
+		if (c < 0x20 || c == 0x7F) // Block control characters and DEL
+		{
+			return false;
+		}
+	}
+	
+	return true;
 }
 
 void VEbisuSDK::Detour(const bool bAttach) const

@@ -7,6 +7,8 @@
 #include "tier0/fasttimer.h"
 #include "tier0/commandline.h"
 #include "tier1/cvar.h"
+#include <cmath>
+#include <algorithm>
 #include "rtech/core/strutils.h"
 #include "rtech/async/asyncio.h"
 #include "rtech/pak/pakstate.h"
@@ -14,13 +16,64 @@
 #include "pluginsystem/modsystem.h"
 #include "ebisusdk/EbisuSDK.h"
 #include "miles_impl.h"
+#include "game/client/viewrender.h"
 #include "miles/src/sdk/shared/rrthreads2.h"
+#include "../fmod/audio_backend.h"
+#include "public/game/client/icliententity.h"
+#include <unordered_map>
+#include <mutex>
+#include <codecs/fmod/studio_backend.cpp>
 
 //-----------------------------------------------------------------------------
 // Console variables
 //-----------------------------------------------------------------------------
 static ConVar miles_debug("miles_debug", "0", FCVAR_DEVELOPMENTONLY, "Enables debug prints for the Miles Sound System", "1 = print; 0 (zero) = no print");
 static ConVar miles_warnings("miles_warnings", "0", FCVAR_RELEASE, "Enables warning prints for the Miles Sound System", "1 = print; 0 (zero) = no print");
+static ConVar fmod_debug("fmod_debug", "0", FCVAR_RELEASE, "Enables debug prints for the FMOD Sound System", "1 = print; 0 (zero) = no print");
+
+// Level change detection
+static ConVar miles_wav_auto_stop_on_level_change("miles_wav_auto_stop_on_level_change", "1", FCVAR_RELEASE, "Automatically stop custom audio when level changes (1 = enabled, 0 = disabled)");
+
+static ICustomAudioBackend* be = nullptr;
+
+/*void SetEventPositionOverride(const char* eventName, const Vector3D& position)
+{
+	std::lock_guard<std::mutex> lg(s_eventPositionMutex);
+	s_eventPositionOverrides[eventName] = position;
+	if (wav_debug.GetBool())
+		Msg(eDLL_T::AUDIO, "Set position override for event '%s': (%.1f, %.1f, %.1f)\n", 
+			eventName, position.x, position.y, position.z);
+}*/
+
+/*bool GetEventPositionOverride(const char* eventName, Vector3D& position)
+{
+	std::lock_guard<std::mutex> lg(s_eventPositionMutex);
+	auto it = s_eventPositionOverrides.find(eventName);
+	if (it != s_eventPositionOverrides.end())
+	{
+		position = it->second;
+		// Remove the override after using it (single-use)
+		s_eventPositionOverrides.erase(it);
+		return true;
+	}
+	return false;
+}*/
+
+
+//-----------------------------------------------------------------------------
+// Purpose: Called when a level change is detected - stops all custom audio
+//-----------------------------------------------------------------------------
+void Miles_HandleLevelChanged()
+{
+	/*if (miles_wav_auto_stop_on_level_change.GetBool())
+	{
+		if (wav_debug.GetBool())
+		{
+			Msg(eDLL_T::AUDIO, "Level change detected via Mod_HandleLevelChanged, stopping all custom audio\n");
+		}
+		StopAllCustomAudio();
+	}*/
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: initializes the miles sound system
@@ -89,6 +142,29 @@ static bool CSOM_Initialize()
 	initTimer.End();
 
 	Msg(eDLL_T::AUDIO, "%s: %s (%f seconds)\n", __FUNCTION__, bResult ? "success" : "failure", initTimer.GetDuration().GetSeconds());
+
+	{
+		static ICustomAudioBackend* s_backend = nullptr;
+		if (!s_backend)
+		{
+			s_backend = CreateFMODStudioBackend();
+			if (s_backend && s_backend->Initialize())
+			{
+				SetActiveCustomAudioBackend(s_backend);
+				be = s_backend;
+				if (fmod_debug.GetBool())
+					Msg(eDLL_T::AUDIO, "Initialized FMOD Studio backend for custom audio\n");
+			}
+			else
+			{
+				if (fmod_debug.GetBool())
+					Msg(eDLL_T::AUDIO, "Failed to initialize FMOD Studio backend; falling back to Miles for custom audio\n");
+				delete s_backend;
+				s_backend = nullptr;
+			}
+		}
+	}
+
 	return bResult;
 }
 
@@ -218,6 +294,9 @@ static void CSOM_LogFunc(int64_t nLogLevel, const char* pszMessage)
 	v_CSOM_LogFunc(nLogLevel, pszMessage);
 }
 
+// Capture flag to sniff the formatted Buffer string produced by sub_1405F2F60
+static thread_local bool g_captureBufferFrom_sub_1405F2F60 = false;
+
 //-----------------------------------------------------------------------------
 // Purpose: runs the event queue
 //-----------------------------------------------------------------------------
@@ -263,20 +342,212 @@ void MilesBankPatch(Miles::Bank* bank, char* streamPatch, char* localizedStreamP
 //-----------------------------------------------------------------------------
 static void CSOM_AddEventToQueue(const char* eventName)
 {
-	if (miles_debug.GetBool())
-		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
-
-	v_CSOM_AddEventToQueue(eventName);
-
-	if (miles_warnings.GetBool())
+	//if isnt a override and eventname dosnt contain dialogue
+	if (!DoesOverrideExist(eventName))
 	{
-		if (g_milesGlobals->queuedEventHash == 1)
-			Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; invalid event name '%s'\n", __FUNCTION__, eventName);
+		v_CSOM_AddEventToQueue(eventName);
 
-		if (g_milesGlobals->queuedEventHash == 2)
-			Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; event '%s' not found.\n", __FUNCTION__, eventName);
+		if (miles_debug.GetBool())
+		{
+			Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
+		}
+
+		if (miles_warnings.GetBool())
+		{
+			if (g_milesGlobals->queuedEventHash == 1)
+				Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; invalid event name '%s'\n", __FUNCTION__, eventName);
+
+			if (g_milesGlobals->queuedEventHash == 2)
+				Warning(eDLL_T::AUDIO, "%s: failed to add event to queue; event '%s' not found.\n", __FUNCTION__, eventName);
+		}
+
+		return;
 	}
+
+	if (DoesOverrideExist(eventName) && !V_strstr(eventName, "diag") && !be->GetUserPropertyBool(eventName, "dont_override"))
+	{
+		FmodDebugEventPrint("CSOM_AddEventToQueue Override", eventName);
+		OverrideEventName(eventName);
+		v_CSOM_AddEventToQueue("");
+		return;
+	}
+
+
+	if(!be->GetUserPropertyBool(eventName, "dont_override"))
+		FmodDebugEventPrint("CSOM_AddEventToQueue Error", eventName);
+
+	v_CSOM_AddEventToQueue("");
+
 };
+
+static void ProcessClientAnimEvent(__int64 a1, __int64 a2, __int64 a3, unsigned int a4, const char* a5, __int64 a6, __int64 a7)
+{
+	//if (fmod_debug.GetBool())
+	//{
+		//Msg(eDLL_T::AUDIO, "ProcessClientAnimEvent: a4 = %d || a5 = %s\n", a4, a5);
+	//}
+
+	v_ProcessClientAnimEvent(a1, a2, a3, a4, a5, a6, a7);
+}
+
+Vector3D lastEntityOrigin = Vector3D{ 0.0f, 0.0f, 0.0f };
+bool lastEntityOriginValid = false;
+
+static int StopSoundOnEntityForLocalPlayer(__int64 a1, const char* eventName)
+{
+	if (be->EventExists(eventName))
+	{
+		FmodDebugEventPrint("StopSoundOnEntityForLocalPlayer", eventName);
+		//be->StopSamplesForEvent(eventName);
+	}
+
+	return v_StopSoundOnEntityForLocalPlayer(a1, eventName);
+}
+
+static int EmitSoundOnEntityForLocalPlayer(__int64 a1, const char* eventName)
+{
+	if (be->EventExists(eventName))
+	{
+		if (V_strstr(eventName, "3p") || V_strstr(eventName, "3P"))
+		{
+			if (lastEntityOriginValid)
+			{
+				FmodDebugEventPrint("EmitSoundOnEntityForLocalPlayer 3P", eventName);
+				be->PlayEvent3D(eventName, lastEntityOrigin, 1.0f);
+				return 0;
+			}
+			else
+			{
+				FmodDebugEventPrint("EmitSoundOnEntityForLocalPlayer 3P No Origin", eventName);
+				be->PlayEvent3D(eventName, { 0,0,0 }, 0.0f);
+			}
+		}
+		else
+		{
+			FmodDebugEventPrint("EmitSoundOnEntityForLocalPlayer 1P", eventName);
+			OverrideEventName(eventName);
+			return 0;
+		}
+	}
+
+	return v_EmitSoundOnEntityForLocalPlayer(a1, eventName);
+}
+
+static __int64 EmitSoundOnEntity(const char *a1, unsigned int a2, __int64 a3, const char *eventName, __int64 a5)
+{
+	if (V_strcmp(a1, "EmitSoundOnEntity") == 0)
+	{
+		if (be->EventExists(eventName))
+		{
+			if (V_strstr(eventName, "3p") || V_strstr(eventName, "3P"))
+			{
+				if (lastEntityOriginValid)
+				{
+					FmodDebugEventPrint("EmitSoundOnEntity 3P", eventName);
+					be->PlayEvent3D(eventName, lastEntityOrigin, 1.0f);
+					return 0;
+				}
+				else
+				{
+					FmodDebugEventPrint("EmitSoundOnEntity 3P No Origin", eventName);
+					be->PlayEvent3D(eventName, { 0,0,0 }, 0.0f);
+				}
+			}
+			else
+			{
+				FmodDebugEventPrint("EmitSoundOnEntity 1P", eventName);
+				OverrideEventName(eventName);
+				return 0;
+			}
+		}
+	}
+
+	FmodDebugEventPrint("EmitSoundOnEntity Default Call", eventName);
+	return v_EmitSoundOnEntity(a1, a2, a3, eventName, a5);
+}
+
+void FmodDebugEventPrint(const char* eventType, const char* eventName)
+{
+	if(fmod_debug.GetBool())
+	{
+		Msg(eDLL_T::AUDIO, "FMOD: %s: '%s'\n", eventType, eventName);
+	}
+}
+
+static __int64 EmitSoundOnEntityImpl_Hook(__int64 a1)
+{
+	// Hook for sub_1409B5120 (EmitSoundOnEntity VM entry)
+	// Extract first argument value from VM frame
+	// a1+88 -> base of value array; copy first value's 16 bytes (type + payload)
+	__m128i val = *reinterpret_cast<const __m128i*>(*reinterpret_cast<const __int64*>(a1 + 88) + 16);
+
+	// If null tag (matches decomp's 0x01000001) treat as no entity
+	if (_mm_cvtsi128_si32(val) == 0x01000001)
+	{
+		return v_EmitSoundOnEntityImpl(a1);
+	}
+
+	// Resolve to entity using helper and VM entity type symbol
+	__int64 entityPtr = 0;
+	if (v_ResolveToEntity)
+	{
+		entityPtr = v_ResolveToEntity(a1, reinterpret_cast<__int64>(&val), reinterpret_cast<__int64>(g_VMEntityType));
+	}
+
+	// Try to get world origin from the resolved entity
+	if (entityPtr)
+	{
+		const IClientEntity* const ent = reinterpret_cast<const IClientEntity*>(entityPtr);
+		const Vector3D& origin = ent->GetAbsOrigin();
+		lastEntityOrigin = origin;
+		lastEntityOriginValid = true;
+	}
+	else
+	{
+		lastEntityOriginValid = false;
+	}
+
+	return v_EmitSoundOnEntityImpl(a1);
+}
+
+static int Charge_EmitSoundOnEntityForLocalPlayer(__int64 a1, const char* a2, float a3)
+{
+	if (be->EventExists(a2))
+	{
+		FmodDebugEventPrint("Charge_EmitSoundOnEntityForLocalPlayer Override", a2);
+		OverrideEventName(a2);
+		return 0;
+	}
+
+	FmodDebugEventPrint("Charge_EmitSoundOnEntityForLocalPlayer Default Call", a2);
+	return v_Charge_EmitSoundOnEntityForLocalPlayer(a1, a2, a3);
+}
+
+void OverrideEventName(const char* eventName)
+{
+	Vector3D soundPos = g_milesGlobals->queuedSoundPosition;
+	Vector3D playerPos = g_vecRenderOrigin ? *g_vecRenderOrigin : Vector3D{ 0.0f, 0.0f, 0.0f };
+
+	if (soundPos == Vector3D{ 0.0f, 0.0f, 0.0f })
+		soundPos = playerPos;
+
+	be->PlayEvent3D(eventName, soundPos, 1.0f);
+}
+
+bool DoesOverrideExist(const char* eventName)
+{
+	if (be->EventExists(eventName))
+	{
+		return true;
+	}
+	else
+	{
+		std::atomic_thread_fence(std::memory_order_seq_cst);
+		std::this_thread::yield();
+		return false;
+	}
+}
+
 
 //-----------------------------------------------------------------------------
 // Purpose: close and reset the CSOM async file instance
@@ -585,9 +856,104 @@ static s32 CSOM_MilesAsync_FileCancel(MilesAsyncRead* const request)
 	return CSOM_MilesAsync_FileStatus(request, RR_WAIT_INFINITE);
 }
 
+/*//-----------------------------------------------------------------------------
+// Purpose: Event build hook
+//-----------------------------------------------------------------------------
+// Global event name for Northstar hooks
+// Event processing function - apply overrides after original function completes
+static char __fastcall h_Sub_18002AAF0(__int64 a1, __int64 a2, __int64 a3, __int64 j)
+{
+	// Call original function first to let Miles set up structures
+	char result = v_h_Sub_18002AAF0(a1, a2, a3, j);
+
+	// Now safely apply overrides after Miles has finished processing
+	__try
+	{
+		const char* name = **(const char***)(*(_QWORD*)(32i64 * *(unsigned __int16*)(a2 + 178) + *(_QWORD*)(a1 + 2216) + 8));
+
+		const void* overridePtr = nullptr;
+		unsigned overrideLen = 0;
+		if (GetAudioOverrideManagerNorthstar()->TryGetOverrideForEvent(name, overridePtr, overrideLen))
+		{
+			if (wav_debug.GetBool())
+				Msg(eDLL_T::AUDIO, "[NORTHSTAR] Applying override for event: %s (post-processing)\n", name);
+
+			// Apply override after original function completed - should be safer
+			__try
+			{
+				// Event structure cast (from decompiled code: v7 = (unsigned __int16 *)a2)
+				unsigned __int16* eventStruct = (unsigned __int16*)a2;
+				
+				// Get first sample index from event structure (from decompiled: i = *v7)
+				unsigned __int16 sampleIndex = *eventStruct;
+				
+				if (sampleIndex != 0xFFFF)  // Valid sample index
+				{
+					// Calculate sample structure address (from decompiled code)
+					__int64 sampleArrayBase = *(_QWORD*)(a1 + 1872);
+					__int64 sampleStructure = sampleArrayBase + 160i64 * sampleIndex;
+					
+					if (wav_debug.GetBool())
+						Msg(eDLL_T::AUDIO, "[NORTHSTAR] Applying to sample structure at: %p (index %u)\n", 
+							(void*)sampleStructure, sampleIndex);
+					
+					// Apply override after Miles processing is complete
+					__try
+					{
+						// Apply Northstar offsets to sample structure
+						*(void**)(sampleStructure + 0xE8) = const_cast<void*>(overridePtr);
+						*(unsigned int*)(sampleStructure + 0xF0) = overrideLen;
+						
+						if (wav_debug.GetBool())
+							Msg(eDLL_T::AUDIO, "[NORTHSTAR] Successfully applied override - Buffer: %p, Len: %u\n",
+								overridePtr, overrideLen);
+					}
+					__except(EXCEPTION_EXECUTE_HANDLER)
+					{
+						if (wav_debug.GetBool())
+							Msg(eDLL_T::AUDIO, "[NORTHSTAR] Failed to write to sample structure %p\n", 
+								(void*)sampleStructure);
+					}
+				}
+				else
+				{
+					if (wav_debug.GetBool())
+						Msg(eDLL_T::AUDIO, "[NORTHSTAR] No valid sample found in event structure\n");
+				}
+			}
+			__except(EXCEPTION_EXECUTE_HANDLER)
+			{
+				if (wav_debug.GetBool())
+					Msg(eDLL_T::AUDIO, "[NORTHSTAR] Failed to access event structure for override\n");
+			}
+		}
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		if (wav_debug.GetBool())
+			Msg(eDLL_T::AUDIO, "[NORTHSTAR] Exception during event name extraction\n");
+	}
+	
+	return result;
+}
+
+static __int64 __fastcall MilesEventBuild_Hook(float* a1, __int64 a2, __int64 a3)
+{
+	return v_MilesEventBuild(a1, a2, a3);
+}
+*/
+
+static __int64 sub_1409A7570_Hook(__int64 a1, char* a2)
+{
+	Msg(eDLL_T::AUDIO, "sub_1409A7570_Hook: %s\n", a2);
+	
+	return v_sub_1409A7570(a1, a2);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 void MilesCore::Detour(const bool bAttach) const
 {
+	//DetourSetup(&v_MilesEventBuild, &MilesEventBuild_Hook, bAttach);
 	DetourSetup(&v_MilesQueueEventRun, &MilesQueueEventRun, bAttach);
 	//DetourSetup(&v_MilesBankPatch, &MilesBankPatch, bAttach);
 	DetourSetup(&v_CSOM_Initialize, &CSOM_Initialize, bAttach);
@@ -597,6 +963,13 @@ void MilesCore::Detour(const bool bAttach) const
 	DetourSetup(&v_CSOM_MilesAsync_FileStatus, &CSOM_MilesAsync_FileStatus, bAttach);
 	DetourSetup(&v_CSOM_MilesAsync_FileCancel, &CSOM_MilesAsync_FileCancel, bAttach);
 	DetourSetup(&v_CSOM_AddEventToQueue, &CSOM_AddEventToQueue, bAttach);
+	DetourSetup(&v_ProcessClientAnimEvent, &ProcessClientAnimEvent, bAttach);
+	DetourSetup(&v_StopSoundOnEntityForLocalPlayer, &StopSoundOnEntityForLocalPlayer, bAttach);
+	DetourSetup(&v_EmitSoundOnEntityForLocalPlayer, &EmitSoundOnEntityForLocalPlayer, bAttach);
+	DetourSetup(&v_Charge_EmitSoundOnEntityForLocalPlayer, &Charge_EmitSoundOnEntityForLocalPlayer, bAttach);
+	DetourSetup(&v_EmitSoundOnEntity, &EmitSoundOnEntity, bAttach);
+	DetourSetup(&v_EmitSoundOnEntityImpl, &EmitSoundOnEntityImpl_Hook, bAttach);
+	DetourSetup(&v_sub_1409A7570, &sub_1409A7570_Hook, bAttach);
 
 	if (bAttach)
 	{

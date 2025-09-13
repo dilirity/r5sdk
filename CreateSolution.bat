@@ -32,7 +32,7 @@ if not exist "%BINDIR%" (
 )
 
 cd "%BUILDDIR%"
-cmake .. -G"%CMAKE_GENERATOR%" -A"x64"
+cmake .. -G"%CMAKE_GENERATOR%" -A"x64" -DUSE_STEAMWORKS=ON
 cd ..
 
 echo Finished generating solution files.

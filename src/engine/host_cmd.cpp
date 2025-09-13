@@ -101,7 +101,7 @@ static void Host_Status_PrintClient(CClient* client, bool bShowAddress, void (*p
 	if (nci != NULL)
 	{
 		print("# %hu \"%s\" %llu %s %i %i %s %d\n",
-			client->GetHandle(), client->GetServerName(), client->GetNucleusID(), COM_FormatSeconds(static_cast<int>(nci->GetTimeConnected())),
+			client->GetHandle(), client->GetServerName(), client->GetSteamID(), COM_FormatSeconds(static_cast<int>(nci->GetTimeConnected())),
 			static_cast<int>(1000.0f * nci->GetAvgLatency(FLOW_OUTGOING)), static_cast<int>(100.0f * nci->GetAvgLoss(FLOW_INCOMING)), state, nci->GetDataRate());
 
 		if (bShowAddress)
@@ -111,7 +111,7 @@ static void Host_Status_PrintClient(CClient* client, bool bShowAddress, void (*p
 	}
 	else
 	{
-		print("#%2hu \"%s\" %llu %s\n", client->GetHandle(), client->GetServerName(), client->GetNucleusID(), state);
+		print("#%2hu \"%s\" %llu %s\n", client->GetHandle(), client->GetServerName(), client->GetSteamID(), state);
 	}
 
 	//print("\n");

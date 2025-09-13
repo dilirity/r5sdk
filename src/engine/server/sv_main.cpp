@@ -1,3 +1,4 @@
+#ifndef CLIENT_DLL
 //===========================================================================//
 //
 // Purpose:
@@ -11,42 +12,11 @@
 #include "engine/client/client.h"
 #include "networksystem/pylon.h"
 #include "networksystem/bansystem.h"
-#include "engine/client/client.h"
 #include "server.h"
 #include "game/server/gameinterface.h"
 #include "game/server/util_server.h"
 
-// Simple non-reversible tag for equality check without leaking plaintext
-static string SV_HashPasswordTag(const char* const pszPassword)
-{
-	if (!pszPassword || !pszPassword[0])
-		return string();
-	uint64_t h = 1469598103934665603ULL; // FNV-1a 64-bit
-	for (const unsigned char* p = reinterpret_cast<const unsigned char*>(pszPassword); *p; ++p)
-	{
-		h ^= *p;
-		h *= 1099511628211ULL;
-	}
-	return Format("pw:%016llx", h);
-}
 
-static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOldValue, ChangeUserData_t pUserData)
-{
-	ConVar* const pPassword = g_pCVar->FindVar(pConVar->GetName());
-	ConVar* const pFilter   = g_pCVar->FindVar("serverFilter");
-	if (!pPassword || !pFilter)
-		return;
-
-	const char* const newPw = pPassword->GetString();
-	// Skip if value hasn't actually changed.
-	if (pOldString && strcmp(pOldString, newPw) == 0)
-		return;
-
-	const string tagged = SV_HashPasswordTag(newPw);
-	pFilter->SetValue(tagged.c_str());
-}
-
-static ConVar sv_password("sv_password", "", FCVAR_RELEASE, "Server password for entry.", false, 0.f, false, 0.f, &SV_ServerPasswordChanged_f, nullptr);
 static ConVar sv_applyGlobalCommsBans("sv_applyGlobalCommsBans", "3", FCVAR_RELEASE, "Determines whether or not to use the global chat ban list, 0 = None, 1 = Text, 2 = Voice, 3 = Both.", false, 0.f, true, 3.f);
 static ConVar sv_commsBansAreGameBans("sv_commsBansAreGameBans", "0", FCVAR_RELEASE, "If set chat bans will be applied as game bans", false, 0.f, true, 1.f);
 
@@ -73,14 +43,14 @@ static bool SV_GlobalCommsBansEnabled()
 	return false;
 }
 
-static void SV_HandleConnectBan(CClient* const pClient, const char* const pszReason, const char* const pszIpStr, const int nPort, const NucleusID_t nNucleusID)
+static void SV_HandleConnectBan(CClient* const pClient, const char* const pszReason, const char* const pszIpStr, const int nPort, const SteamID_t nSteamID)
 {
 	pClient->Disconnect(Reputation_t::REP_MARK_BAD, "%s", pszReason);
 	Warning(eDLL_T::SERVER, "Removed client '[%s]:%i' from slot #%i ('%llu' is banned globally!)\n",
-		pszIpStr, nPort, pClient->GetUserID(), nNucleusID);
+		pszIpStr, nPort, pClient->GetUserID(), nSteamID);
 }
 
-static void SV_HandleCommunicationBan(CClient* const pClient, const char* const pszReason, const char* const pszExpiry, const char* const pszIpStr, const int nPort, const NucleusID_t nNucleusID)
+static void SV_HandleCommunicationBan(CClient* const pClient, const char* const pszReason, const char* const pszExpiry, const char* const pszIpStr, const int nPort, const SteamID_t nSteamID)
 {
 	const int nUserId = pClient->GetUserID();
 	CClientExtended* const pClientExtended = pClient->GetClientExtended();
@@ -89,12 +59,12 @@ static void SV_HandleCommunicationBan(CClient* const pClient, const char* const 
 	{
 		pClient->Disconnect(Reputation_t::REP_MARK_BAD, "%s", pszReason);
 		Warning(eDLL_T::SERVER, "Removed client '[%s]:%i' from slot #%i ('%llu' is communication banned and communication bans are treated as game bans!)\n",
-			pszIpStr, nPort, nUserId, nNucleusID);
+			pszIpStr, nPort, nUserId, nSteamID);
 	}
 	else
 	{
 		DevMsg(eDLL_T::SERVER, "Muting client '[%s]:%i' from slot #%i ('%llu' is communication banned!)\n",
-			pszIpStr, nPort, nUserId, nNucleusID);
+			pszIpStr, nPort, nUserId, nSteamID);
 	}
 
 	pClientExtended->SetClientIsCommsBanned(true);
@@ -105,7 +75,7 @@ static void SV_HandleCommunicationBan(CClient* const pClient, const char* const 
 // Purpose: checks if particular client is banned on the comp server
 //-----------------------------------------------------------------------------
 void SV_CheckForBanAndDisconnect(CClient* const pClient, const string& svIPAddr,
-	const NucleusID_t nNucleusID, const string& svPersonaName, const int nPort)
+	const SteamID_t nSteamID, const string& svPersonaName, const int nPort)
 {
 	Assert(pClient != nullptr);
 
@@ -113,30 +83,30 @@ void SV_CheckForBanAndDisconnect(CClient* const pClient, const string& svIPAddr,
 	string expiry;
 	CBanSystem::Banned_t::BanType_e banType = CBanSystem::Banned_t::CONNECT;
 	
-	const bool bCompBanned = g_MasterServer.CheckForBan(svIPAddr, nNucleusID, svPersonaName, svError, banType, expiry);
+	const bool bCompBanned = g_MasterServer.CheckForBan(svIPAddr, nSteamID, svPersonaName, svError, banType, expiry);
 
 	if (bCompBanned)
 	{
-		g_TaskQueue.Dispatch([pClient, svError, svIPAddr, nNucleusID, nPort, banType, expiry]
+		g_TaskQueue.Dispatch([pClient, svError, svIPAddr, nSteamID, nPort, banType, expiry]
 			{
 				// Make sure client isn't already disconnected,
 				// and that if there is a valid netchannel, that
 				// it hasn't been taken by a different client by
 				// the time this task is getting executed.
 				const CNetChan* const pChan = pClient->GetNetChan();
-				if (pChan && pClient->GetNucleusID() == nNucleusID)
+				if (pChan && pClient->GetSteamID() == nSteamID)
 				{
 					switch (banType)
 					{
 					case CBanSystem::Banned_t::CONNECT:
 					{
-						SV_HandleConnectBan(pClient, svError.c_str(), svIPAddr.c_str(), nPort, nNucleusID);
+						SV_HandleConnectBan(pClient, svError.c_str(), svIPAddr.c_str(), nPort, nSteamID);
 						break;
 					}
 					case CBanSystem::Banned_t::COMMUNICATION:
 					{
 						if(SV_GlobalCommsBansEnabled())
-							SV_HandleCommunicationBan(pClient, svError.c_str(), expiry.c_str(), svIPAddr.c_str(), nPort, nNucleusID);
+							SV_HandleCommunicationBan(pClient, svError.c_str(), expiry.c_str(), svIPAddr.c_str(), nPort, nSteamID);
 						break;
 					default:
 						break;
@@ -198,13 +168,13 @@ void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec /*= 
 			continue;
 
 		const char* const szIPAddr = pNetChan->GetAddress(true);
-		const NucleusID_t nNucleusID = pClient->GetNucleusID();
+		const SteamID_t nSteamID = pClient->GetSteamID();
 
 		// If no banned list was provided, build one with all clients
 		// on the server. This will be used for bulk checking so live
 		// bans could be performed, as this function is called periodically.
 		if (bannedVec)
-			bannedVec->AddToTail(CBanSystem::Banned_t(szIPAddr, nNucleusID));
+			bannedVec->AddToTail(CBanSystem::Banned_t(szIPAddr, nSteamID));
 		else
 		{
 			// Check if current client is within provided banned list, and
@@ -214,7 +184,7 @@ void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec /*= 
 				const CBanSystem::Banned_t& banned = (*pBannedVec)[i];
 
 				//If this ban isnt for this client then we check the next
-				if (banned.m_NucleusID != pClient->GetNucleusID())
+				if (banned.m_SteamID != pClient->GetSteamID())
 					continue;
 
 				const int nPort = pNetChan->GetPort();
@@ -224,14 +194,14 @@ void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec /*= 
 				{
 				case CBanSystem::Banned_t::CONNECT:
 				{
-					SV_HandleConnectBan(pClient, banned.m_Address.String(), szIPAddr, nPort, nNucleusID);
+					SV_HandleConnectBan(pClient, banned.m_Address.String(), szIPAddr, nPort, nSteamID);
 					break;
 				}
 				case CBanSystem::Banned_t::COMMUNICATION:
 				{
 					//Does the host have the comms ban system on and is our client already banned, no point rebanning them if they are
 					if (SV_GlobalCommsBansEnabled() && (!pClient->GetClientExtended()->IsClientCommsBanned() || sv_commsBansAreGameBans.GetBool()))
-						SV_HandleCommunicationBan(pClient, banned.m_Address.String(), banned.m_BanExpiry.Get(), szIPAddr, nPort, nNucleusID);
+						SV_HandleCommunicationBan(pClient, banned.m_Address.String(), banned.m_BanExpiry.Get(), szIPAddr, nPort, nSteamID);
 					break;
 				}
 				//Unknown ban type
@@ -262,6 +232,19 @@ void SV_CheckClientsForBan(const CBanSystem::BannedList_t* const pBannedVec /*= 
 	}
 }
 
+static string SV_HashPasswordTag(const char* const pszPassword)
+{
+	if (!pszPassword || !pszPassword[0])
+		return string();
+	uint64_t h = 1469598103934665603ULL; // FNV-1a 64-bit
+	for (const unsigned char* p = reinterpret_cast<const unsigned char*>(pszPassword); *p; ++p)
+	{
+		h ^= *p;
+		h *= 1099511628211ULL;
+	}
+	return Format("pw:%016llx", h);
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: loads the game .dll
 //-----------------------------------------------------------------------------
@@ -270,7 +253,10 @@ void SV_InitGameDLL()
 	// Mirror current password into the server filter used by the engine's connect validation (hashed tag).
 	if (ConVar* const pFilter = g_pCVar->FindVar("serverFilter"))
 	{
-		const string tagged = SV_HashPasswordTag(sv_password.GetString());
+		const char* pw = "";
+		if (ConVar* const pPw = g_pCVar->FindVar("sv_password"))
+			pw = pPw->GetString();
+		const string tagged = SV_HashPasswordTag(pw);
 		pFilter->SetValue(tagged.c_str());
 	}
 	v_SV_InitGameDLL();
@@ -432,3 +418,4 @@ void SV_BroadcastDurangoVoiceData(CClient* const cl, const int nBytes, char* con
 			pClient->SendNetMsgEx(&voiceData, false, !useVoiceStream, useVoiceStream);
 	}
 }
+#endif // !CLIENT_DLL

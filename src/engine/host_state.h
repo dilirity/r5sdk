@@ -23,6 +23,7 @@ class CHostState
 public:
 	static void FrameUpdate(CHostState* pHostState, double flCurrentTime, float flFrameTime);
 	void LoadConfig(void) const;
+	void LoadModConfigs(void);
 
 	void Init(void);
 	void Setup(void);

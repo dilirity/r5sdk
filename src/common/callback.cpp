@@ -450,6 +450,85 @@ void Capsule_f(const CCommand& args)
 	const float radius = float(atof(args[7]));
 	g_pDebugOverlay->AddCapsuleOverlay(start, end, radius, 141, 233, 135, 200, true, 100);
 }
+
+/*
+=====================
+Box_f
+
+  Draws a material box at 
+  origin<x y z> rotation<pitch yaw roll> size<x y z> [material] [r g b a].
+=====================
+*/
+void Box_f(const CCommand& args)
+{
+	// The command now requires 12 arguments: origin(3) + rotation(3) + mins(3) + maxs(3)
+	if (args.ArgC() < 13)
+	{
+		Msg(eDLL_T::CLIENT, "Usage 'box': origin(x y z) rotation(p y r) mins(x y z) maxs(x y z) [r g b a]\n");
+		return;
+	}
+
+	Vector3D origin, mins, maxs;
+	QAngle rotation;
+
+	// Parse origin (args 1, 2, 3)
+	for (int i = 0; i < 3; ++i)
+	{
+		origin[i] = float(atof(args[i + 1]));
+	}
+
+	// Parse rotation (pitch, yaw, roll) (args 4, 5, 6)
+	for (int i = 0; i < 3; ++i)
+	{
+		rotation[i] = float(atof(args[i + 4]));
+	}
+
+	// Parse mins (args 7, 8, 9)
+	for (int i = 0; i < 3; ++i)
+	{
+		mins[i] = float(atof(args[i + 7]));
+	}
+
+	// Parse maxs (args 10, 11, 12)
+	for (int i = 0; i < 3; ++i)
+	{
+		maxs[i] = float(atof(args[i + 10]));
+	}
+
+	// Create transform matrix from rotation and origin
+	matrix3x4_t transform;
+	AngleMatrix(rotation, origin, transform);
+
+	// Parse optional color (default to yellow)
+	int r = 255, g = 255, b = 0, a = 100;
+	int colorStartArg = 13; // Color arguments now start after mins and maxs
+
+	// Check if color arguments are provided
+	if (args.ArgC() >= colorStartArg + 4)
+	{
+		r = atoi(args[colorStartArg]);
+		g = atoi(args[colorStartArg + 1]);
+		b = atoi(args[colorStartArg + 2]);
+		a = atoi(args[colorStartArg + 3]);
+	}
+
+	// Add the transformed box overlay using the provided mins and maxs
+	g_pDebugOverlay->AddTransformedBoxOverlay(transform, mins, maxs, r, g, b, a, true, 999999999.0f);
+}
+
+/*
+=====================
+ClearBoxes_f
+
+  Clears all debug overlays and rendered boxes.
+=====================
+*/
+void ClearBoxes_f(const CCommand& args)
+{
+	// Clear all debug overlays
+	g_pDebugOverlay->ClearAllOverlays();
+	Msg(eDLL_T::CLIENT, "Cleared all boxes and debug overlays\n");
+}
 #endif // !DEDICATED
 
 // TODO: move to other file?

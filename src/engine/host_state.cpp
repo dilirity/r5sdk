@@ -37,6 +37,7 @@
 #include "engine/server/server.h"
 #include "rtech/liveapi/liveapi.h"
 #endif // !CLIENT_DLL
+#include "pluginsystem/modsystem.h"
 #include "rtech/stryder/stryder.h"
 #include "rtech/playlists/playlists.h"
 #ifndef DEDICATED
@@ -56,6 +57,10 @@
 #include "game/server/gameinterface.h"
 #endif // !CLIENT_DLL
 #include "game/shared/vscript_shared.h"
+#include <tier2/fileutils.h>
+
+static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOldValue, ChangeUserData_t pUserData);
+static string SV_HashPasswordTag(const char* const pszPassword);
 
 #ifndef CLIENT_DLL
 static ConVar host_statusRefreshRate("host_statusRefreshRate", "0.5", FCVAR_RELEASE, "Host status refresh rate (seconds).", true, 0.f, false, 0.f);
@@ -66,6 +71,36 @@ static ConVar host_autoReloadRespectGameState("host_autoReloadRespectGameState",
 
 static ConVar host_sessionId("host_sessionId", "", FCVAR_REPLICATED|FCVAR_DEVELOPMENTONLY, "Host session ID.");
 ConVar hostdesc("hostdesc", "", FCVAR_RELEASE, "Host game server description.");
+static ConVar sv_password("sv_password", "", FCVAR_RELEASE, "Server password for entry.", false, 0.f, false, 0.f, &SV_ServerPasswordChanged_f, nullptr);
+
+static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOldValue, ChangeUserData_t pUserData)
+{
+	ConVar* const pPassword = g_pCVar->FindVar(pConVar->GetName());
+	ConVar* const pFilter   = g_pCVar->FindVar("serverFilter");
+	if (!pPassword || !pFilter)
+		return;
+
+	const char* const newPw = pPassword->GetString();
+	// Skip if value hasn't actually changed.
+	if (pOldString && strcmp(pOldString, newPw) == 0)
+		return;
+
+	const string tagged = SV_HashPasswordTag(newPw);
+	pFilter->SetValue(tagged.c_str());
+}
+
+static string SV_HashPasswordTag(const char* const pszPassword)
+{
+	if (!pszPassword || !pszPassword[0])
+		return string();
+	uint64_t h = 1469598103934665603ULL; // FNV-1a 64-bit
+	for (const unsigned char* p = reinterpret_cast<const unsigned char*>(pszPassword); *p; ++p)
+	{
+		h ^= *p;
+		h *= 1099511628211ULL;
+	}
+	return Format("pw:%016llx", h);
+}
 
 #ifdef DEDICATED
 //-----------------------------------------------------------------------------
@@ -99,8 +134,22 @@ static void HostState_KeepAlive()
 		gpGlobals->maxClients,
 		std::chrono::duration_cast<std::chrono::milliseconds>(
 			std::chrono::system_clock::now().time_since_epoch()
-			).count()
+			).count(),
+		// requiredMods (filled below after struct init)
+		{}
 	};
+
+	// Populate required mods from ModSystem
+	if (ModSystem()->IsEnabled())
+	{
+		ModSystem()->LockModList();
+		const CUtlVector<CUtlString>& req = ModSystem()->GetRequiredMods();
+		for (int i = 0; i < req.Count(); ++i)
+		{
+			const_cast<NetGameServer_t&>(gameServer).requiredMods.emplace_back(req[i].String());
+		}
+		ModSystem()->UnlockModList();
+	}
 
 	std::thread request([&, gameServer]
 		{
@@ -347,6 +396,8 @@ void CHostState::Init(void)
 void CHostState::Setup(void) 
 {
 	g_pHostState->LoadConfig();
+	LoadModConfigs();
+	MergeModPlaylistsIntoFile(); // Merge mod playlists into base file
 #ifndef CLIENT_DLL
 	g_BanSystem.LoadList();
 #endif // !CLIENT_DLL
@@ -487,6 +538,93 @@ void CHostState::LoadConfig(void) const
 		Cbuf_AddText(Cbuf_GetCurrentPlayer(), "exec bind.cfg\n", cmd_source_t::kCommandSrcCode);
 #endif // !DEDICATED
 	}
+}
+
+void CHostState::LoadModConfigs()
+{
+	if (!ModSystem()->IsEnabled())
+		return;
+
+	ModSystem()->LockModList();
+	FOR_EACH_VEC(ModSystem()->GetModList(), i)
+	{
+		CModSystem::ModInstance_t* const mod = ModSystem()->GetModList()[i];
+		if (!mod || !mod->IsEnabled())
+			continue;
+
+		char dirPath[MAX_PATH];
+		Q_snprintf(dirPath, sizeof(dirPath), "%s%s", mod->basePath.String(), "cfg/autoload");
+		CUtlVector<CUtlString> cfgFiles;
+		AddFilesToList(cfgFiles, dirPath, "cfg", "GAME", '/');
+
+		FOR_EACH_VEC(cfgFiles, fidx)
+		{
+			const char* filePath = cfgFiles[fidx].String();
+			FileHandle_t file = FileSystem()->Open(filePath, "rt", "GAME");
+			if (!file)
+				continue;
+
+			const ssize_t fileSize = FileSystem()->Size(file);
+			if (fileSize <= 0)
+			{
+				FileSystem()->Close(file);
+				continue;
+			}
+
+			std::string buffer;
+			buffer.resize(size_t(fileSize));
+			const ssize_t bytesRead = FileSystem()->Read(&buffer[0], fileSize, file);
+			FileSystem()->Close(file);
+			buffer.resize(bytesRead > 0 ? size_t(bytesRead) : 0);
+
+			auto dispatchLine = [&](const char* lineBegin, const char* lineEnd)
+			{
+				while (lineBegin < lineEnd && (*lineBegin == ' ' || *lineBegin == '\t' || *lineBegin == '\r')) ++lineBegin;
+				while (lineEnd > lineBegin && (lineEnd[-1] == '\r' || lineEnd[-1] == ' ' || lineEnd[-1] == '\t')) --lineEnd;
+				if (lineBegin >= lineEnd) return;
+
+				std::string cmd(lineBegin, size_t(lineEnd - lineBegin));
+
+				const char* s = cmd.c_str();
+				while (*s == ' ' || *s == '\t') ++s;
+				const char* e = s;
+				while (*e && *e != ' ' && *e != '\t' && *e != '\n' && *e != '\r') ++e;
+				std::string name(s, size_t(e - s));
+
+				ConCommandBase* pBase = g_pCVar->FindCommandBase(name.c_str());
+				if (!pBase) return;
+
+				cmd.push_back('\n');
+				CCommand args;
+				args.Tokenize(cmd.c_str(), cmd_source_t::kCommandSrcCode);
+				v_Cmd_Dispatch(Cbuf_GetCurrentPlayer(), pBase, &args, false);
+			};
+
+			const char* p = buffer.c_str();
+			const char* end = p + buffer.size();
+			while (p < end)
+			{
+				const char* lineStart = p;
+				const void* newlinePtr = memchr(p, '\n', size_t(end - p));
+				const char* lineEnd = newlinePtr ? static_cast<const char*>(newlinePtr) : end;
+				dispatchLine(lineStart, lineEnd);
+				p = newlinePtr ? lineEnd + 1 : end;
+			}
+
+			char relBuf[MAX_PATH];
+			const char* relPtr = filePath;
+			const char* basePathStr = mod->basePath.String();
+			const size_t baseLen = Q_strlen(basePathStr);
+			if (!Q_strnicmp(filePath, basePathStr, baseLen))
+				relPtr = filePath + baseLen;
+			V_strncpy(relBuf, relPtr, sizeof(relBuf));
+			V_FixSlashes(relBuf, '\\');
+			const char* autoloadPos = V_stristr(relBuf, "cfg\\autoload\\");
+			const char* finalRel = autoloadPos ? autoloadPos : relBuf;
+			Msg(eDLL_T::MODSYSTEM, "Autoloaded config: %s (%s)\n", mod->name.String(), finalRel);
+		}
+	}
+	ModSystem()->UnlockModList();
 }
 
 //-----------------------------------------------------------------------------
