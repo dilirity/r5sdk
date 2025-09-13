@@ -455,7 +455,7 @@ bool CPylon::AuthForConnection(const uint64_t steamUserId, const char* ipAddress
     requestJson.AddMember("id", rapidjson::Value(steamIdStr, allocator), allocator);
     
     // Debug logging
-    Msg(eDLL_T::ENGINE, "[PYLON] DEBUG: Adding Steam User ID to request: %llu (as string: %s)\n", steamUserId, steamIdStr);
+    if(pylon_showdebuginfo.GetBool()) Msg(eDLL_T::STEAM, "Adding Steam User ID to request: %llu (as string: %s)\n", steamUserId, steamIdStr);
     requestJson.AddMember("ip", rapidjson::Value(ipAddress, allocator), allocator);
     // Steam authentication - authCode is no longer used
     requestJson.AddMember("code", rapidjson::Value("", allocator), allocator);
@@ -566,9 +566,9 @@ bool CPylon::SendRequest(const char* endpoint, const rapidjson::Document& reques
     JSON_DocumentToBufferDeserialize(requestJson, stringBuffer);
     
     // Debug: Log the actual JSON being sent for auth requests
-    if (strcmp(endpoint, "/api/client/auth") == 0)
+    if (strcmp(endpoint, "/api/client/auth") == 0 && pylon_showdebuginfo.GetBool())
     {
-        Msg(eDLL_T::ENGINE, "[PYLON] DEBUG: Sending JSON payload: %s\n", stringBuffer.GetString());
+        Msg(eDLL_T::STEAM, "Sending JSON payload: %s\n", stringBuffer.GetString());
     }
 
     string responseBody;

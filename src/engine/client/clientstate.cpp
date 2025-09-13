@@ -465,7 +465,7 @@ void SetSteamPersonaName()
             finalName = SanitizeSteamUsername(steamUsername);
             if (finalName != steamUsername)
             {
-                Msg(eDLL_T::ENGINE, "[STEAM] Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
+                Msg(eDLL_T::ENGINE, "Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
             }
         }
         
@@ -474,7 +474,7 @@ void SetSteamPersonaName()
         
         if (finalName == steamUsername)
         {
-            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Set persona name to Steam username: %s\n", g_PersonaName);
+            if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "Set persona name to Steam username: %s\n", g_PersonaName);
         }
     }
 }
@@ -593,14 +593,14 @@ static void RefreshSteamData_f(const CCommand& args)
             finalName = SanitizeSteamUsername(steamUsername);
             if (finalName != steamUsername)
             {
-                Msg(eDLL_T::ENGINE, "[STEAM] Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
+                Msg(eDLL_T::ENGINE, "Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
             }
         }
         
         strncpy(g_PersonaName, finalName.c_str(), MAX_PERSONA_NAME_LEN - 1);
         g_PersonaName[MAX_PERSONA_NAME_LEN - 1] = '\0';
         
-        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Force updated persona name to: %s\n", g_PersonaName);
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "Force updated persona name to: %s\n", g_PersonaName);
     }
     
     // Show updated info

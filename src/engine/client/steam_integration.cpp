@@ -1,6 +1,7 @@
 #include <string>
 #include "steam_integration.h"
 #include "tier0/dbg.h"
+#include "tier0/commandline.h"
 #include "ebisusdk/EbisuSDK.h"
 
 // C-style interface to pure Steam wrapper (no type conflicts)
@@ -74,38 +75,43 @@ bool Steam_EnsureInitialized()
     // Steamworks is available - proceed with initialization
     if (g_SteamInitialized)
     {
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Already initialized\n");
         return true;
     }
     
-    if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Attempting to initialize Steam API...\n");
+    if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Attempting to initialize Steam API...\n");
     if (Steam_InitAPI())
     {
         g_SteamInitialized = true;
         UpdateSteamEnabledStatus();
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Steam API initialized successfully\n");
+        if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Steam API initialized successfully\n");
         
         // Configure overlay settings to reduce crash risk
         Steam_SetOverlayNotificationPosition(steam_overlay_pos.GetInt());
         
-        bool overlayEnabled = Steam_IsOverlayEnabled();
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Overlay enabled: %s\n", overlayEnabled ? "YES" : "NO");
-        
-        if (overlayEnabled && steam_debug.GetBool())
-        {
-            Msg(eDLL_T::ENGINE, "[STEAM] WARNING: Steam Overlay is enabled. If you experience crashes, try disabling it in Steam settings.\n");
-        }
-        
         return true;
     }
     
-    Msg(eDLL_T::ENGINE, "[STEAM] Failed to initialize Steam API\n"); // Keep this one as it's an error
+    Msg(eDLL_T::STEAM, "Failed to initialize Steam API - falling back to offline mode\n");
+    
+    // Automatically enable offline mode when Steam fails to initialize
+    if (!CommandLine()->CheckParm("-offline"))
+    {
+        CommandLine()->AppendParm("-offline", "");
+    }
+    
     UpdateSteamEnabledStatus(); // Update status after failed init
     return false;
 #else
     // If Steamworks is not available, we're always in offline mode
+    Msg(eDLL_T::STEAM, "Steamworks not available - using offline mode\n");
+    
+    // Add offline parameter if not already present
+    if (!CommandLine()->CheckParm("-offline"))
+    {
+        CommandLine()->AppendParm("-offline", "");
+    }
+    
     UpdateSteamEnabledStatus(); // Update status for offline mode
-    if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Steamworks not available - using offline mode\n");
     return false; // Return false to indicate no Steam API available
 #endif
 }
@@ -117,28 +123,24 @@ bool Steam_GetAuthSessionTicketBase64(std::string& outTicket)
         return false; // Don't get tickets during shutdown
     }
     
-    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Attempting to get auth session ticket...\n");
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::STEAM, "Attempting to get auth session ticket...\n");
     
     if (!Steam_EnsureInitialized())
     {
-        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Steam not initialized, cannot get ticket\n");
+        if (steam_debug_auth.GetBool()) Msg(eDLL_T::STEAM, "Steam not initialized, cannot get ticket\n");
         return false;
     }
 
     char ticketBuffer[8192]; // Large enough for hex-encoded ticket
-    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Calling Steam_GetAuthTicketHex...\n");
     int len = Steam_GetAuthTicketHex(ticketBuffer, sizeof(ticketBuffer));
-    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Steam_GetAuthTicketHex returned length: %d\n", len);
     
     if (len > 0)
     {
         outTicket.assign(ticketBuffer, len);
-        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Successfully got auth ticket (hex length: %d)\n", len);
-        if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Ticket preview: %.64s...\n", ticketBuffer);
         return true;
     }
     
-    Msg(eDLL_T::ENGINE, "[STEAM] Failed to get auth ticket\n"); // Keep error messages
+    Msg(eDLL_T::STEAM, "Failed to get auth ticket\n"); // Keep error messages
     return false;
 }
 
@@ -156,9 +158,7 @@ void Steam_CancelCurrentAuthTicket()
     }
     
     Steam_CancelAuthTicket();
-    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Cancelled current auth ticket\n");
-#else
-    if (steam_debug_auth.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Ticket cancellation not available - compiled without Steamworks\n");
+    if (steam_debug_auth.GetBool()) Msg(eDLL_T::STEAM, "Cancelled current auth ticket\n");
 #endif
 }
 
@@ -173,17 +173,15 @@ bool Steam_GetUsername(std::string& outUsername)
     if (Steam_IsOfflineMode())
     {
         outUsername = steam_offline_username.GetString();
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Using offline username: %s\n", outUsername.c_str());
+        if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Using offline username: %s\n", outUsername.c_str());
         return true;
     }
-    
-    if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Getting Steam username...\n");
     
     if (!Steam_EnsureInitialized())
     {
         // Fallback to offline username if Steam init fails
         outUsername = steam_offline_username.GetString();
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Steam not initialized, using offline username: %s\n", outUsername.c_str());
+        if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Steam not initialized, using offline username: %s\n", outUsername.c_str());
         return true;
     }
 
@@ -193,13 +191,13 @@ bool Steam_GetUsername(std::string& outUsername)
     if (len > 0)
     {
         outUsername.assign(usernameBuffer, len);
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Got username: %s\n", outUsername.c_str());
+        if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Got username: %s\n", outUsername.c_str());
         return true;
     }
     
     // Fallback to offline username if Steam call fails
     outUsername = steam_offline_username.GetString();
-    if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Failed to get Steam username, using offline fallback: %s\n", outUsername.c_str());
+    if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Failed to get Steam username, using offline fallback: %s\n", outUsername.c_str());
     return true;
 }
 
@@ -207,14 +205,14 @@ uint64_t Steam_GetUserID()
 {
     if (g_SteamShuttingDown)
     {
-        return 0; // Don't get user ID during shutdown
+        return 0; // Don't get SteamID during shutdown
     }
     
     // Check if we're in offline mode first
     if (Steam_IsOfflineMode())
     {
         uint64_t offlineID = (uint64_t)strtoull(steam_offline_userid.GetString(), nullptr, 10);
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Using offline user ID: %llu\n", offlineID);
+        if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Using offline SteamID: %llu\n", offlineID);
         return offlineID;
     }
     
@@ -222,20 +220,20 @@ uint64_t Steam_GetUserID()
     {
         // Fallback to offline user ID if Steam init fails
         uint64_t offlineID = (uint64_t)strtoull(steam_offline_userid.GetString(), nullptr, 10);
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Steam not initialized, using offline user ID: %llu\n", offlineID);
+        if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Steam not initialized, using offline SteamID: %llu\n", offlineID);
         return offlineID;
     }
 
     uint64_t userID = Steam_GetUserIDC();
     if (userID > 0)
     {
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Got Steam user ID: %llu\n", userID);
+        if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Got SteamID: %llu\n", userID);
         return userID;
     }
     
     // Fallback to offline user ID if Steam call fails
     uint64_t offlineID = (uint64_t)strtoull(steam_offline_userid.GetString(), nullptr, 10);
-    if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Failed to get Steam user ID, using offline fallback: %llu\n", offlineID);
+    if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Failed to get SteamID, using offline fallback: %llu\n", offlineID);
     return offlineID;
 }
 
@@ -257,10 +255,6 @@ void Steam_RunFrame()
     {
         // During transition, skip callbacks to prevent freeze
         shouldProcessCallbacks = false;
-        if (steam_debug.GetBool() && frameCount % 300 == 0) // Every 5 seconds
-        {
-            Msg(eDLL_T::ENGINE, "[STEAM] Skipping callbacks during overlay transition\n");
-        }
     }
     else if (g_SteamOverlayActive)
     {
@@ -272,11 +266,6 @@ void Steam_RunFrame()
         else
         {
             shouldProcessCallbacks = false;
-        }
-        
-        if (steam_debug.GetBool() && frameCount % 600 == 0) // Every 10 seconds
-        {
-            Msg(eDLL_T::ENGINE, "[STEAM] Reduced callbacks while overlay active\n");
         }
     }
     else if (g_OverlayTimeoutProtection)
@@ -329,7 +318,6 @@ void Steam_RunFrame()
         if (overlayEnabled != g_SteamOverlayActive)
         {
             // Overlay state changed - enter transition period
-            bool wasActive = g_SteamOverlayActive;
             g_SteamOverlayActive = overlayEnabled;
             g_SteamOverlayTransitioning = true;
             g_OverlayTransitionTime = (float)currentTime;
@@ -345,13 +333,6 @@ void Steam_RunFrame()
                 g_OverlayActiveStartTime = 0.0f;
                 g_OverlayTimeoutProtection = false;
             }
-            
-            if (steam_debug.GetBool()) 
-            {
-                Msg(eDLL_T::ENGINE, "[STEAM] Overlay transition: %s -> %s (protection: ALWAYS ON)\n", 
-                    wasActive ? "ACTIVE" : "INACTIVE",
-                    g_SteamOverlayActive ? "ACTIVE" : "INACTIVE");
-            }
         }
         
         // Check for overlay timeout (stuck open) - always use 30 second timeout
@@ -362,11 +343,6 @@ void Steam_RunFrame()
             if (overlayActiveTime > OVERLAY_TIMEOUT_SECONDS)
             {
                 g_OverlayTimeoutProtection = true;
-                if (steam_debug.GetBool())
-                {
-                    Msg(eDLL_T::ENGINE, "[STEAM] Overlay timeout protection activated (%.1fs > %.1fs)\n", 
-                        overlayActiveTime, OVERLAY_TIMEOUT_SECONDS);
-                }
             }
         }
     }
@@ -375,49 +351,45 @@ void Steam_RunFrame()
     if (g_SteamOverlayTransitioning && (currentTime - g_OverlayTransitionTime) > 1.0) // 1 second
     {
         g_SteamOverlayTransitioning = false;
-        if (steam_debug.GetBool())
-        {
-            Msg(eDLL_T::ENGINE, "[STEAM] Overlay transition complete\n");
-        }
     }
 }
 
 // Console command for overlay debugging
 static void Steam_OverlayInfo_f(const CCommand& args)
 {
-    Msg(eDLL_T::ENGINE, "[STEAM] =====  STEAM STATUS  =====\n");
+    Msg(eDLL_T::STEAM, "=====  STEAM STATUS  =====\n");
 #ifndef USE_STEAMWORKS
-    Msg(eDLL_T::ENGINE, "[STEAM] Steamworks support: DISABLED (compiled without USE_STEAMWORKS)\n");
-    Msg(eDLL_T::ENGINE, "[STEAM] Offline mode: FORCED (no Steamworks)\n");
+    Msg(eDLL_T::STEAM, "Steamworks support: DISABLED (compiled without USE_STEAMWORKS)\n");
+    Msg(eDLL_T::STEAM, "Offline mode: FORCED (no Steamworks)\n");
 #else
-    Msg(eDLL_T::ENGINE, "[STEAM] Steamworks support: ENABLED\n");
-    Msg(eDLL_T::ENGINE, "[STEAM] Offline mode: %s\n", Steam_IsOfflineMode() ? "YES" : "NO");
+    Msg(eDLL_T::STEAM, "Steamworks support: ENABLED\n");
+    Msg(eDLL_T::STEAM, "Offline mode: %s\n", Steam_IsOfflineMode() ? "YES" : "NO");
 #endif
-    Msg(eDLL_T::ENGINE, "[STEAM] Steam initialized: %s\n", g_SteamInitialized ? "YES" : "NO");
-    Msg(eDLL_T::ENGINE, "[STEAM] Steam enabled: %s\n", steam_enabled.GetBool() ? "YES" : "NO");
+    Msg(eDLL_T::STEAM, "Steam initialized: %s\n", g_SteamInitialized ? "YES" : "NO");
+    Msg(eDLL_T::STEAM, "Steam enabled: %s\n", steam_enabled.GetBool() ? "YES" : "NO");
     
     if (Steam_IsOfflineMode())
     {
-        Msg(eDLL_T::ENGINE, "[STEAM] Offline username: %s\n", steam_offline_username.GetString());
-        Msg(eDLL_T::ENGINE, "[STEAM] Offline user ID: %s\n", steam_offline_userid.GetString());
+        Msg(eDLL_T::STEAM, "Offline username: %s\n", steam_offline_username.GetString());
+        Msg(eDLL_T::STEAM, "Offline user ID: %s\n", steam_offline_userid.GetString());
     }
     else if (g_SteamInitialized)
     {
         bool overlayEnabled = Steam_IsOverlayEnabled();
-        Msg(eDLL_T::ENGINE, "[STEAM] Overlay enabled: %s\n", overlayEnabled ? "YES" : "NO");
-        Msg(eDLL_T::ENGINE, "[STEAM] Overlay currently active: %s\n", g_SteamOverlayActive ? "YES" : "NO");
-        Msg(eDLL_T::ENGINE, "[STEAM] Overlay transitioning: %s\n", g_SteamOverlayTransitioning ? "YES" : "NO");
-        Msg(eDLL_T::ENGINE, "[STEAM] Timeout protection: %s\n", g_OverlayTimeoutProtection ? "ACTIVE" : "INACTIVE");
-        Msg(eDLL_T::ENGINE, "[STEAM] Freeze protection: ALWAYS ENABLED\n");
-        Msg(eDLL_T::ENGINE, "[STEAM] Active protection: ALWAYS ENABLED\n");
-        Msg(eDLL_T::ENGINE, "[STEAM] Timeout threshold: 30.0s\n");
+        Msg(eDLL_T::STEAM, "Overlay enabled: %s\n", overlayEnabled ? "YES" : "NO");
+        Msg(eDLL_T::STEAM, "Overlay currently active: %s\n", g_SteamOverlayActive ? "YES" : "NO");
+        Msg(eDLL_T::STEAM, "Overlay transitioning: %s\n", g_SteamOverlayTransitioning ? "YES" : "NO");
+        Msg(eDLL_T::STEAM, "Timeout protection: %s\n", g_OverlayTimeoutProtection ? "ACTIVE" : "INACTIVE");
+        Msg(eDLL_T::STEAM, "Freeze protection: ALWAYS ENABLED\n");
+        Msg(eDLL_T::STEAM, "Active protection: ALWAYS ENABLED\n");
+        Msg(eDLL_T::STEAM, "Timeout threshold: 30.0s\n");
         if (g_SteamOverlayActive && g_OverlayActiveStartTime > 0.0f)
         {
             float activeTime = g_LastCallbackTime - g_OverlayActiveStartTime;
-            Msg(eDLL_T::ENGINE, "[STEAM] Overlay active for: %.1fs\n", activeTime);
+            Msg(eDLL_T::STEAM, "Overlay active for: %.1fs\n", activeTime);
         }
-        Msg(eDLL_T::ENGINE, "[STEAM] Overlay position: %d\n", steam_overlay_pos.GetInt());
-        Msg(eDLL_T::ENGINE, "[STEAM] Last callback time: %.2f\n", g_LastCallbackTime);
+        Msg(eDLL_T::STEAM, "Overlay position: %d\n", steam_overlay_pos.GetInt());
+        Msg(eDLL_T::STEAM, "Last callback time: %.2f\n", g_LastCallbackTime);
     }
     
     // Show current effective Steam data
@@ -425,9 +397,9 @@ static void Steam_OverlayInfo_f(const CCommand& args)
     uint64_t currentUserID = Steam_GetUserID();
     Steam_GetUsername(currentUsername);
     
-    Msg(eDLL_T::ENGINE, "[STEAM] Current username: %s\n", currentUsername.c_str());
-    Msg(eDLL_T::ENGINE, "[STEAM] Current user ID: %llu\n", currentUserID);
-    Msg(eDLL_T::ENGINE, "[STEAM] Debug logging: %s\n", steam_debug_auth.GetBool() ? "ENABLED" : "DISABLED");
+    Msg(eDLL_T::STEAM, "Current username: %s\n", currentUsername.c_str());
+    Msg(eDLL_T::STEAM, "Current user ID: %llu\n", currentUserID);
+    Msg(eDLL_T::STEAM, "Debug logging: %s\n", steam_debug_auth.GetBool() ? "ENABLED" : "DISABLED");
 }
 
 static ConCommand steam_status("steam_status", Steam_OverlayInfo_f, "Display comprehensive Steam status and configuration");
@@ -438,7 +410,7 @@ void Steam_Shutdown()
     
     if (g_SteamInitialized)
     {
-        if (steam_debug.GetBool()) Msg(eDLL_T::ENGINE, "[STEAM] Shutting down Steam API\n");
+        if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Shutting down Steam API\n");
         Steam_ShutdownAPI();
         g_SteamInitialized = false;
         UpdateSteamEnabledStatus(); // Update status after shutdown

@@ -68,6 +68,8 @@ ImVec4 GetColorForContext(LogType_t type, eDLL_T context)
 		return CheckForWarnings(type, context, ImVec4(1.00f, 0.80f, 0.60f, 1.00f));
 	case eDLL_T::MODSYSTEM:
 		return CheckForWarnings(type, context, ImVec4(1.00f, 0.81f, 0.00f, 1.00f));
+	case eDLL_T::STEAM:
+		return CheckForWarnings(type, context, ImVec4(0.38f, 0.69f, 1.00f, 1.00f));
 	default:
 		return CheckForWarnings(type, context, ImVec4(0.81f, 0.81f, 0.81f, 1.00f));
 	}
@@ -104,6 +106,7 @@ static const char* GetContextNameByIndex(eDLL_T context, size_t& numTotalChars, 
 	case eDLL_T::VIDEO:
 	case eDLL_T::NETCON:
 	case eDLL_T::MODSYSTEM:
+	case eDLL_T::STEAM:
 	case eDLL_T::COMMON:
 	case eDLL_T::SYSTEM_WARNING:
 	case eDLL_T::SYSTEM_ERROR:
