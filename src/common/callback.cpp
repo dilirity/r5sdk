@@ -99,7 +99,7 @@ void Host_Changelevel_f(const CCommand& args)
 	const int argCount = args.ArgC();
 
 	if (argCount >= 2
-		&& IsOriginInitialized()
+		&& IsPlatformInitialized()
 		&& g_pServer->IsActive())
 	{
 		const char* levelName = args[1];
