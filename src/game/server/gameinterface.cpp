@@ -139,20 +139,19 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 
 	const bool bIsTeamChat = sv_overrideTeamChatRestriction.GetBool() ? sv_forceChatToTeamOnly->GetBool()  : isTeamChat;
 
-	// Sanitize chat text if configured: allow printable ASCII only (32-126). Drop disallowed bytes.
-	std::string chatText;
+	// If not allowed, drop entire message when it contains non-printable/non-ASCII bytes
 	if (!sv_allowAnyChatChars.GetBool() && text)
 	{
-		chatText.reserve(strlen(text));
 		for (const unsigned char* p = reinterpret_cast<const unsigned char*>(text); *p; ++p)
 		{
-			if (*p >= 32 && *p <= 126)
-				chatText += static_cast<char>(*p);
+			if (*p < 32 || *p > 126)
+			{
+				if (chat_debug.GetBool())
+					Msg(eDLL_T::SERVER, "Dropping chat message from '%s' (%llu): contains non-ASCII characters\n",
+						pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId());
+				return; // Drop silently
+			}
 		}
-	}
-	else
-	{
-		chatText = text ? text : "";
 	}
 	const int nMaxClients = gpGlobals->maxClients;
 	const bool bShouldApplyGlobalCommsMutes = SV_ShouldApplyTextChatGlobalMutes();
@@ -182,7 +181,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 
 	for (auto& cb : !PluginSystem()->GetChatMessageCallbacks())
 	{
-		if (!cb.Function()(pSenderPlayer, chatText.c_str(), sv_forceChatToTeamOnly->GetBool()))
+		if (!cb.Function()(pSenderPlayer, text ? text : "", sv_forceChatToTeamOnly->GetBool()))
 		{
 			if (chat_debug.GetBool())
 			{
@@ -190,7 +189,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 
 				V_UnicodeToUTF8(V_UnqualifiedFileName(cb.ModuleName()), moduleName, MAX_PATH);
 
-				Msg(eDLL_T::SERVER, "[%s] Plugin blocked chat message from '%s' (%llu): \"%s\"\n", moduleName, pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId(), chatText.c_str());
+				Msg(eDLL_T::SERVER, "[%s] Plugin blocked chat message from '%s' (%llu): \"%s\"\n", moduleName, pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId(), text ? text : "");
 			}
 
 			return;
@@ -229,7 +228,7 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 		v_UserMessageBegin(&filter, "SayText", 2);
 
 		MessageWriteByte(pSenderPlayer->GetEdict());
-		MessageWriteString(chatText.c_str());
+		MessageWriteString(text ? text : "");
 		MessageWriteBool(bIsTeamChat);
 
 		MessageEnd();
