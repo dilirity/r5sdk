@@ -420,9 +420,104 @@ static ConVar cl_steamTicket("cl_steamTicket", "", FCVAR_HIDDEN | FCVAR_USERINFO
 static ConVar cl_sanitizeSteamName("cl_sanitizeSteamName", "1", FCVAR_RELEASE, "Sanitize Steam username to printable ASCII (32-126); non-printable -> '_' ");
 static ConVar cl_nameFilterEnabled("cl_nameFilterEnabled", "1", FCVAR_RELEASE, "Mask bad words in client names with '*' using chatfilters/badwords.txt from VPKs");
 static ConVar cl_nameFilterPath("cl_nameFilterPath", "chatfilters/badwords.txt", FCVAR_RELEASE, "Relative VPK path to bad word list");
+static ConVar cl_allowIconsInNames("cl_allowIconsInNames", "0", FCVAR_RELEASE, "Allow game icon characters in displayed player names. 0 = Remove icons, 1 = Show icons");
 
 static CUtlVector<string> g_ClientBadWords;
 static bool g_ClientBadWordsLoaded = false;
+
+// Unicode-aware case conversion for better international character support
+static std::string CL_ToLowerUnicode(const std::string& input)
+{
+    std::string result = input;
+    
+    // Handle ASCII characters with standard tolower, preserve Unicode characters
+    std::transform(result.begin(), result.end(), result.begin(), 
+        [](unsigned char c) { 
+            return (c <= 127) ? (char)tolower(c) : (char)c; 
+        });
+    
+    return result;
+}
+
+// Function to remove blocked game icon characters from names
+static void CL_RemoveBlockedIcons(std::string& name)
+{
+    if (name.empty()) return;
+    
+    std::string result;
+    result.reserve(name.size());
+    
+    const unsigned char* p = reinterpret_cast<const unsigned char*>(name.c_str());
+    const unsigned char* end = p + name.size();
+    
+    while (p < end && *p)
+    {
+        bool isBlockedIcon = false;
+        
+        // Check for UTF-8 sequences that represent the blocked icon characters
+        // These characters are in the Private Use Area around U+F0000-U+F0FFF
+        
+        // UTF-8 encoding for U+F0000-U+F0FFF:
+        // 4-byte sequence: 0xF3 0xB0 0x80-0xBF 0x80-0xBF
+        if (p + 3 < end && p[0] == 0xF3 && p[1] == 0xB0)
+        {
+            // This is likely one of the blocked icon characters, skip it
+            p += 4; // Skip the 4-byte UTF-8 sequence
+            isBlockedIcon = true;
+        }
+        // Also check for some other common Private Use Area ranges that might contain icons
+        // U+E000-U+F8FF (3-byte UTF-8: 0xEE-0xEF)
+        else if (p + 2 < end && p[0] >= 0xEE && p[0] <= 0xEF)
+        {
+            // Check if this matches the specific icon pattern
+            if (p[0] == 0xEF && p[1] >= 0x80 && p[1] <= 0xBF)
+            {
+                // Block these specific Private Use Area characters, skip them
+                p += 3; // Skip the 3-byte UTF-8 sequence
+                isBlockedIcon = true;
+            }
+        }
+        
+        if (!isBlockedIcon)
+        {
+            // Copy the character to result
+            if (*p < 0x80)
+            {
+                // ASCII character
+                result += *p;
+                p++;
+            }
+            else if ((*p & 0xE0) == 0xC0 && p + 1 < end)
+            {
+                // 2-byte UTF-8
+                result += *p++;
+                result += *p++;
+            }
+            else if ((*p & 0xF0) == 0xE0 && p + 2 < end)
+            {
+                // 3-byte UTF-8
+                result += *p++;
+                result += *p++;
+                result += *p++;
+            }
+            else if ((*p & 0xF8) == 0xF0 && p + 3 < end)
+            {
+                // 4-byte UTF-8
+                result += *p++;
+                result += *p++;
+                result += *p++;
+                result += *p++;
+            }
+            else
+            {
+                // Invalid UTF-8, skip
+                p++;
+            }
+        }
+    }
+    
+    name = result;
+}
 
 static void CL_LoadNameFilter()
 {
@@ -473,8 +568,9 @@ static void CL_LoadNameFilter()
         while (!w.empty() && (w.back() == ' ' || w.back() == '\t')) w.pop_back();
         if (!w.empty())
         {
-            std::transform(w.begin(), w.end(), w.begin(), [](unsigned char c){ return (char)tolower(c); });
-            g_ClientBadWords.AddToTail(w);
+            // Use Unicode-aware case conversion
+            std::string lowerWord = CL_ToLowerUnicode(w);
+            g_ClientBadWords.AddToTail(lowerWord);
         }
     }
     FileSystem()->FreeOptimalReadBuffer(buf);
@@ -483,7 +579,14 @@ static void CL_LoadNameFilter()
 
 static void CL_MaskBadWords(std::string& name)
 {
-    if (!cl_nameFilterEnabled.GetBool() || name.empty())
+    if (name.empty())
+        return;
+
+    // Remove blocked icon characters (unless allowed)
+    if (!cl_allowIconsInNames.GetBool())
+        CL_RemoveBlockedIcons(name);
+    
+    if (!cl_nameFilterEnabled.GetBool())
         return;
 
     if (!g_ClientBadWordsLoaded)
@@ -491,8 +594,7 @@ static void CL_MaskBadWords(std::string& name)
     if (!g_ClientBadWordsLoaded || g_ClientBadWords.IsEmpty())
         return;
 
-    std::string lower = name;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c){ return (char)tolower(c); });
+    std::string lower = CL_ToLowerUnicode(name);
 
     FOR_EACH_VEC(g_ClientBadWords, i)
     {

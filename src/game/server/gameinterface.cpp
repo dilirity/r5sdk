@@ -127,7 +127,70 @@ static ConVar sv_overrideTeamChatRestriction("sv_overrideTeamChatRestriction", "
 	"When enabled this allows sv_forceChatToTeamOnly to take control of the team chat restriction.",
 	"0: Default, 1: Forces the value from sv_forceChatToTeamOnly."
 );
-static ConVar sv_allowAnyChatChars("sv_allowAnyChatChars", "0", FCVAR_RELEASE, "Allow any characters in chat messages (disables server-side ASCII sanitization)");
+static ConVar sv_allowIconsInChat("sv_allowIconsInChat", "0", FCVAR_RELEASE, "Allow game icon characters in chat messages. 0 = Block icons, 1 = Allow icons");
+
+// Function to check if a UTF-8 string contains blocked game icon characters
+static bool SV_ContainsBlockedIcons(const char* text)
+{
+    if (!text) return false;
+    
+    const unsigned char* p = reinterpret_cast<const unsigned char*>(text);
+    
+    while (*p)
+    {
+        // Check for UTF-8 sequences that represent the blocked icon characters
+        // These characters are in the Private Use Area around U+F0000-U+F0FFF
+        
+        // UTF-8 encoding for U+F0000-U+F0FFF:
+        // 4-byte sequence: 0xF3 0xB0 0x80-0xBF 0x80-0xBF
+        if (p[0] == 0xF3 && p[1] == 0xB0)
+        {
+            // This is likely one of the blocked icon characters
+            return true;
+        }
+        
+        // Also check for some other common Private Use Area ranges that might contain icons
+        // U+E000-U+F8FF (3-byte UTF-8: 0xEE-0xEF)
+        if (p[0] >= 0xEE && p[0] <= 0xEF)
+        {
+            // Check if this matches the specific icon pattern
+            // The icons you listed seem to be in a specific range
+            if (p[0] == 0xEF && p[1] >= 0x80 && p[1] <= 0xBF)
+            {
+                return true; // Block these specific Private Use Area characters
+            }
+        }
+        
+        // Move to next character
+        if (*p < 0x80)
+        {
+            // ASCII character
+            p++;
+        }
+        else if ((*p & 0xE0) == 0xC0)
+        {
+            // 2-byte UTF-8
+            p += 2;
+        }
+        else if ((*p & 0xF0) == 0xE0)
+        {
+            // 3-byte UTF-8
+            p += 3;
+        }
+        else if ((*p & 0xF8) == 0xF0)
+        {
+            // 4-byte UTF-8
+            p += 4;
+        }
+        else
+        {
+            // Invalid UTF-8, skip
+            p++;
+        }
+    }
+    
+    return false;
+}
 
 void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int senderId, const char* text, bool isTeamChat)
 {
@@ -139,17 +202,48 @@ void CServerGameDLL::OnReceivedSayTextMessage(CServerGameDLL* thisptr, int sende
 
 	const bool bIsTeamChat = sv_overrideTeamChatRestriction.GetBool() ? sv_forceChatToTeamOnly->GetBool()  : isTeamChat;
 
-	// If not allowed, drop entire message when it contains non-printable/non-ASCII bytes
-	if (!sv_allowAnyChatChars.GetBool() && text)
+	// Validate chat message characters
+	if (text)
 	{
+		// Always check if it's valid UTF-8
+		if (!V_IsValidUTF8(text))
+		{
+			if (chat_debug.GetBool())
+				Msg(eDLL_T::SERVER, "Dropping chat message from '%s' (%llu): invalid UTF-8 encoding\n",
+					pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId());
+			return; // Drop invalid UTF-8
+		}
+		
+		// Check for blocked game icon characters (unless allowed)
+		if (!sv_allowIconsInChat.GetBool() && SV_ContainsBlockedIcons(text))
+		{
+			if (chat_debug.GetBool())
+				Msg(eDLL_T::SERVER, "Dropping chat message from '%s' (%llu): contains blocked game icon characters\n",
+					pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId());
+			return; // Drop message with blocked icons
+		}
+		
+		// Always check for control characters but allow normal Unicode
 		for (const unsigned char* p = reinterpret_cast<const unsigned char*>(text); *p; ++p)
 		{
-			if (*p < 32 || *p > 126)
+			// Allow printable ASCII (32-126)
+			if (*p >= 32 && *p <= 126)
+				continue;
+				
+			// Allow high-bit characters (UTF-8 sequences) - this includes Japanese, Chinese, etc.
+			if (*p >= 128)
+			{
+				// This is part of a UTF-8 sequence, allow it (Japanese, Chinese, Korean, etc.)
+				continue;
+			}
+			
+			// Block control characters (0-31, 127) except common whitespace
+			if (*p != '\t' && *p != '\n' && *p != '\r')
 			{
 				if (chat_debug.GetBool())
-					Msg(eDLL_T::SERVER, "Dropping chat message from '%s' (%llu): contains non-ASCII characters\n",
+					Msg(eDLL_T::SERVER, "Dropping chat message from '%s' (%llu): contains control characters\n",
 						pSenderPlayer->GetNetName(), pSenderPlayer->GetPlatformUserId());
-				return; // Drop silently
+				return; // Drop message with control characters
 			}
 		}
 	}

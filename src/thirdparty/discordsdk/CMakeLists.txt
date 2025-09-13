@@ -20,6 +20,11 @@ add_library(discordsdk STATIC
     cpp/voice_manager.cpp
 )
 
+# Set folder for Visual Studio organization
+if(FOLDER_CONTEXT)
+    set_target_properties(discordsdk PROPERTIES FOLDER "${FOLDER_CONTEXT}")
+endif()
+
 target_include_directories(discordsdk PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp
 )
@@ -47,7 +52,7 @@ if(WIN32)
             "${GAME_DIR}/"
             
             # Create steam_appid.txt with Apex App ID
-            COMMAND ${CMAKE_COMMAND} -E echo "1172470" > "${GAME_DIR}/steam_appid.txt"
+            COMMAND cmd /c "echo 1172470 > \"${GAME_DIR}/steam_appid.txt\""
             
             COMMENT "Copying Discord and Steam DLLs, creating steam_appid.txt"
         )
@@ -73,7 +78,7 @@ if(WIN32)
             "${GAME_DIR}/"
             
             # Create steam_appid.txt with Apex App ID
-            COMMAND ${CMAKE_COMMAND} -E echo "1172470" > "${GAME_DIR}/steam_appid.txt"
+            COMMAND cmd /c "echo 1172470 > \"${GAME_DIR}/steam_appid.txt\""
             
             COMMENT "Copying Discord and Steam DLLs, creating steam_appid.txt"
         )

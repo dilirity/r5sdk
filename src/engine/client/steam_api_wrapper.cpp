@@ -8,6 +8,11 @@
 extern "C" {
     // C-style interface to avoid C++ name mangling and type conflicts
     
+#ifdef USE_STEAMWORKS
+    // Store the current auth ticket handle for invalidation
+    static HAuthTicket g_CurrentAuthTicket = k_HAuthTicketInvalid;
+#endif
+    
     int Steam_InitAPI() {
 #ifdef USE_STEAMWORKS
         // Check if we need to restart through Steam
@@ -76,12 +81,8 @@ extern "C" {
 #endif
     }
 
-    // Store the current auth ticket handle for invalidation
-    static HAuthTicket g_CurrentAuthTicket = k_HAuthTicketInvalid;
-    
     int Steam_GetAuthTicketHex(char* outBuffer, int bufferSize) {
 #ifdef USE_STEAMWORKS
-        
         if (!outBuffer || bufferSize < 1) {
             return 0;
         }
