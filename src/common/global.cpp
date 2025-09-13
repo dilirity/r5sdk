@@ -322,6 +322,7 @@ void ConVar_InitShipped(void)
 	rui_defaultDebugFontFace->RemoveFlags(FCVAR_DEVELOPMENTONLY);
 	origin_disconnectWhenOffline->RemoveFlags(FCVAR_DEVELOPMENTONLY);
 	discord_updatePresence->RemoveFlags(FCVAR_DEVELOPMENTONLY);
+	discord_updatePresence->AddFlags(FCVAR_HIDDEN);
 #endif // !DEDICATED
 	fps_max->AddFlags(FCVAR_ARCHIVE);
 	fps_max_vsync->RemoveFlags(FCVAR_DEVELOPMENTONLY);

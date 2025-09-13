@@ -26,6 +26,7 @@
 #include <engine/cmd.h>
 #include "filesystem/filesystem.h"
 #include "steam_integration.h"
+#include "discord_presence.h"
 
 //------------------------------------------------------------------------------
 // Purpose: console command callbacks
@@ -179,7 +180,15 @@ float CClientState::GetFrameTime() const
 bool CClientState::VConnectionStart(CClientState* pClient, CNetChan* pChan)
 {
     pClient->RegisterNetMsgs(pChan);
-    return CClientState__ConnectionStart(pClient, pChan);
+    bool result = CClientState__ConnectionStart(pClient, pChan);
+    
+    // Update Discord Rich Presence when connecting
+    if (result)
+    {
+        CDiscordPresence::SetGameState("Connecting to server", "Joining game");
+    }
+    
+    return result;
 }
 
 //------------------------------------------------------------------------------
@@ -189,6 +198,10 @@ void CClientState::VConnectionClosing(CClientState* thisptr, const char* szReaso
 {
     
     CClientState__ConnectionClosing(thisptr, szReason);
+
+    // Update Discord Rich Presence when disconnecting
+    CDiscordPresence::ClearServerInfo();
+    CDiscordPresence::SetGameState("In menu", "Disconnected from server");
 
     // Delay execution to the next frame; this is required to avoid a rare crash.
     // Cannot reload playlists while still disconnecting.

@@ -38,6 +38,7 @@
 #include "codecs/miles/miles_impl.h"
 #include "codecs/miles/miles_shim.h"
 #include "codecs/miles/radshal_wasapi.h"
+#include "engine/client/discord_presence.h"
 #endif // !DEDICATED
 #include "vphysics/physics_collide.h"
 #include "vphysics/QHull.h"
@@ -321,6 +322,11 @@ void Systems_Shutdown()
 #ifndef CLIENT_DLL
 	LiveAPISystem()->Shutdown();
 #endif// !CLIENT_DLL
+
+#ifndef DEDICATED
+	// Shutdown Discord Rich Presence
+	CDiscordPresence::Shutdown();
+#endif // !DEDICATED
 
 	CFastTimer shutdownTimer;
 	shutdownTimer.Start();

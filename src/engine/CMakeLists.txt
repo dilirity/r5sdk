@@ -147,6 +147,10 @@ if( NOT ${PROJECT_NAME} STREQUAL "engine_ds" )
 add_sources( SOURCE_GROUP "Client" # Client only.
     "client/clientstate.cpp"
     "client/clientstate.h"
+    "client/discord_presence.cpp"
+    "client/discord_presence.h"
+    "client/discord_rpc_wrapper.cpp"
+    "client/discord_rpc_wrapper.h"
     "client/cl_main.cpp"
     "client/cl_main.h"
     "client/cl_splitscreen.cpp"
@@ -289,6 +293,11 @@ target_include_directories( ${PROJECT_NAME} PRIVATE
     "${THIRDPARTY_SOURCE_DIR}/recast/"
     "${THIRDPARTY_SOURCE_DIR}/mbedtls/include"
 )
+
+# Link Discord SDK for client builds
+if( NOT ${PROJECT_NAME} STREQUAL "engine_ds" )
+    target_link_libraries( ${PROJECT_NAME} PRIVATE discordsdk )
+endif()
 
 endmacro()
 

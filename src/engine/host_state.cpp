@@ -44,6 +44,7 @@
 #include "vgui/vgui_baseui_interface.h"
 #include "client/vengineclient_impl.h"
 #include "client/cdll_engine_int.h"
+#include "client/discord_presence.h"
 #include "gameui/imgui_system.h"
 #endif // DEDICATED
 #include "networksystem/pylon.h"
@@ -252,6 +253,9 @@ void CHostState::FrameUpdate(CHostState* pHostState, double flCurrentTime, float
 #endif // !CLIENT_DLL
 #ifndef DEDICATED
 	RCONClient()->RunFrame();
+	
+	// Update Discord Rich Presence
+	CDiscordPresence::Update();
 #endif // !DEDICATED
 
 	// Disable "warning C4611: interaction between '_setjmp' and C++ object destruction is non-portable"
@@ -278,16 +282,32 @@ void CHostState::FrameUpdate(CHostState* pHostState, double flCurrentTime, float
 			case HostStates_t::HS_NEW_GAME:
 			{
 				g_pHostState->State_NewGame();
+#ifndef DEDICATED
+				// Update Discord Rich Presence for new game
+				CDiscordPresence::SetGameState("Loading", "Starting new game");
+#endif // !DEDICATED
 				break;
 			}
 			case HostStates_t::HS_CHANGE_LEVEL_SP:
 			{
 				g_pHostState->State_ChangeLevelSP();
+#ifndef DEDICATED
+				// Update Discord Rich Presence for level change
+				CDiscordPresence::SetGameState("Loading", "Changing level");
+				if (g_pHostState->m_levelName[0])
+					CDiscordPresence::SetMapInfo(g_pHostState->m_levelName);
+#endif // !DEDICATED
 				break;
 			}
 			case HostStates_t::HS_CHANGE_LEVEL_MP:
 			{
 				g_pHostState->State_ChangeLevelMP();
+#ifndef DEDICATED
+				// Update Discord Rich Presence for level change
+				CDiscordPresence::SetGameState("Loading", "Changing level");
+				if (g_pHostState->m_levelName[0])
+					CDiscordPresence::SetMapInfo(g_pHostState->m_levelName);
+#endif // !DEDICATED
 				break;
 			}
 			case HostStates_t::HS_RUN:
@@ -406,6 +426,11 @@ void CHostState::Setup(void)
 #ifndef CLIENT_DLL
 	LiveAPISystem()->Init();
 #endif // !CLIENT_DLL
+
+#ifndef DEDICATED
+	// Initialize Discord Rich Presence
+	CDiscordPresence::Initialize();
+#endif // !DEDICATED
 
 	if (CommandLine()->CheckParm("-norandomkey"))
 	{
