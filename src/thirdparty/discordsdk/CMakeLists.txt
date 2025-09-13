@@ -32,7 +32,7 @@ target_include_directories(discordsdk PUBLIC
 if(WIN32)
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
         # 64-bit
-        target_link_libraries(discordsdk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/lis/x86_64/discord_game_sdk.dll.lib")
+        target_link_libraries(discordsdk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libs/x86_64/discord_game_sdk.dll.lib")
         
         # Define paths
         set(DISCORD_DLL_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libs/x86_64/discord_game_sdk.dll")
@@ -58,7 +58,7 @@ if(WIN32)
         )
     else()
         # 32-bit
-        target_link_libraries(discordsdk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/lib/x86/discord_game_sdk.dll.lib")
+        target_link_libraries(discordsdk PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/libs/x86/discord_game_sdk.dll.lib")
         
         # Define paths for 32-bit
         set(DISCORD_DLL_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lib/x86/discord_game_sdk.dll")
