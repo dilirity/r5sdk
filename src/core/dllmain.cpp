@@ -164,11 +164,12 @@ void SDK_Init()
 #endif
 
 #ifndef DEDICATED
-    // Force enable noorigin mode for Steam-only authentication (if enabled)
+    // Force enable Steam mode for Steam-only authentication (if enabled)
     if (ShouldForceSteamOnly() && !CommandLine()->CheckParm("-noorigin"))
     {
         CommandLine()->AppendParm("-noorigin", "");
-        Msg(eDLL_T::ENGINE, "[STEAM_INIT] Forced -noorigin mode for Steam-only authentication\n");
+        //no need to log this
+        //Msg(eDLL_T::ENGINE, "[STEAM_INIT] Forced Steam mode for Steam-only authentication\n");
     }
     
     // Check if we're in offline mode first
@@ -187,7 +188,7 @@ void SDK_Init()
         
         Msg(eDLL_T::ENGINE, "[STEAM_INIT] Using offline Steam data: %s (ID: %llu)\n", steamUsername.c_str(), steamUserID);
         
-        // Set platform_user_id and g_NucleusID to offline Steam ID
+        // Set platform_user_id and g_SteamUserID to offline Steam ID
         if (steamUserID != 0)
         {
             if (platform_user_id)
@@ -249,7 +250,7 @@ void SDK_Init()
                 Msg(eDLL_T::ENGINE, "[STEAM_INIT] Steam User: %s (ID: %llu)\n", steamUsername.c_str(), steamUserID);
             }
             
-            // Set platform_user_id and g_NucleusID to Steam user ID for consistency
+            // Set platform_user_id and g_SteamUserID to Steam user ID for consistency
             if (steamUserID != 0)
             {
                 if (platform_user_id)

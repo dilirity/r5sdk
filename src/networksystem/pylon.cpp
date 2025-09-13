@@ -276,7 +276,7 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
         const CBanSystem::Banned_t& banned = inBannedVec[i];
         rapidjson::Value player(rapidjson::kObjectType);
 
-        player.AddMember("id", banned.m_NucleusID, allocator);
+        player.AddMember("id", banned.m_SteamID, allocator);
         player.AddMember("ip", rapidjson::Value(banned.m_Address.String(), banned.m_Address.Length(), allocator), allocator);
 
         playersArray.PushBack(player, allocator);
@@ -315,8 +315,8 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
         const char* reason = nullptr;
         JSON_GetValue(obj, "reason", reason);
 
-        NucleusID_t nuc = NULL;
-        JSON_GetValue(obj, "id", nuc);
+        SteamID_t steamId = NULL;
+        JSON_GetValue(obj, "id", steamId);
 
         //Default to a connection ban
         CBanSystem::Banned_t::BanType_e banType = CBanSystem::Banned_t::CONNECT;
@@ -325,7 +325,7 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
         const char* pszExpiryTimestamp = nullptr;
         JSON_GetValue(obj, "banExpires", pszExpiryTimestamp);
 
-        CBanSystem::Banned_t banned(reason ? reason : "#DISCONNECT_BANNED", nuc, banType, pszExpiryTimestamp);
+        CBanSystem::Banned_t banned(reason ? reason : "#DISCONNECT_BANNED", steamId, banType, pszExpiryTimestamp);
         (*outBannedVec)->AddToTail(banned);
     }
 
@@ -335,12 +335,12 @@ bool CPylon::GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSyst
 //-----------------------------------------------------------------------------
 // Purpose: Checks if client is banned on the comp server.
 // Input  : &ipAddress - 
-//			nucleusId  - 
+//			steamId  - 
 //			&personaName - 
 //			&outReason - <- contains banned reason if any.
 // Output : True if banned, false if not banned.
 //-----------------------------------------------------------------------------
-bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, const string& personaName, string& outReason, CBanSystem::Banned_t::BanType_e& outBanType, string& outExpiryTimestamp) const
+bool CPylon::CheckForBan(const string& ipAddress, const uint64_t steamId, const string& personaName, string& outReason, CBanSystem::Banned_t::BanType_e& outBanType, string& outExpiryTimestamp) const
 {
     if (!IsEnabled())
     {
@@ -354,7 +354,7 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
     rapidjson::Document::AllocatorType& allocator = requestJson.GetAllocator();
 
     requestJson.AddMember("name", rapidjson::Value(personaName.c_str(), allocator), allocator);
-    requestJson.AddMember("id", nucleusId, allocator);
+    requestJson.AddMember("id", steamId, allocator);
     requestJson.AddMember("ip", rapidjson::Value(ipAddress.c_str(), allocator), allocator);
 
     rapidjson::Document responseJson;
@@ -428,7 +428,7 @@ bool CPylon::CheckForBan(const string& ipAddress, const uint64_t nucleusId, cons
 
 //-----------------------------------------------------------------------------
 // Purpose: authenticate for 'this' particular connection.
-// Input  : nucleusId   - 
+// Input  : steamId   - 
 //          *ipAddress  - 
 //          *authCode   - 
 //          &outToken   - 
@@ -449,7 +449,7 @@ bool CPylon::AuthForConnection(const uint64_t steamUserId, const char* ipAddress
 
     rapidjson::Document::AllocatorType& allocator = requestJson.GetAllocator();
 
-    // Use Steam User ID instead of Nucleus ID - send as string to avoid precision loss
+    // Use Steam User ID instead of legacy ID - send as string to avoid precision loss
     char steamIdStr[32];
     V_snprintf(steamIdStr, sizeof(steamIdStr), "%llu", steamUserId);
     requestJson.AddMember("id", rapidjson::Value(steamIdStr, allocator), allocator);
@@ -474,7 +474,7 @@ bool CPylon::AuthForConnection(const uint64_t steamUserId, const char* ipAddress
 
     CURLINFO status;
 
-    if (!SendRequest("/api/client/auth", requestJson, responseJson, outMessage, status, "origin auth error"))
+    if (!SendRequest("/api/client/auth", requestJson, responseJson, outMessage, status, "platform auth error"))
     {
         return false;
     }

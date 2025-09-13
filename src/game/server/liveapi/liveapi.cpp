@@ -375,12 +375,12 @@ static void LiveAPI_SetVersion(rtech::liveapi::Version* const msg)
 	msg->set_revision(LIVEAPI_REVISION, sizeof(LIVEAPI_REVISION)-1);
 }
 
-static void LiveAPI_SetNucleusHash(std::string* const msg, const SQString* const nucleusId)
+static void LiveAPI_SetSteamHash(std::string* const msg, const SQString* const steamId)
 {
 	static const char hexChars[] = "0123456789abcdef";
-	uint8_t nucleusIdHash[LIVEAPI_SHA512_HASH_SIZE];
+	uint8_t steamIdHash[LIVEAPI_SHA512_HASH_SIZE];
 
-	mbedtls_sha512(reinterpret_cast<const uint8_t*>(nucleusId->_val), nucleusId->_len, nucleusIdHash, NULL);
+	mbedtls_sha512(reinterpret_cast<const uint8_t*>(steamId->_val), steamId->_len, steamIdHash, NULL);
 
 	const size_t hashSize = liveapi_truncate_hash_fields.GetBool()
 		? LIVEAPI_SHA512_HASH_SIZE / 4
@@ -391,8 +391,8 @@ static void LiveAPI_SetNucleusHash(std::string* const msg, const SQString* const
 
 	for (size_t i = 0; i < hashSize; i++)
 	{
-		(*msg)[i * 2] = hexChars[(nucleusIdHash[i] >> 4) & 0xf];
-		(*msg)[i * 2 + 1] = hexChars[nucleusIdHash[i] & 0xf];
+		(*msg)[i * 2] = hexChars[(steamIdHash[i] >> 4) & 0xf];
+		(*msg)[i * 2 + 1] = hexChars[steamIdHash[i] & 0xf];
 	}
 }
 
@@ -478,7 +478,7 @@ static bool LiveAPI_SetPlayerIdentityFields(HSQUIRRELVM const v, const SQTable* 
 		case rtech::liveapi::Player::kNucleusHashFieldNumber:
 		{
 			LIVEAPI_ENSURE_TYPE(v, obj, OT_STRING, playerMsg, fieldNum);
-			LiveAPI_SetNucleusHash(playerMsg->mutable_nucleushash(), _string(obj));
+			LiveAPI_SetSteamHash(playerMsg->mutable_nucleushash(), _string(obj));
 
 			break;
 		}

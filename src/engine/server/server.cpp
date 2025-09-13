@@ -112,7 +112,7 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 		return nullptr;
 
 	char* pszPersonaName = pChallenge->personaName;
-	NucleusID_t nNucleusID = pChallenge->personaId;
+	SteamID_t nSteamID = pChallenge->personaId;
 
 	const bool bEnableLogging = sv_showconnecting.GetBool();
 	const int nPort = int(ntohs(pChallenge->netAdr.GetPort()));
@@ -127,7 +127,7 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 		pszAddresBuffer = szAddresBuffer;
 
 		Msg(eDLL_T::SERVER, "Processing connectionless challenge for '[%s]:%i' ('%llu')\n",
-			pszAddresBuffer, nPort, nNucleusID);
+			pszAddresBuffer, nPort, nSteamID);
 	}
 
 	bool bValidName = false;
@@ -154,20 +154,20 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 		if (bEnableLogging)
 		{
 			Warning(eDLL_T::SERVER, "Connection rejected for '[%s]:%i' ('%llu' has an invalid name!)\n",
-				pszAddresBuffer, nPort, nNucleusID);
+				pszAddresBuffer, nPort, nSteamID);
 		}
 
 		return nullptr;
 	}
 
-	if (g_BanSystem.IsBanned(&pChallenge->netAdr, nNucleusID))
+	if (g_BanSystem.IsBanned(&pChallenge->netAdr, nSteamID))
 	{
 		pServer->RejectConnection(pServer->m_Socket, &pChallenge->netAdr, "#Valve_Reject_Banned");
 
 		if (bEnableLogging)
 		{
 			Warning(eDLL_T::SERVER, "Connection rejected for '[%s]:%i' ('%llu' is banned from this server!)\n",
-				pszAddresBuffer, nPort, nNucleusID);
+				pszAddresBuffer, nPort, nSteamID);
 		}
 
 		return nullptr;
@@ -197,7 +197,7 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 			const string addressBufferCopy(pszAddresBuffer);
 			const string personaNameCopy(pszPersonaName);
 
-			std::thread th(SV_CheckForBanAndDisconnect, pClient, addressBufferCopy, nNucleusID, personaNameCopy, nPort);
+			std::thread th(SV_CheckForBanAndDisconnect, pClient, addressBufferCopy, nSteamID, personaNameCopy, nPort);
 			th.detach();
 		}
 	}

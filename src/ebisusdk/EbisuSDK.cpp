@@ -9,28 +9,28 @@
 void HEbisuSDK_Init()
 {
 	const bool isDedicated = IsDedicated();
-	const bool noOrigin = IsOriginDisabled();
+	const bool steamMode = IsSteamMode();
 
 	// Fill with default data if this is a dedicated server, or if the game was
 	// launched with the platform system disabled. Engine code requires these
 	// to be set for the game to function, else stuff like the "map" command
-	// won't run as 'IsOriginInitialized()' returns false (which got inlined in
+	// won't run as 'IsPlatformInitialized()' returns false (which got inlined in
 	// every place this was called in the game's executable).
 	// Steam-only mode: bypass EA/Origin requirement and use placeholder values
 	// The g_SteamUserID will be replaced with the actual Steam ID during authentication
-	if (isDedicated || noOrigin)
+	if (isDedicated || steamMode)
 	{
 		*g_EbisuSDKInit = true;
 		*g_EbisuProfileInit = true;
-		*g_SteamUserID = FAKE_BASE_NUCLEUD_ID; // Placeholder - replaced with Steam ID later
+		*g_SteamUserID = FAKE_BASE_STEAM_ID; // Placeholder - replaced with Steam ID later
 
 		// EA/Origin authentication tokens are no longer needed with Steam authentication
 		// Q_snprintf(g_OriginAuthCode, 256, "%s", "INVALID_OAUTH_CODE"); // REMOVED: No longer needed with Steam auth
-		Q_snprintf(g_LegacyAuthToken, 1024, "%s", "INVALID_LEGACY_TOKEN"); // Legacy compatibility (renamed from g_NucleusToken)
+		Q_snprintf(g_LegacyAuthToken, 1024, "%s", "INVALID_LEGACY_TOKEN"); // Legacy compatibility (renamed from legacy EA token)
 
 		if (!isDedicated)
 		{
-			platform_user_id->SetValue(FAKE_BASE_NUCLEUD_ID);
+			platform_user_id->SetValue(FAKE_BASE_STEAM_ID);
 		}
 	}
 }
@@ -40,7 +40,7 @@ void HEbisuSDK_Init()
 //-----------------------------------------------------------------------------
 void HEbisuSDK_RunFrame()
 {
-	if (IsOriginDisabled())
+	if (IsSteamMode())
 	{
 		return;
 	}
@@ -88,17 +88,17 @@ const char* HEbisuSDK_GetLanguage()
 // Purpose: checks if the EbisuSDK is disabled
 // Output : true on success, false on failure
 //-----------------------------------------------------------------------------
-bool IsOriginDisabled()
+bool IsSteamMode()
 {
-	const static bool isDisabled = CommandLine()->CheckParm("-noorigin");
-	return isDisabled;
+	const static bool steamMode = CommandLine()->CheckParm("-noorigin");
+	return steamMode;
 }
 
 //-----------------------------------------------------------------------------
 // Purpose: checks if the EbisuSDK is initialized
 // Output : true on success, false on failure
 //-----------------------------------------------------------------------------
-bool IsOriginInitialized()
+bool IsPlatformInitialized()
 {
 	if (IsDedicated())
 	{

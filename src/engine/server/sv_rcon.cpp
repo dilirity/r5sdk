@@ -439,16 +439,16 @@ void CRConServer::Authenticate(const netcon::request& request, ConnectedNetConso
 //-----------------------------------------------------------------------------
 bool CRConServer::Comparator(const string& svPassword) const
 {
-	uint8_t clientPasswordHash[RCON_SHA512_HASH_SIZE];
-	mbedtls_sha512(reinterpret_cast<const uint8_t*>(svPassword.c_str()), svPassword.length(),
-		clientPasswordHash, NULL);
+    uint8_t clientPasswordHash[RCON_SHA512_HASH_SIZE];
+    mbedtls_sha512(reinterpret_cast<const uint8_t*>(svPassword.c_str()), svPassword.length(),
+        clientPasswordHash, NULL);
 
-	if (memcmp(clientPasswordHash, m_PasswordHash, RCON_SHA512_HASH_SIZE) == 0)
-	{
-		return true;
-	}
-
-	return false;
+    volatile uint8_t result = 0;
+    for (size_t i = 0; i < RCON_SHA512_HASH_SIZE; i++)
+    {
+        result |= clientPasswordHash[i] ^ m_PasswordHash[i];
+    }
+    return result == 0;
 }
 
 //-----------------------------------------------------------------------------

@@ -18,7 +18,8 @@ void Steam_Shutdown();
 bool Steam_IsOfflineMode();
 
 
-// Steam ConVars accessible from other files
+// Steam ConVars accessible from other files  
+extern ConVar steam_debug;
 extern ConVar steam_debug_auth;
 
 

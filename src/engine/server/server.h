@@ -23,7 +23,7 @@ struct user_creds_s
 	int32_t  protocolVer;
 	int32_t  challenge;
 	uint32_t reservation;
-	NucleusID_t personaId;
+	SteamID_t personaId;
 	char* personaName;
 };
 

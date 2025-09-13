@@ -26,7 +26,7 @@ public:
 	bool PostServerHost(string& outMessage, string& svOutToken, string& outHostIp, const NetGameServer_t& netGameServer) const;
 
 	bool GetBannedList(const CBanSystem::BannedList_t& inBannedVec, CBanSystem::BannedList_t** outBannedVec) const;
-	bool CheckForBan(const string& ipAddress, const uint64_t nucleusId, const string& personaName, string& outReason, CBanSystem::Banned_t::BanType_e& outBanType, string& outExpiryTimestamp) const;
+	bool CheckForBan(const string& ipAddress, const uint64_t steamId, const string& personaName, string& outReason, CBanSystem::Banned_t::BanType_e& outBanType, string& outExpiryTimestamp) const;
 
 	bool AuthForConnection(const uint64_t steamUserId, const char* ipAddress, const char* authCode, string& outToken, string& outMessage, const char* steamTicket = nullptr, const char* steamUsername = nullptr) const;
 
