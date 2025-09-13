@@ -24,7 +24,7 @@ if(WIN32)
         add_custom_command(TARGET deploy_runtime_files POST_BUILD
             # Copy Discord Game SDK DLL
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/thirdparty/discordsdk/lib/x86_64/discord_game_sdk.dll"
+            "${CMAKE_SOURCE_DIR}/thirdparty/discordsdk/libs/x86_64/discord_game_sdk.dll"
             "${GAME_DEPLOY_DIR}/"
             
             # Copy Steam API DLL
