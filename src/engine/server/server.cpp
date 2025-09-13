@@ -21,6 +21,7 @@
 #include "public/edict.h"
 #include "pluginsystem/pluginsystem.h"
 #include "game/server/gameinterface.h"
+#include "filesystem/filesystem.h"
 
 //---------------------------------------------------------------------------------
 // Console variables
@@ -34,6 +35,97 @@ static ConVar sv_validatePersonaName("sv_validatePersonaName", "1", FCVAR_RELEAS
 static ConVar sv_minPersonaNameLength("sv_minPersonaNameLength", "1", FCVAR_RELEASE, "The minimum length of the client's textual persona name.", true, 0.f, false, 0.f);
 static ConVar sv_maxPersonaNameLength("sv_maxPersonaNameLength", "32", FCVAR_RELEASE, "The maximum length of the client's textual persona name.", true, 0.f, false, 0.f);
 static ConVar sv_allowAnyNameChars("sv_allowAnyNameChars", "0", FCVAR_RELEASE, "Allow any characters in client persona names (disables server-side ASCII sanitization)");
+static ConVar sv_nameFilterEnabled("sv_nameFilterEnabled", "1", FCVAR_RELEASE, "Kick players whose names contain words from the bad word list asset");
+static ConVar sv_nameFilterPath("sv_nameFilterPath", "chatfilters/badwords.txt", FCVAR_RELEASE, "Relative path (in VPK) to the bad word list file");
+
+//---------------------------------------------------------------------------------
+// Purpose: load bad word list from VPK (englishserver_mp_common / englishclient_mp_common)
+//---------------------------------------------------------------------------------
+static CUtlVector<string> g_NameFilterWords;
+static bool g_NameFilterLoaded = false;
+
+static void SV_LoadNameFilter()
+{
+    g_NameFilterWords.RemoveAll();
+    g_NameFilterLoaded = false;
+
+    const char* const filePath = sv_nameFilterPath.GetString();
+    if (!filePath || !*filePath)
+        return;
+
+    FileHandle_t hFile = FileSystem()->Open(filePath, "rb", "GAME");
+    if (hFile == FILESYSTEM_INVALID_HANDLE)
+        return;
+
+    const ssize_t nFileSize = FileSystem()->Size(hFile);
+    if (nFileSize <= 0)
+    {
+        FileSystem()->Close(hFile);
+        return;
+    }
+
+    const u64 nBufSize = FileSystem()->GetOptimalReadSize(hFile, nFileSize + 2);
+    char* const pBuf = (char*)FileSystem()->AllocOptimalReadBuffer(hFile, nBufSize, 0);
+    if (!pBuf)
+    {
+        FileSystem()->Close(hFile);
+        return;
+    }
+
+    const ssize_t nRead = FileSystem()->ReadEx(pBuf, nBufSize, nFileSize, hFile);
+    FileSystem()->Close(hFile);
+    if (nRead <= 0)
+    {
+        FileSystem()->FreeOptimalReadBuffer(pBuf);
+        return;
+    }
+
+    pBuf[nRead] = '\0';
+
+    // Parse lines
+    const char* p = pBuf;
+    while (*p)
+    {
+        while (*p == '\r' || *p == '\n' || *p == ' ' || *p == '\t') ++p;
+        if (!*p) break;
+
+        const char* start = p;
+        while (*p && *p != '\r' && *p != '\n') ++p;
+        string word(start, p - start);
+
+        while (!word.empty() && (word.back() == ' ' || word.back() == '\t')) word.pop_back();
+        if (!word.empty())
+        {
+            std::transform(word.begin(), word.end(), word.begin(), [](unsigned char c){ return (char)tolower(c); });
+            g_NameFilterWords.AddToTail(word);
+        }
+    }
+
+    FileSystem()->FreeOptimalReadBuffer(pBuf);
+    g_NameFilterLoaded = true;
+}
+
+static bool SV_NameContainsBadWord(const char* pszName)
+{
+    if (!sv_nameFilterEnabled.GetBool() || !pszName || !*pszName)
+        return false;
+
+    if (!g_NameFilterLoaded)
+        SV_LoadNameFilter();
+
+    if (!g_NameFilterLoaded || g_NameFilterWords.IsEmpty())
+        return false;
+
+    string lowered(pszName);
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c){ return (char)tolower(c); });
+
+    FOR_EACH_VEC(g_NameFilterWords, i)
+    {
+        if (lowered.find(g_NameFilterWords[i]) != string::npos)
+            return true;
+    }
+    return false;
+}
 
 //---------------------------------------------------------------------------------
 // Purpose: Gets the number of human players on the server
@@ -139,7 +231,8 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 			const unsigned char ch = static_cast<unsigned char>(*p);
 			if (ch < 32 || ch > 126)
 			{
-				pServer->RejectConnection(pServer->m_Socket, &pChallenge->netAdr, "#Valve_Reject_Invalid_Name");
+				//#Client_Reject_Invalid_Name: Your name contains invalid characters.
+				pServer->RejectConnection(pServer->m_Socket, &pChallenge->netAdr, "#Client_Reject_Invalid_Name");
 				if (bEnableLogging)
 				{
 					if (!pszAddresBuffer)
@@ -153,6 +246,24 @@ CClient* CServer::ConnectClient(CServer* pServer, user_creds_s* pChallenge)
 				return nullptr;
 			}
 		}
+	}
+
+	// Reject if persona name contains a filtered word from asset (VPK)
+	if (SV_NameContainsBadWord(pszPersonaName))
+	{
+		//#Client_Reject_Banned_Name: Your name contains a banned word.
+		pServer->RejectConnection(pServer->m_Socket, &pChallenge->netAdr, "#Client_Reject_Banned_Name");
+		if (bEnableLogging)
+		{
+			if (!pszAddresBuffer)
+			{
+				pChallenge->netAdr.ToString(szAddresBuffer, sizeof(szAddresBuffer), true);
+				pszAddresBuffer = szAddresBuffer;
+			}
+			Warning(eDLL_T::SERVER, "Connection rejected for '[%s]:%i' ('%llu' name contains banned word)\n",
+				pszAddresBuffer, nPort, nSteamID);
+		}
+		return nullptr;
 	}
 
 	bool bValidName = false;

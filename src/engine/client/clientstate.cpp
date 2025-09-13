@@ -24,12 +24,14 @@
 #include "rtech/playlists/playlists.h"
 #include <ebisusdk/EbisuSDK.h>
 #include <engine/cmd.h>
+#include "filesystem/filesystem.h"
 #include "steam_integration.h"
 
 //------------------------------------------------------------------------------
 // Purpose: console command callbacks
 //------------------------------------------------------------------------------
 static std::string SanitizeSteamUsername(const std::string& steamUsername); // forward
+static void CL_MaskBadWords(std::string& name); // forward
 
 static void SetName_f(const CCommand& args)
 {
@@ -46,6 +48,8 @@ static void SetName_f(const CCommand& args)
 
     // Sanitize to allowed ASCII set before applying
     std::string sanitized = SanitizeSteamUsername(pszName);
+    // Mask bad words locally
+    CL_MaskBadWords(sanitized);
     if (sanitized.empty())
         sanitized = "_";
 
@@ -400,7 +404,98 @@ static ConVar cl_onlineAuthTokenSignature2("cl_onlineAuthTokenSignature2", "", F
 // Steam authentication - the client uses Steam session tickets for authentication.
 // Fresh tickets are generated per connection for security. cl_steamTicket shows the last used ticket for debugging only.
 static ConVar cl_steamTicket("cl_steamTicket", "", FCVAR_HIDDEN | FCVAR_USERINFO | FCVAR_DONTRECORD | FCVAR_SERVER_CANNOT_QUERY | FCVAR_PLATFORM_SYSTEM, "Steam session ticket (debug display only - fresh tickets generated per connection)");
-static ConVar cl_sanitizeSteamName("cl_sanitizeSteamName", "1", FCVAR_RELEASE, "Sanitize Steam username to printable ASCII (32-126); non-printable -> '_'");
+static ConVar cl_sanitizeSteamName("cl_sanitizeSteamName", "1", FCVAR_RELEASE, "Sanitize Steam username to printable ASCII (32-126); non-printable -> '_' ");
+static ConVar cl_nameFilterEnabled("cl_nameFilterEnabled", "1", FCVAR_RELEASE, "Mask bad words in client names with '*' using chatfilters/badwords.txt from VPKs");
+static ConVar cl_nameFilterPath("cl_nameFilterPath", "chatfilters/badwords.txt", FCVAR_RELEASE, "Relative VPK path to bad word list");
+
+static CUtlVector<string> g_ClientBadWords;
+static bool g_ClientBadWordsLoaded = false;
+
+static void CL_LoadNameFilter()
+{
+    g_ClientBadWords.RemoveAll();
+    g_ClientBadWordsLoaded = false;
+
+    const char* filePath = cl_nameFilterPath.GetString();
+    if (!filePath || !*filePath)
+        return;
+
+    FileHandle_t f = FileSystem()->Open(filePath, "rb", "GAME");
+    if (f == FILESYSTEM_INVALID_HANDLE)
+        return;
+
+    const ssize_t fs = FileSystem()->Size(f);
+    if (fs <= 0)
+    {
+        FileSystem()->Close(f);
+        return;
+    }
+
+    const u64 bufSz = FileSystem()->GetOptimalReadSize(f, fs + 2);
+    char* const buf = (char*)FileSystem()->AllocOptimalReadBuffer(f, bufSz, 0);
+    if (!buf)
+    {
+        FileSystem()->Close(f);
+        return;
+    }
+
+    const ssize_t nRead = FileSystem()->ReadEx(buf, bufSz, fs, f);
+    FileSystem()->Close(f);
+    if (nRead <= 0)
+    {
+        FileSystem()->FreeOptimalReadBuffer(buf);
+        return;
+    }
+
+    buf[nRead] = '\0';
+
+    const char* p = buf;
+    while (*p)
+    {
+        while (*p == '\r' || *p == '\n' || *p == ' ' || *p == '\t') ++p;
+        if (!*p) break;
+        const char* start = p;
+        while (*p && *p != '\r' && *p != '\n') ++p;
+        string w(start, p - start);
+        while (!w.empty() && (w.back() == ' ' || w.back() == '\t')) w.pop_back();
+        if (!w.empty())
+        {
+            std::transform(w.begin(), w.end(), w.begin(), [](unsigned char c){ return (char)tolower(c); });
+            g_ClientBadWords.AddToTail(w);
+        }
+    }
+    FileSystem()->FreeOptimalReadBuffer(buf);
+    g_ClientBadWordsLoaded = true;
+}
+
+static void CL_MaskBadWords(std::string& name)
+{
+    if (!cl_nameFilterEnabled.GetBool() || name.empty())
+        return;
+
+    if (!g_ClientBadWordsLoaded)
+        CL_LoadNameFilter();
+    if (!g_ClientBadWordsLoaded || g_ClientBadWords.IsEmpty())
+        return;
+
+    std::string lower = name;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c){ return (char)tolower(c); });
+
+    FOR_EACH_VEC(g_ClientBadWords, i)
+    {
+        const std::string& bad = g_ClientBadWords[i];
+        size_t pos = 0;
+        while ((pos = lower.find(bad, pos)) != std::string::npos)
+        {
+            for (size_t k = 0; k < bad.size() && (pos + k) < name.size(); ++k)
+            {
+                name[pos + k] = '*';
+                lower[pos + k] = '*';
+            }
+            pos += bad.size();
+        }
+    }
+}
 
 // Steam debug ConVar is declared in steam_integration.h
 
@@ -447,6 +542,7 @@ void SetSteamPersonaName()
     if (Steam_GetUsername(steamUsername) && !steamUsername.empty())
     {
         std::string finalName = cl_sanitizeSteamName.GetBool() ? SanitizeSteamUsername(steamUsername) : steamUsername;
+        CL_MaskBadWords(finalName);
         if (finalName != steamUsername)
         {
             Msg(eDLL_T::STEAM, "Sanitized Steam username '%s' -> '%s'\n", steamUsername.c_str(), finalName.c_str());
