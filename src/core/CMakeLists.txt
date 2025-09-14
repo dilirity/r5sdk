@@ -226,7 +226,7 @@ set_target_properties( ${PROJECT_NAME} PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "$(ProjectDir)../../../${BUILD_OUTPUT_DIR}/"
 )
 
-# Optional Steamworks support (define USE_STEAMWORKS and set STEAM_SDK_DIR)
+# Auto-detect Steamworks support (checks for SDK availability)
 if( DEFINED ENV{STEAM_SDK_DIR} )
     set(STEAM_SDK_DIR $ENV{STEAM_SDK_DIR})
 endif()
@@ -235,8 +235,31 @@ if( NOT STEAM_SDK_DIR AND EXISTS "${THIRDPARTY_SOURCE_DIR}/steamworks/sdk" )
     set(STEAM_SDK_DIR "${THIRDPARTY_SOURCE_DIR}/steamworks/sdk")
 endif()
 
+# Auto-enable Steamworks if SDK is found and required files exist
+set(USE_STEAMWORKS OFF)
+if( STEAM_SDK_DIR AND EXISTS "${STEAM_SDK_DIR}/public/steam/steam_api.h" )
+    if( WIN32 )
+        if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
+            set(_STEAM_LIB_CHECK "${STEAM_SDK_DIR}/redistributable_bin/win64/steam_api64.lib")
+        else()
+            set(_STEAM_LIB_CHECK "${STEAM_SDK_DIR}/redistributable_bin/steam_api.lib")
+        endif()
+        if( EXISTS "${_STEAM_LIB_CHECK}" )
+            set(USE_STEAMWORKS ON)
+        endif()
+    else()
+        # For non-Windows platforms, just check for header existence
+        set(USE_STEAMWORKS ON)
+    endif()
+endif()
+
 if( USE_STEAMWORKS AND STEAM_SDK_DIR )
-    message(STATUS "Building with Steamworks from: ${STEAM_SDK_DIR}")
+    message(STATUS "Auto-detected Steamworks SDK - Building with Steamworks from: ${STEAM_SDK_DIR}")
+else()
+    message(STATUS "Steamworks SDK not found - Building without Steamworks support")
+endif()
+
+if( USE_STEAMWORKS AND STEAM_SDK_DIR )
     if( NOT ${PROJECT_NAME} STREQUAL "dedicated" )
         # Add USE_STEAMWORKS define to all files in the target
         target_compile_definitions(${PROJECT_NAME} PRIVATE USE_STEAMWORKS)
