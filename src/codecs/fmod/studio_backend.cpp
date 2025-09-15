@@ -138,6 +138,92 @@ class FMODStudioBackend final : public ICustomAudioBackend
             }
         }
 
+        // Reload all FMOD banks (both base and mod banks)
+        void ReloadAllBanks()
+        {
+            Msg(eDLL_T::AUDIO, "FMOD: Reloading all banks...\n");
+            
+            // Unload all current banks
+            for (auto& it : m_loadedBanks)
+            {
+                if (it.second)
+                {
+                    Msg(eDLL_T::AUDIO, "FMOD: Unloading bank '%s'\n", it.first.c_str());
+                    it.second->unload();
+                }
+            }
+            m_loadedBanks.clear();
+            
+            // Reset master bus reference (will be reacquired on next sync)
+            m_masterBus = nullptr;
+            
+            // Reload all banks
+            LoadBaseBanks();
+            LoadModBanks();
+            
+            Msg(eDLL_T::AUDIO, "FMOD: Bank reload complete. %d bank(s) loaded\n", (int)m_loadedBanks.size());
+        }
+
+        // Reload only base game banks
+        void ReloadBaseBanks()
+        {
+            Msg(eDLL_T::AUDIO, "FMOD: Reloading base banks...\n");
+            
+            // Unload base banks (those without '/' in the key, indicating mod banks)
+            auto it = m_loadedBanks.begin();
+            while (it != m_loadedBanks.end())
+            {
+                if (it->first.find('/') == std::string::npos) // No '/' means base bank
+                {
+                    if (it->second)
+                    {
+                        Msg(eDLL_T::AUDIO, "FMOD: Unloading base bank '%s'\n", it->first.c_str());
+                        it->second->unload();
+                    }
+                    it = m_loadedBanks.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+            
+            // Reload base banks
+            LoadBaseBanks();
+            
+            Msg(eDLL_T::AUDIO, "FMOD: Base bank reload complete\n");
+        }
+
+        // Reload only mod banks
+        void ReloadModBanks()
+        {
+            Msg(eDLL_T::AUDIO, "FMOD: Reloading mod banks...\n");
+            
+            // Unload mod banks (those with '/' in the key)
+            auto it = m_loadedBanks.begin();
+            while (it != m_loadedBanks.end())
+            {
+                if (it->first.find('/') != std::string::npos) // '/' means mod bank
+                {
+                    if (it->second)
+                    {
+                        Msg(eDLL_T::AUDIO, "FMOD: Unloading mod bank '%s'\n", it->first.c_str());
+                        it->second->unload();
+                    }
+                    it = m_loadedBanks.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+            
+            // Reload mod banks
+            LoadModBanks();
+            
+            Msg(eDLL_T::AUDIO, "FMOD: Mod bank reload complete\n");
+        }
+
         bool EventExists(const char* eventPathOrName) override
         {
             if (!m_studioSystem || !eventPathOrName) return false;
@@ -365,5 +451,82 @@ static void CC_fmod_list_banks(const CCommand& args)
     studio->ListLoadedBanks();
 }
 static ConCommand fmod_list_banks("fmod_list_banks", CC_fmod_list_banks, "List currently loaded FMOD Studio banks", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+static void CC_fmod_reload_banks(const CCommand& args)
+{
+    ICustomAudioBackend* be = GetActiveCustomAudioBackend();
+    if (!be)
+    {
+        Msg(eDLL_T::AUDIO, "No active custom audio backend\n");
+        return;
+    }
+
+    // Only supported by the Studio backend
+    FMODStudioBackend* studio = dynamic_cast<FMODStudioBackend*>(be);
+    if (!studio)
+    {
+        Msg(eDLL_T::AUDIO, "The active backend does not support FMOD bank reloading\n");
+        return;
+    }
+
+    const char* type = "all";
+    if (args.ArgC() >= 2)
+    {
+        type = args[1];
+    }
+
+    if (V_stricmp(type, "all") == 0)
+    {
+        studio->ReloadAllBanks();
+    }
+    else if (V_stricmp(type, "base") == 0)
+    {
+        studio->ReloadBaseBanks();
+    }
+    else if (V_stricmp(type, "mod") == 0 || V_stricmp(type, "mods") == 0)
+    {
+        studio->ReloadModBanks();
+    }
+    else
+    {
+        Msg(eDLL_T::AUDIO, "Usage: fmod_reload_banks [all|base|mod]\n");
+        Msg(eDLL_T::AUDIO, "  all  - Reload all banks (default)\n");
+        Msg(eDLL_T::AUDIO, "  base - Reload only base game banks\n");
+        Msg(eDLL_T::AUDIO, "  mod  - Reload only mod banks\n");
+    }
+}
+static ConCommand fmod_reload_banks("fmod_reload_banks", CC_fmod_reload_banks, "Reload FMOD Studio banks [all|base|mod]", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+// Convenience commands for specific reload types
+static void CC_fmod_reload_all(const CCommand& args)
+{
+    ICustomAudioBackend* be = GetActiveCustomAudioBackend();
+    if (!be) { Msg(eDLL_T::AUDIO, "No active custom audio backend\n"); return; }
+    FMODStudioBackend* studio = dynamic_cast<FMODStudioBackend*>(be);
+    if (!studio) { Msg(eDLL_T::AUDIO, "FMOD Studio backend not active\n"); return; }
+    studio->ReloadAllBanks();
+}
+
+static void CC_fmod_reload_base(const CCommand& args)
+{
+    ICustomAudioBackend* be = GetActiveCustomAudioBackend();
+    if (!be) { Msg(eDLL_T::AUDIO, "No active custom audio backend\n"); return; }
+    FMODStudioBackend* studio = dynamic_cast<FMODStudioBackend*>(be);
+    if (!studio) { Msg(eDLL_T::AUDIO, "FMOD Studio backend not active\n"); return; }
+    studio->ReloadBaseBanks();
+}
+
+static void CC_fmod_reload_mods(const CCommand& args)
+{
+    ICustomAudioBackend* be = GetActiveCustomAudioBackend();
+    if (!be) { Msg(eDLL_T::AUDIO, "No active custom audio backend\n"); return; }
+    FMODStudioBackend* studio = dynamic_cast<FMODStudioBackend*>(be);
+    if (!studio) { Msg(eDLL_T::AUDIO, "FMOD Studio backend not active\n"); return; }
+    studio->ReloadModBanks();
+}
+
+static ConCommand fmod_reload_all("fmod_reload_all", CC_fmod_reload_all, "Reload all FMOD Studio banks", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+static ConCommand fmod_reload_base("fmod_reload_base", CC_fmod_reload_base, "Reload base game FMOD Studio banks", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+static ConCommand fmod_reload_mods("fmod_reload_mods", CC_fmod_reload_mods, "Reload mod FMOD Studio banks", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 
 
