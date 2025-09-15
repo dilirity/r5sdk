@@ -100,6 +100,52 @@ static ConVar sv_onlineAuthIssuedAtTolerance("sv_onlineAuthIssuedAtTolerance", "
 static ConVar sv_quota_stringCmdsPerSecond("sv_quota_stringCmdsPerSecond", "32", FCVAR_RELEASE, "How many string commands per second clients are allowed to submit, 0 to disallow all string commands", true, 0.f, false, 0.f);
 
 //---------------------------------------------------------------------------------
+// Purpose: check if an IP address is in a private network range (RFC 1918)
+// Input  : *ipAddress - IP address string
+// Output : true if private/local, false otherwise
+//---------------------------------------------------------------------------------
+static bool IsPrivateNetworkAddress(const char* ipAddress)
+{
+	if (!ipAddress || !*ipAddress)
+		return false;
+
+	// Handle IPv6-mapped IPv4 addresses (::ffff:192.168.1.x format)
+	const char* ipv4Part = strstr(ipAddress, "::ffff:");
+	if (ipv4Part)
+	{
+		ipAddress = ipv4Part + 7; // Skip "::ffff:" prefix
+	}
+
+	// Check for localhost/loopback (127.x.x.x)
+	if (strstr(ipAddress, "127.") == ipAddress)
+		return true;
+
+	// Check for private network IP ranges (RFC 1918)
+	// 192.168.x.x (Class C private)
+	if (strstr(ipAddress, "192.168.") == ipAddress)
+		return true;
+
+	// 10.x.x.x (Class A private) 
+	if (strstr(ipAddress, "10.") == ipAddress)
+		return true;
+
+	// 172.16.x.x - 172.31.x.x (Class B private)
+	if (strncmp(ipAddress, "172.", 4) == 0) {
+		// Extract the second octet
+		const char* secondOctet = ipAddress + 4;
+		int octet = atoi(secondOctet);
+		if (octet >= 16 && octet <= 31)
+			return true;
+	}
+
+	// Link-local addresses (169.254.x.x)
+	if (strstr(ipAddress, "169.254.") == ipAddress)
+		return true;
+
+	return false;
+}
+
+//---------------------------------------------------------------------------------
 // Purpose: check whether this client is authorized to join this server
 // Input  : *playerName  - 
 //			*reasonBuf   - 
@@ -111,6 +157,11 @@ bool CClient::Authenticate(const char* const playerName, char* const reasonBuf, 
 #ifndef CLIENT_DLL
 	// don't bother checking platform auth on bots or local clients
 	if (IsFakeClient() || GetNetChan()->GetRemoteAddress().IsLoopback())
+		return true;
+
+	// also skip auth for private network addresses (192.168.x.x, 10.x.x.x, etc.)
+	const char* clientIP = GetNetChan()->GetAddress(true);
+	if (IsPrivateNetworkAddress(clientIP))
 		return true;
 
 	l8w8jwt_claim* claims = nullptr;

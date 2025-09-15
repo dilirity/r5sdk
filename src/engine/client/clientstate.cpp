@@ -958,7 +958,35 @@ bool CClientState::Authenticate(connectparams_t* connectParams, char* const reas
 
 bool IsLocalHost(connectparams_t* connectParams)
 {
-    return (strstr(connectParams->netAdr, "localhost") || strstr(connectParams->netAdr, "127.0.0.1"));
+    // Check for localhost/loopback
+    if (strstr(connectParams->netAdr, "localhost") || strstr(connectParams->netAdr, "127.0.0.1"))
+        return true;
+    
+    // Check for private network IP ranges (RFC 1918)
+    const char* ip = connectParams->netAdr;
+    
+    // 192.168.x.x (Class C private)
+    if (strstr(ip, "192.168.") == ip)
+        return true;
+    
+    // 10.x.x.x (Class A private) 
+    if (strstr(ip, "10.") == ip)
+        return true;
+    
+    // 172.16.x.x - 172.31.x.x (Class B private)
+    if (strncmp(ip, "172.", 4) == 0) {
+        // Extract the second octet
+        const char* secondOctet = ip + 4;
+        int octet = atoi(secondOctet);
+        if (octet >= 16 && octet <= 31)
+            return true;
+    }
+    
+    // Link-local addresses (169.254.x.x)
+    if (strstr(ip, "169.254.") == ip)
+        return true;
+    
+    return false;
 }
 
 void CClientState::VConnect(CClientState* thisptr, connectparams_t* connectParams)
