@@ -120,7 +120,19 @@ bool SVC_SystemSayText::Process(void)
 {
 #ifndef DEDICATED
 	if (*g_ppHudChat)
-		(*g_ppHudChat)->PrintSystemMsg(m_szPrefix, m_szMessage, m_bAdminMsg);
+	{
+		// Check if this is a ChatBuilder command (marker in message field)
+		if (strncmp(m_szMessage, "~~~CB~~~", 8) == 0)
+		{
+			// Call the safe member function to process commands
+			(*g_ppHudChat)->ProcessChatBuilderCommands(m_szMessage + 8);
+		}
+		else
+		{
+			// Regular message - use default handling
+			(*g_ppHudChat)->PrintSystemMsg(m_szPrefix, m_szMessage, m_bAdminMsg);
+		}
+	}
 #endif
 	return true;
 }

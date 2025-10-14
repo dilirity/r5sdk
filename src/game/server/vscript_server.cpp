@@ -353,6 +353,110 @@ static SQRESULT ServerScript_SendServerTextMessage(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+// Chat Builder API - gives complete control over chat rendering
+// Format: "CMD|data|CMD|data|..."
+// Commands: N=newline, T=text, C=color(r,g,b), F=fade(dur,fade)
+
+static SQRESULT ServerScript_ChatBuilder(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+    const SQChar* pszCommands = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    sq_getstring(v, 2, &pszCommands);
+
+    if (!VALID_CHARSTAR(pszCommands))
+    {
+        v_SQVM_ScriptError("Null commands string");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    CClient* const pClient = g_pServer->GetClient(pPlayer->GetEdict() - 1);
+
+    if (!pClient)
+        return SQ_ERROR;
+
+    // Prefix commands with special marker in message field
+    char szMarkedCommands[256];
+    V_snprintf(szMarkedCommands, sizeof(szMarkedCommands), "~~~CB~~~%s", pszCommands);
+
+    // Send with empty prefix
+    SVC_SystemSayText message("", szMarkedCommands, true);
+
+    sq_pushbool(v, pClient->SendNetMsgEx(&message, false, false, false));
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+// Broadcast ChatBuilder message to all players
+static SQRESULT ServerScript_BroadcastChatBuilder(HSQUIRRELVM v)
+{
+    const SQChar* pszCommands = nullptr;
+    sq_getstring(v, 2, &pszCommands);
+
+    if (!VALID_CHARSTAR(pszCommands))
+    {
+        v_SQVM_ScriptError("Null commands string");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    // Prefix commands with special marker in message field
+    char szMarkedCommands[256];
+    V_snprintf(szMarkedCommands, sizeof(szMarkedCommands), "~~~CB~~~%s", pszCommands);
+
+    // Send with empty prefix
+    SVC_SystemSayText message("", szMarkedCommands, true);
+
+    g_pServer->BroadcastMessage(&message, true, false);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static SQRESULT ServerScript_ChatBuilderRainbow(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+    const SQChar* pszText = nullptr;
+    SQFloat flDuration = 5.0f;
+    SQFloat flFadeTime = 1.0f;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    sq_getstring(v, 2, &pszText);
+    sq_getfloat(v, 3, &flDuration);
+    sq_getfloat(v, 4, &flFadeTime);
+
+    if (!VALID_CHARSTAR(pszText))
+    {
+        v_SQVM_ScriptError("Null text string");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    CClient* const pClient = g_pServer->GetClient(pPlayer->GetEdict() - 1);
+    if (!pClient)
+        return SQ_ERROR;
+
+    // Build simplified command using client-side 'R' command
+    // Format: "N|F|duration,fade|R|text|"
+    char szCommands[512];
+    int written = snprintf(szCommands, sizeof(szCommands), "N|F|%.1f,%.1f|R|%s|",
+        flDuration, flFadeTime, pszText);
+
+    if (written < 0 || written >= sizeof(szCommands))
+    {
+        v_SQVM_ScriptError("Command buffer overflow - text too long");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    // Send the message
+    char szMarkedCommands[512];
+    V_snprintf(szMarkedCommands, sizeof(szMarkedCommands), "~~~CB~~~%s", szCommands);
+
+    SVC_SystemSayText message("", szMarkedCommands, true);
+    sq_pushbool(v, pClient->SendNetMsgEx(&message, false, false, false));
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: gets the number of real players on this server
 //-----------------------------------------------------------------------------
@@ -781,6 +885,7 @@ void Script_RegisterAdminServerFunctions(CSquirrelVM* s)
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, UnbanPlayer, "Unbans a player from the server by Steam ID or ip address", "void", "string handle", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, BroadcastServerTextMessage, "Broadcasts a chatmessage to all clients", "void", "string prefix, string message, bool adminMsg", false);
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, BroadcastChatBuilder, "Broadcasts a ChatBuilder message to all clients", "void", "string commands", false);
 }
 
 //---------------------------------------------------------------------------------
@@ -822,6 +927,22 @@ static void Script_RegisterServerPlayerClassFuncs()
         "string prefix, string message, bool adminMsg",
         false,
         ServerScript_SendServerTextMessage);
+
+    g_serverScriptPlayerStruct->AddFunction("ChatBuilder",
+        "ScriptChatBuilder",
+        "Advanced chat builder API. Send commands as: 'N|' (newline), 'T|text|' (text), 'C|r,g,b|' (color), 'F|dur,fade|' (fade). Example: 'N|F|5,1|C|255,0,0|T|Red text!|'",
+        "bool",
+        "string commands",
+        false,
+        ServerScript_ChatBuilder);
+
+    g_serverScriptPlayerStruct->AddFunction("ChatBuilderRainbow",
+        "ScriptChatBuilderRainbow",
+        "Sends a rainbow-colored message (cycles through colors per character). Keep text SHORT (under 20 chars recommended)",
+        "bool",
+        "string text, float duration, float fadeTime",
+        false,
+        ServerScript_ChatBuilderRainbow);
 }
 //---------------------------------------------------------------------------------
 static void Script_RegisterServerAIClassFuncs()

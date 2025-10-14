@@ -12,6 +12,11 @@ class CBaseHudChat : public vgui::EditablePanel
 {
 public:
 	void PrintSystemMsg(const char* const pszPrefixStr, const char* const pszMsgText, const bool bAdminMsg);
+	void PrintSystemMsg(const char* const pszPrefixStr, const char* const pszMsgText, const int r, const int g, const int b);
+	void PrintSystemMsg(const char* const pszPrefixStr, const char* const pszMsgText, const int r, const int g, const int b, const float flDuration, const float flFadeTime);
+
+	// ChatBuilder API - processes command string for advanced chat rendering
+	void ProcessChatBuilderCommands(const char* pszCommands);
 
 private:
 	char m_gap02C8[8];
