@@ -9,10 +9,10 @@ class ConVar;
 // They return false in that case.
 
 bool Steam_EnsureInitialized();
-bool Steam_GetAuthSessionTicketBase64(std::string& outTicket);
+__declspec(dllexport) bool Steam_GetAuthSessionTicketBase64(std::string& outTicket);
 void Steam_CancelCurrentAuthTicket();
-bool Steam_GetUsername(std::string& outUsername);
-uint64_t Steam_GetUserID();
+__declspec(dllexport) bool Steam_GetUsername(std::string& outUsername);
+__declspec(dllexport) uint64_t Steam_GetUserID();
 void Steam_RunFrame();
 void Steam_Shutdown();
 bool Steam_IsOfflineMode();

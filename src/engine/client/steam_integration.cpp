@@ -116,15 +116,15 @@ bool Steam_EnsureInitialized()
 #endif
 }
 
-bool Steam_GetAuthSessionTicketBase64(std::string& outTicket)
+__declspec(dllexport) bool Steam_GetAuthSessionTicketBase64(std::string& outTicket)
 {
     if (g_SteamShuttingDown)
     {
         return false; // Don't get tickets during shutdown
     }
-    
+
     if (steam_debug_auth.GetBool()) Msg(eDLL_T::STEAM, "Attempting to get auth session ticket...\n");
-    
+
     if (!Steam_EnsureInitialized())
     {
         if (steam_debug_auth.GetBool()) Msg(eDLL_T::STEAM, "Steam not initialized, cannot get ticket\n");
@@ -133,13 +133,13 @@ bool Steam_GetAuthSessionTicketBase64(std::string& outTicket)
 
     char ticketBuffer[8192]; // Large enough for hex-encoded ticket
     int len = Steam_GetAuthTicketHex(ticketBuffer, sizeof(ticketBuffer));
-    
+
     if (len > 0)
     {
         outTicket.assign(ticketBuffer, len);
         return true;
     }
-    
+
     Msg(eDLL_T::STEAM, "Failed to get auth ticket\n"); // Keep error messages
     return false;
 }
@@ -162,13 +162,13 @@ void Steam_CancelCurrentAuthTicket()
 #endif
 }
 
-bool Steam_GetUsername(std::string& outUsername)
+__declspec(dllexport) bool Steam_GetUsername(std::string& outUsername)
 {
     if (g_SteamShuttingDown)
     {
         return false; // Don't get username during shutdown
     }
-    
+
     // Check if we're in offline mode first
     if (Steam_IsOfflineMode())
     {
@@ -176,7 +176,7 @@ bool Steam_GetUsername(std::string& outUsername)
         if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Using offline username: %s\n", outUsername.c_str());
         return true;
     }
-    
+
     if (!Steam_EnsureInitialized())
     {
         // Fallback to offline username if Steam init fails
@@ -187,27 +187,27 @@ bool Steam_GetUsername(std::string& outUsername)
 
     char usernameBuffer[256];
     int len = Steam_GetUsernameC(usernameBuffer, sizeof(usernameBuffer));
-    
+
     if (len > 0)
     {
         outUsername.assign(usernameBuffer, len);
         if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Got username: %s\n", outUsername.c_str());
         return true;
     }
-    
+
     // Fallback to offline username if Steam call fails
     outUsername = steam_offline_username.GetString();
     if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Failed to get Steam username, using offline fallback: %s\n", outUsername.c_str());
     return true;
 }
 
-uint64_t Steam_GetUserID()
+__declspec(dllexport) uint64_t Steam_GetUserID()
 {
     if (g_SteamShuttingDown)
     {
         return 0; // Don't get SteamID during shutdown
     }
-    
+
     // Check if we're in offline mode first
     if (Steam_IsOfflineMode())
     {
@@ -215,7 +215,7 @@ uint64_t Steam_GetUserID()
         if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Using offline SteamID: %llu\n", offlineID);
         return offlineID;
     }
-    
+
     if (!Steam_EnsureInitialized())
     {
         // Fallback to offline user ID if Steam init fails
@@ -230,7 +230,7 @@ uint64_t Steam_GetUserID()
         if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Got SteamID: %llu\n", userID);
         return userID;
     }
-    
+
     // Fallback to offline user ID if Steam call fails
     uint64_t offlineID = (uint64_t)strtoull(steam_offline_userid.GetString(), nullptr, 10);
     if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Failed to get SteamID, using offline fallback: %llu\n", offlineID);
