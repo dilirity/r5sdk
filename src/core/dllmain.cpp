@@ -243,22 +243,30 @@ void SDK_Init()
             {
                 Msg(eDLL_T::STEAM, "Steam User: %s (ID: %llu)\n", steamUsername.c_str(), steamUserID);
             }
-            
-            // Set platform_user_id and g_SteamUserID to Steam user ID for consistency
-            if (steamUserID != 0)
+
+            // Set g_SteamUserID to Steam user ID
+            if (steamUserID != 0 && g_SteamUserID)
             {
-                if (platform_user_id)
-                {
-                    platform_user_id->SetValue(Format("%llu", steamUserID).c_str());
-                }
-                
-                if (g_SteamUserID)
-                {
-                    *g_SteamUserID = steamUserID;
-                }
+                *g_SteamUserID = steamUserID;
             }
-            
+
             // Set Steam username as default persona name (may need retry later)
+            SetSteamPersonaName();
+        }
+        else
+        {
+            // Steam initialization failed - use offline Steam data
+            uint64_t steamUserID = Steam_GetUserID(); // Returns offline ID from config
+            std::string steamUsername;
+            Steam_GetUsername(steamUsername); // Returns offline username from config
+
+            Msg(eDLL_T::STEAM, "Using offline Steam data: %s (ID: %llu)\n", steamUsername.c_str(), steamUserID);
+
+            if (steamUserID != 0 && g_SteamUserID)
+            {
+                *g_SteamUserID = steamUserID;
+            }
+
             SetSteamPersonaName();
         }
 #endif

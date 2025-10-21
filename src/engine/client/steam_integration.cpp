@@ -77,40 +77,46 @@ bool Steam_EnsureInitialized()
     {
         return true;
     }
-    
+
     if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Attempting to initialize Steam API...\n");
     if (Steam_InitAPI())
     {
         g_SteamInitialized = true;
         UpdateSteamEnabledStatus();
         if (steam_debug.GetBool()) Msg(eDLL_T::STEAM, "Steam API initialized successfully\n");
-        
+
         // Configure overlay settings to reduce crash risk
         Steam_SetOverlayNotificationPosition(steam_overlay_pos.GetInt());
-        
+
         return true;
     }
-    
-    Msg(eDLL_T::STEAM, "Failed to initialize Steam API - falling back to offline mode\n");
-    
-    // Automatically enable offline mode when Steam fails to initialize
+
+    // Automatically enable offline mode and Steam mode when Steam fails to initialize
     if (!CommandLine()->CheckParm("-offline"))
     {
         CommandLine()->AppendParm("-offline", "");
     }
-    
+    if (!CommandLine()->CheckParm("-noorigin"))
+    {
+        CommandLine()->AppendParm("-noorigin", "");
+    }
+
     UpdateSteamEnabledStatus(); // Update status after failed init
     return false;
 #else
     // If Steamworks is not available, we're always in offline mode
     Msg(eDLL_T::STEAM, "Steamworks not available - using offline mode\n");
-    
-    // Add offline parameter if not already present
+
+    // Add offline and Steam mode parameters if not already present
     if (!CommandLine()->CheckParm("-offline"))
     {
         CommandLine()->AppendParm("-offline", "");
     }
-    
+    if (!CommandLine()->CheckParm("-noorigin"))
+    {
+        CommandLine()->AppendParm("-noorigin", "");
+    }
+
     UpdateSteamEnabledStatus(); // Update status for offline mode
     return false; // Return false to indicate no Steam API available
 #endif

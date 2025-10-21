@@ -22,7 +22,12 @@ void HEbisuSDK_Init()
 	{
 		*g_EbisuSDKInit = true;
 		*g_EbisuProfileInit = true;
-		*g_SteamUserID = FAKE_BASE_STEAM_ID; // Placeholder - replaced with Steam ID later
+
+		// Only set fake Steam ID if not already initialized with a real Steam ID
+		if (*g_SteamUserID == 0 || *g_SteamUserID == FAKE_BASE_STEAM_ID)
+		{
+			*g_SteamUserID = FAKE_BASE_STEAM_ID;
+		}
 
 		// EA/Origin authentication tokens are no longer needed with Steam authentication
 		// Q_snprintf(g_OriginAuthCode, 256, "%s", "INVALID_OAUTH_CODE"); // REMOVED: No longer needed with Steam auth
@@ -30,7 +35,16 @@ void HEbisuSDK_Init()
 
 		if (!isDedicated)
 		{
-			platform_user_id->SetValue(FAKE_BASE_STEAM_ID);
+			// Sync platform_user_id with g_SteamUserID (which may have been set during SDK_Init)
+			if (*g_SteamUserID != 0 && *g_SteamUserID != FAKE_BASE_STEAM_ID)
+			{
+				std::string steamIDStr = Format("%llu", *g_SteamUserID);
+				platform_user_id->SetValue(steamIDStr.c_str());
+			}
+			else
+			{
+				platform_user_id->SetValue(FAKE_BASE_STEAM_ID);
+			}
 		}
 	}
 }

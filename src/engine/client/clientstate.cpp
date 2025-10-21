@@ -710,7 +710,8 @@ static void SteamInfo_f(const CCommand& args)
         // Show platform user ID and Steam ID for debugging
         if (platform_user_id)
         {
-            Msg(eDLL_T::ENGINE, "platform_user_id: %llu\n", (uint64_t)platform_user_id->GetInt());
+            uint64_t platformID = strtoull(platform_user_id->GetString(), nullptr, 10);
+            Msg(eDLL_T::ENGINE, "platform_user_id: %llu\n", platformID);
         }
         else
         {
