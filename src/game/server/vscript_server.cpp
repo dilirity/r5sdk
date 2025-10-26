@@ -485,6 +485,60 @@ static SQRESULT ServerScript_GetSessionID(HSQUIRRELVM v)
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: creates a fake player and returns the edict index
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_CreateFakePlayer(HSQUIRRELVM v)
+{
+    if (!g_pServer->IsActive())
+    {
+        sq_pushinteger(v, -1);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const int numPlayers = g_pServer->GetNumClients();
+
+    // Already at max, don't create
+    if (numPlayers >= g_ServerGlobalVariables->maxClients)
+    {
+        sq_pushinteger(v, -1);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const SQChar* playerName;
+    SQInteger teamNum;
+
+    // Get parameters
+    sq_getstring(v, 2, &playerName);
+    sq_getinteger(v, 3, &teamNum);
+
+    if (!VALID_CHARSTAR(playerName))
+    {
+        v_SQVM_ScriptError("Empty or null player name");
+        sq_pushinteger(v, -1);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Thread synchronization required
+    ThreadJoinServerJob();
+
+    // Create the fake client
+    const edict_t nHandle = g_pEngineServer->CreateFakeClient(playerName, static_cast<int>(teamNum));
+
+    if (nHandle < 0)
+    {
+        sq_pushinteger(v, -1);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Fully connect the client
+    g_pServerGameClients->ClientFullyConnect(nHandle, false);
+
+    // Return the edict index - scripts can use GetPlayerArray() or GetPlayerByIndex() to get the entity
+    sq_pushinteger(v, static_cast<SQInteger>(nHandle));
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: sets a class var on the server and each client
 //-----------------------------------------------------------------------------
 static SQRESULT ServerScript_ScriptSetClassVar(HSQUIRRELVM v)
@@ -875,6 +929,8 @@ void Script_RegisterAdminServerFunctions(CSquirrelVM* s)
 {
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, GetNumHumanPlayers, "Gets the number of human players on the server", "int", "", false);
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, GetNumFakeClients, "Gets the number of bot players on the server", "int", "", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, CreateFakePlayer, "Creates a fake player and returns the edict index (-1 on failure). Use GetPlayerArray() to get entity.", "int", "string name, int team", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, KickPlayerByName, "Kicks a player from the server by name", "void", "string name, string reason", false);
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, KickPlayerById, "Kicks a player from the server by handle or Steam ID", "void", "string id, string reason", false);
