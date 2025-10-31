@@ -97,7 +97,7 @@ void CBaseHudChat::ProcessChatBuilderCommands(const char* pszCommands)
 	};
 	static const int numRainbowColors = sizeof(rainbowColors) / sizeof(rainbowColors[0]);
 
-	while (*cmd)
+	while (cmd && *cmd)
 	{
 		// Skip whitespace
 		while (*cmd == ' ' || *cmd == '\t') cmd++;
