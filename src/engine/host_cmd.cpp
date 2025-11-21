@@ -20,7 +20,8 @@ static const char* const s_paksToLoad[] =
 	"common_roots.rpak",
 #ifndef DEDICATED
 	// Used to load UI assets associated with the main menu.
-	"ui_mainmenu.rpak"
+	"ui_mainmenu.rpak",
+	"ui_core.rpak"
 #endif // !DEDICATED
 };
 
