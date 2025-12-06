@@ -72,6 +72,7 @@ static ConVar host_autoReloadRespectGameState("host_autoReloadRespectGameState",
 
 static ConVar host_sessionId("host_sessionId", "", FCVAR_REPLICATED|FCVAR_DEVELOPMENTONLY, "Host session ID.");
 ConVar hostdesc("hostdesc", "", FCVAR_RELEASE, "Host game server description.");
+ConVar sv_modsProfile("sv_modsProfile", "", FCVAR_RELEASE, "Thunderstore mods profile identifier.");
 static ConVar sv_password("sv_password", "", FCVAR_RELEASE, "Server password for entry.", false, 0.f, false, 0.f, &SV_ServerPasswordChanged_f, nullptr);
 
 static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOldValue, ChangeUserData_t pUserData)
@@ -137,7 +138,8 @@ static void HostState_KeepAlive()
 			std::chrono::system_clock::now().time_since_epoch()
 			).count(),
 		// requiredMods (filled below after struct init)
-		{}
+		{},
+		sv_modsProfile.GetString()
 	};
 
 	// Populate required mods from ModSystem
