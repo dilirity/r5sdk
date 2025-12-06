@@ -45,6 +45,7 @@
 #include "client/vengineclient_impl.h"
 #include "client/cdll_engine_int.h"
 #include "client/discord_presence.h"
+#include "client/steam_integration.h"
 #include "gameui/imgui_system.h"
 #endif // DEDICATED
 #include "networksystem/pylon.h"
@@ -255,6 +256,7 @@ void CHostState::FrameUpdate(CHostState* pHostState, double flCurrentTime, float
 #endif // !CLIENT_DLL
 #ifndef DEDICATED
 	RCONClient()->RunFrame();
+	Steam_RunFrame();
 	
 	// Update Discord Rich Presence
 	CDiscordPresence::Update();
@@ -434,7 +436,14 @@ void CHostState::Setup(void)
 	CDiscordPresence::Initialize();
 #endif // !DEDICATED
 
-	if (CommandLine()->CheckParm("-norandomkey"))
+	// Check if a custom net key was specified via ConVar (e.g., from command line)
+	const char* customKey = sv_netkey.GetString();
+	if (customKey && customKey[0] != '\0')
+	{
+		// Use the custom key provided by the user
+		NET_SetKey(customKey);
+	}
+	else if (CommandLine()->CheckParm("-norandomkey"))
 	{
 		// Change callbacks sets the default.
 		net_useRandomKey.SetValue(0);
