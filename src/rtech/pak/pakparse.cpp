@@ -16,7 +16,89 @@
 #include "pakdecode.h"
 #include "pakstream.h"
 
+#ifndef DEDICATED
+#include "materialsystem/cmaterialglue.h"
+#endif // !DEDICATED
+
+constexpr uint32_t RPAK_ASSET_FOURCC_MATERIAL = 0x6C74616D; // 'matl'
+static constexpr const char* const kUnknownMaterialName = "<unknown>";
+
+static const char* Pak_GetMaterialName(const PakAssetShort_s& assetInfo)
+{
+#ifndef DEDICATED
+    if (const CMaterialGlue* const material = reinterpret_cast<const CMaterialGlue*>(assetInfo.head))
+    {
+        const MaterialGlue_s* const materialDef = material->Get();
+
+        if (materialDef && materialDef->name && materialDef->name[0])
+            return materialDef->name;
+    }
+#endif // !DEDICATED
+
+    return kUnknownMaterialName;
+}
+
+
 static ConVar pak_debugrelations("pak_debugrelations", "0", FCVAR_DEVELOPMENTONLY | FCVAR_ACCESSIBLE_FROM_THREADS, "Debug RPAK asset dependency resolving");
+static ConVar pak_debugmaterialdeps("pak_debugmaterialdeps", "0", FCVAR_DEVELOPMENTONLY | FCVAR_ACCESSIBLE_FROM_THREADS,
+    "Log which asset dependency resolution requests material assets");
+
+static void Pak_LogMaterialDependency(const PakFile_s* const pak, const PakAsset_s* const dependentAsset,
+    const PakAssetBinding_s& dependentBinding, const PakAssetShort_s& dependencyAsset,
+    const PakAssetBinding_s& dependencyBinding, const PakGuid_t dependencyGuid)
+{
+    const char* const dependentType = dependentBinding.description ? dependentBinding.description : "<unknown>";
+    const char* const dependencyName = Pak_GetMaterialName(dependencyAsset);
+    const char* const pakName = pak ? pak->GetName() : "<unknown>";
+
+    Msg(eDLL_T::RTECH,
+        "[pak] %s asset 0x%llX requested material \"%s\" (guid 0x%llX) while loading \"%s\"\n",
+        dependentType,
+        dependentAsset->guid,
+        dependencyName,
+        dependencyGuid,
+        pakName);
+}
+
+static void Pak_TryLogMaterialDependency(const PakFile_s* const pak, const PakAsset_s* const dependentAsset,
+    const PakGuid_t dependencyGuid, const int dependencyAssetIndex)
+{
+    if (!pak_debugmaterialdeps.GetBool())
+        return;
+
+    if (!g_pakGlobals)
+        return;
+
+    if (dependencyAssetIndex < 0 || dependencyAssetIndex >= PAK_MAX_LOADED_ASSETS)
+        return;
+
+    const PakAssetShort_s& dependencyAsset = g_pakGlobals->loadedAssets[dependencyAssetIndex];
+    const uint32_t trackerIndex = dependencyAsset.trackerIndex;
+
+    if (trackerIndex >= PAK_MAX_TRACKED_ASSETS)
+        return;
+
+    const PakAssetTracker_s& tracker = g_pakGlobals->trackedAssets[trackerIndex];
+    const uint8_t dependencyTypeIdx = tracker.assetTypeHashIdx;
+
+    if (dependencyTypeIdx >= PAK_MAX_TRACKED_TYPES)
+        return;
+
+    const PakAssetBinding_s& dependencyBinding = g_pakGlobals->assetBindings[dependencyTypeIdx];
+
+    if (dependencyBinding.extension != RPAK_ASSET_FOURCC_MATERIAL)
+        return;
+
+    const uint8_t dependentTypeIdx = dependentAsset->HashTableIndexForAssetType();
+
+    if (dependentTypeIdx >= PAK_MAX_TRACKED_TYPES)
+        return;
+
+    const PakAssetBinding_s& dependentBinding = g_pakGlobals->assetBindings[dependentTypeIdx];
+
+    Pak_LogMaterialDependency(pak, dependentAsset, dependentBinding, dependencyAsset, dependencyBinding, dependencyGuid);
+}
+
 static ConVar pak_debugchannel("pak_debugchannel", "4", FCVAR_DEVELOPMENTONLY | FCVAR_ACCESSIBLE_FROM_THREADS, "Log RPAK files loaded or unloaded with this channel ID", false, 0.f, false, 0.f, "0 = disabled, -1 = all");
 
 //-----------------------------------------------------------------------------
@@ -110,6 +192,7 @@ static void Pak_ResolveAssetRelations(PakFile_s* const pak, const PakAsset_s* co
         }
 
         // finally write the pointer to the guid entry
+        Pak_TryLogMaterialDependency(pak, asset, targetGuid, currentIndex);
         *pCurrentGuid = g_pakGlobals->loadedAssets[currentIndex].head;
     }
 }
