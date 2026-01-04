@@ -79,7 +79,7 @@ struct CustomPakData_s
 
 		// the pak that loads after CommonPakData_t::PAK_TYPE_COMMON_GM has loaded,
 		// and unloads before CommonPakData_t::PAK_TYPE_COMMON_GM gets unloaded
-		PAK_TYPE_COMMON_R5VALK,
+		//NO PAK TYPE FOR COMMON_GM
 
 		// the total number of base SDK pak files
 		PAK_TYPE_COUNT
