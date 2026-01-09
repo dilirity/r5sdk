@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <string>
 #include <vector>
+#include <mutex>
 
 #include "thirdparty/fmod/inc/fmod_studio.h"
 #include "thirdparty/fmod/inc/fmod_studio.hpp"
@@ -13,288 +14,639 @@
 #include "../miles/miles_impl.h"
 #include "pluginsystem/modsystem.h"
 
+// Forward declaration for debug printing
+extern ConVar* fmod_debug;
+
+// Structure to track active FMOD event instances
+struct FMODEventInstance
+{
+    FMOD::Studio::EventInstance* instance;
+    std::string eventPath;
+    uint64_t milesHash;      // The Miles event hash for tracking
+    uint64_t internalId;     // Our internal ID
+    bool isLooping;          // Track if this is a looping sound
+};
+
 class FMODStudioBackend final : public ICustomAudioBackend
+{
+public:
+    bool Initialize() override
     {
-    public:
-        bool Initialize() override
-        {
-            if (m_studioSystem)
-                return true;
-
-            FMOD::Studio::System::create(&m_studioSystem);
-            if (!m_studioSystem) return false;
-
-            m_studioSystem->initialize(64, FMOD_STUDIO_INIT_NORMAL, FMOD_INIT_NORMAL, nullptr);
-            m_studioSystem->getCoreSystem(&m_core);
-            if (!m_core) return false;
-
-            LoadBaseBanks();
-            LoadModBanks();
+        if (m_studioSystem)
             return true;
-        }
 
-        void Shutdown() override
+        FMOD::Studio::System::create(&m_studioSystem);
+        if (!m_studioSystem) return false;
+
+        // Use FMOD_STUDIO_INIT_SYNCHRONOUS_UPDATE to ensure proper cleanup
+        m_studioSystem->initialize(512, FMOD_STUDIO_INIT_NORMAL, FMOD_INIT_NORMAL | FMOD_INIT_3D_RIGHTHANDED, nullptr);
+        m_studioSystem->getCoreSystem(&m_core);
+        if (!m_core) return false;
+
+        // Set 3D settings for proper spatial audio
+        m_core->set3DSettings(1.0f, 39.37f, 1.0f); // Doppler, distance factor (inches to meters), rolloff
+
+        LoadBaseBanks();
+        LoadModBanks();
+        return true;
+    }
+
+    void Shutdown() override
+    {
+        // Stop and release all active instances
         {
-            for (auto& it : m_loadedBanks)
+            std::lock_guard<std::mutex> lock(m_instanceMutex);
+            for (auto& pair : m_activeInstances)
             {
-                if (it.second)
-                    it.second->unload();
+                if (pair.second.instance)
+                {
+                    pair.second.instance->stop(FMOD_STUDIO_STOP_IMMEDIATE);
+                    pair.second.instance->release();
+                }
             }
-            m_loadedBanks.clear();
-            if (m_studioSystem)
-            {
-                m_studioSystem->unloadAll();
-                m_studioSystem->release();
-                m_studioSystem = nullptr;
-            }
-            m_core = nullptr;
+            m_activeInstances.clear();
+            m_hashToInstance.clear();
         }
 
-        void Update(float /*dt*/) override
+        for (auto& it : m_loadedBanks)
         {
-            if (!m_studioSystem)
-                return;
+            if (it.second)
+                it.second->unload();
+        }
+        m_loadedBanks.clear();
 
-            // Sync global volume from engine cvar (Miles global state)
-            SyncGlobalVolume();
+        if (m_studioSystem)
+        {
+            m_studioSystem->unloadAll();
+            m_studioSystem->release();
+            m_studioSystem = nullptr;
+        }
+        m_core = nullptr;
+    }
 
-            m_studioSystem->update();
+    void Update(float /*dt*/) override
+    {
+        if (!m_studioSystem)
+            return;
+
+        // Sync global volume from engine cvar (Miles global state)
+        SyncGlobalVolume();
+
+        // Clean up stopped instances
+        CleanupStoppedInstances();
+
+        m_studioSystem->update();
+    }
+
+    void SetListenerPosition(const Vector3D& position, const QAngle& rotation) override
+    {
+        if (!m_studioSystem) return;
+        FMOD_3D_ATTRIBUTES attrs{};
+
+        Vector3D forward, up;
+        AngleVectors(rotation, &forward, nullptr, &up);
+
+        // Source engine uses X=forward, Y=left, Z=up
+        // FMOD uses right-handed coordinate system
+        attrs.position = { position.x, position.z, position.y };
+        attrs.forward = { -forward.x, -forward.z, -forward.y };
+        attrs.up = { up.x, up.z, up.y };
+        m_studioSystem->setListenerAttributes(0, &attrs);
+    }
+
+    uint64_t PlayRawPCM3D(const void*, unsigned int, int, unsigned short, unsigned short, const Vector3D&, float, const char*) override
+    {
+        // Not supported in Studio backend
+        return 0;
+    }
+
+    uint64_t PlayEvent3D(const char* eventPathOrName, const Vector3D& position, float initialVolume, uint64_t milesEventHash = 0) override
+    {
+        if (!m_studioSystem || !eventPathOrName) return 0;
+
+        // Ensure path has event:/ prefix
+        char pathBuf[512];
+        const char* query = eventPathOrName;
+        if (V_strnicmp(query, "event:/", 7) != 0)
+        {
+            V_snprintf(pathBuf, sizeof(pathBuf), "event:/%s", eventPathOrName);
+            query = pathBuf;
         }
 
-        void SetListenerPosition(const Vector3D& position, const QAngle& rotation) override
-        {
-            if (!m_studioSystem) return;
-            FMOD_3D_ATTRIBUTES attrs{};
-
-            Vector3D forward, up;
-            AngleVectors(rotation, &forward, nullptr, &up);
-
-            attrs.position = { position.x, position.y, position.z };
-            attrs.forward = { -forward.x, -forward.y, -forward.z };
-            attrs.up = { up.x, up.y, up.z };
-            m_studioSystem->setListenerAttributes(0, &attrs);
-        }
-
-        uint64_t PlayRawPCM3D(const void*, unsigned int, int, unsigned short, unsigned short, const Vector3D&, float, const char*) override
-        {
-            // Not supported in Studio backend
+        FMOD::Studio::EventDescription* desc = nullptr;
+        if (m_studioSystem->getEvent(query, &desc) != FMOD_OK || !desc)
             return 0;
-        }
 
-        uint64_t PlayEvent3D(const char* eventPathOrName, const Vector3D& position, float initialVolume) override
+        FMOD::Studio::EventInstance* inst = nullptr;
+        if (desc->createInstance(&inst) != FMOD_OK || !inst)
+            return 0;
+
+        // Set 3D position - convert from Source coords to FMOD coords
+        FMOD_3D_ATTRIBUTES attrs{};
+        attrs.position = { position.x, position.z, position.y };
+        attrs.forward = { 0.0f, 0.0f, 1.0f };
+        attrs.up = { 0.0f, 1.0f, 0.0f };
+        inst->set3DAttributes(&attrs);
+        inst->setVolume(initialVolume);
+
+        // Check if this event is oneshot or looping
+        bool isOneshot = false;
+        desc->isOneshot(&isOneshot);
+
+        inst->start();
+
+        // Only auto-release oneshot events
+        if (isOneshot && milesEventHash == 0)
         {
-            if (!m_studioSystem || !eventPathOrName) return 0;
-
-            // Ensure path has event:/ prefix
-            char pathBuf[512];
-            const char* query = eventPathOrName;
-            if (V_strnicmp(query, "event:/", 7) != 0)
-            {
-                V_snprintf(pathBuf, sizeof(pathBuf), "event:/%s", eventPathOrName);
-                query = pathBuf;
-            }
-
-            FMOD::Studio::EventDescription* desc = nullptr;
-            if (m_studioSystem->getEvent(query, &desc) != FMOD_OK || !desc)
-                return 0;
-
-            FMOD::Studio::EventInstance* inst = nullptr;
-            if (desc->createInstance(&inst) != FMOD_OK || !inst)
-                return 0;
-
-            FMOD_3D_ATTRIBUTES attrs{};
-            attrs.position = { position.x, position.y, position.z };
-            attrs.forward = { 0.0f, 0.0f, 1.0f };
-            attrs.up = { 0.0f, 1.0f, 0.0f };
-            inst->set3DAttributes(&attrs);
-            inst->setVolume(initialVolume);
-            inst->start();
-            inst->release(); // auto-release once stopped
+            inst->release();
             return ++m_nextId;
         }
 
-        int StopSamplesForEvent(const char* /*eventName*/) override
+        // Track this instance
+        uint64_t id = ++m_nextId;
         {
-            // Could be implemented by querying instances by path; keep simple for now
-            return 0;
-        }
+            std::lock_guard<std::mutex> lock(m_instanceMutex);
+            FMODEventInstance tracked;
+            tracked.instance = inst;
+            tracked.eventPath = query;
+            tracked.milesHash = milesEventHash;
+            tracked.internalId = id;
+            tracked.isLooping = !isOneshot;
+            m_activeInstances[id] = tracked;
 
-        void StopAll() override
-        {
-            if (!m_studioSystem) return;
-            m_studioSystem->flushCommands();
-            m_studioSystem->unloadAll();
-            m_loadedBanks.clear();
-        }
-
-        // Utility: print currently loaded banks
-        void ListLoadedBanks() const
-        {
-            int count = (int)m_loadedBanks.size();
-            Msg(eDLL_T::AUDIO, "FMOD: %d bank(s) loaded\n", count);
-            for (const auto& it : m_loadedBanks)
+            if (milesEventHash != 0)
             {
-                Msg(eDLL_T::AUDIO, " - %s\n", it.first.c_str());
+                m_hashToInstance[milesEventHash] = id;
+            }
+
+            if (fmod_debug && fmod_debug->GetBool())
+            {
+                Msg(eDLL_T::AUDIO, "FMOD: Started event '%s' (id=%llu, hash=0x%llX, looping=%d)\n",
+                    query, id, milesEventHash, !isOneshot);
             }
         }
 
-        // Reload all FMOD banks (both base and mod banks)
-        void ReloadAllBanks()
+        return id;
+    }
+
+    bool StopEventByHash(uint64_t milesEventHash, bool immediate = false) override
+    {
+        if (milesEventHash == 0) return false;
+
+        std::lock_guard<std::mutex> lock(m_instanceMutex);
+        auto hashIt = m_hashToInstance.find(milesEventHash);
+        if (hashIt == m_hashToInstance.end())
+            return false;
+
+        uint64_t id = hashIt->second;
+        auto instIt = m_activeInstances.find(id);
+        if (instIt == m_activeInstances.end())
+            return false;
+
+        if (instIt->second.instance)
         {
-            Msg(eDLL_T::AUDIO, "FMOD: Reloading all banks...\n");
-            
-            // Unload all current banks
-            for (auto& it : m_loadedBanks)
+            FMOD_STUDIO_STOP_MODE mode = immediate ? FMOD_STUDIO_STOP_IMMEDIATE : FMOD_STUDIO_STOP_ALLOWFADEOUT;
+            instIt->second.instance->stop(mode);
+
+            if (fmod_debug && fmod_debug->GetBool())
             {
-                if (it.second)
-                {
-                    Msg(eDLL_T::AUDIO, "FMOD: Unloading bank '%s'\n", it.first.c_str());
-                    it.second->unload();
-                }
+                Msg(eDLL_T::AUDIO, "FMOD: Stopped event by hash 0x%llX (id=%llu, immediate=%d)\n",
+                    milesEventHash, id, immediate);
             }
-            m_loadedBanks.clear();
-            
-            // Reset master bus reference (will be reacquired on next sync)
-            m_masterBus = nullptr;
-            
-            // Reload all banks
-            LoadBaseBanks();
-            LoadModBanks();
-            
-            Msg(eDLL_T::AUDIO, "FMOD: Bank reload complete. %d bank(s) loaded\n", (int)m_loadedBanks.size());
+
+            // Release and remove
+            instIt->second.instance->release();
+            m_activeInstances.erase(instIt);
         }
 
-        // Reload only base game banks
-        void ReloadBaseBanks()
+        m_hashToInstance.erase(hashIt);
+        return true;
+    }
+
+    int StopSamplesForEvent(const char* eventName, bool immediate = false) override
+    {
+        if (!eventName) return 0;
+
+        // Ensure path has event:/ prefix for comparison
+        char pathBuf[512];
+        const char* query = eventName;
+        if (V_strnicmp(query, "event:/", 7) != 0)
         {
-            Msg(eDLL_T::AUDIO, "FMOD: Reloading base banks...\n");
-            
-            // Unload base banks (those without '/' in the key, indicating mod banks)
-            auto it = m_loadedBanks.begin();
-            while (it != m_loadedBanks.end())
-            {
-                if (it->first.find('/') == std::string::npos) // No '/' means base bank
-                {
-                    if (it->second)
-                    {
-                        Msg(eDLL_T::AUDIO, "FMOD: Unloading base bank '%s'\n", it->first.c_str());
-                        it->second->unload();
-                    }
-                    it = m_loadedBanks.erase(it);
-                }
-                else
-                {
-                    ++it;
-                }
-            }
-            
-            // Reload base banks
-            LoadBaseBanks();
-            
-            Msg(eDLL_T::AUDIO, "FMOD: Base bank reload complete\n");
+            V_snprintf(pathBuf, sizeof(pathBuf), "event:/%s", eventName);
+            query = pathBuf;
         }
 
-        // Reload only mod banks
-        void ReloadModBanks()
+        int count = 0;
+        std::lock_guard<std::mutex> lock(m_instanceMutex);
+
+        std::vector<uint64_t> toRemove;
+        for (auto& pair : m_activeInstances)
         {
-            Msg(eDLL_T::AUDIO, "FMOD: Reloading mod banks...\n");
-            
-            // Unload mod banks (those with '/' in the key)
-            auto it = m_loadedBanks.begin();
-            while (it != m_loadedBanks.end())
+            if (pair.second.eventPath == query)
             {
-                if (it->first.find('/') != std::string::npos) // '/' means mod bank
+                if (pair.second.instance)
                 {
-                    if (it->second)
-                    {
-                        Msg(eDLL_T::AUDIO, "FMOD: Unloading mod bank '%s'\n", it->first.c_str());
-                        it->second->unload();
-                    }
-                    it = m_loadedBanks.erase(it);
+                    FMOD_STUDIO_STOP_MODE mode = immediate ? FMOD_STUDIO_STOP_IMMEDIATE : FMOD_STUDIO_STOP_ALLOWFADEOUT;
+                    pair.second.instance->stop(mode);
+                    pair.second.instance->release();
+                    count++;
                 }
-                else
+                toRemove.push_back(pair.first);
+
+                // Also remove from hash map
+                if (pair.second.milesHash != 0)
                 {
-                    ++it;
+                    m_hashToInstance.erase(pair.second.milesHash);
                 }
             }
-            
-            // Reload mod banks
-            LoadModBanks();
-            
-            Msg(eDLL_T::AUDIO, "FMOD: Mod bank reload complete\n");
         }
 
-        bool EventExists(const char* eventPathOrName) override
+        for (uint64_t id : toRemove)
         {
-            if (!m_studioSystem || !eventPathOrName) return false;
-            // Try with provided string, then with event:/ prefix
-            FMOD::Studio::EventDescription* desc = nullptr;
-            if (m_studioSystem->getEvent(eventPathOrName, &desc) == FMOD_OK && desc != nullptr)
+            m_activeInstances.erase(id);
+        }
+
+        if (fmod_debug && fmod_debug->GetBool() && count > 0)
+        {
+            Msg(eDLL_T::AUDIO, "FMOD: Stopped %d instances of event '%s'\n", count, query);
+        }
+
+        return count;
+    }
+
+    void StopAll(bool immediate = false) override
+    {
+        std::lock_guard<std::mutex> lock(m_instanceMutex);
+
+        FMOD_STUDIO_STOP_MODE mode = immediate ? FMOD_STUDIO_STOP_IMMEDIATE : FMOD_STUDIO_STOP_ALLOWFADEOUT;
+
+        for (auto& pair : m_activeInstances)
+        {
+            if (pair.second.instance)
+            {
+                pair.second.instance->stop(mode);
+                pair.second.instance->release();
+            }
+        }
+
+        if (fmod_debug && fmod_debug->GetBool())
+        {
+            Msg(eDLL_T::AUDIO, "FMOD: Stopped all %zu instances\n", m_activeInstances.size());
+        }
+
+        m_activeInstances.clear();
+        m_hashToInstance.clear();
+    }
+
+    bool PauseEventByHash(uint64_t milesEventHash, bool paused) override
+    {
+        if (milesEventHash == 0) return false;
+
+        std::lock_guard<std::mutex> lock(m_instanceMutex);
+        auto hashIt = m_hashToInstance.find(milesEventHash);
+        if (hashIt == m_hashToInstance.end())
+            return false;
+
+        auto instIt = m_activeInstances.find(hashIt->second);
+        if (instIt == m_activeInstances.end() || !instIt->second.instance)
+            return false;
+
+        instIt->second.instance->setPaused(paused);
+
+        if (fmod_debug && fmod_debug->GetBool())
+        {
+            Msg(eDLL_T::AUDIO, "FMOD: %s event by hash 0x%llX\n",
+                paused ? "Paused" : "Resumed", milesEventHash);
+        }
+
+        return true;
+    }
+
+    bool SetEventVolumeByHash(uint64_t milesEventHash, float volume) override
+    {
+        if (milesEventHash == 0) return false;
+
+        std::lock_guard<std::mutex> lock(m_instanceMutex);
+        auto hashIt = m_hashToInstance.find(milesEventHash);
+        if (hashIt == m_hashToInstance.end())
+            return false;
+
+        auto instIt = m_activeInstances.find(hashIt->second);
+        if (instIt == m_activeInstances.end() || !instIt->second.instance)
+            return false;
+
+        instIt->second.instance->setVolume(volume);
+        return true;
+    }
+
+    bool SetEventPositionByHash(uint64_t milesEventHash, const Vector3D& position) override
+    {
+        if (milesEventHash == 0) return false;
+
+        std::lock_guard<std::mutex> lock(m_instanceMutex);
+        auto hashIt = m_hashToInstance.find(milesEventHash);
+        if (hashIt == m_hashToInstance.end())
+            return false;
+
+        auto instIt = m_activeInstances.find(hashIt->second);
+        if (instIt == m_activeInstances.end() || !instIt->second.instance)
+            return false;
+
+        FMOD_3D_ATTRIBUTES attrs{};
+        attrs.position = { position.x, position.z, position.y };
+        attrs.forward = { 0.0f, 0.0f, 1.0f };
+        attrs.up = { 0.0f, 1.0f, 0.0f };
+        instIt->second.instance->set3DAttributes(&attrs);
+        return true;
+    }
+
+    bool IsEventPlaying(uint64_t milesEventHash) override
+    {
+        if (milesEventHash == 0) return false;
+
+        std::lock_guard<std::mutex> lock(m_instanceMutex);
+        auto hashIt = m_hashToInstance.find(milesEventHash);
+        if (hashIt == m_hashToInstance.end())
+            return false;
+
+        auto instIt = m_activeInstances.find(hashIt->second);
+        if (instIt == m_activeInstances.end() || !instIt->second.instance)
+            return false;
+
+        FMOD_STUDIO_PLAYBACK_STATE state;
+        instIt->second.instance->getPlaybackState(&state);
+        return state == FMOD_STUDIO_PLAYBACK_PLAYING || state == FMOD_STUDIO_PLAYBACK_STARTING;
+    }
+
+    int GetActiveInstanceCount() override
+    {
+        std::lock_guard<std::mutex> lock(m_instanceMutex);
+        return static_cast<int>(m_activeInstances.size());
+    }
+
+    void EnumerateEvents(void (*callback)(const char* eventPath, void* userData), void* userData) override
+    {
+        if (!m_studioSystem || !callback) return;
+
+        // Enumerate events from all loaded banks
+        for (const auto& bankPair : m_loadedBanks)
+        {
+            FMOD::Studio::Bank* bank = bankPair.second;
+            if (!bank) continue;
+
+            int eventCount = 0;
+            bank->getEventCount(&eventCount);
+            if (eventCount <= 0) continue;
+
+            std::vector<FMOD::Studio::EventDescription*> events(eventCount);
+            bank->getEventList(events.data(), eventCount, &eventCount);
+
+            for (int i = 0; i < eventCount; i++)
+            {
+                if (!events[i]) continue;
+
+                char pathBuf[512];
+                int retrieved = 0;
+                if (events[i]->getPath(pathBuf, sizeof(pathBuf), &retrieved) == FMOD_OK && retrieved > 0)
+                {
+                    callback(pathBuf, userData);
+                }
+            }
+        }
+    }
+
+    // Utility: print currently loaded banks
+    void ListLoadedBanks() const
+    {
+        int count = (int)m_loadedBanks.size();
+        Msg(eDLL_T::AUDIO, "FMOD: %d bank(s) loaded\n", count);
+        for (const auto& it : m_loadedBanks)
+        {
+            Msg(eDLL_T::AUDIO, " - %s\n", it.first.c_str());
+        }
+    }
+
+    // List active instances for debugging
+    void ListActiveInstances() const
+    {
+        std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(m_instanceMutex));
+        Msg(eDLL_T::AUDIO, "FMOD: %zu active instance(s)\n", m_activeInstances.size());
+        for (const auto& pair : m_activeInstances)
+        {
+            FMOD_STUDIO_PLAYBACK_STATE state = FMOD_STUDIO_PLAYBACK_STOPPED;
+            if (pair.second.instance)
+            {
+                pair.second.instance->getPlaybackState(&state);
+            }
+            const char* stateStr = "unknown";
+            switch (state)
+            {
+                case FMOD_STUDIO_PLAYBACK_PLAYING: stateStr = "playing"; break;
+                case FMOD_STUDIO_PLAYBACK_SUSTAINING: stateStr = "sustaining"; break;
+                case FMOD_STUDIO_PLAYBACK_STOPPED: stateStr = "stopped"; break;
+                case FMOD_STUDIO_PLAYBACK_STARTING: stateStr = "starting"; break;
+                case FMOD_STUDIO_PLAYBACK_STOPPING: stateStr = "stopping"; break;
+            }
+            Msg(eDLL_T::AUDIO, "  [%llu] %s (hash=0x%llX, state=%s, looping=%d)\n",
+                pair.first, pair.second.eventPath.c_str(), pair.second.milesHash, stateStr, pair.second.isLooping);
+        }
+    }
+
+    // Reload all FMOD banks (both base and mod banks)
+    void ReloadAllBanks()
+    {
+        Msg(eDLL_T::AUDIO, "FMOD: Reloading all banks...\n");
+
+        // Stop all playing sounds first
+        StopAll(true);
+
+        // Unload all current banks
+        for (auto& it : m_loadedBanks)
+        {
+            if (it.second)
+            {
+                Msg(eDLL_T::AUDIO, "FMOD: Unloading bank '%s'\n", it.first.c_str());
+                it.second->unload();
+            }
+        }
+        m_loadedBanks.clear();
+
+        // Reset master bus reference (will be reacquired on next sync)
+        m_masterBus = nullptr;
+
+        // Reload all banks
+        LoadBaseBanks();
+        LoadModBanks();
+
+        Msg(eDLL_T::AUDIO, "FMOD: Bank reload complete. %d bank(s) loaded\n", (int)m_loadedBanks.size());
+    }
+
+    // Reload only base game banks
+    void ReloadBaseBanks()
+    {
+        Msg(eDLL_T::AUDIO, "FMOD: Reloading base banks...\n");
+
+        // Unload base banks (those without '/' in the key, indicating mod banks)
+        auto it = m_loadedBanks.begin();
+        while (it != m_loadedBanks.end())
+        {
+            if (it->first.find('/') == std::string::npos) // No '/' means base bank
+            {
+                if (it->second)
+                {
+                    Msg(eDLL_T::AUDIO, "FMOD: Unloading base bank '%s'\n", it->first.c_str());
+                    it->second->unload();
+                }
+                it = m_loadedBanks.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+
+        // Reload base banks
+        LoadBaseBanks();
+
+        Msg(eDLL_T::AUDIO, "FMOD: Base bank reload complete\n");
+    }
+
+    // Reload only mod banks
+    void ReloadModBanks()
+    {
+        Msg(eDLL_T::AUDIO, "FMOD: Reloading mod banks...\n");
+
+        // Unload mod banks (those with '/' in the key)
+        auto it = m_loadedBanks.begin();
+        while (it != m_loadedBanks.end())
+        {
+            if (it->first.find('/') != std::string::npos) // '/' means mod bank
+            {
+                if (it->second)
+                {
+                    Msg(eDLL_T::AUDIO, "FMOD: Unloading mod bank '%s'\n", it->first.c_str());
+                    it->second->unload();
+                }
+                it = m_loadedBanks.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+
+        // Reload mod banks
+        LoadModBanks();
+
+        Msg(eDLL_T::AUDIO, "FMOD: Mod bank reload complete\n");
+    }
+
+    bool EventExists(const char* eventPathOrName) override
+    {
+        if (!m_studioSystem || !eventPathOrName) return false;
+        // Try with provided string, then with event:/ prefix
+        FMOD::Studio::EventDescription* desc = nullptr;
+        if (m_studioSystem->getEvent(eventPathOrName, &desc) == FMOD_OK && desc != nullptr)
+            return true;
+        char pathBuf[512];
+        if (V_strnicmp(eventPathOrName, "event:/", 7) != 0)
+        {
+            V_snprintf(pathBuf, sizeof(pathBuf), "event:/%s", eventPathOrName);
+            if (m_studioSystem->getEvent(pathBuf, &desc) == FMOD_OK && desc != nullptr)
                 return true;
-            char pathBuf[512];
-            if (V_strnicmp(eventPathOrName, "event:/", 7) != 0)
-            {
-                V_snprintf(pathBuf, sizeof(pathBuf), "event:/%s", eventPathOrName);
-                if (m_studioSystem->getEvent(pathBuf, &desc) == FMOD_OK && desc != nullptr)
-                    return true;
-            }
+        }
+        return false;
+    }
+
+    bool GetUserPropertyBool(const char* eventPathOrName, const char* propertyName) override
+    {
+        if (!m_studioSystem || !eventPathOrName)
             return false;
+
+        // Ensure path has event:/ prefix
+        char pathBuf[512];
+        const char* query = eventPathOrName;
+        if (V_strnicmp(query, "event:/", 7) != 0)
+        {
+            V_snprintf(pathBuf, sizeof(pathBuf), "event:/%s", eventPathOrName);
+            query = pathBuf;
         }
 
-        bool GetUserPropertyBool(const char* eventPathOrName, const char* propertyName) override
-        {
-            if (!m_studioSystem || !eventPathOrName)
-                return false;
-
-            // Ensure path has event:/ prefix
-            char pathBuf[512];
-            const char* query = eventPathOrName;
-            if (V_strnicmp(query, "event:/", 7) != 0)
-            {
-                V_snprintf(pathBuf, sizeof(pathBuf), "event:/%s", eventPathOrName);
-                query = pathBuf;
-            }
-
-            FMOD::Studio::EventDescription* desc = nullptr;
-            if (m_studioSystem->getEvent(query, &desc) != FMOD_OK || !desc)
-                return false;
-
-            FMOD_STUDIO_USER_PROPERTY prop{};
-            if (desc->getUserProperty(propertyName, &prop) != FMOD_OK)
-                return false;
-
-            if (prop.type == FMOD_STUDIO_USER_PROPERTY_TYPE_FLOAT)
-            {
-                return prop.floatvalue == 1;
-            }
-
+        FMOD::Studio::EventDescription* desc = nullptr;
+        if (m_studioSystem->getEvent(query, &desc) != FMOD_OK || !desc)
             return false;
+
+        FMOD_STUDIO_USER_PROPERTY prop{};
+        if (desc->getUserProperty(propertyName, &prop) != FMOD_OK)
+            return false;
+
+        if (prop.type == FMOD_STUDIO_USER_PROPERTY_TYPE_FLOAT)
+        {
+            return prop.floatvalue == 1;
         }
 
-    private:
-        void SyncGlobalVolume()
-        {
-            if (!g_milesGlobals)
-                return;
+        return false;
+    }
 
-            // Acquire master bus once
-            if (!m_masterBus)
+private:
+    void CleanupStoppedInstances()
+    {
+        std::lock_guard<std::mutex> lock(m_instanceMutex);
+
+        std::vector<uint64_t> toRemove;
+        for (auto& pair : m_activeInstances)
+        {
+            if (!pair.second.instance)
             {
-                if (m_studioSystem->getBus("bus:/", &m_masterBus) != FMOD_OK || !m_masterBus)
+                toRemove.push_back(pair.first);
+                continue;
+            }
+
+            FMOD_STUDIO_PLAYBACK_STATE state;
+            if (pair.second.instance->getPlaybackState(&state) == FMOD_OK)
+            {
+                if (state == FMOD_STUDIO_PLAYBACK_STOPPED)
                 {
-                    // Fallback in case project uses explicit Master path
-                    m_studioSystem->getBus("bus:/Master", &m_masterBus);
+                    pair.second.instance->release();
+                    toRemove.push_back(pair.first);
+
+                    if (pair.second.milesHash != 0)
+                    {
+                        m_hashToInstance.erase(pair.second.milesHash);
+                    }
                 }
             }
+        }
 
-            const float desired = (g_milesGlobals->soundMasterVolume < 0.0f) ? 0.0f : (g_milesGlobals->soundMasterVolume > 1.0f ? 1.0f : g_milesGlobals->soundMasterVolume);
+        for (uint64_t id : toRemove)
+        {
+            m_activeInstances.erase(id);
+        }
+    }
 
-            if (m_masterBus && fabsf(desired - m_lastGlobalVolume) > 0.001f)
+    void SyncGlobalVolume()
+    {
+        if (!g_milesGlobals)
+            return;
+
+        // Acquire master bus once
+        if (!m_masterBus)
+        {
+            if (m_studioSystem->getBus("bus:/", &m_masterBus) != FMOD_OK || !m_masterBus)
             {
-                m_masterBus->setVolume(desired);
-                m_lastGlobalVolume = desired;
+                // Fallback in case project uses explicit Master path
+                m_studioSystem->getBus("bus:/Master", &m_masterBus);
             }
         }
+
+        const float desired = (g_milesGlobals->soundMasterVolume < 0.0f) ? 0.0f : (g_milesGlobals->soundMasterVolume > 1.0f ? 1.0f : g_milesGlobals->soundMasterVolume);
+
+        if (m_masterBus && fabsf(desired - m_lastGlobalVolume) > 0.001f)
+        {
+            m_masterBus->setVolume(desired);
+            m_lastGlobalVolume = desired;
+        }
+    }
 
         void LoadBaseBanks()
         {
@@ -399,13 +751,18 @@ class FMODStudioBackend final : public ICustomAudioBackend
             ModSystem()->UnlockModList();
         }
 
-        FMOD::Studio::System* m_studioSystem = nullptr;
-        FMOD::System* m_core = nullptr;
-        std::unordered_map<std::string, FMOD::Studio::Bank*> m_loadedBanks;
-        uint64_t m_nextId = 1;
-        FMOD::Studio::Bus* m_masterBus = nullptr;
-        float m_lastGlobalVolume = -1.0f;
-    };
+    FMOD::Studio::System* m_studioSystem = nullptr;
+    FMOD::System* m_core = nullptr;
+    std::unordered_map<std::string, FMOD::Studio::Bank*> m_loadedBanks;
+    uint64_t m_nextId = 1;
+    FMOD::Studio::Bus* m_masterBus = nullptr;
+    float m_lastGlobalVolume = -1.0f;
+
+    // Instance tracking for proper stop/pause/volume control
+    mutable std::mutex m_instanceMutex;
+    std::unordered_map<uint64_t, FMODEventInstance> m_activeInstances;
+    std::unordered_map<uint64_t, uint64_t> m_hashToInstance; // milesHash -> internal instance ID
+};
 
 ICustomAudioBackend* CreateFMODStudioBackend()
 {
@@ -529,4 +886,173 @@ static ConCommand fmod_reload_all("fmod_reload_all", CC_fmod_reload_all, "Reload
 static ConCommand fmod_reload_base("fmod_reload_base", CC_fmod_reload_base, "Reload base game FMOD Studio banks", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 static ConCommand fmod_reload_mods("fmod_reload_mods", CC_fmod_reload_mods, "Reload mod FMOD Studio banks", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 
+static void CC_fmod_list_instances(const CCommand& args)
+{
+    ICustomAudioBackend* be = GetActiveCustomAudioBackend();
+    if (!be) { Msg(eDLL_T::AUDIO, "No active custom audio backend\n"); return; }
+    FMODStudioBackend* studio = dynamic_cast<FMODStudioBackend*>(be);
+    if (!studio) { Msg(eDLL_T::AUDIO, "FMOD Studio backend not active\n"); return; }
+    studio->ListActiveInstances();
+}
+static ConCommand fmod_list_instances("fmod_list_instances", CC_fmod_list_instances, "List active FMOD event instances", FCVAR_CLIENTDLL | FCVAR_RELEASE);
 
+static void CC_fmod_stop_all(const CCommand& args)
+{
+    ICustomAudioBackend* be = GetActiveCustomAudioBackend();
+    if (!be) { Msg(eDLL_T::AUDIO, "No active custom audio backend\n"); return; }
+    bool immediate = (args.ArgC() >= 2 && V_stricmp(args[1], "now") == 0);
+    be->StopAll(immediate);
+    Msg(eDLL_T::AUDIO, "FMOD: Stopped all sounds%s\n", immediate ? " immediately" : " (with fadeout)");
+}
+static ConCommand fmod_stop_all("fmod_stop_all", CC_fmod_stop_all, "Stop all FMOD sounds [now]", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+//-----------------------------------------------------------------------------
+// Ghost Event Console Commands - for testing custom FMOD-only sounds
+//-----------------------------------------------------------------------------
+
+// Track the last played ghost event for easy stop testing
+static uint64_t s_lastGhostEventHash = 0;
+
+static void CC_fmod_play(const CCommand& args)
+{
+    if (args.ArgC() < 2)
+    {
+        Msg(eDLL_T::AUDIO, "Usage: fmod_play <event_path> [volume]\n");
+        Msg(eDLL_T::AUDIO, "  Example: fmod_play event:/Weapons/Rifle_Fire 1.0\n");
+        return;
+    }
+    
+    float volume = (args.ArgC() >= 3) ? static_cast<float>(atof(args[2])) : 1.0f;
+    uint64_t hash = FMOD_PlayGhostEvent(args[1], volume);
+    
+    if (hash > 0)
+    {
+        s_lastGhostEventHash = hash;
+        Msg(eDLL_T::AUDIO, "FMOD: Playing '%s' (hash=0x%llX, volume=%.2f)\n", args[1], hash, volume);
+    }
+    else
+    {
+        Msg(eDLL_T::AUDIO, "FMOD: Failed to play '%s'\n", args[1]);
+    }
+}
+static ConCommand fmod_play("fmod_play", CC_fmod_play, "Play an FMOD event: fmod_play <event_path> [volume]", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+static void CC_fmod_play3d(const CCommand& args)
+{
+    if (args.ArgC() < 5)
+    {
+        Msg(eDLL_T::AUDIO, "Usage: fmod_play3d <event_path> <x> <y> <z> [volume]\n");
+        Msg(eDLL_T::AUDIO, "  Example: fmod_play3d event:/Ambient/Wind 100 200 50 0.5\n");
+        return;
+    }
+    
+    Vector3D pos;
+    pos.x = static_cast<float>(atof(args[2]));
+    pos.y = static_cast<float>(atof(args[3]));
+    pos.z = static_cast<float>(atof(args[4]));
+    float volume = (args.ArgC() >= 6) ? static_cast<float>(atof(args[5])) : 1.0f;
+    
+    uint64_t hash = FMOD_PlayGhostEvent3D(args[1], pos, volume);
+    
+    if (hash > 0)
+    {
+        s_lastGhostEventHash = hash;
+        Msg(eDLL_T::AUDIO, "FMOD: Playing '%s' at (%.1f, %.1f, %.1f) (hash=0x%llX)\n", 
+            args[1], pos.x, pos.y, pos.z, hash);
+    }
+    else
+    {
+        Msg(eDLL_T::AUDIO, "FMOD: Failed to play '%s'\n", args[1]);
+    }
+}
+static ConCommand fmod_play3d("fmod_play3d", CC_fmod_play3d, "Play an FMOD event at 3D position: fmod_play3d <event_path> <x> <y> <z> [volume]", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+static void CC_fmod_stop(const CCommand& args)
+{
+    uint64_t hash = s_lastGhostEventHash;
+    
+    if (args.ArgC() >= 2)
+    {
+        // If argument provided, try to parse as hex hash
+        hash = strtoull(args[1], nullptr, 16);
+    }
+    
+    if (hash == 0)
+    {
+        Msg(eDLL_T::AUDIO, "Usage: fmod_stop [hash] - stops last played event or specified hash\n");
+        return;
+    }
+    
+    bool immediate = (args.ArgC() >= 3 && V_stricmp(args[2], "now") == 0);
+    
+    if (FMOD_StopGhostEvent(hash, immediate))
+    {
+        Msg(eDLL_T::AUDIO, "FMOD: Stopped event 0x%llX%s\n", hash, immediate ? " immediately" : "");
+        if (hash == s_lastGhostEventHash)
+            s_lastGhostEventHash = 0;
+    }
+    else
+    {
+        Msg(eDLL_T::AUDIO, "FMOD: Failed to stop event 0x%llX\n", hash);
+    }
+}
+static ConCommand fmod_stop("fmod_stop", CC_fmod_stop, "Stop an FMOD event: fmod_stop [hash] [now]", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+static void CC_fmod_volume(const CCommand& args)
+{
+    if (args.ArgC() < 2)
+    {
+        Msg(eDLL_T::AUDIO, "Usage: fmod_volume <volume> [hash] - set volume for last or specified event\n");
+        return;
+    }
+    
+    float volume = static_cast<float>(atof(args[1]));
+    uint64_t hash = (args.ArgC() >= 3) ? strtoull(args[2], nullptr, 16) : s_lastGhostEventHash;
+    
+    if (hash == 0)
+    {
+        Msg(eDLL_T::AUDIO, "No event to adjust (play one first or specify hash)\n");
+        return;
+    }
+    
+    if (FMOD_SetGhostEventVolume(hash, volume))
+        Msg(eDLL_T::AUDIO, "FMOD: Set volume to %.2f for event 0x%llX\n", volume, hash);
+    else
+        Msg(eDLL_T::AUDIO, "FMOD: Failed to set volume for event 0x%llX\n", hash);
+}
+static ConCommand fmod_volume("fmod_volume", CC_fmod_volume, "Set volume for an FMOD event: fmod_volume <volume> [hash]", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+static void CC_fmod_pause(const CCommand& args)
+{
+    uint64_t hash = (args.ArgC() >= 2) ? strtoull(args[1], nullptr, 16) : s_lastGhostEventHash;
+    
+    if (hash == 0)
+    {
+        Msg(eDLL_T::AUDIO, "Usage: fmod_pause [hash] - toggle pause for last or specified event\n");
+        return;
+    }
+    
+    // Toggle pause (we don't track state, so just pause it)
+    if (FMOD_PauseGhostEvent(hash, true))
+        Msg(eDLL_T::AUDIO, "FMOD: Paused event 0x%llX\n", hash);
+    else
+        Msg(eDLL_T::AUDIO, "FMOD: Failed to pause event 0x%llX\n", hash);
+}
+static ConCommand fmod_pause("fmod_pause", CC_fmod_pause, "Pause an FMOD event: fmod_pause [hash]", FCVAR_CLIENTDLL | FCVAR_RELEASE);
+
+static void CC_fmod_resume(const CCommand& args)
+{
+    uint64_t hash = (args.ArgC() >= 2) ? strtoull(args[1], nullptr, 16) : s_lastGhostEventHash;
+    
+    if (hash == 0)
+    {
+        Msg(eDLL_T::AUDIO, "Usage: fmod_resume [hash] - resume last or specified event\n");
+        return;
+    }
+    
+    if (FMOD_PauseGhostEvent(hash, false))
+        Msg(eDLL_T::AUDIO, "FMOD: Resumed event 0x%llX\n", hash);
+    else
+        Msg(eDLL_T::AUDIO, "FMOD: Failed to resume event 0x%llX\n", hash);
+}
+static ConCommand fmod_resume("fmod_resume", CC_fmod_resume, "Resume an FMOD event: fmod_resume [hash]", FCVAR_CLIENTDLL | FCVAR_RELEASE);
