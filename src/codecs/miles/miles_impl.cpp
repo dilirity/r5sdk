@@ -645,8 +645,11 @@ static void CacheMilesEventNames()
 		}
 	}
 
-	Msg(eDLL_T::AUDIO, "FMOD: Miles event enumeration complete - %d already cached, %d newly cached\n", 
-		eventsCached, eventsNewlyCached);
+	if (fmod_debug->GetBool())
+	{
+		Msg(eDLL_T::AUDIO, "FMOD: Miles event enumeration complete - %d already cached, %d newly cached\n", 
+			eventsCached, eventsNewlyCached);
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -658,9 +661,11 @@ static __int64 Miles_DispatchEvent_Hook(unsigned __int16 action)
 	// Deferred Miles event enumeration - table is now built
 	if (!g_milesEventsCached)
 	{
-		// Debug: log what we're seeing
-		Msg(eDLL_T::AUDIO, "FMOD: Checking Miles event table... g_Miles_EventTableBase=%p, value=%llX\n", 
-			(void*)g_Miles_EventTableBase, g_Miles_EventTableBase ? *g_Miles_EventTableBase : 0);
+		if (fmod_debug->GetBool())
+		{
+			Msg(eDLL_T::AUDIO, "FMOD: Checking Miles event table... g_Miles_EventTableBase=%p, value=%llX\n", 
+				(void*)g_Miles_EventTableBase, g_Miles_EventTableBase ? *g_Miles_EventTableBase : 0);
+		}
 		
 		if (g_Miles_EventTableBase && *g_Miles_EventTableBase)
 		{
@@ -676,8 +681,11 @@ static __int64 Miles_DispatchEvent_Hook(unsigned __int16 action)
 	if (fmod_debug->GetBool())
 	{
 		const char* cachedName = (eventHash > 2) ? LookupEventNameFromHash(eventHash) : nullptr;
-		Msg(eDLL_T::AUDIO, "FMOD: Miles_DispatchEvent action=%d hash=0x%llX name='%s'\n", 
-			action, eventHash, cachedName ? cachedName : "(unknown)");
+		if (fmod_debug->GetBool())
+		{
+			Msg(eDLL_T::AUDIO, "FMOD: Miles_DispatchEvent action=%d hash=0x%llX name='%s'\n", 
+				action, eventHash, cachedName ? cachedName : "(unknown)");
+		}
 	}
 	
 	// Ignore invalid hashes (1=empty name, 2=not found)
