@@ -99,6 +99,7 @@ static ConVar sv_onlineAuthIssuedAtTolerance("sv_onlineAuthIssuedAtTolerance", "
 
 static ConVar sv_quota_stringCmdsPerSecond("sv_quota_stringCmdsPerSecond", "32", FCVAR_RELEASE, "How many string commands per second clients are allowed to submit, 0 to disallow all string commands", true, 0.f, false, 0.f);
 
+#ifndef CLIENT_DLL
 //---------------------------------------------------------------------------------
 // Purpose: check if an IP address is in a private network range (RFC 1918)
 // Input  : *ipAddress - IP address string
@@ -144,6 +145,7 @@ static bool IsPrivateNetworkAddress(const char* ipAddress)
 
 	return false;
 }
+#endif // !CLIENT_DLL
 
 //---------------------------------------------------------------------------------
 // Purpose: check whether this client is authorized to join this server

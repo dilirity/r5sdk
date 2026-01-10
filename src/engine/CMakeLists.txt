@@ -151,6 +151,8 @@ if( NOT ${PROJECT_NAME} STREQUAL "engine_ds" )
 add_sources( SOURCE_GROUP "Client" # Client only.
     "client/clientstate.cpp"
     "client/clientstate.h"
+    "client/discord_ipc.cpp"
+    "client/discord_ipc.h"
     "client/discord_presence.cpp"
     "client/discord_presence.h"
     "client/discord_rpc_wrapper.cpp"
@@ -290,10 +292,12 @@ if( USE_STEAMWORKS AND STEAM_SDK_DIR )
         # Add USE_STEAMWORKS define to all files in the target
         target_compile_definitions(${PROJECT_NAME} PRIVATE USE_STEAMWORKS)
         
-        # Add Steam includes and definitions to the wrapper file
+        # Exclude steam_api_wrapper.cpp from precompiled headers to avoid type conflicts
+        # between r5sdk's sdkint.h and Steam's steamtypes.h
         set_source_files_properties(
             "client/steam_api_wrapper.cpp"
             PROPERTIES
+            SKIP_PRECOMPILE_HEADERS ON
             INCLUDE_DIRECTORIES "${STEAM_SDK_DIR}/public;${STEAM_SDK_DIR}/public/steam"
         )
         if( WIN32 )
@@ -321,10 +325,7 @@ target_include_directories( ${PROJECT_NAME} PRIVATE
     "${THIRDPARTY_SOURCE_DIR}/mbedtls/include"
 )
 
-# Link Discord SDK for client builds
-if( NOT ${PROJECT_NAME} STREQUAL "engine_ds" )
-    target_link_libraries( ${PROJECT_NAME} PRIVATE discordsdk )
-endif()
+# Discord Rich Presence is built-in using native IPC (no external DLL required)
 
 endmacro()
 

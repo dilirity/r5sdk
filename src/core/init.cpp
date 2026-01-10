@@ -56,6 +56,7 @@
 #include "vguimatsurface/MatSystemSurface.h"
 #include "particles/particles.h"
 #include "particles/particle_overlay.h"
+#include "particles/particle_effect_callback.h"
 #include "engine/client/vengineclient_impl.h"
 #include "engine/client/cdll_engine_int.h"
 #include "engine/client/datablock_receiver.h"
@@ -604,6 +605,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	// Particles
 	REGISTER(VParticles);
 	REGISTER(VParticleOverlay);
+	REGISTER(VParticleEffectCallback);
 
 	// Client
 	REGISTER(HVEngineClient);
