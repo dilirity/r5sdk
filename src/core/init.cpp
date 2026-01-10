@@ -96,6 +96,7 @@
 #include "engine/traceinit.h"
 #include "engine/common.h"
 #include "engine/cmodel_bsp.h"
+#include "engine/sv_model_precache_ext.h"
 #ifndef DEDICATED
 #include "engine/cmodel_bsp_debug.h"
 #endif // !DEDICATED
@@ -659,6 +660,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 
 	REGISTER(VTraceInit);
 	REGISTER(VModel_BSP);
+	REGISTER(VSV_ModelPrecacheExt);
 	REGISTER(VHost);
 	REGISTER(VHostCmd);
 	REGISTER(VHostState);

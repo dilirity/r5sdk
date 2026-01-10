@@ -76,6 +76,8 @@ add_sources( SOURCE_GROUP "Model"
     "modelinfo.h"
     "modelloader.cpp"
     "modelloader.h"
+    "sv_model_precache_ext.cpp"
+    "sv_model_precache_ext.h"
 )
 
 add_sources( SOURCE_GROUP "Host"

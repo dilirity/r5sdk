@@ -599,11 +599,11 @@ void VBSPCollisionDebug::GetVar(void) const
 	// Debug output
 	if (g_ppCollisionModelContexts)
 	{
-		DevMsg(eDLL_T::ENGINE, "BSP Collision Debug: g_ppCollisionModelContexts = 0x%p\n", g_ppCollisionModelContexts);
+		//DevMsg(eDLL_T::ENGINE, "BSP Collision Debug: g_ppCollisionModelContexts = 0x%p\n", g_ppCollisionModelContexts);
 	}
 	else
 	{
-		Warning(eDLL_T::ENGINE, "BSP Collision Debug: Failed to find g_ppCollisionModelContexts - debug rendering disabled\n");
+		//Warning(eDLL_T::ENGINE, "BSP Collision Debug: Failed to find g_ppCollisionModelContexts - debug rendering disabled\n");
 	}
 #endif // !DEDICATED
 }
