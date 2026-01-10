@@ -96,6 +96,9 @@
 #include "engine/traceinit.h"
 #include "engine/common.h"
 #include "engine/cmodel_bsp.h"
+#ifndef DEDICATED
+#include "engine/cmodel_bsp_debug.h"
+#endif // !DEDICATED
 #include "engine/modelinfo.h"
 #include "engine/host.h"
 #include "engine/host_cmd.h"
@@ -651,6 +654,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	REGISTER(VSys_Utils);
 	REGISTER(VEngine);
 	REGISTER(VEngineTrace);
+	// Note: VBSPCollisionDebug is self-registered in cmodel_bsp_debug.cpp
 	REGISTER(VModelInfo);
 
 	REGISTER(VTraceInit);

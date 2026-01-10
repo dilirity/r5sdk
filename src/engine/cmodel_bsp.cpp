@@ -333,7 +333,10 @@ static bool Mod_IsCustomPakLoadFinished(const int commonType)
 #endif // DEDICATED
     case CommonPakData_s::PakType_e::PAK_TYPE_COMMON:
         return true;
-    //case CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM:
+
+    case CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM:
+        return Mod_IsPakLoadFinished(s_customPakData.handles[CustomPakData_s::PakType_e::PAK_TYPE_COMMON_SDK]) &&
+            Mod_IsPakLoadFinished(s_customPakData.handles[CustomPakData_s::PakType_e::PAK_TYPE_COMMON_R5VALK]);
 
     case CommonPakData_s::PakType_e::PAK_TYPE_LOBBY:
         // Check for preloaded paks at this stage (loaded from preload.rson).
@@ -809,10 +812,13 @@ static bool Mod_HandleCustomPakUnloadForType(const int type)
         g_StudioMdlFallbackHandler.Clear();
         break;
     }
-    /*case CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM:
+    case CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM:
     {
+        if (!s_customPakData.UnloadBasePak(CustomPakData_s::PakType_e::PAK_TYPE_COMMON_R5VALK)
+            || !s_customPakData.UnloadBasePak(CustomPakData_s::PakType_e::PAK_TYPE_COMMON_SDK))
+            return false;
         break;
-    }*/
+    }
     case CommonPakData_s::PakType_e::PAK_TYPE_LOBBY:
     {
         if (!Mod_UnloadPreloadedPaks())
@@ -948,10 +954,12 @@ static void Mod_HandleCustomPakLoadForType(const int type)
         break;
     }
 #endif // !DEDICATED
-    /*case CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM:
+    case CommonPakData_s::PakType_e::PAK_TYPE_COMMON_GM:
     {
+        s_customPakData.LoadBasePak("common_sdk.rpak", CustomPakData_s::PakType_e::PAK_TYPE_COMMON_SDK);
+        s_customPakData.LoadBasePak("common_r5valk.rpak", CustomPakData_s::PakType_e::PAK_TYPE_COMMON_R5VALK);
         break;
-    }*/
+    }
     case CommonPakData_s::PakType_e::PAK_TYPE_LOBBY:
     {
         Mod_PreloadAllPaks();

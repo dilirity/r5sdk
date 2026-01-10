@@ -15,6 +15,8 @@ add_sources( SOURCE_GROUP "Engine"
 )
 
 add_sources( SOURCE_GROUP "Collision"
+    "cmodel_bsp_debug.cpp"
+    "cmodel_bsp_debug.h"
     "enginetrace.cpp"
     "enginetrace.h"
     "traceinit.h"
