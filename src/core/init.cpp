@@ -170,6 +170,7 @@
 #include "game/client/c_player.h"
 #include "game/client/c_baseentity.h"
 #include "game/client/hud_basechat.h"
+#include "game/client/c_zipline_fix.h"
 #endif // !DEDICATED
 #include "public/edict.h"
 #ifndef DEDICATED
@@ -748,6 +749,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	REGISTER(V_Player);
 	REGISTER(VC_BaseEntity);
 	REGISTER(VHudChat);
+	REGISTER(VZiplineFix);
 #endif // !DEDICATED
 
 	// Public

@@ -273,6 +273,11 @@ add_sources( SOURCE_GROUP "Hud"
     "client/hud_basechat.h"
 )
 
+add_sources( SOURCE_GROUP "Zipline"
+    "client/c_zipline_fix.cpp"
+    "client/c_zipline_fix.h"
+)
+
 file( GLOB GAME_CLIENT_PUBLIC_HEADERS
     "${ENGINE_SOURCE_DIR}/public/game/client/*"
 )
