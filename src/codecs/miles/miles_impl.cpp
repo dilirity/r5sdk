@@ -1287,5 +1287,17 @@ void MilesCore::Detour(const bool bAttach) const
 		// on all other enums are still identical and do not need to be fixes.
 		mem.Offset(0x762).Patch({ 0x4 });
 		mem.Offset(0x78B).Patch({ 0xC });
+
+		// Miles 10.0.62 changed internal listener data structures causing a crash
+		// when the audio spatialization function tries to clear listener bitmask bits.
+		// The crash occurs at offset 0x4A2 with instruction: sub [rbx+r11*8], rax
+		// We NOP out this instruction to prevent the crash. Audio may not be properly
+		// culled for out-of-range listeners but the game will not crash.
+		if (v_Miles_ProcessListenerMasks)
+		{
+			CMemory listenerMem(v_Miles_ProcessListenerMasks);
+			// Offset 0x4A2: sub [rbx+r11*8], rax = 4A 29 04 DB (4 bytes)
+			listenerMem.Offset(0x4A2).Patch({ 0x90, 0x90, 0x90, 0x90 });
+		}
 	}
 }

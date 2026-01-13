@@ -76,6 +76,12 @@ inline void(*v_Miles_SetEventHashFromValue)(__int64 eventHash);
 // Miles event table entry processor (sub_1409AF740) - gets event details from template ID
 inline char(*v_Miles_ProcessEventEntry)(__int64 entryPtr);
 
+// Audio listener bitmask processing function (sub_1409190F0)
+// This function processes 3D audio spatialization and listener masks.
+// In Miles 10.0.62, internal data structures changed causing a crash when
+// clearing listener bitmask bits. We patch to NOP out the problematic instruction.
+inline void(*v_Miles_ProcessListenerMasks)();
+
 // Global pointers for audio state
 inline uint64_t* g_Miles_QueuedEventData;    // qword_1655B9640 - event data structure
 inline uint64_t* g_Miles_EventTimeOffset;     // qword_1655B9648 - time offset
@@ -164,6 +170,7 @@ class MilesCore : public IDetour
 		LogFunAdr("Miles_SetEventHashFromName", v_Miles_SetEventHashFromName);
 		LogFunAdr("Miles_SetEventHashFromValue", v_Miles_SetEventHashFromValue);
 		LogFunAdr("Miles_ProcessEventEntry", v_Miles_ProcessEventEntry);
+		LogFunAdr("Miles_ProcessListenerMasks", v_Miles_ProcessListenerMasks);
 		LogVarAdr("g_Miles_QueuedEventData", g_Miles_QueuedEventData);
 		LogVarAdr("g_Miles_QueuedEventHash", g_Miles_QueuedEventHash);
 		LogVarAdr("g_Miles_EventTableBase", g_Miles_EventTableBase);
@@ -201,6 +208,10 @@ class MilesCore : public IDetour
 
 		// Miles event entry processor (sub_1409AF740) - processes event table entries
 		Module_FindPattern(g_GameDll, "40 55 53 56 41 56 48 8D 6C 24 ?? 48 81 EC 38 01").GetPtr(v_Miles_ProcessEventEntry);
+
+		// Audio listener bitmask processing (sub_1409190F0) - needs patching for Miles 10.0.62
+		// Pattern: Function prologue with unique stack frame size 0x50B10
+		Module_FindPattern(g_GameDll, "48 89 5C 24 08 48 89 74 24 10 48 89 7C 24 18 F3 0F 11 5C 24 20 55 41 56 41 57 B8 10 0B 05 00").GetPtr(v_Miles_ProcessListenerMasks);
 
 		g_RadAudioSystemDll.GetExportedSymbol("MilesAllocEx").GetPtr(v_MilesAllocEx);
 		g_RadAudioSystemDll.GetExportedSymbol("MilesQueueEventRun").GetPtr(v_MilesQueueEventRun);
