@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__ida-pro-mcp__lookup_funcs",
+      "mcp__ida-pro-mcp__find",
+      "mcp__ida-pro-mcp__disasm",
+      "mcp__ida-pro-mcp__list_funcs",
+      "mcp__ida-pro-mcp__decompile",
+      "mcp__ida-pro-mcp__xrefs_to",
+      "mcp__ida-pro-mcp__get_global_value",
+      "mcp__ida-pro-mcp__find_bytes",
+      "mcp__ida-pro-mcp__get_bytes"
+    ]
+  }
+}

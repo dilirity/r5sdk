@@ -24,7 +24,6 @@ extern ConVar bsp_collision_debug_alpha;
 #ifndef DEDICATED
 
 //-----------------------------------------------------------------------------
-// CollBvh4Node_s - BVH4 node structure (from PDB)
 // 
 // Memory layout (64 bytes):
 //   minMax[3][2][4] - 48 bytes: int16 bounds per axis/minmax/child
@@ -70,10 +69,9 @@ struct CollBvh4Node_t
 static_assert(sizeof(CollBvh4Node_t) == 64);
 
 //-----------------------------------------------------------------------------
-// CollBvh4_s - Full collision BVH structure (from PDB, 88 bytes)
+// CollBvh4_s - Full collision BVH structure (88 bytes)
 //
 // This is the main collision structure containing the BVH tree and metadata.
-// NOTE: This is the newer (PDB) version. The older game version uses a 72-byte 
 // context struct instead (CollisionModelContext_t below).
 //-----------------------------------------------------------------------------
 struct CollBvh4_t
@@ -98,7 +96,7 @@ struct CollBvh4_t
 static_assert(sizeof(CollBvh4_t) == 88);
 
 //-----------------------------------------------------------------------------
-// CollisionModelContext_t - 72-byte collision context (older game versions)
+// CollisionModelContext_t - 72-byte collision context
 //
 // This is the per-model collision context structure used in older game versions.
 // Array accessed via qword_1634F1638 + 72 * modelIndex

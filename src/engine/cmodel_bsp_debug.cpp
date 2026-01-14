@@ -25,10 +25,10 @@
 ConVar bsp_collision_debug("bsp_collision_debug", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, 
 	"Enable BSP collision debug rendering (draws collision triangles)");
 
-ConVar bsp_collision_debug_mode("bsp_collision_debug_mode", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
+ConVar bsp_collision_debug_mode("bsp_collision_debug_mode", "3", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
 	"Debug draw mode: 1=wireframe, 2=solid, 3=both");
 
-ConVar bsp_collision_debug_radius("bsp_collision_debug_radius", "1024", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
+ConVar bsp_collision_debug_radius("bsp_collision_debug_radius", "2048", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
 	"Radius around player to render collision triangles", true, 64.f, true, 16384.f);
 
 ConVar bsp_collision_debug_alpha("bsp_collision_debug_alpha", "32", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
@@ -409,7 +409,6 @@ void CBSPCollisionDebug::DrawNodeRecursive(const CollBvh4Node_t* nodes, int node
 
 	const CollBvh4Node_t* node = &nodes[nodeIndex];
 
-	// From PDB and decompiled CollBvh_VisitNodes_r:
 	// Child type extraction (from packedMetaData[2] and [3]):
 	//   type0 = packedMetaData[2] & 0xF
 	//   type1 = (packedMetaData[2] >> 4) & 0xF

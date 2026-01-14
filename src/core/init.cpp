@@ -43,6 +43,7 @@
 #include "vphysics/physics_collide.h"
 #include "vphysics/QHull.h"
 #include "engine/staticpropmgr.h"
+#include "engine/staticprop_bounds_debug.h"
 #include "materialsystem/cmaterialsystem.h"
 #include "materialsystem/cmatqueuedrendercontext.h"
 #include "materialsystem/constbuffer.h"
@@ -111,6 +112,7 @@
 #include "engine/net_chan.h"
 #include "engine/networkstringtable.h"
 #include "engine/debugoverlay.h"
+#include "engine/vis_debug.h"
 #ifndef CLIENT_DLL
 #include "engine/server/sv_main.h"
 #include "engine/server/sv_rcon.h"
@@ -583,6 +585,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 
 	// StaticPropMgr
 	REGISTER(VStaticPropMgr);
+	REGISTER(VStaticPropBoundsDebug);
 
 	// MaterialSystem
 	REGISTER(VMaterialSystem);
@@ -693,6 +696,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 #endif // !DEDICATED
 
 	REGISTER(VDebugOverlay);
+	REGISTER(VVisDebug);
 
 	// VScript
 	REGISTER(VSquirrel);

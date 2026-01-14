@@ -25,6 +25,8 @@ add_sources( SOURCE_GROUP "Collision"
 add_sources( SOURCE_GROUP "Debug"
     "debugoverlay.cpp"
     "debugoverlay.h"
+    "vis_debug.cpp"
+    "vis_debug.h"
 )
 
 if( NOT ${PROJECT_NAME} STREQUAL "engine_ds" )
@@ -64,6 +66,8 @@ add_sources( SOURCE_GROUP "Network"
     "packed_entity.h"
     "staticpropmgr.cpp"
     "staticpropmgr.h"
+    "staticprop_bounds_debug.cpp"
+    "staticprop_bounds_debug.h"
     # "networkvar.cpp" # TODO: Enable?
 )
 
