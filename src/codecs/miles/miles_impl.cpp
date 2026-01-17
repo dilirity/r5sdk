@@ -327,11 +327,6 @@ void MilesQueueEventRun(Miles::Queue* queue, const char* eventName)
 	if(miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: running event: '%s'\n", __FUNCTION__, eventName);
 
-	// Memory barrier to ensure all prior writes (event hash setup, position data, etc.)
-	// are visible before Miles processes the event. Without this, weapon sounds may
-	// not play due to a race condition where Miles reads stale data.
-	_mm_mfence();
-
 	v_MilesQueueEventRun(queue, eventName);
 }
 
@@ -434,11 +429,6 @@ static void CSOM_AddEventToQueue(const char* eventName)
 		// may not play. This replicates the timing effect of the debug print.
 		SwitchToThread();
 	}
-
-	// Memory barrier to ensure all prior writes (event hash setup, position data, etc.)
-	// are visible before Miles processes the event. Without this, weapon sounds may
-	// not play due to a race condition where Miles reads stale data.
-	_mm_mfence();
 
 	if (miles_warnings.GetBool())
 	{
@@ -1234,16 +1224,58 @@ void MilesCore::Detour(const bool bAttach) const
 		//
 		// Since the fixed code is larger (7 bytes vs 4 bytes), we use a code cave
 		// (trampoline) to hold the fixed instructions and redirect execution there.
+		// IMPORTANT: The code cave MUST be allocated within ±2GB of the target to use
+		// rel32 jumps, so we search for free memory near the function.
 		if (v_Miles_ProcessListenerMasks)
 		{
 			CMemory listenerMem(v_Miles_ProcessListenerMasks);
 			static uint8_t* s_listenerMaskCodeCave = nullptr;
 			if (!s_listenerMaskCodeCave)
 			{
-				s_listenerMaskCodeCave = reinterpret_cast<uint8_t*>(
-					VirtualAlloc(nullptr, 64, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+				/*// We need to allocate executable memory within ±2GB of the patch site
+				// to use 32-bit relative jumps. Search for a free region near the function.
+				const uintptr_t targetAddr = listenerMem.Offset(0x4A2).GetPtr();
+				const SIZE_T allocSize = 64;
 				
-				if (s_listenerMaskCodeCave)
+				// Try to allocate within ±2GB range (start searching 1GB before target)
+				uintptr_t searchStart = (targetAddr > 0x40000000) ? (targetAddr - 0x40000000) : 0x10000;
+				uintptr_t searchEnd = targetAddr + 0x40000000;
+				
+				MEMORY_BASIC_INFORMATION mbi;
+				for (uintptr_t addr = searchStart; addr < searchEnd; addr += mbi.RegionSize)
+				{
+					if (VirtualQuery(reinterpret_cast<LPCVOID>(addr), &mbi, sizeof(mbi)) == 0)
+					{
+						addr += 0x10000;  // Skip on error
+						continue;
+					}
+					
+					if (mbi.State == MEM_FREE && mbi.RegionSize >= allocSize)
+					{
+						// Try to allocate at this address
+						uintptr_t alignedAddr = (reinterpret_cast<uintptr_t>(mbi.BaseAddress) + 0xFFFF) & ~0xFFFF;
+						s_listenerMaskCodeCave = reinterpret_cast<uint8_t*>(
+							VirtualAlloc(reinterpret_cast<LPVOID>(alignedAddr), allocSize, 
+							             MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+						
+						if (s_listenerMaskCodeCave)
+						{
+							// Verify it's within rel32 range (±2GB)
+							intptr_t distance = reinterpret_cast<intptr_t>(s_listenerMaskCodeCave) - 
+							                    static_cast<intptr_t>(targetAddr);
+							if (distance < INT32_MIN || distance > INT32_MAX)
+							{
+								// Too far, free and try again
+								VirtualFree(s_listenerMaskCodeCave, 0, MEM_RELEASE);
+								s_listenerMaskCodeCave = nullptr;
+								continue;
+							}
+							break;  // Found suitable memory
+						}
+					}
+				}*/
+				
+				/*if (s_listenerMaskCodeCave)
 				{
 					// Build the fixed code sequence in the code cave:
 					// sub r9, rax         ; 49 29 C1 (3 bytes) - subtract from register
@@ -1283,13 +1315,13 @@ void MilesCore::Detour(const bool bAttach) const
 					listenerMem.Offset(0x4A2).Patch({ patchBytes[0], patchBytes[1], patchBytes[2], 
 					                                   patchBytes[3], patchBytes[4], patchBytes[5] });
 					
-					Msg(eDLL_T::AUDIO, "Miles listener mask fix applied via code cave at %p\n", 
-						static_cast<void*>(s_listenerMaskCodeCave));
+					Msg(eDLL_T::AUDIO, "Miles listener mask fix applied via code cave at %p (target: %p)\n", 
+						static_cast<void*>(s_listenerMaskCodeCave), reinterpret_cast<void*>(targetAddr));
 				}
-				else
+				else*/
 				{
-					//idk why this would ever happen
-					//but just NOP out the crash instruction as a last resort
+					//Above is broken will fix later, for now it seems the simplest solution is to NOP out the crash instruction
+					//Dosnt look like it has any adverse effects on audio
 					listenerMem.Offset(0x4A2).Patch({ 0x90, 0x90, 0x90, 0x90 });
 				}
 			}

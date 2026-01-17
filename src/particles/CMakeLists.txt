@@ -8,8 +8,6 @@ add_sources( SOURCE_GROUP "Runtime"
     "particles.h"
     "particle_overlay.cpp"
     "particle_overlay.h"
-    "particle_effect_callback.cpp"
-    "particle_effect_callback.h"
 )
 
 end_sources()
