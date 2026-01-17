@@ -6,6 +6,9 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <chrono>
+#include <algorithm>
+#include <cfloat>
 
 #include "thirdparty/fmod/inc/fmod_studio.h"
 #include "thirdparty/fmod/inc/fmod_studio.hpp"
@@ -25,6 +28,7 @@ struct FMODEventInstance
     uint64_t milesHash;      // The Miles event hash for tracking
     uint64_t internalId;     // Our internal ID
     bool isLooping;          // Track if this is a looping sound
+    double startTime;        // Time when this instance started (for FIFO ordering)
 };
 
 class FMODStudioBackend final : public ICustomAudioBackend
@@ -65,7 +69,7 @@ public:
                 }
             }
             m_activeInstances.clear();
-            m_hashToInstance.clear();
+            m_hashToInstances.clear();
         }
 
         for (auto& it : m_loadedBanks)
@@ -155,34 +159,106 @@ public:
 
         inst->start();
 
-        // Only auto-release oneshot events
+        // Only auto-release oneshot events that don't need tracking
         if (isOneshot && milesEventHash == 0)
         {
             inst->release();
             return ++m_nextId;
         }
 
-        // Track this instance
+        // Track this instance - use timestamp for FIFO ordering when stopping
         uint64_t id = ++m_nextId;
+        double startTime = std::chrono::duration<double>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
         {
             std::lock_guard<std::mutex> lock(m_instanceMutex);
+            
+            // INSTANCE STEALING: When rapidly firing the same sound, Miles may not send
+            // stop events for every start. To prevent orphaned instances piling up,
+            // limit concurrent instances per hash. For sounds with "loop" in the name,
+            // only allow 1 instance (new one steals from old). For other sounds, allow 2.
+            if (milesEventHash != 0)
+            {
+                auto& instanceList = m_hashToInstances[milesEventHash];
+                
+                // Determine max instances based on event name
+                // Loop sounds typically should only have 1 instance at a time
+                bool isLoopSound = (V_stristr(query, "loop") != nullptr);
+                size_t maxInstances = isLoopSound ? 1 : 2;
+                
+                if (fmod_debug && fmod_debug->GetBool() && !instanceList.empty())
+                {
+                    Msg(eDLL_T::AUDIO, "FMOD: PlayEvent3D check - existing=%zu, max=%zu, isLoop=%d for '%s'\n",
+                        instanceList.size(), maxInstances, isLoopSound, query);
+                }
+                
+                // Stop oldest instances if we're at the limit
+                while (instanceList.size() >= maxInstances)
+                {
+                    // Find and stop the oldest instance
+                    uint64_t oldestId = 0;
+                    double oldestTime = DBL_MAX;
+                    size_t oldestIdx = 0;
+                    
+                    for (size_t i = 0; i < instanceList.size(); i++)
+                    {
+                        auto instIt = m_activeInstances.find(instanceList[i]);
+                        if (instIt != m_activeInstances.end() && instIt->second.startTime < oldestTime)
+                        {
+                            oldestTime = instIt->second.startTime;
+                            oldestId = instanceList[i];
+                            oldestIdx = i;
+                        }
+                    }
+                    
+                    if (oldestId != 0)
+                    {
+                        auto instIt = m_activeInstances.find(oldestId);
+                        if (instIt != m_activeInstances.end() && instIt->second.instance)
+                        {
+                            // Stop IMMEDIATELY to prevent sound overlap during rapid fire
+                            instIt->second.instance->stop(FMOD_STUDIO_STOP_IMMEDIATE);
+                            instIt->second.instance->release();
+                            
+                            if (fmod_debug && fmod_debug->GetBool())
+                            {
+                                Msg(eDLL_T::AUDIO, "FMOD: Instance stealing - stopped old instance id=%llu for '%s'\n",
+                                    oldestId, query);
+                            }
+                        }
+                        m_activeInstances.erase(oldestId);
+                        instanceList.erase(instanceList.begin() + oldestIdx);
+                    }
+                    else
+                    {
+                        // No valid instances found, clear the list
+                        instanceList.clear();
+                        break;
+                    }
+                }
+            }
+            
             FMODEventInstance tracked;
             tracked.instance = inst;
             tracked.eventPath = query;
             tracked.milesHash = milesEventHash;
             tracked.internalId = id;
             tracked.isLooping = !isOneshot;
+            tracked.startTime = startTime;
             m_activeInstances[id] = tracked;
 
+            // For rapid-fire sounds, we need to track MULTIPLE instances per hash
+            // Use a multimap-style approach: store list of instance IDs per hash
             if (milesEventHash != 0)
             {
-                m_hashToInstance[milesEventHash] = id;
+                m_hashToInstances[milesEventHash].push_back(id);
             }
 
             if (fmod_debug && fmod_debug->GetBool())
             {
-                Msg(eDLL_T::AUDIO, "FMOD: Started event '%s' (id=%llu, hash=0x%llX, looping=%d)\n",
-                    query, id, milesEventHash, !isOneshot);
+                size_t instanceCount = milesEventHash != 0 ? m_hashToInstances[milesEventHash].size() : 1;
+                Msg(eDLL_T::AUDIO, "FMOD: Started event '%s' (id=%llu, hash=0x%llX, looping=%d, instances=%zu)\n",
+                    query, id, milesEventHash, !isOneshot, instanceCount);
             }
         }
 
@@ -194,32 +270,63 @@ public:
         if (milesEventHash == 0) return false;
 
         std::lock_guard<std::mutex> lock(m_instanceMutex);
-        auto hashIt = m_hashToInstance.find(milesEventHash);
-        if (hashIt == m_hashToInstance.end())
+        
+        // Find all instances for this hash
+        auto hashIt = m_hashToInstances.find(milesEventHash);
+        if (hashIt == m_hashToInstances.end() || hashIt->second.empty())
             return false;
 
-        uint64_t id = hashIt->second;
-        auto instIt = m_activeInstances.find(id);
-        if (instIt == m_activeInstances.end())
+        // Stop the OLDEST instance (FIFO) - this matches how Miles processes stop events
+        // When rapidly firing, stops should match starts in order
+        uint64_t oldestId = 0;
+        double oldestTime = DBL_MAX;  // Use DBL_MAX to avoid Windows max() macro conflict
+        size_t oldestIdx = 0;
+        
+        for (size_t i = 0; i < hashIt->second.size(); i++)
+        {
+            uint64_t id = hashIt->second[i];
+            auto instIt = m_activeInstances.find(id);
+            if (instIt != m_activeInstances.end() && instIt->second.startTime < oldestTime)
+            {
+                oldestTime = instIt->second.startTime;
+                oldestId = id;
+                oldestIdx = i;
+            }
+        }
+        
+        if (oldestId == 0)
+        {
+            // No valid instances found, clean up the hash entry
+            m_hashToInstances.erase(hashIt);
             return false;
+        }
 
-        if (instIt->second.instance)
+        auto instIt = m_activeInstances.find(oldestId);
+        if (instIt != m_activeInstances.end() && instIt->second.instance)
         {
             FMOD_STUDIO_STOP_MODE mode = immediate ? FMOD_STUDIO_STOP_IMMEDIATE : FMOD_STUDIO_STOP_ALLOWFADEOUT;
             instIt->second.instance->stop(mode);
 
             if (fmod_debug && fmod_debug->GetBool())
             {
-                Msg(eDLL_T::AUDIO, "FMOD: Stopped event by hash 0x%llX (id=%llu, immediate=%d)\n",
-                    milesEventHash, id, immediate);
+                Msg(eDLL_T::AUDIO, "FMOD: Stopped event by hash 0x%llX (id=%llu, immediate=%d, remaining=%zu)\n",
+                    milesEventHash, oldestId, immediate, hashIt->second.size() - 1);
             }
 
-            // Release and remove
+            // Release and remove from active instances
             instIt->second.instance->release();
             m_activeInstances.erase(instIt);
         }
 
-        m_hashToInstance.erase(hashIt);
+        // Remove this ID from the hash->instances list
+        hashIt->second.erase(hashIt->second.begin() + oldestIdx);
+        
+        // Clean up empty hash entries
+        if (hashIt->second.empty())
+        {
+            m_hashToInstances.erase(hashIt);
+        }
+        
         return true;
     }
 
@@ -253,10 +360,19 @@ public:
                 }
                 toRemove.push_back(pair.first);
 
-                // Also remove from hash map
+                // Also remove from hash->instances map
                 if (pair.second.milesHash != 0)
                 {
-                    m_hashToInstance.erase(pair.second.milesHash);
+                    auto hashIt = m_hashToInstances.find(pair.second.milesHash);
+                    if (hashIt != m_hashToInstances.end())
+                    {
+                        auto& vec = hashIt->second;
+                        vec.erase(std::remove(vec.begin(), vec.end(), pair.first), vec.end());
+                        if (vec.empty())
+                        {
+                            m_hashToInstances.erase(hashIt);
+                        }
+                    }
                 }
             }
         }
@@ -295,7 +411,7 @@ public:
         }
 
         m_activeInstances.clear();
-        m_hashToInstance.clear();
+        m_hashToInstances.clear();
     }
 
     bool PauseEventByHash(uint64_t milesEventHash, bool paused) override
@@ -303,23 +419,29 @@ public:
         if (milesEventHash == 0) return false;
 
         std::lock_guard<std::mutex> lock(m_instanceMutex);
-        auto hashIt = m_hashToInstance.find(milesEventHash);
-        if (hashIt == m_hashToInstance.end())
+        auto hashIt = m_hashToInstances.find(milesEventHash);
+        if (hashIt == m_hashToInstances.end() || hashIt->second.empty())
             return false;
 
-        auto instIt = m_activeInstances.find(hashIt->second);
-        if (instIt == m_activeInstances.end() || !instIt->second.instance)
-            return false;
-
-        instIt->second.instance->setPaused(paused);
-
-        if (fmod_debug && fmod_debug->GetBool())
+        // Pause/resume ALL instances with this hash
+        bool anySuccess = false;
+        for (uint64_t id : hashIt->second)
         {
-            Msg(eDLL_T::AUDIO, "FMOD: %s event by hash 0x%llX\n",
-                paused ? "Paused" : "Resumed", milesEventHash);
+            auto instIt = m_activeInstances.find(id);
+            if (instIt != m_activeInstances.end() && instIt->second.instance)
+            {
+                instIt->second.instance->setPaused(paused);
+                anySuccess = true;
+            }
         }
 
-        return true;
+        if (fmod_debug && fmod_debug->GetBool() && anySuccess)
+        {
+            Msg(eDLL_T::AUDIO, "FMOD: %s %zu instance(s) by hash 0x%llX\n",
+                paused ? "Paused" : "Resumed", hashIt->second.size(), milesEventHash);
+        }
+
+        return anySuccess;
     }
 
     bool SetEventVolumeByHash(uint64_t milesEventHash, float volume) override
@@ -327,16 +449,22 @@ public:
         if (milesEventHash == 0) return false;
 
         std::lock_guard<std::mutex> lock(m_instanceMutex);
-        auto hashIt = m_hashToInstance.find(milesEventHash);
-        if (hashIt == m_hashToInstance.end())
+        auto hashIt = m_hashToInstances.find(milesEventHash);
+        if (hashIt == m_hashToInstances.end() || hashIt->second.empty())
             return false;
 
-        auto instIt = m_activeInstances.find(hashIt->second);
-        if (instIt == m_activeInstances.end() || !instIt->second.instance)
-            return false;
-
-        instIt->second.instance->setVolume(volume);
-        return true;
+        // Set volume on ALL instances with this hash
+        bool anySuccess = false;
+        for (uint64_t id : hashIt->second)
+        {
+            auto instIt = m_activeInstances.find(id);
+            if (instIt != m_activeInstances.end() && instIt->second.instance)
+            {
+                instIt->second.instance->setVolume(volume);
+                anySuccess = true;
+            }
+        }
+        return anySuccess;
     }
 
     bool SetEventPositionByHash(uint64_t milesEventHash, const Vector3D& position) override
@@ -344,20 +472,27 @@ public:
         if (milesEventHash == 0) return false;
 
         std::lock_guard<std::mutex> lock(m_instanceMutex);
-        auto hashIt = m_hashToInstance.find(milesEventHash);
-        if (hashIt == m_hashToInstance.end())
-            return false;
-
-        auto instIt = m_activeInstances.find(hashIt->second);
-        if (instIt == m_activeInstances.end() || !instIt->second.instance)
+        auto hashIt = m_hashToInstances.find(milesEventHash);
+        if (hashIt == m_hashToInstances.end() || hashIt->second.empty())
             return false;
 
         FMOD_3D_ATTRIBUTES attrs{};
         attrs.position = { position.x, position.z, position.y };
         attrs.forward = { 0.0f, 0.0f, 1.0f };
         attrs.up = { 0.0f, 1.0f, 0.0f };
-        instIt->second.instance->set3DAttributes(&attrs);
-        return true;
+
+        // Update position on ALL instances with this hash
+        bool anySuccess = false;
+        for (uint64_t id : hashIt->second)
+        {
+            auto instIt = m_activeInstances.find(id);
+            if (instIt != m_activeInstances.end() && instIt->second.instance)
+            {
+                instIt->second.instance->set3DAttributes(&attrs);
+                anySuccess = true;
+            }
+        }
+        return anySuccess;
     }
 
     bool IsEventPlaying(uint64_t milesEventHash) override
@@ -365,17 +500,23 @@ public:
         if (milesEventHash == 0) return false;
 
         std::lock_guard<std::mutex> lock(m_instanceMutex);
-        auto hashIt = m_hashToInstance.find(milesEventHash);
-        if (hashIt == m_hashToInstance.end())
+        auto hashIt = m_hashToInstances.find(milesEventHash);
+        if (hashIt == m_hashToInstances.end() || hashIt->second.empty())
             return false;
 
-        auto instIt = m_activeInstances.find(hashIt->second);
-        if (instIt == m_activeInstances.end() || !instIt->second.instance)
-            return false;
-
-        FMOD_STUDIO_PLAYBACK_STATE state;
-        instIt->second.instance->getPlaybackState(&state);
-        return state == FMOD_STUDIO_PLAYBACK_PLAYING || state == FMOD_STUDIO_PLAYBACK_STARTING;
+        // Return true if ANY instance with this hash is playing
+        for (uint64_t id : hashIt->second)
+        {
+            auto instIt = m_activeInstances.find(id);
+            if (instIt != m_activeInstances.end() && instIt->second.instance)
+            {
+                FMOD_STUDIO_PLAYBACK_STATE state;
+                instIt->second.instance->getPlaybackState(&state);
+                if (state == FMOD_STUDIO_PLAYBACK_PLAYING || state == FMOD_STUDIO_PLAYBACK_STARTING)
+                    return true;
+            }
+        }
+        return false;
     }
 
     int GetActiveInstanceCount() override
@@ -610,9 +751,19 @@ private:
                     pair.second.instance->release();
                     toRemove.push_back(pair.first);
 
+                    // Remove from hash->instances map
                     if (pair.second.milesHash != 0)
                     {
-                        m_hashToInstance.erase(pair.second.milesHash);
+                        auto hashIt = m_hashToInstances.find(pair.second.milesHash);
+                        if (hashIt != m_hashToInstances.end())
+                        {
+                            auto& vec = hashIt->second;
+                            vec.erase(std::remove(vec.begin(), vec.end(), pair.first), vec.end());
+                            if (vec.empty())
+                            {
+                                m_hashToInstances.erase(hashIt);
+                            }
+                        }
                     }
                 }
             }
@@ -761,7 +912,8 @@ private:
     // Instance tracking for proper stop/pause/volume control
     mutable std::mutex m_instanceMutex;
     std::unordered_map<uint64_t, FMODEventInstance> m_activeInstances;
-    std::unordered_map<uint64_t, uint64_t> m_hashToInstance; // milesHash -> internal instance ID
+    // Multi-instance tracking: one hash can have MULTIPLE active instances (for rapid-fire sounds)
+    std::unordered_map<uint64_t, std::vector<uint64_t>> m_hashToInstances; // milesHash -> list of internal instance IDs
 };
 
 ICustomAudioBackend* CreateFMODStudioBackend()

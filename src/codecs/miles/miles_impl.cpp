@@ -176,10 +176,6 @@ static bool CSOM_Initialize()
 					CacheEventNameByHash(eventName, hash);
 					(*count)++;
 				}, &eventsCached);
-
-				Msg(eDLL_T::AUDIO, "FMOD: Pre-cached %d event name hashes\n", eventsCached);
-				// Miles event table enumeration will be done on first dispatch
-				// (table isn't built yet at this point)
 			}
 			else
 			{
@@ -1184,93 +1180,6 @@ static s32 CSOM_MilesAsync_FileCancel(MilesAsyncRead* const request)
 	return CSOM_MilesAsync_FileStatus(request, RR_WAIT_INFINITE);
 }
 
-/*//-----------------------------------------------------------------------------
-// Purpose: Event build hook
-//-----------------------------------------------------------------------------
-// Global event name for Northstar hooks
-// Event processing function - apply overrides after original function completes
-static char __fastcall h_Sub_18002AAF0(__int64 a1, __int64 a2, __int64 a3, __int64 j)
-{
-	// Call original function first to let Miles set up structures
-	char result = v_h_Sub_18002AAF0(a1, a2, a3, j);
-
-	// Now safely apply overrides after Miles has finished processing
-	__try
-	{
-		const char* name = **(const char***)(*(_QWORD*)(32i64 * *(unsigned __int16*)(a2 + 178) + *(_QWORD*)(a1 + 2216) + 8));
-
-		const void* overridePtr = nullptr;
-		unsigned overrideLen = 0;
-		if (GetAudioOverrideManagerNorthstar()->TryGetOverrideForEvent(name, overridePtr, overrideLen))
-		{
-			if (wav_debug.GetBool())
-				Msg(eDLL_T::AUDIO, "[NORTHSTAR] Applying override for event: %s (post-processing)\n", name);
-
-			// Apply override after original function completed - should be safer
-			__try
-			{
-				// Event structure cast (from decompiled code: v7 = (unsigned __int16 *)a2)
-				unsigned __int16* eventStruct = (unsigned __int16*)a2;
-				
-				// Get first sample index from event structure (from decompiled: i = *v7)
-				unsigned __int16 sampleIndex = *eventStruct;
-				
-				if (sampleIndex != 0xFFFF)  // Valid sample index
-				{
-					// Calculate sample structure address (from decompiled code)
-					__int64 sampleArrayBase = *(_QWORD*)(a1 + 1872);
-					__int64 sampleStructure = sampleArrayBase + 160i64 * sampleIndex;
-					
-					if (wav_debug.GetBool())
-						Msg(eDLL_T::AUDIO, "[NORTHSTAR] Applying to sample structure at: %p (index %u)\n", 
-							(void*)sampleStructure, sampleIndex);
-					
-					// Apply override after Miles processing is complete
-					__try
-					{
-						// Apply Northstar offsets to sample structure
-						*(void**)(sampleStructure + 0xE8) = const_cast<void*>(overridePtr);
-						*(unsigned int*)(sampleStructure + 0xF0) = overrideLen;
-						
-						if (wav_debug.GetBool())
-							Msg(eDLL_T::AUDIO, "[NORTHSTAR] Successfully applied override - Buffer: %p, Len: %u\n",
-								overridePtr, overrideLen);
-					}
-					__except(EXCEPTION_EXECUTE_HANDLER)
-					{
-						if (wav_debug.GetBool())
-							Msg(eDLL_T::AUDIO, "[NORTHSTAR] Failed to write to sample structure %p\n", 
-								(void*)sampleStructure);
-					}
-				}
-				else
-				{
-					if (wav_debug.GetBool())
-						Msg(eDLL_T::AUDIO, "[NORTHSTAR] No valid sample found in event structure\n");
-				}
-			}
-			__except(EXCEPTION_EXECUTE_HANDLER)
-			{
-				if (wav_debug.GetBool())
-					Msg(eDLL_T::AUDIO, "[NORTHSTAR] Failed to access event structure for override\n");
-			}
-		}
-	}
-	__except(EXCEPTION_EXECUTE_HANDLER)
-	{
-		if (wav_debug.GetBool())
-			Msg(eDLL_T::AUDIO, "[NORTHSTAR] Exception during event name extraction\n");
-	}
-	
-	return result;
-}
-
-static __int64 __fastcall MilesEventBuild_Hook(float* a1, __int64 a2, __int64 a3)
-{
-	return v_MilesEventBuild(a1, a2, a3);
-}
-*/
-
 ///////////////////////////////////////////////////////////////////////////////
 void MilesCore::Detour(const bool bAttach) const
 {
@@ -1328,8 +1237,6 @@ void MilesCore::Detour(const bool bAttach) const
 		if (v_Miles_ProcessListenerMasks)
 		{
 			CMemory listenerMem(v_Miles_ProcessListenerMasks);
-			
-			// Allocate executable memory for our code cave
 			static uint8_t* s_listenerMaskCodeCave = nullptr;
 			if (!s_listenerMaskCodeCave)
 			{
@@ -1381,8 +1288,8 @@ void MilesCore::Detour(const bool bAttach) const
 				}
 				else
 				{
-					// Fallback: NOP out the crash instruction (audio culling won't work properly)
-					Warning(eDLL_T::AUDIO, "Failed to allocate code cave for Miles listener fix, using NOP fallback\n");
+					//idk why this would ever happen
+					//but just NOP out the crash instruction as a last resort
 					listenerMem.Offset(0x4A2).Patch({ 0x90, 0x90, 0x90, 0x90 });
 				}
 			}
