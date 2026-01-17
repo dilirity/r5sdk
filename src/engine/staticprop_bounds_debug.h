@@ -82,7 +82,7 @@ class VStaticPropBoundsDebug : public IDetour
 	
 	virtual void Detour(const bool bAttach) const
 	{
-		DetourSetup(&v_StaticPropBoundsCheck, &StaticPropBoundsCheck_Hook, bAttach);
+		//DetourSetup(&v_StaticPropBoundsCheck, &StaticPropBoundsCheck_Hook, bAttach);
 	}
 };
 ///////////////////////////////////////////////////////////////////////////////
