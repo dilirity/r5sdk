@@ -331,6 +331,11 @@ void MilesQueueEventRun(Miles::Queue* queue, const char* eventName)
 	if(miles_debug.GetBool())
 		Msg(eDLL_T::AUDIO, "%s: running event: '%s'\n", __FUNCTION__, eventName);
 
+	// Memory barrier to ensure all prior writes (event hash setup, position data, etc.)
+	// are visible before Miles processes the event. Without this, weapon sounds may
+	// not play due to a race condition where Miles reads stale data.
+	_mm_mfence();
+
 	v_MilesQueueEventRun(queue, eventName);
 }
 
@@ -378,6 +383,11 @@ static void CSOM_AddEventToQueue(const char* eventName)
 	// Call original - this sets the event pointer in qword_1655B9658
 	v_CSOM_AddEventToQueue(eventName);
 
+	// Memory barrier to ensure the event hash is fully written before we read it
+	// and before Miles processes the event. This fixes weapon sounds not playing
+	// when miles_debug is disabled (the Msg() call was acting as an implicit barrier).
+	_mm_mfence();
+
 	// Cache the event pointer -> name mapping for later lookup
 	if (eventName && *eventName && g_Miles_QueuedEventHash)
 	{
@@ -421,6 +431,18 @@ static void CSOM_AddEventToQueue(const char* eventName)
 	{
 		Msg(eDLL_T::AUDIO, "%s: queuing audio event '%s'\n", __FUNCTION__, eventName);
 	}
+	else
+	{
+		// Yield to other threads - Miles apparently needs a small window to process
+		// the event internally. Without this (or the Msg() call above), weapon sounds
+		// may not play. This replicates the timing effect of the debug print.
+		SwitchToThread();
+	}
+
+	// Memory barrier to ensure all prior writes (event hash setup, position data, etc.)
+	// are visible before Miles processes the event. Without this, weapon sounds may
+	// not play due to a race condition where Miles reads stale data.
+	_mm_mfence();
 
 	if (miles_warnings.GetBool())
 	{
@@ -1291,13 +1313,79 @@ void MilesCore::Detour(const bool bAttach) const
 		// Miles 10.0.62 changed internal listener data structures causing a crash
 		// when the audio spatialization function tries to clear listener bitmask bits.
 		// The crash occurs at offset 0x4A2 with instruction: sub [rbx+r11*8], rax
-		// We NOP out this instruction to prevent the crash. Audio may not be properly
-		// culled for out-of-range listeners but the game will not crash.
+		// 
+		// The bug is that the old code does a direct memory subtraction which can cause
+		// issues. The fix (from newer Miles versions) is to:
+		//   1. Subtract from the register copy (R9) instead of memory
+		//   2. Write the result back to memory
+		//
+		// Original (buggy):   sub [rbx+r11*8], rax      ; 4A 29 04 DB
+		// Fixed:              sub r9, rax               ; 49 29 C1
+		//                     mov [rbx+r11*8], r9       ; 4E 89 0C DB
+		//
+		// Since the fixed code is larger (7 bytes vs 4 bytes), we use a code cave
+		// (trampoline) to hold the fixed instructions and redirect execution there.
 		if (v_Miles_ProcessListenerMasks)
 		{
 			CMemory listenerMem(v_Miles_ProcessListenerMasks);
-			// Offset 0x4A2: sub [rbx+r11*8], rax = 4A 29 04 DB (4 bytes)
-			listenerMem.Offset(0x4A2).Patch({ 0x90, 0x90, 0x90, 0x90 });
+			
+			// Allocate executable memory for our code cave
+			static uint8_t* s_listenerMaskCodeCave = nullptr;
+			if (!s_listenerMaskCodeCave)
+			{
+				s_listenerMaskCodeCave = reinterpret_cast<uint8_t*>(
+					VirtualAlloc(nullptr, 64, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+				
+				if (s_listenerMaskCodeCave)
+				{
+					// Build the fixed code sequence in the code cave:
+					// sub r9, rax         ; 49 29 C1 (3 bytes) - subtract from register
+					// mov [rbx+r11*8], r9 ; 4E 89 0C DB (4 bytes) - write result to memory
+					// jmp back_to_loop    ; E9 xx xx xx xx (5 bytes) - return to loop start
+					
+					s_listenerMaskCodeCave[0] = 0x49;  // REX.WB
+					s_listenerMaskCodeCave[1] = 0x29;  // SUB r/m64, r64
+					s_listenerMaskCodeCave[2] = 0xC1;  // ModR/M: r9, rax
+					
+					s_listenerMaskCodeCave[3] = 0x4E;  // REX.WRX
+					s_listenerMaskCodeCave[4] = 0x89;  // MOV r/m64, r64
+					s_listenerMaskCodeCave[5] = 0x0C;  // ModR/M: [rbx+r11*8]
+					s_listenerMaskCodeCave[6] = 0xDB;  // SIB: scale=8, index=r11, base=rbx
+					
+					// Calculate jump offset back to loop start (offset 0x477 in the function)
+					// The original jmp short at 0x4A6 jumps to 0x477 (the bsf instruction)
+					const uintptr_t loopStartAddr = listenerMem.Offset(0x477).GetPtr();
+					const uintptr_t jmpInstructionEnd = reinterpret_cast<uintptr_t>(&s_listenerMaskCodeCave[12]);
+					const int32_t jmpOffset = static_cast<int32_t>(loopStartAddr - jmpInstructionEnd);
+					
+					s_listenerMaskCodeCave[7] = 0xE9;  // JMP rel32
+					*reinterpret_cast<int32_t*>(&s_listenerMaskCodeCave[8]) = jmpOffset;
+					
+					// Now patch the original code at offset 0x4A2 to jump to our code cave
+					// We have 6 bytes available (4 bytes crash instr + 2 bytes jmp short)
+					// Patch with: jmp rel32 to codeCave (5 bytes) + nop (1 byte)
+					const uintptr_t patchAddr = listenerMem.Offset(0x4A2).GetPtr();
+					const uintptr_t caveAddr = reinterpret_cast<uintptr_t>(s_listenerMaskCodeCave);
+					const int32_t caveOffset = static_cast<int32_t>(caveAddr - (patchAddr + 5));
+					
+					uint8_t patchBytes[6];
+					patchBytes[0] = 0xE9;  // JMP rel32
+					*reinterpret_cast<int32_t*>(&patchBytes[1]) = caveOffset;
+					patchBytes[5] = 0x90;  // NOP (fills the remaining byte from old jmp short)
+					
+					listenerMem.Offset(0x4A2).Patch({ patchBytes[0], patchBytes[1], patchBytes[2], 
+					                                   patchBytes[3], patchBytes[4], patchBytes[5] });
+					
+					Msg(eDLL_T::AUDIO, "Miles listener mask fix applied via code cave at %p\n", 
+						static_cast<void*>(s_listenerMaskCodeCave));
+				}
+				else
+				{
+					// Fallback: NOP out the crash instruction (audio culling won't work properly)
+					Warning(eDLL_T::AUDIO, "Failed to allocate code cave for Miles listener fix, using NOP fallback\n");
+					listenerMem.Offset(0x4A2).Patch({ 0x90, 0x90, 0x90, 0x90 });
+				}
+			}
 		}
 	}
 }
