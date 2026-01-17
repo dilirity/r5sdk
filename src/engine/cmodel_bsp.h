@@ -23,6 +23,7 @@ struct CommonPakData_s
 		PAK_TYPE_COMMON,
 
 		// the base pak assigned to the current gamemode (range in GameMode_t)
+		PAK_TYPE_COMMON_GM,
 		PAK_TYPE_LOBBY,
 
 		// NOTE: this one is assigned to the name of the level, the prior ones are
