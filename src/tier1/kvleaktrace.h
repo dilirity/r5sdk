@@ -48,10 +48,10 @@ public:
 	CUtlVector< kve > keys;
 };
 
-static CLeakTrack track;
+static CLeakTrack* track = new CLeakTrack();
 
-#define TRACK_KV_ADD( ptr, name )	track.AddKv( ptr, name )
-#define TRACK_KV_REMOVE( ptr )		track.RemoveKv( ptr )
+#define TRACK_KV_ADD( ptr, name )	track->AddKv( ptr, name )
+#define TRACK_KV_REMOVE( ptr )		track->RemoveKv( ptr )
 
 #else
 
