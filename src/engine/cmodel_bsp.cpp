@@ -528,19 +528,9 @@ static void Mod_HandleLevelChanged(const char* const levelName)
         // are on. Detect the changing to/from lobby level here and handle it.
         s_customPakData.inLobby = V_strcmp(levelName, "mp_lobby") == NULL;
 
-        // note(kawe): corner case; if we are remounting paks (either through
-        // the concommand `pak_emulateremount` or an actual scenario, and we
-        // load the lobby directly after while its still reloading the paks,
-        // the system will call `Mod_LoadAllLevelPaks` while we are loading the
-        // lobby. We should retain the last precached level here and not update
-        // it when we go into the lobby to account for this scenario. This is
-        // technically also the correct behavior since the lobby isn't a level
-        // in the context of this system (lobby has its own slot in the main
-        // `CommonPakData_s` structure, with a higher priority than the level
-        // paks. The lobby paks are also always loaded and persistent accross
-        // all level changes).
-        if (!s_customPakData.inLobby)
-            s_customPakData.lastPrecachedLevel = levelName;
+        // Always update lastPrecachedLevel, even when entering lobby.
+        // This is needed to make sure level paks unload correctly when entering lobby.
+        s_customPakData.lastPrecachedLevel = levelName;
 
 #ifndef DEDICATED
         Miles_HandleLevelChanged();
@@ -769,6 +759,14 @@ static bool Mod_UnloadLevelPaks(const bool modsOnly)
 //-----------------------------------------------------------------------------
 static int Mod_GetTargetPakToUnloadType()
 {
+    // When entering lobby, force unload the level pak to save memory
+    if (s_customPakData.inLobby)
+    {
+        const CommonPakData_s& levelPak = g_commonPakData[CommonPakData_s::PakType_e::PAK_TYPE_LEVEL];
+        if (levelPak.pakName[0] != '\0' && !levelPak.isUnloading)
+            return CommonPakData_s::PakType_e::PAK_TYPE_LEVEL;
+    }
+
     int endIndex;
     for (endIndex = 0; endIndex < CommonPakData_s::PAK_TYPE_COUNT; ++endIndex)
     {
@@ -1117,16 +1115,20 @@ static void Mod_RunPakJobFrame()
     s_emulatePakRemount = false;
 #endif // !DEDICATED
 
-    // If we change to the lobby, we should retain all the currently loaded
-    // paks, including mod paks as its likely we will be going back to the
-    // same level and same playlist again. If we do actually change to a
-    // different level than the previous one from the lobby, the paks will
-    // all be unloaded in the above `Mod_UnloadPaksUntilType` call and all
-    // the level mod paks will be re-evaluated anyways.
-    if (!s_customPakData.inLobby)
+    // Unload level mod paks when changing levels, even when entering lobby.
+    // Previously the game would retain these paks in lobby as an optimization,
+    // This is actually how it supposed to be, but we are using mixed shaders from
+    // Different apex versions, these break mp_lobby.rpak materials which cause
+    // Engine crash and visual bugs in lobby.
+    // TODO: Revert this to original after all s3 shaders converted to s7 format.
+    if (!Mod_HandleUserLevelModPaksUnload())
+        return;
+
+    // When entering lobby, clear the level pak's basePakName to prevent it from reloading
+    if (s_customPakData.inLobby)
     {
-        if (!Mod_HandleUserLevelModPaksUnload())
-            return;
+        CommonPakData_s& levelPak = g_commonPakData[CommonPakData_s::PakType_e::PAK_TYPE_LEVEL];
+        levelPak.basePakName = "";
     }
 
     *g_pPakPrecacheJobFinished = true;
