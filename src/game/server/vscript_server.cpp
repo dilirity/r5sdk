@@ -865,7 +865,7 @@ static SQRESULT ServerScript_NavMesh_FindPath(HSQUIRRELVM v)
         sq_pushvector(v, &pt);
         sq_arrayappend(v, -2);
     }
-    sq_newslot(v, -3, SQFalse);
+    sq_newslot(v, -3);
 
     // Add traverseTypes array
     sq_pushstring(v, "traverseTypes", -1);
@@ -875,7 +875,7 @@ static SQRESULT ServerScript_NavMesh_FindPath(HSQUIRRELVM v)
         sq_pushinteger(v, straightJumps[i]);
         sq_arrayappend(v, -2);
     }
-    sq_newslot(v, -3, SQFalse);
+    sq_newslot(v, -3);
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -1123,6 +1123,85 @@ static SQRESULT ServerScript_NavMesh_IsGoalReachable(HSQUIRRELVM v)
         nav, startRef, endRef, ANIMTYPE_HUMAN);
 
     sq_pushbool(v, reachable);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: finds distance to nearest wall/boundary from a position.
+// Returns a table with 'distance', 'hitPos', and 'hitNormal', or null if
+// the position is off the navmesh.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_GetWallDistance(HSQUIRRELVM v)
+{
+    const SQVector3D* posVec = nullptr;
+    SQFloat maxRadius;
+    SQInteger hullIdx;
+
+    sq_getvector(v, 2, &posVec);
+    sq_getfloat(v, 3, &maxRadius);
+    sq_getinteger(v, 4, &hullIdx);
+
+    dtQueryFilter filter;
+    rdVec3D halfExtents;
+
+    const dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &filter, &halfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    // findDistanceToWall requires node pools, so must use init()
+    dtNavMeshQuery query;
+
+    if (dtStatusFailed(query.init(nav, 512)))
+    {
+        v_SQVM_ScriptError("Failed to initialize NavMesh query");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const rdVec3D pos(posVec->x, posVec->y, posVec->z);
+
+    dtPolyRef nearestRef = 0;
+    rdVec3D nearestPt;
+
+    query.findNearestPoly(&pos, &halfExtents, &filter, &nearestRef, &nearestPt);
+
+    if (!nearestRef)
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    float hitDist = 0.f;
+    rdVec3D hitPos, hitNormal;
+
+    const dtStatus status = query.findDistanceToWall(
+        nearestRef, &nearestPt, maxRadius, &filter,
+        &hitDist, &hitPos, &hitNormal);
+
+    if (dtStatusFailed(status))
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Return table: { distance, hitPos, hitNormal }
+    sq_newtable(v);
+
+    sq_pushstring(v, "distance", -1);
+    sq_pushfloat(v, hitDist);
+    sq_newslot(v, -3);
+
+    sq_pushstring(v, "hitPos", -1);
+    const SQVector3D sqHitPos(hitPos.x, hitPos.y, hitPos.z);
+    sq_pushvector(v, &sqHitPos);
+    sq_newslot(v, -3);
+
+    sq_pushstring(v, "hitNormal", -1);
+    const SQVector3D sqHitNormal(hitNormal.x, hitNormal.y, hitNormal.z);
+    sq_pushvector(v, &sqHitNormal);
+    sq_newslot(v, -3);
+
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -1498,6 +1577,11 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "Checks if a goal is reachable from start using traverse tables",
         "bool",
         "vector startPos, vector endPos, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetWallDistance,
+        "Finds distance to nearest wall within radius. Returns {distance, hitPos, hitNormal} or null",
+        "table ornull",
+        "vector pos, float maxRadius, int hullType", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, Bot_Create,
         "Creates a bot player, returns edict index (-1 on failure). Use GetEntByIndex() to get entity",
