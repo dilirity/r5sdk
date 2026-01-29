@@ -35,6 +35,27 @@
 #include "engine/server/vengineserver_impl.h" // g_pEngineServer, CreateFakeClient
 #include "game/server/gameinterface.h"        // g_pServerGameClients, ClientFullyConnect
 #include "game/server/player_command.h"       // g_botInputs, BotInput
+
+#include "thirdparty/recast/DetourCrowd/Include/DetourPathCorridor.h"
+#include <unordered_map>
+
+//=============================================================================
+// Bot Navigation Corridor System
+//=============================================================================
+struct BotCorridor
+{
+    dtPathCorridor corridor;
+    dtNavMeshQuery query;
+    dtQueryFilter filter;
+    Hull_e hullType;
+    bool initialized;
+
+    BotCorridor() : hullType(HULL_HUMAN), initialized(false) {}
+};
+
+static std::unordered_map<int, BotCorridor*> g_corridors;
+static int g_nextCorridorHandle = 1;
+
 /*
 =====================
 SQVM_ServerScript_f
@@ -1206,6 +1227,338 @@ static SQRESULT ServerScript_NavMesh_GetWallDistance(HSQUIRRELVM v)
 }
 
 //=============================================================================
+// NavMesh Corridor API
+//=============================================================================
+
+//-----------------------------------------------------------------------------
+// Purpose: creates a path corridor for bot navigation. Returns handle.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_CreateCorridor(HSQUIRRELVM v)
+{
+    SQInteger hullIdx;
+    sq_getinteger(v, 2, &hullIdx);
+
+    if (!Internal_ServerScript_ValidateHull(hullIdx))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const Hull_e hullType = Hull_e(hullIdx);
+    const NavMeshType_e navType = NAI_Hull::NavMeshType(hullType);
+    const dtNavMesh* const nav = Detour_GetNavMeshByType(navType);
+
+    if (!nav)
+    {
+        v_SQVM_ScriptError("NavMesh_CreateCorridor: navmesh not loaded for hull type %d", hullIdx);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    BotCorridor* pCorridor = new BotCorridor();
+    pCorridor->hullType = hullType;
+
+    // Initialize the navmesh query with node pools for pathfinding
+    if (dtStatusFailed(pCorridor->query.init(nav, 2048)))
+    {
+        delete pCorridor;
+        v_SQVM_ScriptError("NavMesh_CreateCorridor: failed to init navmesh query");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    // Initialize corridor path buffer
+    if (!pCorridor->corridor.init(256))
+    {
+        delete pCorridor;
+        v_SQVM_ScriptError("NavMesh_CreateCorridor: failed to init corridor");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    // Setup filter for human traversal
+    pCorridor->filter.setIncludeFlags(0xFFFF);
+    pCorridor->filter.setExcludeFlags(0);
+    pCorridor->filter.setTraverseFlags(0x13F); // ANIMTYPE_HUMAN traverse types
+
+    pCorridor->initialized = true;
+
+    const int handle = g_nextCorridorHandle++;
+    g_corridors[handle] = pCorridor;
+
+    sq_pushinteger(v, handle);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: destroys a path corridor, freeing its memory.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_DestroyCorridor(HSQUIRRELVM v)
+{
+    SQInteger handle;
+    sq_getinteger(v, 2, &handle);
+
+    auto it = g_corridors.find((int)handle);
+    if (it == g_corridors.end())
+    {
+        // Corridor not found - not an error, just return
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    delete it->second;
+    g_corridors.erase(it);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: sets the path in the corridor from start to target position.
+// Internally performs findPath + setCorridor.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_CorridorSetPath(HSQUIRRELVM v)
+{
+    SQInteger handle;
+    const SQVector3D* startVec = nullptr;
+    const SQVector3D* targetVec = nullptr;
+
+    sq_getinteger(v, 2, &handle);
+    sq_getvector(v, 3, &startVec);
+    sq_getvector(v, 4, &targetVec);
+
+    auto it = g_corridors.find((int)handle);
+    if (it == g_corridors.end())
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorSetPath: invalid corridor handle %d", handle);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    BotCorridor* pCorridor = it->second;
+    if (!pCorridor->initialized)
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorSetPath: corridor not initialized");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const rdVec3D startPos(startVec->x, startVec->y, startVec->z);
+    const rdVec3D targetPos(targetVec->x, targetVec->y, targetVec->z);
+
+    // Get extents for poly search
+    const Vector3D& maxs = NAI_Hull::Maxs(pCorridor->hullType);
+    const rdVec3D halfExtents(maxs.x, maxs.y, maxs.z);
+
+    // Find nearest polys
+    dtPolyRef startRef = 0, targetRef = 0;
+    rdVec3D nearestStart, nearestTarget;
+
+    dtStatus status = dtNavMeshQuery__findNearestPoly(
+        &pCorridor->query, &startPos, &halfExtents,
+        &pCorridor->filter, &startRef, &nearestStart);
+
+    if (dtStatusFailed(status) || startRef == 0)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    status = dtNavMeshQuery__findNearestPoly(
+        &pCorridor->query, &targetPos, &halfExtents,
+        &pCorridor->filter, &targetRef, &nearestTarget);
+
+    if (dtStatusFailed(status) || targetRef == 0)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Find path
+    dtPolyRef pathPolys[256];
+    unsigned char pathJumps[256];
+    int pathCount = 0;
+
+    status = dtNavMeshQuery__findPath(
+        &pCorridor->query, startRef, targetRef,
+        &nearestStart, &nearestTarget, &pCorridor->filter,
+        pathPolys, pathJumps, &pathCount, 256);
+
+    if (dtStatusFailed(status) || pathCount == 0)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Load path into corridor
+    pCorridor->corridor.setCorridor(&nearestTarget, pathPolys, pathJumps, pathCount);
+
+    sq_pushbool(v, true);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: updates the corridor position, sliding it forward as the agent moves.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_CorridorMove(HSQUIRRELVM v)
+{
+    SQInteger handle;
+    const SQVector3D* posVec = nullptr;
+
+    sq_getinteger(v, 2, &handle);
+    sq_getvector(v, 3, &posVec);
+
+    auto it = g_corridors.find((int)handle);
+    if (it == g_corridors.end())
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorMove: invalid corridor handle %d", handle);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    BotCorridor* pCorridor = it->second;
+    if (!pCorridor->initialized)
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorMove: corridor not initialized");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const rdVec3D pos(posVec->x, posVec->y, posVec->z);
+
+    const bool success = pCorridor->corridor.movePosition(&pos, &pCorridor->query, &pCorridor->filter);
+
+    sq_pushbool(v, success);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets steering corners from the corridor. Returns array of
+// {pos, traverseType} tables, or empty array if no path.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_CorridorGetCorners(HSQUIRRELVM v)
+{
+    SQInteger handle;
+    SQInteger maxCorners;
+
+    sq_getinteger(v, 2, &handle);
+    sq_getinteger(v, 3, &maxCorners);
+
+    auto it = g_corridors.find((int)handle);
+    if (it == g_corridors.end())
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorGetCorners: invalid corridor handle %d", handle);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    BotCorridor* pCorridor = it->second;
+    if (!pCorridor->initialized)
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorGetCorners: corridor not initialized");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    if (maxCorners < 1) maxCorners = 1;
+    if (maxCorners > 8) maxCorners = 8;
+
+    rdVec3D cornerVerts[8];
+    unsigned char cornerFlags[8];
+    dtPolyRef cornerPolys[8];
+    unsigned char cornerJumps[8];
+
+    const int cornerCount = pCorridor->corridor.findCorners(
+        cornerVerts, cornerFlags, cornerPolys, cornerJumps,
+        (int)maxCorners, &pCorridor->query, &pCorridor->filter);
+
+    // Create array of {pos, traverseType} tables
+    sq_newarray(v, 0);
+
+    for (int i = 0; i < cornerCount; i++)
+    {
+        sq_newtable(v);
+
+        sq_pushstring(v, "pos", -1);
+        const SQVector3D sqPos(cornerVerts[i].x, cornerVerts[i].y, cornerVerts[i].z);
+        sq_pushvector(v, &sqPos);
+        sq_newslot(v, -3);
+
+        sq_pushstring(v, "traverseType", -1);
+        sq_pushinteger(v, cornerJumps[i]);
+        sq_newslot(v, -3);
+
+        sq_arrayappend(v, -2);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the current position in the corridor.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_CorridorGetPos(HSQUIRRELVM v)
+{
+    SQInteger handle;
+    sq_getinteger(v, 2, &handle);
+
+    auto it = g_corridors.find((int)handle);
+    if (it == g_corridors.end())
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorGetPos: invalid corridor handle %d", handle);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    BotCorridor* pCorridor = it->second;
+    const rdVec3D* pos = pCorridor->corridor.getPos();
+
+    const SQVector3D sqPos(pos->x, pos->y, pos->z);
+    sq_pushvector(v, &sqPos);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the target position in the corridor.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_CorridorGetTarget(HSQUIRRELVM v)
+{
+    SQInteger handle;
+    sq_getinteger(v, 2, &handle);
+
+    auto it = g_corridors.find((int)handle);
+    if (it == g_corridors.end())
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorGetTarget: invalid corridor handle %d", handle);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    BotCorridor* pCorridor = it->second;
+    const rdVec3D* target = pCorridor->corridor.getTarget();
+
+    const SQVector3D sqTarget(target->x, target->y, target->z);
+    sq_pushvector(v, &sqTarget);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: checks if the corridor path is still valid.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_CorridorIsValid(HSQUIRRELVM v)
+{
+    SQInteger handle;
+    sq_getinteger(v, 2, &handle);
+
+    auto it = g_corridors.find((int)handle);
+    if (it == g_corridors.end())
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    BotCorridor* pCorridor = it->second;
+    if (!pCorridor->initialized)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Check if corridor has a valid path
+    const bool valid = pCorridor->corridor.getPathCount() > 0 &&
+                       pCorridor->corridor.isValid(10, &pCorridor->query, &pCorridor->filter);
+
+    sq_pushbool(v, valid);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//=============================================================================
 // Bot Control API
 //=============================================================================
 
@@ -1583,6 +1936,47 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "table ornull",
         "vector pos, float maxRadius, int hullType", false);
 
+    // NavMesh Corridor API
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CreateCorridor,
+        "Creates a path corridor for bot navigation. Returns handle",
+        "int",
+        "int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_DestroyCorridor,
+        "Destroys a path corridor, freeing its memory",
+        "void",
+        "int handle", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorSetPath,
+        "Sets the path in the corridor from start to target. Returns true on success",
+        "bool",
+        "int handle, vector startPos, vector targetPos", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorMove,
+        "Updates corridor position as agent moves. Returns true on success",
+        "bool",
+        "int handle, vector pos", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorGetCorners,
+        "Gets steering corners from corridor. Returns array of {pos, traverseType}",
+        "array",
+        "int handle, int maxCorners", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorGetPos,
+        "Gets current position in the corridor",
+        "vector",
+        "int handle", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorGetTarget,
+        "Gets target position in the corridor",
+        "vector",
+        "int handle", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorIsValid,
+        "Checks if the corridor path is still valid",
+        "bool",
+        "int handle", false);
+    
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, Bot_Create,
         "Creates a bot player, returns edict index (-1 on failure). Use GetEntByIndex() to get entity",
         "int",
