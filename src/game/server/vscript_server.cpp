@@ -32,6 +32,8 @@
 #include "player.h"
 #include "detour_impl.h"
 
+#include "engine/server/vengineserver_impl.h" // g_pEngineServer, CreateFakeClient
+#include "game/server/gameinterface.h"        // g_pServerGameClients, ClientFullyConnect
 /*
 =====================
 SQVM_ServerScript_f
@@ -1122,6 +1124,49 @@ static SQRESULT ServerScript_NavMesh_IsGoalReachable(HSQUIRRELVM v)
     sq_pushbool(v, reachable);
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
+
+//=============================================================================
+// Bot Control API
+//=============================================================================
+
+//-----------------------------------------------------------------------------
+// Purpose: creates a bot (fake client) and returns its edict index.
+// Returns -1 on failure. Use GetEntByIndex() in script to get the entity.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_Bot_Create(HSQUIRRELVM v)
+{
+    const SQChar* pszName = nullptr;
+    SQInteger teamNum;
+
+    sq_getstring(v, 2, &pszName);
+    sq_getinteger(v, 3, &teamNum);
+
+    if (!VALID_CHARSTAR(pszName))
+    {
+        v_SQVM_ScriptError("Bot_Create: null or empty name");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    if (g_pServer->GetNumClients() >= g_ServerGlobalVariables->maxClients)
+    {
+        // Server full — return -1, not an error (caller should handle this)
+        sq_pushinteger(v, -1);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const edict_t nHandle = g_pEngineServer->CreateFakeClient(pszName, (int)teamNum);
+
+    if (nHandle == FL_EDICT_INVALID)
+    {
+        sq_pushinteger(v, -1);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    g_pServerGameClients->ClientFullyConnect(nHandle, false);
+
+    sq_pushinteger(v, (SQInteger)nHandle);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
 //-----------------------------------------------------------------------------
 // Purpose: saves a recorded animation on the disk to be used by bakery
 //-----------------------------------------------------------------------------
@@ -1339,6 +1384,12 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "Checks if a goal is reachable from start using traverse tables",
         "bool",
         "vector startPos, vector endPos, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, Bot_Create,
+        "Creates a bot player, returns edict index (-1 on failure). Use GetEntByIndex() to get entity",
+        "int",
+        "string name, int team", false);
+
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SaveRecordedAnimation, "Saves an anim_recording asset to be used by bakery. (dev only)", "void", "var recordedAnim, string fileName", false);
 }
 
