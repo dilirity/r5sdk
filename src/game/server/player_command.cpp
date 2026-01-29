@@ -1,4 +1,4 @@
-//====== Copyright © 1996-2005, Valve Corporation, All rights reserved. =======//
+//====== Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. =======//
 //
 // Purpose: 
 //
@@ -8,6 +8,8 @@
 #include "engine/client/client.h"
 
 #include "player_command.h"
+
+BotInput g_botInputs[MAX_PLAYERS] = {};
 
 //-----------------------------------------------------------------------------
 // Purpose: 
@@ -48,6 +50,27 @@ void CPlayerMove::StaticRunCommand(CPlayerMove* thisp, CPlayer* player, CUserCmd
 
 	if (!player->IsBot() && (timeAllowedForProcessing < playerFrameTime))
 		return; // Don't process this command
+
+	// Inject script-provided bot input into the command
+	if (player->IsBot())
+	{
+		const int idx = player->GetEdict() - 1;
+
+		if (idx >= 0 && idx < MAX_PLAYERS)
+		{
+			if (g_botInputs[idx].hasInput)
+			{
+				ucmd->viewangles = g_botInputs[idx].viewAngles;
+				ucmd->forwardmove = g_botInputs[idx].forwardMove;
+				ucmd->sidemove = g_botInputs[idx].sideMove;
+				ucmd->buttons = g_botInputs[idx].buttons;
+				g_botInputs[idx].hasInput = false;
+			}
+
+			// Always merge persistent forced buttons (from BotButtonPress)
+			ucmd->buttons |= g_botInputs[idx].forcedButtons;
+		}
+	}
 
 	CPlayerMove__RunCommand(thisp, player, ucmd, moveHelper);
 }

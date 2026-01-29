@@ -34,6 +34,7 @@
 
 #include "engine/server/vengineserver_impl.h" // g_pEngineServer, CreateFakeClient
 #include "game/server/gameinterface.h"        // g_pServerGameClients, ClientFullyConnect
+#include "game/server/player_command.h"       // g_botInputs, BotInput
 /*
 =====================
 SQVM_ServerScript_f
@@ -1167,6 +1168,119 @@ static SQRESULT ServerScript_Bot_Create(HSQUIRRELVM v)
     sq_pushinteger(v, (SQInteger)nHandle);
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
+
+//-----------------------------------------------------------------------------
+// Purpose: sets the bot's input for the current frame.
+// Only works on bot (fake client) players. Returns false if not a bot.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_SetBotInput(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    if (!pPlayer || !pPlayer->IsBot())
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const SQVector3D* anglesVec = nullptr;
+    SQFloat forwardMove;
+    SQFloat sideMove;
+    SQInteger buttons;
+
+    sq_getvector(v, 2, &anglesVec);
+    sq_getfloat(v, 3, &forwardMove);
+    sq_getfloat(v, 4, &sideMove);
+    sq_getinteger(v, 5, &buttons);
+
+    const int idx = pPlayer->GetEdict() - 1;
+
+    if (idx < 0 || idx >= MAX_PLAYERS)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    g_botInputs[idx].viewAngles.Init(anglesVec->x, anglesVec->y, anglesVec->z);
+    g_botInputs[idx].forwardMove = forwardMove;
+    g_botInputs[idx].sideMove = sideMove;
+    g_botInputs[idx].buttons = (int)buttons;
+    g_botInputs[idx].hasInput = true;
+
+    sq_pushbool(v, true);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: persistently forces a bot button input (e.g. IN_DUCK, IN_FORWARD).
+// Stays active until BotButtonRelease is called for the same button.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_BotButtonPress(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    if (!pPlayer || !pPlayer->IsBot())
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    SQInteger button;
+    sq_getinteger(v, 2, &button);
+
+    const int idx = pPlayer->GetEdict() - 1;
+
+    if (idx < 0 || idx >= MAX_PLAYERS)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    g_botInputs[idx].forcedButtons |= (int)button;
+
+    sq_pushbool(v, true);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: releases a persistently forced bot button input.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_BotButtonRelease(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    if (!pPlayer || !pPlayer->IsBot())
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    SQInteger button;
+    sq_getinteger(v, 2, &button);
+
+    const int idx = pPlayer->GetEdict() - 1;
+
+    if (idx < 0 || idx >= MAX_PLAYERS)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    g_botInputs[idx].forcedButtons &= ~(int)button;
+
+    sq_pushbool(v, true);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: saves a recorded animation on the disk to be used by bakery
 //-----------------------------------------------------------------------------
@@ -1455,6 +1569,30 @@ static void Script_RegisterServerPlayerClassFuncs()
         "string prefix, string message, bool adminMsg",
         false,
         ServerScript_SendServerTextMessage);
+
+    g_serverScriptPlayerStruct->AddFunction("SetBotInput",
+        "ScriptSetBotInput",
+        "Sets bot input for this frame. Only works on bot players. Returns false if not a bot",
+        "bool",
+        "vector viewAngles, float forwardMove, float sideMove, int buttons",
+        false,
+        ServerScript_SetBotInput);
+
+    g_serverScriptPlayerStruct->AddFunction("BotButtonPress",
+        "Script_BotButtonPress",
+        "Forces a bot player to activate an input (such as IN_ATTACK). Stays active until BotButtonRelease",
+        "bool",
+        "int button",
+        false,
+        ServerScript_BotButtonPress);
+
+    g_serverScriptPlayerStruct->AddFunction("BotButtonRelease",
+        "Script_BotButtonRelease",
+        "Deactivates a forced bot input (such as IN_ATTACK)",
+        "bool",
+        "int button",
+        false,
+        ServerScript_BotButtonRelease);
 
     g_serverScriptPlayerStruct->AddFunction("ChatBuilder",
         "ScriptChatBuilder",

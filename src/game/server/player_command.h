@@ -45,6 +45,33 @@ protected:
 	virtual void	StartCommand(CPlayer* player, IMoveHelper* pHelper, CUserCmd* cmd) = 0;
 };
 
+//-----------------------------------------------------------------------------
+// Purpose: stores script-provided input for bot players.
+// Written by VScript SetBotInput, consumed by CPlayerMove::StaticRunCommand.
+//-----------------------------------------------------------------------------
+struct BotInput
+{
+	QAngle viewAngles;
+	float forwardMove;
+	float sideMove;
+	int buttons;
+	bool hasInput;  // true = script provided input this frame
+	int forcedButtons; // persistent buttons from BotButtonPress/BotButtonRelease
+
+	void Reset()
+	{
+		viewAngles.Init();
+		forwardMove = 0.f;
+		sideMove = 0.f;
+		buttons = 0;
+		hasInput = false;
+		// NOTE: forcedButtons intentionally NOT reset here —
+		// they persist until explicitly released via BotButtonRelease.
+	}
+};
+
+extern BotInput g_botInputs[MAX_PLAYERS];
+
 inline void (*CPlayerMove__RunCommand)(CPlayerMove* thisp, CPlayer* player, CUserCmd* ucmd, IMoveHelper* moveHelper);
 
 ///////////////////////////////////////////////////////////////////////////////
