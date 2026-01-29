@@ -725,6 +725,403 @@ static SQRESULT ServerScript_NavMesh_GetNearestPosInBounds(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+//=============================================================================
+// NavMesh Pathfinding API
+//=============================================================================
+
+//-----------------------------------------------------------------------------
+// Purpose: resolves navmesh + sets up filter and extents for a given hull type.
+// Returns the navmesh pointer, or null (and raises script error) on failure.
+//-----------------------------------------------------------------------------
+static dtNavMesh* Internal_ServerScript_NavMesh_GetNavMesh(
+    HSQUIRRELVM v,
+    const SQInteger hullIdx,
+    dtQueryFilter* outFilter,
+    rdVec3D* outHalfExtents)
+{
+    if (!Internal_ServerScript_ValidateHull(hullIdx))
+        return nullptr;
+
+    const Hull_e hullType = Hull_e(hullIdx);
+    const NavMeshType_e navType = NAI_Hull::NavMeshType(hullType);
+    dtNavMesh* const nav = Detour_GetNavMeshByType(navType);
+
+    if (!nav)
+    {
+        v_SQVM_ScriptError("NavMesh \"%s\" for hull \"%s\" hasn't been loaded!",
+            NavMesh_GetNameForType(navType), g_aiHullNames[hullType]);
+        return nullptr;
+    }
+
+    outFilter->setIncludeFlags(DT_POLYFLAGS_ALL);
+    outFilter->setExcludeFlags(DT_POLYFLAGS_DISABLED);
+
+    const Vector3D& maxs = NAI_Hull::Maxs(hullType);
+    outHalfExtents->init(maxs.x, maxs.y, maxs.z);
+
+    return nav;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: finds a path between two points on the navmesh.
+// Returns a table with 'positions' (array of vectors) and 'traverseTypes'
+// (array of ints), or null if no path found. Traverse type 255 means normal
+// walking; values 0-31 indicate specific traverse actions (climb, jump, etc).
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_FindPath(HSQUIRRELVM v)
+{
+    const SQVector3D* startVec = nullptr;
+    const SQVector3D* endVec = nullptr;
+    SQInteger hullIdx;
+
+    sq_getvector(v, 2, &startVec);
+    sq_getvector(v, 3, &endVec);
+    sq_getinteger(v, 4, &hullIdx);
+
+    dtQueryFilter filter;
+    rdVec3D halfExtents;
+
+    const dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &filter, &halfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    // init() allocates node pools needed by findPath; destructor frees them.
+    dtNavMeshQuery query;
+
+    if (dtStatusFailed(query.init(nav, 2048)))
+    {
+        v_SQVM_ScriptError("Failed to initialize NavMesh query");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const rdVec3D startPos(startVec->x, startVec->y, startVec->z);
+    const rdVec3D endPos(endVec->x, endVec->y, endVec->z);
+
+    // Find nearest polys for start and end
+    dtPolyRef startRef = 0, endRef = 0;
+    rdVec3D startNearest, endNearest;
+
+    query.findNearestPoly(&startPos, &halfExtents, &filter, &startRef, &startNearest);
+    query.findNearestPoly(&endPos, &halfExtents, &filter, &endRef, &endNearest);
+
+    if (!startRef || !endRef)
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Compute polygon corridor via A*
+    static const int MAX_PATH_POLYS = 256;
+    dtPolyRef pathPolys[MAX_PATH_POLYS];
+    unsigned char jumpTypes[MAX_PATH_POLYS];
+    int pathCount = 0;
+
+    const dtStatus pathStatus = query.findPath(
+        startRef, endRef,
+        &startNearest, &endNearest, &filter,
+        pathPolys, jumpTypes, &pathCount, MAX_PATH_POLYS);
+
+    if (dtStatusFailed(pathStatus) || pathCount == 0)
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Convert polygon corridor to waypoints
+    static const int MAX_STRAIGHT_PATH = 256;
+    rdVec3D straightPath[MAX_STRAIGHT_PATH];
+    unsigned char straightFlags[MAX_STRAIGHT_PATH];
+    dtPolyRef straightRefs[MAX_STRAIGHT_PATH];
+    unsigned char straightJumps[MAX_STRAIGHT_PATH];
+    int straightCount = 0;
+
+    const dtStatus straightStatus = query.findStraightPath(
+        &startNearest, &endNearest,
+        pathPolys, jumpTypes, pathCount,
+        straightPath, straightFlags, straightRefs,
+        straightJumps, &straightCount, MAX_STRAIGHT_PATH,
+        0xFF, 0);
+
+    if (dtStatusFailed(straightStatus) || straightCount == 0)
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Push result as table with positions and traverseTypes arrays
+    sq_newtable(v);
+
+    // Add positions array
+    sq_pushstring(v, "positions", -1);
+    sq_newarray(v, 0);
+    for (int i = 0; i < straightCount; i++)
+    {
+        const SQVector3D pt(straightPath[i].x, straightPath[i].y, straightPath[i].z);
+        sq_pushvector(v, &pt);
+        sq_arrayappend(v, -2);
+    }
+    sq_newslot(v, -3, SQFalse);
+
+    // Add traverseTypes array
+    sq_pushstring(v, "traverseTypes", -1);
+    sq_newarray(v, 0);
+    for (int i = 0; i < straightCount; i++)
+    {
+        sq_pushinteger(v, straightJumps[i]);
+        sq_arrayappend(v, -2);
+    }
+    sq_newslot(v, -3, SQFalse);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: casts a ray along the navmesh surface.
+// Returns the furthest reachable point, or null if start is off the mesh.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_Raycast(HSQUIRRELVM v)
+{
+    const SQVector3D* startVec = nullptr;
+    const SQVector3D* endVec = nullptr;
+    SQInteger hullIdx;
+
+    sq_getvector(v, 2, &startVec);
+    sq_getvector(v, 3, &endVec);
+    sq_getinteger(v, 4, &hullIdx);
+
+    dtQueryFilter filter;
+    rdVec3D halfExtents;
+
+    const dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &filter, &halfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    dtNavMeshQuery query;
+    query.attachNavMeshUnsafe(nav);
+
+    const rdVec3D startPos(startVec->x, startVec->y, startVec->z);
+    const rdVec3D endPos(endVec->x, endVec->y, endVec->z);
+
+    dtPolyRef startRef = 0;
+    rdVec3D startNearest;
+
+    query.findNearestPoly(&startPos, &halfExtents, &filter, &startRef, &startNearest);
+
+    if (!startRef)
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Use the simple raycast overload (no node pools required)
+    float t = 0.f;
+    rdVec3D hitNormal;
+    dtPolyRef hitPath[256];
+    int hitPathCount = 0;
+
+    const dtStatus status = query.raycast(
+        startRef, &startNearest, &endPos, &filter,
+        &t, &hitNormal, hitPath, &hitPathCount, 256);
+
+    if (dtStatusFailed(status))
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    SQVector3D result;
+
+    if (t >= 1.0f)
+    {
+        // Ray reached the end — full line of sight
+        result.x = endPos.x;
+        result.y = endPos.y;
+        result.z = endPos.z;
+    }
+    else
+    {
+        // Ray hit something — interpolate to the hit point
+        result.x = startNearest.x + (endPos.x - startNearest.x) * t;
+        result.y = startNearest.y + (endPos.y - startNearest.y) * t;
+        result.z = startNearest.z + (endPos.z - startNearest.z) * t;
+    }
+
+    sq_pushvector(v, &result);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: slides along the navmesh surface from start toward end.
+// Returns the actual reached position, or null if start is off the mesh.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_MoveAlongSurface(HSQUIRRELVM v)
+{
+    const SQVector3D* startVec = nullptr;
+    const SQVector3D* endVec = nullptr;
+    SQInteger hullIdx;
+
+    sq_getvector(v, 2, &startVec);
+    sq_getvector(v, 3, &endVec);
+    sq_getinteger(v, 4, &hullIdx);
+
+    dtQueryFilter filter;
+    rdVec3D halfExtents;
+
+    const dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &filter, &halfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    // init() allocates tinyNodePool needed by moveAlongSurface.
+    dtNavMeshQuery query;
+
+    if (dtStatusFailed(query.init(nav, 2048)))
+    {
+        v_SQVM_ScriptError("Failed to initialize NavMesh query");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const rdVec3D startPos(startVec->x, startVec->y, startVec->z);
+    const rdVec3D endPos(endVec->x, endVec->y, endVec->z);
+
+    dtPolyRef startRef = 0;
+    rdVec3D startNearest;
+
+    query.findNearestPoly(&startPos, &halfExtents, &filter, &startRef, &startNearest);
+
+    if (!startRef)
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    rdVec3D resultPos;
+    dtPolyRef visited[64];
+    int visitedCount = 0;
+
+    const dtStatus status = query.moveAlongSurface(
+        startRef, &startNearest, &endPos, &filter,
+        &resultPos, visited, &visitedCount, 64, 0);
+
+    if (dtStatusFailed(status))
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const SQVector3D result(resultPos.x, resultPos.y, resultPos.z);
+    sq_pushvector(v, &result);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the navmesh surface height at a given XY position.
+// Returns -1.0 if the position is not over any navmesh polygon.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_GetPolyHeight(HSQUIRRELVM v)
+{
+    const SQVector3D* posVec = nullptr;
+    SQInteger hullIdx;
+
+    sq_getvector(v, 2, &posVec);
+    sq_getinteger(v, 3, &hullIdx);
+
+    dtQueryFilter filter;
+    rdVec3D halfExtents;
+
+    const dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &filter, &halfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    dtNavMeshQuery query;
+    query.attachNavMeshUnsafe(nav);
+
+    const rdVec3D pos(posVec->x, posVec->y, posVec->z);
+
+    dtPolyRef nearestRef = 0;
+    rdVec3D nearestPt;
+
+    query.findNearestPoly(&pos, &halfExtents, &filter, &nearestRef, &nearestPt);
+
+    if (!nearestRef)
+    {
+        sq_pushfloat(v, -1.0f);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    float height = 0.f;
+
+    const dtStatus status = query.getPolyHeight(nearestRef, &nearestPt, &height);
+
+    if (dtStatusFailed(status))
+    {
+        sq_pushfloat(v, -1.0f);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    sq_pushfloat(v, height);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: checks if a goal position is reachable from a start position
+// using the navmesh traverse tables. Much cheaper than computing a full path.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_IsGoalReachable(HSQUIRRELVM v)
+{
+    const SQVector3D* startVec = nullptr;
+    const SQVector3D* endVec = nullptr;
+    SQInteger hullIdx;
+
+    sq_getvector(v, 2, &startVec);
+    sq_getvector(v, 3, &endVec);
+    sq_getinteger(v, 4, &hullIdx);
+
+    dtQueryFilter filter;
+    rdVec3D halfExtents;
+
+    dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &filter, &halfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    // findNearestPoly only needs m_nav, so attachNavMeshUnsafe is fine.
+    dtNavMeshQuery query;
+    query.attachNavMeshUnsafe(nav);
+
+    const rdVec3D startPos(startVec->x, startVec->y, startVec->z);
+    const rdVec3D endPos(endVec->x, endVec->y, endVec->z);
+
+    dtPolyRef startRef = 0, endRef = 0;
+    rdVec3D startNearest, endNearest;
+
+    query.findNearestPoly(&startPos, &halfExtents, &filter, &startRef, &startNearest);
+    query.findNearestPoly(&endPos, &halfExtents, &filter, &endRef, &endNearest);
+
+    if (!startRef || !endRef)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // v_Detour_IsGoalPolyReachable is a standalone function (not a class method).
+    // It takes dtNavMesh* directly and handles traverse table indexing internally.
+    // Default to ANIMTYPE_HUMAN for player-like bots.
+    const bool reachable = v_Detour_IsGoalPolyReachable(
+        nav, startRef, endRef, ANIMTYPE_HUMAN);
+
+    sq_pushbool(v, reachable);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
 //-----------------------------------------------------------------------------
 // Purpose: saves a recorded animation on the disk to be used by bakery
 //-----------------------------------------------------------------------------
@@ -918,6 +1315,30 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPos, "Finds the nearest position to the provided point on the hull's NavMesh using the hull's bounds as extents", "vector ornull", "vector searchPoint, int hullType", false);
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPosInBounds, "Finds the nearest position to the provided point on the hull's NavMesh using provided bounds as extents", "vector ornull", "vector searchPoint, vector halfExtents, int hullType", false);
 
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_FindPath,
+        "Finds a path between two points. Returns table with 'positions' (array of vectors) and 'traverseTypes' (array of ints where 255=walk, 0-31=traverse action), or null if no path",
+        "table ornull",
+        "vector startPos, vector endPos, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_Raycast,
+        "Casts a ray along the navmesh, returns furthest reachable point",
+        "vector ornull",
+        "vector startPos, vector endPos, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_MoveAlongSurface,
+        "Slides along the navmesh surface toward a target position",
+        "vector ornull",
+        "vector startPos, vector endPos, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetPolyHeight,
+        "Gets the navmesh surface height at an XY position (-1 if off mesh)",
+        "float",
+        "vector pos, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_IsGoalReachable,
+        "Checks if a goal is reachable from start using traverse tables",
+        "bool",
+        "vector startPos, vector endPos, int hullType", false);
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SaveRecordedAnimation, "Saves an anim_recording asset to be used by bakery. (dev only)", "void", "var recordedAnim, string fileName", false);
 }
 
