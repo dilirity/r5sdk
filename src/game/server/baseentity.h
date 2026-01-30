@@ -121,6 +121,7 @@ public:
 	string_t		GetModelName(void) const;  // Virtual in-engine!
 	const Vector3D& GetViewOffset(void) const { return m_vecViewOffset; }
 	const Vector3D& GetVecPrevAbsOrigin(void) const { return m_vecPrevAbsOrigin; }
+	const Vector3D& GetAbsOrigin(void) const { return m_vecAbsOrigin; }
 
 	inline edict_t GetEdict(void) const { return NetworkProp()->GetEdict(); }
 	inline string_t GetEntityName(void) const { return m_iName; }

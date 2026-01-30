@@ -123,6 +123,10 @@ public:
 	/// @return The current position within the corridor.
 	inline const rdVec3D* getPos() const { return &m_pos; }
 
+	/// Sets the current position within the corridor.
+	/// @param[in]	pos		The new position. [(x, y, z)]
+	inline void setPos(const rdVec3D* pos) { m_pos = *pos; }
+
 	/// Gets the current target within the corridor. (In the last polygon.)
 	/// @return The current target within the corridor.
 	inline const rdVec3D* getTarget() const { return &m_target; }

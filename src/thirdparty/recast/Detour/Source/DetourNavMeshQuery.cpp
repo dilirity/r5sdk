@@ -2221,35 +2221,35 @@ dtStatus dtNavMeshQuery::findStraightPath(const rdVec3D* startPos, const rdVec3D
 				rdAssert(jumpTypes[i] == DT_NULL_TRAVERSE_TYPE);
 
 			// Jump vertex.
+			// NOTE: Always add corner for traverse links regardless of funnel state.
+			// The funnel algorithm optimizes for minimal turns, but for traverse links
+			// we NEED the corner so the bot knows where to jump/climb, even if the
+			// path is a straight line through the portal.
 			if (i > 0 && jumpTypes[i] != DT_NULL_TRAVERSE_TYPE && !dtIsTraverseTypeOffMesh(jumpTypes[i]))
 			{
-				if (rdTriArea2D(&portalLeft, &portalRight, &left) < 0.0f ||
-					rdTriArea2D(&portalLeft, &portalRight, &right) < 0.0f)
+				rdVec3D jumpPt;
+				rdVlerp(&jumpPt, &portalLeft, &portalRight, 0.5f);
+
+				// Append 'from' jump vertex.
+				stat = appendVertex(&jumpPt, 0, path[i-1], jumpTypes[i],
+					straightPath, straightPathFlags, straightPathRefs,
+					straightPathJumps, straightPathCount, maxStraightPath);
+
+				const bool contAfterJmp = (options & DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP) != 0;
+
+				// Append portals along the current straight path segment.
+				if (!(stat & DT_BUFFER_TOO_SMALL))
 				{
-					rdVec3D jumpPt;
-					rdVlerp(&jumpPt, &portalLeft, &portalRight, 0.5f);
+					stat = appendPortalVertex(&jumpPt, &closestEndPos, i, path,
+											  straightPath, straightPathFlags, straightPathRefs,
+											  straightPathJumps, straightPathCount, maxStraightPath);
 
-					// Append 'from' jump vertex.
-					stat = appendVertex(&jumpPt, 0, path[i-1], jumpTypes[i],
-						straightPath, straightPathFlags, straightPathRefs,
-						straightPathJumps, straightPathCount, maxStraightPath);
-
-					const bool contAfterJmp = (options & DT_STRAIGHTPATH_CONTINUE_AFTER_JUMP) != 0;
-
-					// Append portals along the current straight path segment.
-					if (!(stat & DT_BUFFER_TOO_SMALL))
-					{
-						stat = appendPortalVertex(&jumpPt, &closestEndPos, i, path,
-												  straightPath, straightPathFlags, straightPathRefs,
-												  straightPathJumps, straightPathCount, maxStraightPath);
-
-						if ((contAfterJmp && stat != DT_IN_PROGRESS) || (!contAfterJmp && stat == DT_IN_PROGRESS))
-							return DT_SUCCESS;
-					}
-
-					if (!contAfterJmp)
-						return stat;
+					if ((contAfterJmp && stat != DT_IN_PROGRESS) || (!contAfterJmp && stat == DT_IN_PROGRESS))
+						return DT_SUCCESS;
 				}
+
+				if (!contAfterJmp)
+					return stat;
 			}
 			
 			enum AddStraightPathSegments

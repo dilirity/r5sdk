@@ -529,9 +529,21 @@ bool dtPathCorridor::movePosition(const rdVec3D* npos, dtNavMeshQuery* navquery,
 												 &result, visitedPolys, &nvisited, MAX_VISITED, 0);
 	if (dtStatusSucceed(status)) {
 
+		// Look up original jump types for visited polygons to preserve traverse info
 		unsigned char visitedJumps[MAX_VISITED];
-		for (int i = 0; i < MAX_VISITED; i++)
+		for (int i = 0; i < nvisited; i++)
+		{
 			visitedJumps[i] = DT_NULL_TRAVERSE_TYPE;
+			// Find this poly in our path and copy its jump type
+			for (int j = 0; j < m_npath; j++)
+			{
+				if (m_path[j] == visitedPolys[i])
+				{
+					visitedJumps[i] = m_jumps[j];
+					break;
+				}
+			}
+		}
 
 		m_npath = dtMergeCorridorStartMoved(m_path, m_jumps, m_npath, m_maxPath, visitedPolys, visitedJumps, nvisited);
 		

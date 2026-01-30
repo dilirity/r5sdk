@@ -47,26 +47,43 @@ protected:
 
 //-----------------------------------------------------------------------------
 // Purpose: stores script-provided input for bot players.
-// Written by VScript SetBotInput, consumed by CPlayerMove::StaticRunCommand.
+// Written by VScript SetBotInput, consumed by Physics_RunBotSimulation.
 //-----------------------------------------------------------------------------
 struct BotInput
 {
 	QAngle viewAngles;
 	float forwardMove;
 	float sideMove;
+	float upMove;
 	int buttons;
 	bool hasInput;  // true = script provided input this frame
 	int forcedButtons; // persistent buttons from BotButtonPress/BotButtonRelease
+
+	// Persistent movement input - used when hasInput is false
+	// This ensures continuous input across frames (critical for wall climbing)
+	bool hasPersistentInput;
+	QAngle persistentViewAngles;
+	float persistentForwardMove;
+	float persistentSideMove;
 
 	void Reset()
 	{
 		viewAngles.Init();
 		forwardMove = 0.f;
 		sideMove = 0.f;
+		upMove = 0.f;
 		buttons = 0;
 		hasInput = false;
-		// NOTE: forcedButtons intentionally NOT reset here —
-		// they persist until explicitly released via BotButtonRelease.
+		// NOTE: forcedButtons and persistent input intentionally NOT reset here —
+		// they persist until explicitly changed.
+	}
+
+	void ClearPersistentInput()
+	{
+		hasPersistentInput = false;
+		persistentViewAngles.Init();
+		persistentForwardMove = 0.f;
+		persistentSideMove = 0.f;
 	}
 };
 

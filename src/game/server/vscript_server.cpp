@@ -37,6 +37,7 @@
 #include "game/server/player_command.h"       // g_botInputs, BotInput
 
 #include "thirdparty/recast/DetourCrowd/Include/DetourPathCorridor.h"
+#include "public/game/server/ai_agent.h"  // g_traverseAnimDefaultCosts
 #include <unordered_map>
 
 //=============================================================================
@@ -656,6 +657,63 @@ static bool Internal_ServerScript_NavMesh_GetExtents(HSQUIRRELVM v, const SQInte
     out->init(extents->x, extents->y, extents->z);
     return true;
 }
+ 
+//-----------------------------------------------------------------------------
+// Purpose: finds nearest polygon prioritizing Z-closeness over 3D distance.
+// This prevents selecting polygons on objects above/below when multiple
+// polygons exist at the same XY location.
+// Returns true if a polygon was found, false otherwise.
+//-----------------------------------------------------------------------------
+static bool Internal_FindNearestPolyByHeight(
+    dtNavMeshQuery* query,
+    const rdVec3D* center,
+    const rdVec3D* halfExtents,
+    const dtQueryFilter* filter,
+    dtPolyRef* outRef,
+    rdVec3D* outNearest)
+{
+    // Query all polygons in the search box
+    dtPolyRef polys[64];
+    int polyCount = 0;
+
+    dtStatus status = query->queryPolygons(center, halfExtents, filter, polys, &polyCount, 64);
+    if (dtStatusFailed(status) || polyCount == 0)
+    {
+        *outRef = 0;
+        return false;
+    }
+
+    // Find polygon with closest height to query position
+    float bestZDiff = FLT_MAX;
+    dtPolyRef bestRef = 0;
+    rdVec3D bestPos(0, 0, 0);
+
+    for (int i = 0; i < polyCount; i++)
+    {
+        float height = 0.f;
+        status = query->getPolyHeight(polys[i], center, &height);
+        if (dtStatusFailed(status))
+            continue;
+
+        float zDiff = fabsf(height - center->z);
+        if (zDiff < bestZDiff)
+        {
+            bestZDiff = zDiff;
+            bestRef = polys[i];
+            bestPos.init(center->x, center->y, height);
+        }
+    }
+
+    if (bestRef == 0)
+    {
+        *outRef = 0;
+        return false;
+    }
+
+    *outRef = bestRef;
+    *outNearest = bestPos;
+    return true;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: finds the nearest poly to given point, with an optional bounds filter.
@@ -709,9 +767,13 @@ static bool Internal_ServerScript_NavMesh_FindNearestPos(HSQUIRRELVM v, const bo
     dtPolyRef nearestRef;
     rdVec3D nearestPt;
 
-    const dtStatus status = query.findNearestPoly(&searchPoint, &halfExtents, &filter, &nearestRef, &nearestPt);
+    if (!Internal_FindNearestPolyByHeight(&query, &searchPoint, &halfExtents, &filter, &nearestRef, &nearestPt))
+    {
+        v->PushNull();
+        return true;
+    }
 
-    if (dtStatusFailed(status) || !nearestRef)
+    if (!nearestRef)
     {
         v->PushNull();
         return true;
@@ -780,6 +842,7 @@ static dtNavMesh* Internal_ServerScript_NavMesh_GetNavMesh(
     outFilter->setIncludeFlags(DT_POLYFLAGS_ALL);
     outFilter->setExcludeFlags(DT_POLYFLAGS_DISABLED);
 
+    // Use full hull height for search box - Z-priority selection handles multi-floor
     const Vector3D& maxs = NAI_Hull::Maxs(hullType);
     outHalfExtents->init(maxs.x, maxs.y, maxs.z);
 
@@ -823,12 +886,12 @@ static SQRESULT ServerScript_NavMesh_FindPath(HSQUIRRELVM v)
     const rdVec3D startPos(startVec->x, startVec->y, startVec->z);
     const rdVec3D endPos(endVec->x, endVec->y, endVec->z);
 
-    // Find nearest polys for start and end
+    // Find nearest polys for start and end (Z-priority to avoid wrong floor)
     dtPolyRef startRef = 0, endRef = 0;
     rdVec3D startNearest, endNearest;
 
-    query.findNearestPoly(&startPos, &halfExtents, &filter, &startRef, &startNearest);
-    query.findNearestPoly(&endPos, &halfExtents, &filter, &endRef, &endNearest);
+    Internal_FindNearestPolyByHeight(&query, &startPos, &halfExtents, &filter, &startRef, &startNearest);
+    Internal_FindNearestPolyByHeight(&query, &endPos, &halfExtents, &filter, &endRef, &endNearest);
 
     if (!startRef || !endRef)
     {
@@ -933,7 +996,7 @@ static SQRESULT ServerScript_NavMesh_Raycast(HSQUIRRELVM v)
     dtPolyRef startRef = 0;
     rdVec3D startNearest;
 
-    query.findNearestPoly(&startPos, &halfExtents, &filter, &startRef, &startNearest);
+    Internal_FindNearestPolyByHeight(&query, &startPos, &halfExtents, &filter, &startRef, &startNearest);
 
     if (!startRef)
     {
@@ -1016,7 +1079,7 @@ static SQRESULT ServerScript_NavMesh_MoveAlongSurface(HSQUIRRELVM v)
     dtPolyRef startRef = 0;
     rdVec3D startNearest;
 
-    query.findNearestPoly(&startPos, &halfExtents, &filter, &startRef, &startNearest);
+    Internal_FindNearestPolyByHeight(&query, &startPos, &halfExtents, &filter, &startRef, &startNearest);
 
     if (!startRef)
     {
@@ -1073,7 +1136,7 @@ static SQRESULT ServerScript_NavMesh_GetPolyHeight(HSQUIRRELVM v)
     dtPolyRef nearestRef = 0;
     rdVec3D nearestPt;
 
-    query.findNearestPoly(&pos, &halfExtents, &filter, &nearestRef, &nearestPt);
+    Internal_FindNearestPolyByHeight(&query, &pos, &halfExtents, &filter, &nearestRef, &nearestPt);
 
     if (!nearestRef)
     {
@@ -1118,7 +1181,7 @@ static SQRESULT ServerScript_NavMesh_IsGoalReachable(HSQUIRRELVM v)
     if (!nav)
         SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 
-    // findNearestPoly only needs m_nav, so attachNavMeshUnsafe is fine.
+    // Z-priority poly search only needs m_nav, so attachNavMeshUnsafe is fine.
     dtNavMeshQuery query;
     query.attachNavMeshUnsafe(nav);
 
@@ -1128,8 +1191,8 @@ static SQRESULT ServerScript_NavMesh_IsGoalReachable(HSQUIRRELVM v)
     dtPolyRef startRef = 0, endRef = 0;
     rdVec3D startNearest, endNearest;
 
-    query.findNearestPoly(&startPos, &halfExtents, &filter, &startRef, &startNearest);
-    query.findNearestPoly(&endPos, &halfExtents, &filter, &endRef, &endNearest);
+    Internal_FindNearestPolyByHeight(&query, &startPos, &halfExtents, &filter, &startRef, &startNearest);
+    Internal_FindNearestPolyByHeight(&query, &endPos, &halfExtents, &filter, &endRef, &endNearest);
 
     if (!startRef || !endRef)
     {
@@ -1185,7 +1248,7 @@ static SQRESULT ServerScript_NavMesh_GetWallDistance(HSQUIRRELVM v)
     dtPolyRef nearestRef = 0;
     rdVec3D nearestPt;
 
-    query.findNearestPoly(&pos, &halfExtents, &filter, &nearestRef, &nearestPt);
+    Internal_FindNearestPolyByHeight(&query, &pos, &halfExtents, &filter, &nearestRef, &nearestPt);
 
     if (!nearestRef)
     {
@@ -1275,6 +1338,12 @@ static SQRESULT ServerScript_NavMesh_CreateCorridor(HSQUIRRELVM v)
     pCorridor->filter.setExcludeFlags(0);
     pCorridor->filter.setTraverseFlags(0x13F); // ANIMTYPE_HUMAN traverse types
 
+    // Set traverse costs from game's default table so A* properly weighs
+    // traverse links against walking distance. Without this, all traverse costs
+    // default to 1.0, making climbs/jumps appear ~300x cheaper than walking.
+    for (int i = 0; i < DT_MAX_TRAVERSE_TYPES; i++)
+        pCorridor->filter.setTraverseCost(i, g_traverseAnimDefaultCosts[ANIMTYPE_HUMAN][i]);
+
     pCorridor->initialized = true;
 
     const int handle = g_nextCorridorHandle++;
@@ -1336,29 +1405,21 @@ static SQRESULT ServerScript_NavMesh_CorridorSetPath(HSQUIRRELVM v)
     const rdVec3D startPos(startVec->x, startVec->y, startVec->z);
     const rdVec3D targetPos(targetVec->x, targetVec->y, targetVec->z);
 
-    // Get extents for poly search
+    // Get extents for poly search - use full hull height, Z-priority handles multi-floor
     const Vector3D& maxs = NAI_Hull::Maxs(pCorridor->hullType);
     const rdVec3D halfExtents(maxs.x, maxs.y, maxs.z);
 
-    // Find nearest polys
+    // Find nearest polys (Z-priority to avoid wrong floor)
     dtPolyRef startRef = 0, targetRef = 0;
     rdVec3D nearestStart, nearestTarget;
 
-    dtStatus status = dtNavMeshQuery__findNearestPoly(
-        &pCorridor->query, &startPos, &halfExtents,
-        &pCorridor->filter, &startRef, &nearestStart);
-
-    if (dtStatusFailed(status) || startRef == 0)
+    if (!Internal_FindNearestPolyByHeight(&pCorridor->query, &startPos, &halfExtents, &pCorridor->filter, &startRef, &nearestStart))
     {
         sq_pushbool(v, false);
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
 
-    status = dtNavMeshQuery__findNearestPoly(
-        &pCorridor->query, &targetPos, &halfExtents,
-        &pCorridor->filter, &targetRef, &nearestTarget);
-
-    if (dtStatusFailed(status) || targetRef == 0)
+    if (!Internal_FindNearestPolyByHeight(&pCorridor->query, &targetPos, &halfExtents, &pCorridor->filter, &targetRef, &nearestTarget))
     {
         sq_pushbool(v, false);
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -1369,19 +1430,29 @@ static SQRESULT ServerScript_NavMesh_CorridorSetPath(HSQUIRRELVM v)
     unsigned char pathJumps[256];
     int pathCount = 0;
 
-    status = dtNavMeshQuery__findPath(
+    // Debug: print filter settings
+    DevMsg(eDLL_T::SERVER, "[BOT] filter: traverseFlags=0x%x cost[8]=%.2f\n",
+            pCorridor->filter.getTraverseFlags(), pCorridor->filter.getTraverseCost(8));
+    
+    dtStatus status = dtNavMeshQuery__findPath(
         &pCorridor->query, startRef, targetRef,
         &nearestStart, &nearestTarget, &pCorridor->filter,
         pathPolys, pathJumps, &pathCount, 256);
 
+    // Debug: print status and refs
+    DevMsg(eDLL_T::SERVER, "[BOT] findPath: startRef=%llu targetRef=%llu status=0x%x pathCount=%d\n",
+            startRef, targetRef, status, pathCount);
+    
     if (dtStatusFailed(status) || pathCount == 0)
     {
+        DevMsg(eDLL_T::SERVER, "[BOT] findPath FAILED or no path\n");
         sq_pushbool(v, false);
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
 
     // Load path into corridor
     pCorridor->corridor.setCorridor(&nearestTarget, pathPolys, pathJumps, pathCount);
+    pCorridor->corridor.setPos(&nearestStart);
 
     sq_pushbool(v, true);
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -1622,11 +1693,16 @@ static SQRESULT ServerScript_SetBotInput(HSQUIRRELVM v)
     SQFloat forwardMove;
     SQFloat sideMove;
     SQInteger buttons;
+    SQFloat upMove = 0.0f; // Optional parameter, defaults to 0
 
     sq_getvector(v, 2, &anglesVec);
     sq_getfloat(v, 3, &forwardMove);
     sq_getfloat(v, 4, &sideMove);
     sq_getinteger(v, 5, &buttons);
+
+    // Optional 6th parameter for upMove (vertical movement)
+    if (sq_gettop(v) >= 6)
+        sq_getfloat(v, 6, &upMove);
 
     const int idx = pPlayer->GetEdict() - 1;
 
@@ -1639,6 +1715,7 @@ static SQRESULT ServerScript_SetBotInput(HSQUIRRELVM v)
     g_botInputs[idx].viewAngles.Init(anglesVec->x, anglesVec->y, anglesVec->z);
     g_botInputs[idx].forwardMove = forwardMove;
     g_botInputs[idx].sideMove = sideMove;
+    g_botInputs[idx].upMove = upMove;
     g_botInputs[idx].buttons = (int)buttons;
     g_botInputs[idx].hasInput = true;
 
@@ -1710,6 +1787,190 @@ static SQRESULT ServerScript_BotButtonRelease(HSQUIRRELVM v)
     g_botInputs[idx].forcedButtons &= ~(int)button;
 
     sq_pushbool(v, true);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: stops persistent bot input (movement that continues across frames).
+// Call this when you want the bot to stop moving between script frames.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_BotStopPersistentInput(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    if (!pPlayer || !pPlayer->IsBot())
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const int idx = pPlayer->GetEdict() - 1;
+
+    if (idx < 0 || idx >= MAX_PLAYERS)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    g_botInputs[idx].hasPersistentInput = false;
+    g_botInputs[idx].persistentViewAngles.Init();
+    g_botInputs[idx].persistentForwardMove = 0.0f;
+    g_botInputs[idx].persistentSideMove = 0.0f;
+
+    sq_pushbool(v, true);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: manually initiates a traversal (climb/mantle/jump) for a player.
+// Used to bypass broken traversal detection for bots.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_StartTraversal(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    if (!pPlayer)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    SQInteger traversalType;
+    const SQVector3D* beginVec = nullptr;
+    const SQVector3D* endVec = nullptr;
+
+    sq_getinteger(v, 2, &traversalType);
+    sq_getvector(v, 3, &beginVec);
+    sq_getvector(v, 4, &endVec);
+
+    // Set traversal state variables
+    pPlayer->m_traversalType = (int)traversalType;
+    pPlayer->m_traversalState = 1; // Assume 1 = active state
+
+    pPlayer->m_traversalBegin.Init(beginVec->x, beginVec->y, beginVec->z);
+    pPlayer->m_traversalEnd.Init(endVec->x, endVec->y, endVec->z);
+
+    // Calculate midpoint
+    pPlayer->m_traversalMid.x = (beginVec->x + endVec->x) * 0.5f;
+    pPlayer->m_traversalMid.y = (beginVec->y + endVec->y) * 0.5f;
+    pPlayer->m_traversalMid.z = (beginVec->z + endVec->z) * 0.5f;
+    pPlayer->m_traversalMidFrac = 0.5f;
+
+    // Calculate forward direction
+    Vector3D dir;
+    dir.x = endVec->x - beginVec->x;
+    dir.y = endVec->y - beginVec->y;
+    dir.z = endVec->z - beginVec->z;
+    float len = sqrtf(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+    if (len > 0.001f)
+    {
+        pPlayer->m_traversalForwardDir.x = dir.x / len;
+        pPlayer->m_traversalForwardDir.y = dir.y / len;
+        pPlayer->m_traversalForwardDir.z = dir.z / len;
+    }
+
+    pPlayer->m_traversalRefPos = pPlayer->m_traversalBegin;
+    pPlayer->m_traversalProgress = 0.0f;
+    pPlayer->m_traversalStartTime = gpGlobals->curTime;
+    pPlayer->m_traversalYawDelta = 0.0f;
+
+    sq_pushbool(v, true);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: sets the wall climb setup state for a player (forces wall climb)
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_SetWallClimbSetUp(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    if (!pPlayer)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    SQBool value;
+    sq_getbool(v, 2, &value);
+
+    pPlayer->m_wallClimbSetUp = value ? true : false;
+
+    sq_pushbool(v, true);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the wall climb setup state for a player
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_IsWallClimbSetUp(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    if (!pPlayer)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    sq_pushbool(v, pPlayer->m_wallClimbSetUp);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: sets the wall hanging state for a player
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_SetWallHanging(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    if (!pPlayer)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    SQBool value;
+    sq_getbool(v, 2, &value);
+
+    pPlayer->m_wallHanging = value ? true : false;
+
+    sq_pushbool(v, true);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the wall hanging state for a player
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_IsWallHanging(HSQUIRRELVM v)
+{
+    CPlayer* pPlayer = nullptr;
+
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
+        return SQ_ERROR;
+
+    if (!pPlayer)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    sq_pushbool(v, pPlayer->m_wallHanging);
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -2052,7 +2313,7 @@ static void Script_RegisterServerPlayerClassFuncs()
         "ScriptSetBotInput",
         "Sets bot input for this frame. Only works on bot players. Returns false if not a bot",
         "bool",
-        "vector viewAngles, float forwardMove, float sideMove, int buttons",
+        "vector viewAngles, float forwardMove, float sideMove, int buttons, float upMove = 0.0",
         false,
         ServerScript_SetBotInput);
 
@@ -2087,6 +2348,54 @@ static void Script_RegisterServerPlayerClassFuncs()
         "string text, float duration, float fadeTime",
         false,
         ServerScript_ChatBuilderRainbow);
+
+    g_serverScriptPlayerStruct->AddFunction("BotStopPersistentInput",
+        "Script_BotStopPersistentInput",
+        "Stops persistent bot movement input. Bot input persists across frames to maintain continuous movement for wall climbing",
+        "bool",
+        "",
+        false,
+        ServerScript_BotStopPersistentInput);
+
+    g_serverScriptPlayerStruct->AddFunction("StartTraversal",
+        "Script_StartTraversal",
+        "Manually initiates a traversal (climb/mantle/jump). Used to bypass broken traversal detection for bots",
+        "bool",
+        "int traversalType, vector beginPos, vector endPos",
+        false,
+        ServerScript_StartTraversal);
+
+    g_serverScriptPlayerStruct->AddFunction("SetWallClimbSetUp",
+        "Script_SetWallClimbSetUp",
+        "Sets the wall climb setup state for a player. Used to force wall climb initiation for bots",
+        "bool",
+        "bool value",
+        false,
+        ServerScript_SetWallClimbSetUp);
+
+    g_serverScriptPlayerStruct->AddFunction("IsWallClimbSetUp",
+        "Script_IsWallClimbSetUp",
+        "Returns true if the player is set up for wall climbing",
+        "bool",
+        "",
+        false,
+        ServerScript_IsWallClimbSetUp);
+
+    g_serverScriptPlayerStruct->AddFunction("SetWallHanging",
+        "Script_SetWallHanging",
+        "Sets the wall hanging state for a player. Used to force wall hang for bots",
+        "bool",
+        "bool value",
+        false,
+        ServerScript_SetWallHanging);
+
+    g_serverScriptPlayerStruct->AddFunction("IsWallHanging",
+        "Script_IsWallHanging",
+        "Returns true if the player is wall hanging",
+        "bool",
+        "",
+        false,
+        ServerScript_IsWallHanging);
 }
 //---------------------------------------------------------------------------------
 static void Script_RegisterServerAIClassFuncs()

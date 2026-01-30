@@ -85,6 +85,7 @@ target_link_libraries( ${PROJECT_NAME} PRIVATE
     "libprotobuf"
     "libspdlog"
     "libdetour"
+    "libdetourcrowd"
     "navdebugutils"
     "navsharedcommon"
 

@@ -412,11 +412,14 @@ private:
 	float m_wallrunRetryTime;
 	Vector3D m_wallrunRetryPos;
 	Vector3D m_wallrunRetryNormal;
+public: // Make wall climb variables accessible for bot wall climbing
 	bool m_wallClimbSetUp;
 	bool m_wallHanging;
+private:
 	char gap_669a[2];
 	float m_wallHangStartTime;
 	float m_wallHangTime;
+public: // Make traversal variables accessible for bot traversal triggers
 	int m_traversalType;
 	int m_traversalState;
 	Vector3D m_traversalBegin;
@@ -433,6 +436,7 @@ private:
 	Vector3D m_traversalBlendOutStartOffset;
 	float m_traversalYawDelta;
 	int m_traversalYawPoseParameter;
+private: // Restore private access for remaining variables
 	float m_wallDangleJumpOffTime;
 	bool m_wallDangleMayHangHere;
 	bool m_wallDangleForceFallOff;
