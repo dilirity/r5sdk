@@ -1759,6 +1759,18 @@ static SQRESULT ServerScript_NavMesh_GetTileTraversePortals(HSQUIRRELVM v)
             sq_pushvector(v, &sqSrcCenter);
             sq_newslot(v, -3);
 
+            // Edge vertex A
+            sq_pushstring(v, "vertA", -1);
+            const SQVector3D sqVertA(vertA->x, vertA->y, vertA->z);
+            sq_pushvector(v, &sqVertA);
+            sq_newslot(v, -3);
+
+            // Edge vertex B
+            sq_pushstring(v, "vertB", -1);
+            const SQVector3D sqVertB(vertB->x, vertB->y, vertB->z);
+            sq_pushvector(v, &sqVertB);
+            sq_newslot(v, -3);
+
             sq_arrayappend(v, -2);
         }
 
