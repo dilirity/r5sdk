@@ -1629,6 +1629,145 @@ static SQRESULT ServerScript_NavMesh_CorridorIsValid(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: gets traversal links for the specific polygon at the given position.
+// Returns array of {startPos, endPos, traverseType, traverseDist}.
+// Only returns traverse links connected to the polygon at the query position.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_GetTileTraversePortals(HSQUIRRELVM v)
+{
+    const SQVector3D* posVec = nullptr;
+    SQInteger hullIdx;
+
+    sq_getvector(v, 2, &posVec);
+    sq_getinteger(v, 3, &hullIdx);
+
+    dtQueryFilter filter;
+    rdVec3D halfExtents;
+
+    dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &filter, &halfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const rdVec3D pos(posVec->x, posVec->y, posVec->z);
+
+    // Find the specific polygon at this position
+    dtNavMeshQuery query;
+    query.attachNavMeshUnsafe(nav);
+
+    dtPolyRef polyRef = 0;
+    rdVec3D nearestPt;
+
+    if (!Internal_FindNearestPolyByHeight(&query, &pos, &halfExtents, &filter, &polyRef, &nearestPt))
+    {
+        sq_newarray(v, 0);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    if (!polyRef)
+    {
+        sq_newarray(v, 0);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Get the tile and polygon
+    const dtMeshTile* tile = nullptr;
+    const dtPoly* poly = nullptr;
+    nav->getTileAndPolyByRefUnsafe(polyRef, &tile, &poly);
+
+    if (!tile || !poly)
+    {
+        sq_newarray(v, 0);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Create result array
+    sq_newarray(v, 0);
+
+    // Get the traverse type filter from cvar (-1 = all types)
+    int filterType = -1;
+    ConVar* pFilterCvar = g_pCVar->FindVar("navmesh_draw_traverse_portals_type");
+    if (pFilterCvar)
+        filterType = pFilterCvar->GetInt();
+
+    // Follow the link chain for this specific polygon only
+    unsigned int linkIdx = poly->firstLink;
+    while (linkIdx != DT_NULL_LINK)
+    {
+        const dtLink* link = &tile->links[linkIdx];
+
+        // Check if this link has a traverse type (not normal walking)
+        // and matches the filter (if filter is -1, show all)
+        const int linkTraverseType = link->getTraverseType();
+        if (link->hasTraverseType() && (filterType == -1 || linkTraverseType == filterType))
+        {
+            // Get the edge vertices for this link
+            const unsigned char edgeIdx = link->edge;
+            const unsigned short va = poly->verts[edgeIdx];
+            const unsigned short vb = poly->verts[(edgeIdx + 1) % poly->vertCount];
+
+            const rdVec3D* vertA = &tile->verts[va];
+            const rdVec3D* vertB = &tile->verts[vb];
+
+            // Calculate edge midpoint (this is where the traverse starts)
+            rdVec3D edgeMid;
+            edgeMid.x = (vertA->x + vertB->x) * 0.5f;
+            edgeMid.y = (vertA->y + vertB->y) * 0.5f;
+            edgeMid.z = (vertA->z + vertB->z) * 0.5f;
+
+            // Get the target polygon to find the landing position
+            const dtMeshTile* targetTile = nullptr;
+            const dtPoly* targetPoly = nullptr;
+            nav->getTileAndPolyByRefUnsafe(link->ref, &targetTile, &targetPoly);
+
+            rdVec3D targetPos = edgeMid; // Default to edge mid if we can't find target
+            if (targetTile && targetPoly)
+            {
+                // Use the target polygon's center as the end position
+                targetPos = targetPoly->center;
+            }
+
+            sq_newtable(v);
+
+            // Start position (edge midpoint)
+            sq_pushstring(v, "startPos", -1);
+            const SQVector3D sqStartPos(edgeMid.x, edgeMid.y, edgeMid.z);
+            sq_pushvector(v, &sqStartPos);
+            sq_newslot(v, -3);
+
+            // End position (target poly center)
+            sq_pushstring(v, "endPos", -1);
+            const SQVector3D sqEndPos(targetPos.x, targetPos.y, targetPos.z);
+            sq_pushvector(v, &sqEndPos);
+            sq_newslot(v, -3);
+
+            // Traverse type
+            sq_pushstring(v, "traverseType", -1);
+            sq_pushinteger(v, link->getTraverseType());
+            sq_newslot(v, -3);
+
+            // Traverse distance
+            sq_pushstring(v, "traverseDist", -1);
+            sq_pushfloat(v, link->traverseDist * DT_TRAVERSE_DIST_QUANT_FACTOR);
+            sq_newslot(v, -3);
+
+            // Source polygon center
+            sq_pushstring(v, "sourceCenter", -1);
+            const SQVector3D sqSrcCenter(poly->center.x, poly->center.y, poly->center.z);
+            sq_pushvector(v, &sqSrcCenter);
+            sq_newslot(v, -3);
+
+            sq_arrayappend(v, -2);
+        }
+
+        linkIdx = link->next;
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //=============================================================================
 // Bot Control API
 //=============================================================================
@@ -2237,7 +2376,12 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "Checks if the corridor path is still valid",
         "bool",
         "int handle", false);
-    
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetTileTraversePortals,
+        "Gets traversal portals (off-mesh connections) for the navmesh tile at position. Returns array of {startPos, endPos, traverseType, radius, refPos, refYaw}",
+        "array",
+        "vector pos, int hullType", false);
+
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, Bot_Create,
         "Creates a bot player, returns edict index (-1 on failure). Use GetEntByIndex() to get entity",
         "int",
