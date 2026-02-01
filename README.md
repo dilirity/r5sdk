@@ -1,4 +1,16 @@
-# Source SDK
+# AI usage disclosure
+
+The work in this repo is done by a person who knows how to code and AI. The main reason for the AI usage is,
+is the lack of time to learn C++ or Squirrel to fully understand things.
+
+## Goal
+
+The goal of the project is to have Bots in Apex Legends R5Reloaded, that can navigate a complex map,
+loot and shoot at enemies. Using abilities based on the legends they are might be added depending on the complexity.
+
+----
+
+## Source SDK
 * This repository houses the source code for the development package targeting the game **Apex Legends**.
 
 ## Building
