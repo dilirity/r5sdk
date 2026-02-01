@@ -21,7 +21,6 @@ https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots
 - Lots of changes in [src/game/server/vscript_server.cpp](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-c40f4588cd9163db29b5c8ecb5cecba6b49d82146a8dce519b87ed3151c334b1):
   - Internal_FindNearestPolyByHeight can probably be removed;
   - NavMesh API needed more exposure:
-    - ServerScript_NavMesh_GetWallDistance
     - ServerScript_NavMesh_CreateCorridor
     - ServerScript_NavMesh_DestroyCorridor
     - ServerScript_NavMesh_CorridorSetPath
