@@ -269,11 +269,11 @@ static void drawTraverseLinks(duDebugDraw* dd, const dtNavMesh& mesh, const dtNa
 			if (!link->hasTraverseType())
 				continue;
 
-			// Filter, drawLinkType -1 means draw all types
-			const int drawTraverseType = traverseLinkParams.traverseLinkType;
+			// Filter by traverse type bitmask (0xFFFFFFFF means draw all types)
+			const unsigned int traverseTypeMask = traverseLinkParams.traverseLinkTypeMask;
 			const unsigned char linkTraverseType = link->getTraverseType();
 
-			if (drawTraverseType != -1 && linkTraverseType != drawTraverseType)
+			if (traverseTypeMask != 0xFFFFFFFF && !(traverseTypeMask & (1u << linkTraverseType)))
 				continue;
 
 			// Filter, drawLinkDistance -1 means draw all distances

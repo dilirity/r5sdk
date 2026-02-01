@@ -51,7 +51,7 @@ enum DrawDetourMeshFlags
 struct duDrawTraverseLinkParams
 {
 	duDrawTraverseLinkParams() :
-		traverseLinkType(-1),
+		traverseLinkTypeMask(0xFFFFFFFF),
 		traverseLinkDistance(-1),
 		traverseAnimType(-2),
 		cellHeight(0.0f),
@@ -59,7 +59,7 @@ struct duDrawTraverseLinkParams
 		dynamicOffset(false)
 	{}
 
-	int traverseLinkType;
+	unsigned int traverseLinkTypeMask; // Bitmask of types to draw (0xFFFFFFFF = all)
 	int traverseLinkDistance;
 
 	// -2 means all, -1 means disjoint poly groups only, anything above

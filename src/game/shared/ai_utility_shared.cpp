@@ -49,7 +49,7 @@ static ConVar navmesh_draw_poly_bounds_inner("navmesh_draw_poly_bounds_inner", "
 static ConVar navmesh_draw_poly_bounds_outer("navmesh_draw_poly_bounds_outer", "1", FCVAR_DEVELOPMENTONLY, "Draws the outer polygon bounds of the NavMesh tiles");
 
 static ConVar navmesh_draw_traverse_portals("navmesh_draw_traverse_portals", "0", FCVAR_DEVELOPMENTONLY, "Draws the traversal network connecting the polygons of the NavMesh");
-static ConVar navmesh_draw_traverse_portals_type("navmesh_draw_traverse_portals_type", "-1", FCVAR_DEVELOPMENTONLY, "Only draw traverse portals of this type (-1 = everything)", true, -1, true, DT_MAX_TRAVERSE_TYPES-1, "Type: >= -1 && < DT_MAX_TRAVERSE_TYPES - 1");
+static ConVar navmesh_draw_traverse_portals_type("navmesh_draw_traverse_portals_type", "-1", FCVAR_DEVELOPMENTONLY, "Draw traverse portals of specified types (-1 = all, single number = one type, comma-separated = multiple e.g. \"3,7,12\")");
 
 static ConVar navmesh_draw_force_opaque("navmesh_draw_force_opaque", "0", FCVAR_DEVELOPMENTONLY, "Disable transparency in NavMesh debug draw");
 static ConVar navmesh_draw_flag_show_tile_id("navmesh_draw_show_tile_ids", "0", FCVAR_DEVELOPMENTONLY, "Color NavMesh tiles by their lookup ID");
@@ -57,6 +57,48 @@ static ConVar navmesh_draw_flag_show_poly_groups("navmesh_draw_show_poly_groups"
 
 static ConVar ai_script_nodes_draw_range("ai_script_nodes_draw_range", "1000", FCVAR_DEVELOPMENTONLY, "Only draw AIN script nodes within this distance from our camera");
 static ConVar ai_script_nodes_draw_nearest("ai_script_nodes_draw_nearest", "1", FCVAR_DEVELOPMENTONLY, "Debug draw AIN script node links to nearest node (build order is used if null)");
+
+//------------------------------------------------------------------------------
+// Purpose: parse traverse portal type filter string into bitmask
+// Input  : *pszTypes - comma-separated type values or "-1" for all
+// Output : bitmask of types to draw (0xFFFFFFFF = all)
+//------------------------------------------------------------------------------
+static u32 ParseTraverseTypeMask(const char* pszTypes)
+{
+	if (!pszTypes || !*pszTypes)
+		return 0xFFFFFFFF;
+
+	// Handle "-1" for all types
+	if (pszTypes[0] == '-' && pszTypes[1] == '1' && (pszTypes[2] == '\0' || pszTypes[2] == ' '))
+		return 0xFFFFFFFF;
+
+	u32 mask = 0;
+	const char* p = pszTypes;
+
+	while (*p)
+	{
+		// Skip whitespace and commas
+		while (*p == ' ' || *p == ',')
+			p++;
+
+		if (!*p)
+			break;
+
+		// Parse number
+		int type = atoi(p);
+
+		// Validate range and set bit
+		if (type >= 0 && type < DT_MAX_TRAVERSE_TYPES)
+			mask |= (1u << type);
+
+		// Skip to next separator
+		while (*p && *p != ',' && *p != ' ')
+			p++;
+	}
+
+	// If no valid types were parsed, show all
+	return mask ? mask : 0xFFFFFFFF;
+}
 
 //------------------------------------------------------------------------------
 // Purpose:
@@ -161,7 +203,7 @@ void CAI_Utility::DrawNavMesh(const dtNavMesh& mesh, const u32 flags)
 
         if (flags & DU_DRAW_DETOURMESH_TRAVERSE_LINKS)
         {
-            traverseLinkDrawParams.traverseLinkType = navmesh_draw_traverse_portals_type.GetInt();
+            traverseLinkDrawParams.traverseLinkTypeMask = ParseTraverseTypeMask(navmesh_draw_traverse_portals_type.GetString());
             traverseLinkDrawParams.extraOffset = tile->header->walkableRadius * 2;
         }
 

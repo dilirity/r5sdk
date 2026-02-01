@@ -1191,8 +1191,10 @@ void Editor::renderDetourDebugMenu()
 
 	if (isEnabled && m_navMesh) // Supplemental options only available with a valid navmesh!
 	{
+		static int traverseTypeSlider = -1;
 		ImGui::PushItemWidth(190);
-		ImGui::SliderInt("Traverse Type", &m_traverseLinkDrawParams.traverseLinkType, -1, DT_MAX_TRAVERSE_TYPES-1);
+		if (ImGui::SliderInt("Traverse Type", &traverseTypeSlider, -1, DT_MAX_TRAVERSE_TYPES-1))
+			m_traverseLinkDrawParams.traverseLinkTypeMask = (traverseTypeSlider == -1) ? 0xFFFFFFFF : (1u << traverseTypeSlider);
 		ImGui::SliderInt("Traverse Dist", &m_traverseLinkDrawParams.traverseLinkDistance, -1, dtQuantLinkDistance(DT_TRAVERSE_DIST_MAX));
 		ImGui::SliderInt("Traverse Anim", &m_traverseLinkDrawParams.traverseAnimType, -2, m_navMesh->getParams()->traverseTableCount-1);
 		ImGui::PopItemWidth();
