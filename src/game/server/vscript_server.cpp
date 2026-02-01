@@ -1686,29 +1686,6 @@ static SQRESULT ServerScript_NavMesh_GetTileTraversePortals(HSQUIRRELVM v)
     // Create result array
     sq_newarray(v, 0);
 
-    // Get the traverse type filter from cvar (-1 = all types, or comma-separated list)
-    unsigned int filterMask = 0xFFFFFFFF;
-    ConVar* pFilterCvar = g_pCVar->FindVar("navmesh_draw_traverse_portals_type");
-    if (pFilterCvar)
-    {
-        const char* pszTypes = pFilterCvar->GetString();
-        if (pszTypes && *pszTypes && !(pszTypes[0] == '-' && pszTypes[1] == '1'))
-        {
-            filterMask = 0;
-            const char* p = pszTypes;
-            while (*p)
-            {
-                while (*p == ' ' || *p == ',') p++;
-                if (!*p) break;
-                int type = atoi(p);
-                if (type >= 0 && type < DT_MAX_TRAVERSE_TYPES)
-                    filterMask |= (1u << type);
-                while (*p && *p != ',' && *p != ' ') p++;
-            }
-            if (!filterMask) filterMask = 0xFFFFFFFF;
-        }
-    }
-
     // Follow the link chain for this specific polygon only
     unsigned int linkIdx = poly->firstLink;
     while (linkIdx != DT_NULL_LINK)
@@ -1716,9 +1693,7 @@ static SQRESULT ServerScript_NavMesh_GetTileTraversePortals(HSQUIRRELVM v)
         const dtLink* link = &tile->links[linkIdx];
 
         // Check if this link has a traverse type (not normal walking)
-        // and matches the filter mask
-        const unsigned char linkTraverseType = link->getTraverseType();
-        if (link->hasTraverseType() && (filterMask == 0xFFFFFFFF || (filterMask & (1u << linkTraverseType))))
+        if (link->hasTraverseType())
         {
             // Get the edge vertices for this link
             const unsigned char edgeIdx = link->edge;
