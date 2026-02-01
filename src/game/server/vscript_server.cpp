@@ -893,16 +893,20 @@ static SQRESULT ServerScript_NavMesh_CreateCorridor(HSQUIRRELVM v)
         SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
     }
 
-    // Setup filter for human traversal
+    // Setup filter for pilot traversal (includes ziplines)
     pCorridor->filter.setIncludeFlags(0xFFFF);
     pCorridor->filter.setExcludeFlags(0);
-    pCorridor->filter.setTraverseFlags(0x13F); // ANIMTYPE_HUMAN traverse types
+    pCorridor->filter.setTraverseFlags(0x8013F); // ANIMTYPE_PILOT traverse types (0-5, 8, 19)
 
     // Set traverse costs from game's default table so A* properly weighs
     // traverse links against walking distance. Without this, all traverse costs
     // default to 1.0, making climbs/jumps appear ~300x cheaper than walking.
     for (int i = 0; i < DT_MAX_TRAVERSE_TYPES; i++)
-        pCorridor->filter.setTraverseCost(i, g_traverseAnimDefaultCosts[ANIMTYPE_HUMAN][i]);
+        pCorridor->filter.setTraverseCost(i, g_traverseAnimDefaultCosts[ANIMTYPE_PILOT][i]);
+
+    // Type 19 (ziplines) has 0 cost in pilot table - override with reasonable value
+    // Use similar cost to wall climb (type 8) since ziplines are similar effort
+    pCorridor->filter.setTraverseCost(19, 1294.07f);
 
     pCorridor->initialized = true;
 
@@ -1102,7 +1106,8 @@ static SQRESULT ServerScript_NavMesh_CorridorGetCorners(HSQUIRRELVM v)
         sq_newslot(v, -3);
 
         sq_pushstring(v, "traverseType", -1);
-        sq_pushinteger(v, cornerJumps[i]);
+        // Mask off the off-mesh flags (bits 6-7), keep only traverse type (bits 0-4)
+        sq_pushinteger(v, cornerJumps[i] & (DT_MAX_TRAVERSE_TYPES - 1));
         sq_newslot(v, -3);
 
         sq_arrayappend(v, -2);
@@ -1196,18 +1201,43 @@ static SQRESULT ServerScript_NavMesh_GetTileTraversePortals(HSQUIRRELVM v)
             const dtPoly* targetPoly = nullptr;
             nav->getTileAndPolyByRefUnsafe(link->ref, &targetTile, &targetPoly);
 
+            rdVec3D startPos = edgeMid; // Default to edge mid
             rdVec3D targetPos = edgeMid; // Default to edge mid if we can't find target
             if (targetTile && targetPoly)
             {
-                // Use the target polygon's center as the end position
-                targetPos = targetPoly->center;
+                // For off-mesh connections (ziplines, etc.), use both endpoint vertices
+                // Off-mesh polys have 2 verts: one near the source, one at the destination
+                if (targetPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION && targetPoly->vertCount == 2)
+                {
+                    const rdVec3D* v0 = &targetTile->verts[targetPoly->verts[0]];
+                    const rdVec3D* v1 = &targetTile->verts[targetPoly->verts[1]];
+
+                    // Pick vertex closest to source poly center as start, furthest as end
+                    const float dist0 = rdVdistSqr(v0, &poly->center);
+                    const float dist1 = rdVdistSqr(v1, &poly->center);
+                    if (dist0 < dist1)
+                    {
+                        startPos = *v0;
+                        targetPos = *v1;
+                    }
+                    else
+                    {
+                        startPos = *v1;
+                        targetPos = *v0;
+                    }
+                }
+                else
+                {
+                    // Regular polygon - use center as the end position
+                    targetPos = targetPoly->center;
+                }
             }
 
             sq_newtable(v);
 
-            // Start position (edge midpoint)
+            // Start position (edge midpoint, or off-mesh connection start)
             sq_pushstring(v, "startPos", -1);
-            const SQVector3D sqStartPos(edgeMid.x, edgeMid.y, edgeMid.z);
+            const SQVector3D sqStartPos(startPos.x, startPos.y, startPos.z);
             sq_pushvector(v, &sqStartPos);
             sq_newslot(v, -3);
 
@@ -1222,9 +1252,12 @@ static SQRESULT ServerScript_NavMesh_GetTileTraversePortals(HSQUIRRELVM v)
             sq_pushinteger(v, link->getTraverseType());
             sq_newslot(v, -3);
 
-            // Traverse distance
+            // Traverse distance - calculate from positions if stored value is 0
             sq_pushstring(v, "traverseDist", -1);
-            sq_pushfloat(v, link->traverseDist * DT_TRAVERSE_DIST_QUANT_FACTOR);
+            float traverseDist = link->traverseDist * DT_TRAVERSE_DIST_QUANT_FACTOR;
+            if (traverseDist <= 0.0f)
+                traverseDist = rdVdist(&startPos, &targetPos);
+            sq_pushfloat(v, traverseDist);
             sq_newslot(v, -3);
 
             // Source polygon center
