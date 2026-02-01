@@ -8,6 +8,8 @@ is the lack of time to learn C++ or Squirrel to fully understand things.
 The goal of the project is to have Bots in Apex Legends R5Reloaded, that can navigate a complex map,
 loot and shoot at enemies. Using abilities based on the legends they are might be added depending on the complexity.
 
+For the actual bots mod, see https://github.com/dilirity/r5_apex_bots
+
 ----
 
 ## Source SDK
