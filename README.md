@@ -34,7 +34,6 @@ https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots
   - Have more control over what inputs the bots send:
     - ServerScript_SetBotInput
     - ServerScript_BotButtonPress
-    - ServerScript_BotButtonRelease
     - ServerScript_BotStopPersistentInput
 - console command `navmesh_draw_traverse_portals_type` was updated to support a list of comma separated types. This makes visual debugging easier, so you don't have to go through all types to see if any connect polygons you're debugging:
   - This will probably either be reverted or properly implemented. It's really helpful for debugging;

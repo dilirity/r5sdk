@@ -1462,39 +1462,6 @@ static SQRESULT ServerScript_BotButtonPress(HSQUIRRELVM v)
 }
 
 //-----------------------------------------------------------------------------
-// Purpose: releases a persistently forced bot button input.
-//-----------------------------------------------------------------------------
-static SQRESULT ServerScript_BotButtonRelease(HSQUIRRELVM v)
-{
-    CPlayer* pPlayer = nullptr;
-
-    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
-        return SQ_ERROR;
-
-    if (!pPlayer || !pPlayer->IsBot())
-    {
-        sq_pushbool(v, false);
-        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-    }
-
-    SQInteger button;
-    sq_getinteger(v, 2, &button);
-
-    const int idx = pPlayer->GetEdict() - 1;
-
-    if (idx < 0 || idx >= MAX_PLAYERS)
-    {
-        sq_pushbool(v, false);
-        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-    }
-
-    g_botInputs[idx].forcedButtons &= ~(int)button;
-
-    sq_pushbool(v, true);
-    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-}
-
-//-----------------------------------------------------------------------------
 // Purpose: stops persistent bot input (movement that continues across frames).
 // Call this when you want the bot to stop moving between script frames.
 //-----------------------------------------------------------------------------
@@ -1863,14 +1830,6 @@ static void Script_RegisterServerPlayerClassFuncs()
         "int button",
         false,
         ServerScript_BotButtonPress);
-
-    g_serverScriptPlayerStruct->AddFunction("BotButtonRelease",
-        "Script_BotButtonRelease",
-        "Deactivates a forced bot input (such as IN_ATTACK)",
-        "bool",
-        "int button",
-        false,
-        ServerScript_BotButtonRelease);
 
     g_serverScriptPlayerStruct->AddFunction("ChatBuilder",
         "ScriptChatBuilder",
