@@ -10,6 +10,63 @@ loot and shoot at enemies. Using abilities based on the legends they are might b
 
 For the actual bots mod, see https://github.com/dilirity/r5_apex_bots
 
+## Modifications made to allow the bots to be possible (will try to keep this updated)
+
+https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots
+
+- [Physics_RunBotSimulation](https://github.com/dilirity/r5sdk/blob/aea234647ec1265eb8d9a9002fb881eb0eb0d69c/src/game/server/physics_main.cpp#L22) had to be updated so it doesn't run [`RunNullCommand`](https://github.com/R5Reloaded/r5sdk/blob/a27ea9e20d564258c8a86591bde1404fa6d38f65/src/game/server/physics_main.cpp#L33).
+- [The visibility of a couple of variables](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-a1327d987ab46da298a7ea096de075495f242b0f27c659237a4709386e86bc20) needed to be changed so we can expose them to scripting (not sure if we need it though).
+- [CPlayerMove::StaticRunCommand](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-c3dce5e0293fa4bb70d077a45b6b916ce17909a4596843a35276f4096caa926f) had to be updated so we can send inputs from the bots (this needs validation at some point).
+- [BotInput](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-a4088623d426b43ccc5f7811813ff17e69295aa91b224da772fa0c54cfc30e40) added to aid the above.
+- Lots of changes in [src/game/server/vscript_server.cpp](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-c40f4588cd9163db29b5c8ecb5cecba6b49d82146a8dce519b87ed3151c334b1):
+  - A lot of these should be removed;
+  - Internal_FindNearestPolyByHeight can probably be removed;
+  - NavMesh API needed more exposure:
+    - ServerScript_NavMesh_FindPath
+    - ServerScript_NavMesh_Raycast
+    - ServerScript_NavMesh_MoveAlongSurface
+    - ServerScript_NavMesh_GetPolyHeight
+    - ServerScript_NavMesh_IsGoalReachable
+    - ServerScript_NavMesh_GetWallDistance
+    - ServerScript_NavMesh_CreateCorridor
+    - ServerScript_NavMesh_DestroyCorridor
+    - ServerScript_NavMesh_CorridorSetPath
+    - ServerScript_NavMesh_CorridorMove
+    - ServerScript_NavMesh_CorridorGetCorners
+    - ServerScript_NavMesh_CorridorGetPos
+    - ServerScript_NavMesh_CorridorGetTarget
+    - ServerScript_NavMesh_CorridorIsValid
+    - ServerScript_NavMesh_GetTileTraversePortals
+  - Have more control over bot creation:
+    - ServerScript_Bot_Create
+  - Have more control over what inputs the bots send:
+    - ServerScript_SetBotInput
+    - ServerScript_BotButtonPress
+    - ServerScript_BotButtonRelease
+    - ServerScript_BotStopPersistentInput
+  - Some information about traversal (these might not be necessary, not sure yet)
+    - ServerScript_StartTraversal
+    - ServerScript_SetWallClimbSetUp
+    - ServerScript_IsWallClimbSetUp
+    - ServerScript_SetWallHanging
+    - ServerScript_IsWallHanging
+- console command `navmesh_draw_traverse_portals_type` was updated to support a list of comma separated types. This makes visual debugging easier, so you don't have to go through all types to see if any connect polygons you're debugging:
+  - This will probably either be reverted or properly implemented. It's really helpful for debugging;
+  - As a result, a couple of other files needed to be updated as the code is used there as well:
+    - [src/naveditor/Editor.cpp](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-141ffd937a1f8ab34bd73d1b42d21131c5f376821e30808da840ab291b192ad6);
+    - [src/thirdparty/recast/DebugUtils/Include/DetourDebugDraw.h](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-cbca3836ec1a8b5dbec30d56331e413ab2dda2ba6507bdf0698234dbed3e2201);
+    - [src/thirdparty/recast/DebugUtils/Source/DetourDebugDraw.cpp](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-a48a4a90a05906f9bc9d3fad4cfb1d480ab2a64c782fdb85a6aa68e026a94398);
+- Fixed some failed assertions (this is probably me not knowing how to work with VS 2019 more than anything. there's probably a setting or something that needs to be adjusted):
+  - [src/loader/loader.cpp](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-f057b2d856c96e9cc025b7157fc8a677f1e5120f95a33438638f94fce816aac4);
+  - [src/rtech/rui/rui.cpp](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-1a2fdf064bdf25124d456661a83dd4aab996050ddec11d25feb9fbebce1ce026);
+  - [src/tier1/kvleaktrace.h](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-53e4da0f4639ba0596467305a31c242ecb94acef98f3c80cca0777eb83fea7cf);
+- Needed more information about the polygon corners from [`dtNavMeshQuery::findStraightPath`](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-204719d27f6eac2d173143d698d9634c16d8d74aaf77dd6e0eb9a47d8e5d34e3). This is because of the way I'm implementing navigation. A better way might not need this;
+- More nav data:
+  - [src/thirdparty/recast/DetourCrowd/Include/DetourPathCorridor.h](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-38b07ea1d3d34f886516139d3c2b916bdc6dc4f5ad5cfe2e3d0a33ec8baca33b);
+  - traverse types [src/thirdparty/recast/DetourCrowd/Source/DetourPathCorridor.cpp](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-62209c824804e44630355145091e2ea74a1792506145c32539c83f215d5a336d);
+
+Original readme below.
+
 ----
 
 ## Source SDK
