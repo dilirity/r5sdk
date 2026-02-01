@@ -994,8 +994,8 @@ static SQRESULT ServerScript_NavMesh_CorridorSetPath(HSQUIRRELVM v)
     DevMsg(eDLL_T::SERVER, "[BOT] filter: traverseFlags=0x%x cost[8]=%.2f\n",
             pCorridor->filter.getTraverseFlags(), pCorridor->filter.getTraverseCost(8));
     
-    dtStatus status = dtNavMeshQuery__findPath(
-        &pCorridor->query, startRef, targetRef,
+    dtStatus status = pCorridor->query.findPath(
+        startRef, targetRef,
         &nearestStart, &nearestTarget, &pCorridor->filter,
         pathPolys, pathJumps, &pathCount, 256);
 
