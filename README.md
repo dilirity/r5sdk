@@ -19,7 +19,6 @@ https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots
 - [CPlayerMove::StaticRunCommand](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-c3dce5e0293fa4bb70d077a45b6b916ce17909a4596843a35276f4096caa926f) had to be updated so we can send inputs from the bots (this needs validation at some point).
 - [BotInput](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-a4088623d426b43ccc5f7811813ff17e69295aa91b224da772fa0c54cfc30e40) added to aid the above.
 - Lots of changes in [src/game/server/vscript_server.cpp](https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots#diff-c40f4588cd9163db29b5c8ecb5cecba6b49d82146a8dce519b87ed3151c334b1):
-  - Internal_FindNearestPolyByHeight can probably be removed;
   - NavMesh API needed more exposure:
     - ServerScript_NavMesh_CreateCorridor
     - ServerScript_NavMesh_DestroyCorridor
@@ -27,6 +26,7 @@ https://github.com/R5Reloaded/r5sdk/compare/p4sync...dilirity:r5sdk:bots
     - ServerScript_NavMesh_CorridorMove
     - ServerScript_NavMesh_CorridorGetCorners
     - ServerScript_NavMesh_GetTileTraversePortals
+    - ServerScript_NavMesh_FindClosestNavmeshPoint
   - Have more control over bot creation:
     - ServerScript_Bot_Create
   - Have more control over what inputs the bots send:

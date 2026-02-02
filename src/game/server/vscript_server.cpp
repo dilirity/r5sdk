@@ -811,6 +811,95 @@ static SQRESULT ServerScript_NavMesh_GetNearestPosInBounds(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: finds the closest point on navmesh even when query point is outside
+//          polygon bounds. Used for recovery when bot is completely off-mesh.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_FindClosestNavmeshPoint(HSQUIRRELVM v)
+{
+    // Parameters: (vector searchPoint, vector halfExtents, int hullType)
+    // Slot 2: searchPoint, Slot 3: halfExtents, Slot 4: hullType
+    SQInteger hullIdx;
+    sq_getinteger(v, 4, &hullIdx);
+
+    if (!Internal_ServerScript_ValidateHull(hullIdx))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const Hull_e hullType = Hull_e(hullIdx);
+    const NavMeshType_e navType = NAI_Hull::NavMeshType(hullType);
+    const dtNavMesh* const nav = Detour_GetNavMeshByType(navType);
+
+    if (!nav)
+    {
+        v_SQVM_ScriptError("NavMesh \"%s\" for hull \"%s\" hasn't been loaded!",
+            NavMesh_GetNameForType(navType), g_aiHullNames[hullType]);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    rdVec3D halfExtents;
+    if (!Internal_ServerScript_NavMesh_GetExtents(v, 3, &halfExtents))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const SQVector3D* point = nullptr;
+    sq_getvector(v, 2, &point);
+    const rdVec3D searchPoint(point->x, point->y, point->z);
+
+    dtNavMeshQuery query;
+    query.attachNavMeshUnsafe(nav);
+
+    dtQueryFilter filter;
+    filter.setIncludeFlags(DT_POLYFLAGS_ALL);
+    filter.setExcludeFlags(DT_POLYFLAGS_DISABLED);
+
+    // Query all polygons in the search box
+    dtPolyRef polys[64];
+    int polyCount = 0;
+
+    dtStatus status = query.queryPolygons(&searchPoint, &halfExtents, &filter, polys, &polyCount, 64);
+    if (dtStatusFailed(status) || polyCount == 0)
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Find polygon with closest point to query position
+    float bestDistSq = FLT_MAX;
+    dtPolyRef bestRef = 0;
+    rdVec3D bestPos(0, 0, 0);
+
+    for (int i = 0; i < polyCount; i++)
+    {
+        rdVec3D closestPt;
+        bool posOverPoly = false;
+        status = query.closestPointOnPoly(polys[i], &searchPoint, &closestPt, &posOverPoly);
+        if (dtStatusFailed(status))
+            continue;
+
+        // Calculate distance to this point
+        float dx = closestPt.x - searchPoint.x;
+        float dy = closestPt.y - searchPoint.y;
+        float dz = closestPt.z - searchPoint.z;
+        float distSq = dx*dx + dy*dy + dz*dz;
+
+        if (distSq < bestDistSq)
+        {
+            bestDistSq = distSq;
+            bestRef = polys[i];
+            bestPos = closestPt;
+        }
+    }
+
+    if (bestRef == 0)
+    {
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const SQVector3D result(bestPos.x, bestPos.y, bestPos.z);
+    sq_pushvector(v, &result);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //=============================================================================
 // NavMesh Pathfinding API
 //=============================================================================
@@ -1627,6 +1716,7 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPos, "Finds the nearest position to the provided point on the hull's NavMesh using the hull's bounds as extents", "vector ornull", "vector searchPoint, int hullType", false);
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPosInBounds, "Finds the nearest position to the provided point on the hull's NavMesh using provided bounds as extents", "vector ornull", "vector searchPoint, vector halfExtents, int hullType", false);
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_FindClosestNavmeshPoint, "Finds the closest point on navmesh even when query point is outside polygon bounds. For recovery when off-mesh.", "vector ornull", "vector searchPoint, vector halfExtents, int hullType", false);
 
     // NavMesh Corridor API
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CreateCorridor,
