@@ -57,6 +57,82 @@ struct BotCorridor
 static std::unordered_map<int, BotCorridor*> g_corridors;
 static int g_nextCorridorHandle = 1;
 
+//-----------------------------------------------------------------------------
+// Purpose: Helper to push portal geometry fields to a squirrel table.
+// Expects a table on top of the stack, adds vertA, vertB, startPos, endPos.
+//-----------------------------------------------------------------------------
+static void Internal_PushPortalGeometry(HSQUIRRELVM v, const dtNavMesh* nav,
+    const dtMeshTile* tile, const dtPoly* poly, const dtLink* link)
+{
+    // Get the edge vertices for this link
+    const unsigned char edgeIdx = link->edge;
+    const unsigned short va = poly->verts[edgeIdx];
+    const unsigned short vb = poly->verts[(edgeIdx + 1) % poly->vertCount];
+
+    const rdVec3D* vertA = &tile->verts[va];
+    const rdVec3D* vertB = &tile->verts[vb];
+
+    // Calculate edge midpoint
+    rdVec3D edgeMid;
+    edgeMid.x = (vertA->x + vertB->x) * 0.5f;
+    edgeMid.y = (vertA->y + vertB->y) * 0.5f;
+    edgeMid.z = (vertA->z + vertB->z) * 0.5f;
+
+    // Get the target polygon to find the landing position
+    const dtMeshTile* targetTile = nullptr;
+    const dtPoly* targetPoly = nullptr;
+    nav->getTileAndPolyByRefUnsafe(link->ref, &targetTile, &targetPoly);
+
+    rdVec3D startPos = edgeMid;
+    rdVec3D targetPos = edgeMid;
+    if (targetTile && targetPoly)
+    {
+        if (targetPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION && targetPoly->vertCount == 2)
+        {
+            const rdVec3D* v0 = &targetTile->verts[targetPoly->verts[0]];
+            const rdVec3D* v1 = &targetTile->verts[targetPoly->verts[1]];
+
+            const float dist0 = rdVdistSqr(v0, &poly->center);
+            const float dist1 = rdVdistSqr(v1, &poly->center);
+            if (dist0 < dist1)
+            {
+                startPos = *v0;
+                targetPos = *v1;
+            }
+            else
+            {
+                startPos = *v1;
+                targetPos = *v0;
+            }
+        }
+        else
+        {
+            targetPos = targetPoly->center;
+        }
+    }
+
+    // Push portal geometry to table
+    sq_pushstring(v, "vertA", -1);
+    const SQVector3D sqVertA(vertA->x, vertA->y, vertA->z);
+    sq_pushvector(v, &sqVertA);
+    sq_newslot(v, -3);
+
+    sq_pushstring(v, "vertB", -1);
+    const SQVector3D sqVertB(vertB->x, vertB->y, vertB->z);
+    sq_pushvector(v, &sqVertB);
+    sq_newslot(v, -3);
+
+    sq_pushstring(v, "startPos", -1);
+    const SQVector3D sqStartPos(startPos.x, startPos.y, startPos.z);
+    sq_pushvector(v, &sqStartPos);
+    sq_newslot(v, -3);
+
+    sq_pushstring(v, "endPos", -1);
+    const SQVector3D sqEndPos(targetPos.x, targetPos.y, targetPos.z);
+    sq_pushvector(v, &sqEndPos);
+    sq_newslot(v, -3);
+}
+
 /*
 =====================
 SQVM_ServerScript_f
@@ -1182,6 +1258,9 @@ static SQRESULT ServerScript_NavMesh_CorridorGetCorners(HSQUIRRELVM v)
         cornerVerts, cornerFlags, cornerPolys, cornerJumps,
         (int)maxCorners, &pCorridor->query, &pCorridor->filter);
 
+    // Get navmesh for portal lookups
+    const dtNavMesh* nav = pCorridor->query.getAttachedNavMesh();
+
     // Create array of {pos, traverseType} tables
     sq_newarray(v, 0);
 
@@ -1194,10 +1273,87 @@ static SQRESULT ServerScript_NavMesh_CorridorGetCorners(HSQUIRRELVM v)
         sq_pushvector(v, &sqPos);
         sq_newslot(v, -3);
 
-        sq_pushstring(v, "traverseType", -1);
         // Mask off the off-mesh flags (bits 6-7), keep only traverse type (bits 0-4)
-        sq_pushinteger(v, cornerJumps[i] & (DT_MAX_TRAVERSE_TYPES - 1));
+        const unsigned char traverseType = cornerJumps[i] & (DT_MAX_TRAVERSE_TYPES - 1);
+
+        sq_pushstring(v, "traverseType", -1);
+        sq_pushinteger(v, traverseType);
         sq_newslot(v, -3);
+
+        // If this corner has a traverse type, include portal geometry
+        // Use the corridor's path and jumps directly
+        if (traverseType != 0 && nav)
+        {
+            const dtPolyRef* path = pCorridor->corridor.getPath();
+            const int pathCount = pCorridor->corridor.getPathCount();
+
+            // DEBUG: Print all path data
+            for (int j = 0; j < pathCount; j++)
+            {
+
+                const dtMeshTile* tile = nullptr;
+                const dtPoly* poly = nullptr;
+                nav->getTileAndPolyByRefUnsafe(path[j], &tile, &poly);
+
+                if (tile && poly)
+                {
+                    unsigned int linkIdx = poly->firstLink;
+                    while (linkIdx != DT_NULL_LINK)
+                    {
+                        const dtLink* link = &tile->links[linkIdx];
+                        linkIdx = link->next;
+                    }
+                }
+            }
+
+            // Find the link with matching traverse type that connects consecutive path polygons
+            bool found = false;
+            for (int j = 0; j < pathCount - 1 && !found; j++)
+            {
+                const dtMeshTile* tile = nullptr;
+                const dtPoly* poly = nullptr;
+                nav->getTileAndPolyByRefUnsafe(path[j], &tile, &poly);
+
+                if (!tile || !poly)
+                    continue;
+
+                const dtPolyRef nextPolyRef = path[j + 1];
+
+                // Check all links from this polygon
+                unsigned int linkIdx = poly->firstLink;
+                while (linkIdx != DT_NULL_LINK)
+                {
+                    const dtLink* link = &tile->links[linkIdx];
+
+                    if (link->hasTraverseType() && link->getTraverseType() == traverseType)
+                    {
+                        DevMsg(eDLL_T::SERVER, "[CORRIDOR] path[%d] has type=%d link: ref=%llu nextPoly=%llu match=%s\n",
+                            j, traverseType, link->ref, nextPolyRef, (link->ref == nextPolyRef) ? "YES" : "NO");
+                    }
+
+                    // Find a link with matching traverse type that goes to the NEXT polygon in path
+                    if (link->hasTraverseType() &&
+                        link->getTraverseType() == traverseType &&
+                        link->ref == nextPolyRef)
+                    {
+                        Internal_PushPortalGeometry(v, nav, tile, poly, link);
+                        found = true;
+                        break;
+                    }
+
+                    linkIdx = link->next;
+                }
+            }
+
+            if (!found)
+            {
+                DevMsg(eDLL_T::SERVER, "[CORRIDOR] NO matching link found for type=%d\n", traverseType);
+            }
+
+            if (!found)
+            {
+            }
+        }
 
         sq_arrayappend(v, -2);
     }
@@ -1271,70 +1427,7 @@ static SQRESULT ServerScript_NavMesh_GetTileTraversePortals(HSQUIRRELVM v)
         // Check if this link has a traverse type (not normal walking)
         if (link->hasTraverseType())
         {
-            // Get the edge vertices for this link
-            const unsigned char edgeIdx = link->edge;
-            const unsigned short va = poly->verts[edgeIdx];
-            const unsigned short vb = poly->verts[(edgeIdx + 1) % poly->vertCount];
-
-            const rdVec3D* vertA = &tile->verts[va];
-            const rdVec3D* vertB = &tile->verts[vb];
-
-            // Calculate edge midpoint (this is where the traverse starts)
-            rdVec3D edgeMid;
-            edgeMid.x = (vertA->x + vertB->x) * 0.5f;
-            edgeMid.y = (vertA->y + vertB->y) * 0.5f;
-            edgeMid.z = (vertA->z + vertB->z) * 0.5f;
-
-            // Get the target polygon to find the landing position
-            const dtMeshTile* targetTile = nullptr;
-            const dtPoly* targetPoly = nullptr;
-            nav->getTileAndPolyByRefUnsafe(link->ref, &targetTile, &targetPoly);
-
-            rdVec3D startPos = edgeMid; // Default to edge mid
-            rdVec3D targetPos = edgeMid; // Default to edge mid if we can't find target
-            if (targetTile && targetPoly)
-            {
-                // For off-mesh connections (ziplines, etc.), use both endpoint vertices
-                // Off-mesh polys have 2 verts: one near the source, one at the destination
-                if (targetPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION && targetPoly->vertCount == 2)
-                {
-                    const rdVec3D* v0 = &targetTile->verts[targetPoly->verts[0]];
-                    const rdVec3D* v1 = &targetTile->verts[targetPoly->verts[1]];
-
-                    // Pick vertex closest to source poly center as start, furthest as end
-                    const float dist0 = rdVdistSqr(v0, &poly->center);
-                    const float dist1 = rdVdistSqr(v1, &poly->center);
-                    if (dist0 < dist1)
-                    {
-                        startPos = *v0;
-                        targetPos = *v1;
-                    }
-                    else
-                    {
-                        startPos = *v1;
-                        targetPos = *v0;
-                    }
-                }
-                else
-                {
-                    // Regular polygon - use center as the end position
-                    targetPos = targetPoly->center;
-                }
-            }
-
             sq_newtable(v);
-
-            // Start position (edge midpoint, or off-mesh connection start)
-            sq_pushstring(v, "startPos", -1);
-            const SQVector3D sqStartPos(startPos.x, startPos.y, startPos.z);
-            sq_pushvector(v, &sqStartPos);
-            sq_newslot(v, -3);
-
-            // End position (target poly center)
-            sq_pushstring(v, "endPos", -1);
-            const SQVector3D sqEndPos(targetPos.x, targetPos.y, targetPos.z);
-            sq_pushvector(v, &sqEndPos);
-            sq_newslot(v, -3);
 
             // Traverse type
             sq_pushstring(v, "traverseType", -1);
@@ -1345,7 +1438,24 @@ static SQRESULT ServerScript_NavMesh_GetTileTraversePortals(HSQUIRRELVM v)
             sq_pushstring(v, "traverseDist", -1);
             float traverseDist = link->traverseDist * DT_TRAVERSE_DIST_QUANT_FACTOR;
             if (traverseDist <= 0.0f)
-                traverseDist = rdVdist(&startPos, &targetPos);
+            {
+                // Calculate edge midpoint for distance calc
+                const unsigned char edgeIdx = link->edge;
+                const rdVec3D* vA = &tile->verts[poly->verts[edgeIdx]];
+                const rdVec3D* vB = &tile->verts[poly->verts[(edgeIdx + 1) % poly->vertCount]];
+                rdVec3D edgeMid;
+                edgeMid.x = (vA->x + vB->x) * 0.5f;
+                edgeMid.y = (vA->y + vB->y) * 0.5f;
+                edgeMid.z = (vA->z + vB->z) * 0.5f;
+
+                const dtMeshTile* targetTile = nullptr;
+                const dtPoly* targetPoly = nullptr;
+                nav->getTileAndPolyByRefUnsafe(link->ref, &targetTile, &targetPoly);
+                rdVec3D targetPos = edgeMid;
+                if (targetTile && targetPoly)
+                    targetPos = targetPoly->center;
+                traverseDist = rdVdist(&edgeMid, &targetPos);
+            }
             sq_pushfloat(v, traverseDist);
             sq_newslot(v, -3);
 
@@ -1355,17 +1465,8 @@ static SQRESULT ServerScript_NavMesh_GetTileTraversePortals(HSQUIRRELVM v)
             sq_pushvector(v, &sqSrcCenter);
             sq_newslot(v, -3);
 
-            // Edge vertex A
-            sq_pushstring(v, "vertA", -1);
-            const SQVector3D sqVertA(vertA->x, vertA->y, vertA->z);
-            sq_pushvector(v, &sqVertA);
-            sq_newslot(v, -3);
-
-            // Edge vertex B
-            sq_pushstring(v, "vertB", -1);
-            const SQVector3D sqVertB(vertB->x, vertB->y, vertB->z);
-            sq_pushvector(v, &sqVertB);
-            sq_newslot(v, -3);
+            // Portal geometry (vertA, vertB, startPos, endPos)
+            Internal_PushPortalGeometry(v, nav, tile, poly, link);
 
             sq_arrayappend(v, -2);
         }
