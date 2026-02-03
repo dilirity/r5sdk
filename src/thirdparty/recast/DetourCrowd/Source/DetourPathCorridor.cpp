@@ -70,7 +70,11 @@ int dtMergeCorridorStartMoved(dtPolyRef* path, unsigned char* jump, const int np
 		path[i] = visitedPolys[(nvisited-1)-i];
 		jump[i] = visitedJumps[(nvisited-1)-i];
 	}
-	
+
+	// The first polygon has no incoming traverse - agent is already there.
+	if (req+size > 0)
+		jump[0] = DT_NULL_TRAVERSE_TYPE;
+
 	return req+size;
 }
 
@@ -165,7 +169,11 @@ int dtMergeCorridorStartShortcut(dtPolyRef* path, unsigned char* jump, const int
 		path[i] = visitedPolys[i];
 		jump[i] = visitedJumps[i];
 	}
-	
+
+	// The first polygon has no incoming traverse - agent is already there.
+	if (req+size > 0)
+		jump[0] = DT_NULL_TRAVERSE_TYPE;
+
 	return req+size;
 }
 
@@ -633,7 +641,8 @@ bool dtPathCorridor::fixPathStart(dtPolyRef safeRef, unsigned char safeJump, con
 
 		m_jumps[2] = m_jumps[m_npath-1];
 		m_jumps[1] = DT_NULL_TRAVERSE_TYPE;
-		m_jumps[0] = safeJump;
+		// First polygon has no incoming traverse - agent is already there.
+		m_jumps[0] = DT_NULL_TRAVERSE_TYPE;
 
 		m_npath = 3;
 	}
@@ -669,7 +678,8 @@ bool dtPathCorridor::trimInvalidPath(dtPolyRef safeRef, unsigned char safeJump, 
 		// The first polyref is bad, use current safe values.
 		m_pos = *safePos;
 		m_path[0] = safeRef;
-		m_jumps[0] = safeJump;
+		// First polygon has no incoming traverse - agent is already there.
+		m_jumps[0] = DT_NULL_TRAVERSE_TYPE;
 		m_npath = 1;
 	}
 	else
