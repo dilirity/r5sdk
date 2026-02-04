@@ -28,7 +28,6 @@ static void Rui_CodeAssert(RuiInstance_s* const ruiInstance, const char* const e
 	if (rui_codeAsserts.GetBool())
 		Error(eDLL_T::UI, 0, "%s", errorMsg);
 
-	Assert(0);
 	ruiInstance->hasError = true;
 }
 
