@@ -1083,22 +1083,13 @@ static SQRESULT ServerScript_NavMesh_CorridorSetPath(HSQUIRRELVM v)
     unsigned char pathJumps[256];
     int pathCount = 0;
 
-    // Debug: print filter settings
-    DevMsg(eDLL_T::SERVER, "[BOT] filter: traverseFlags=0x%x cost[8]=%.2f\n",
-            pCorridor->filter.getTraverseFlags(), pCorridor->filter.getTraverseCost(8));
-    
     dtStatus status = pCorridor->query.findPath(
         startRef, targetRef,
         &nearestStart, &nearestTarget, &pCorridor->filter,
         pathPolys, pathJumps, &pathCount, 256);
 
-    // Debug: print status and refs
-    DevMsg(eDLL_T::SERVER, "[BOT] findPath: startRef=%llu targetRef=%llu status=0x%x pathCount=%d\n",
-            startRef, targetRef, status, pathCount);
-    
     if (dtStatusFailed(status) || pathCount == 0)
     {
-        DevMsg(eDLL_T::SERVER, "[BOT] findPath FAILED or no path\n");
         sq_pushbool(v, false);
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
