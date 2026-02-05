@@ -1867,6 +1867,10 @@ dtStatus dtNavMeshQuery::appendVertex(const rdVec3D* pos, const unsigned char fl
 									  dtPolyRef* straightPathRefs, unsigned char* straightPathJumps,
 									  int* straightPathCount, const int maxStraightPath) const
 {
+	// Guard against callers that didn't check the previous DT_BUFFER_TOO_SMALL status.
+	if ((*straightPathCount) >= maxStraightPath)
+		return DT_SUCCESS | DT_BUFFER_TOO_SMALL;
+
 	if ((*straightPathCount) > 0 && ref && rdVequal(&straightPath[((*straightPathCount)-1)], pos))
 	{
 		// The vertices are equal, update flags and poly.
@@ -2248,7 +2252,7 @@ dtStatus dtNavMeshQuery::findStraightPath(const rdVec3D* startPos, const rdVec3D
 						return DT_SUCCESS;
 				}
 
-				if (!contAfterJmp)
+				if (!contAfterJmp || (stat & DT_BUFFER_TOO_SMALL))
 					return stat;
 			}
 			
