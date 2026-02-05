@@ -630,6 +630,7 @@ void dtPathCorridor::setCorridor(const rdVec3D* target, const dtPolyRef* path, c
 
 bool dtPathCorridor::fixPathStart(dtPolyRef safeRef, unsigned char safeJump, const rdVec3D* safePos)
 {
+	rdIgnoreUnused(safeJump);
 	rdAssert(m_path);
 
 	m_pos = *safePos;
@@ -658,6 +659,7 @@ bool dtPathCorridor::fixPathStart(dtPolyRef safeRef, unsigned char safeJump, con
 bool dtPathCorridor::trimInvalidPath(dtPolyRef safeRef, unsigned char safeJump, const rdVec3D* safePos,
 									 dtNavMeshQuery* navquery, const dtQueryFilter* filter)
 {
+	rdIgnoreUnused(safeJump);
 	rdAssert(navquery);
 	rdAssert(filter);
 	rdAssert(m_path);
