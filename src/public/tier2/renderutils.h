@@ -13,6 +13,7 @@ void DebugDrawMark(const Vector3D& vOrigin, const float flRadius, const Color c,
 void DrawStar(const Vector3D& vRrigin, const float flRadius, const bool bZBuffer = true);
 void DebugDrawArrow(const Vector3D& vOrigin, const Vector3D& vEnd, const float flArraySize, const Color color, const bool bZBuffer = true);
 void DebugDrawAxis(const Vector3D& vOrigin, const QAngle& vAngles = { 0, 0, 0 }, const float flScale = 50.f, const bool bZBuffer = true);
+void DebugDrawText(const Vector3D& vOrigin, const char* pText, Color color, float flDuration = 0.0f);
 
 ///////////////////////////////////////////////////////////////////////////////
 void RenderLine(const Vector3D& v1, const Vector3D& v2, Color color, bool bZBuffer);

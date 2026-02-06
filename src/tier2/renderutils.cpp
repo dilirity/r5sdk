@@ -18,6 +18,7 @@
 #include "materialsystem/cmatrendercontext.h"
 #include "materialsystem/cmatqueuedrendercontext.h"
 #include "materialsystem/meshbuilder.h"
+#include "engine/debugoverlay.h"
 
 //-----------------------------------------------------------------------------
 // Purpose: standard materials
@@ -1345,6 +1346,17 @@ void DebugDrawAxis(const Vector3D& vOrigin, const QAngle& vAngles, const float f
     RenderLine(vOrigin, vOrigin + vForward * flScale, Color(0, 255, 0, 255), bZBuffer);
     RenderLine(vOrigin, vOrigin + vUp * flScale, Color(255, 0, 0, 255), bZBuffer);
     RenderLine(vOrigin, vOrigin + vRight * flScale, Color(0, 0, 255, 255), bZBuffer);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: render debug text at a world position
+//-----------------------------------------------------------------------------
+void DebugDrawText(const Vector3D& vOrigin, const char* pText, const Color color, const float flDuration)
+{
+    if (!g_pDebugOverlay)
+        return;
+
+    static_cast<IVDebugOverlay*>(g_pDebugOverlay)->AddTextOverlayRGBu32(vOrigin, 0, flDuration, color.r(), color.g(), color.b(), color.a(), "%s", pText);
 }
 
 void V_RenderUtils::Detour(const bool bAttach) const

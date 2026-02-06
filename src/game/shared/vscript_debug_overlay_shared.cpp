@@ -141,6 +141,23 @@ SQRESULT SharedScript_DebugDrawCapsule(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+SQRESULT SharedScript_DebugDrawText(HSQUIRRELVM v)
+{
+    const SQVector3D* origin;
+    const SQChar* text;
+    SQBool drawThroughWorld;
+    SQFloat duration;
+
+    sq_getvector(v, 2, &origin);
+    sq_getstring(v, 3, &text);
+    sq_getbool(v, 4, &drawThroughWorld);
+    sq_getfloat(v, 5, &duration);
+
+    static_cast<IVDebugOverlay*>(g_pDebugOverlay)->AddTextOverlay(*(Vector3D*)origin, duration, "%s", text);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: create a permanent box for map making
 //-----------------------------------------------------------------------------

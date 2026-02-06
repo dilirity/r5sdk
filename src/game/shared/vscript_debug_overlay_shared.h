@@ -6,6 +6,7 @@ extern SQRESULT SharedScript_DebugDrawSweptBox(HSQUIRRELVM v);
 extern SQRESULT SharedScript_DebugDrawTriangle(HSQUIRRELVM v);
 extern SQRESULT SharedScript_DebugDrawSolidSphere(HSQUIRRELVM v);
 extern SQRESULT SharedScript_DebugDrawCapsule(HSQUIRRELVM v);
+extern SQRESULT SharedScript_DebugDrawText(HSQUIRRELVM v);
 extern SQRESULT SharedScript_CreateBox(HSQUIRRELVM v);
 extern SQRESULT SharedScript_ClearBoxes(HSQUIRRELVM v);
 
