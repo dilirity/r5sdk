@@ -900,10 +900,18 @@ void dtCrowd::update(const float dt, dtCrowdAgentDebugInfo* debug)
 			continue;
 		if (ag->targetState == DT_CROWDAGENT_TARGET_NONE || ag->targetState == DT_CROWDAGENT_TARGET_VELOCITY)
 			continue;
-		
+
 		// Find corners for steering
-		ag->ncorners = ag->corridor.findCorners(ag->cornerVerts, ag->cornerFlags, ag->cornerPolys, ag->cornerJumps,
-												DT_CROWDAGENT_MAX_CORNERS, m_navquery, &m_filters[ag->params.queryFilterType]);
+		// Only find corners if we have a valid path in the corridor
+		if (ag->corridor.getPathCount() > 0)
+		{
+			ag->ncorners = ag->corridor.findCorners(ag->cornerVerts, ag->cornerFlags, ag->cornerPolys, ag->cornerJumps,
+													DT_CROWDAGENT_MAX_CORNERS, m_navquery, &m_filters[ag->params.queryFilterType]);
+		}
+		else
+		{
+			ag->ncorners = 0;
+		}
 		
 		// Check to see if the corner after the next corner is directly visible,
 		// and short cut to there.

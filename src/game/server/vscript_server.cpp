@@ -1161,6 +1161,14 @@ static SQRESULT ServerScript_NavMesh_CorridorGetCorners(HSQUIRRELVM v)
         SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
     }
 
+    // Check if corridor has a valid path
+    if (pCorridor->corridor.getPathCount() <= 0)
+    {
+        // Return empty array if no path exists
+        sq_newarray(v, 0);
+        return SQ_OK;
+    }
+
     if (maxCorners < 1) maxCorners = 1;
     if (maxCorners > 8) maxCorners = 8;
 
