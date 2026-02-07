@@ -1416,7 +1416,6 @@ static SQRESULT ServerScript_NavMesh_GetPortalsFromPoly(HSQUIRRELVM v)
 
     if (!tile || !poly)
     {
-        DevMsg(eDLL_T::SERVER, "[NavMesh] GetPortalsFromPoly: Invalid polyRef %u\n", (unsigned int)polyRef);
         sq_newarray(v, 0);
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
@@ -1486,8 +1485,6 @@ static SQRESULT ServerScript_NavMesh_GetPortalsFromPoly(HSQUIRRELVM v)
         if (link->hasTraverseType())
         {
             traverseLinkCount++;
-            DevMsg(eDLL_T::SERVER, "[NavMesh] GetPortalsFromPoly: Found traverse link #%d, type=%u, targetRef=%u\n",
-                traverseLinkCount, link->getTraverseType(), (unsigned int)link->ref);
             // Get the edge vertices for this link
             const unsigned char edgeIdx = link->edge;
             const unsigned short va = poly->verts[edgeIdx];
@@ -1577,9 +1574,6 @@ static SQRESULT ServerScript_NavMesh_GetPortalsFromPoly(HSQUIRRELVM v)
 
         linkIdx = link->next;
     }
-
-    DevMsg(eDLL_T::SERVER, "[NavMesh] GetPortalsFromPoly: Finished - total links=%d traverse links=%d\n",
-        linkCount, traverseLinkCount);
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
