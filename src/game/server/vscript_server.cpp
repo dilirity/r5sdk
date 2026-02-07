@@ -1181,7 +1181,14 @@ static SQRESULT ServerScript_NavMesh_CorridorGetCorners(HSQUIRRELVM v)
         cornerVerts, cornerFlags, cornerPolys, cornerJumps,
         (int)maxCorners, &pCorridor->query, &pCorridor->filter);
 
-    // Create array of {pos, traverseType} tables
+    // Get the corridor path to find target polygons
+    const dtPolyRef* pathPolys = pCorridor->corridor.getPath();
+    const int pathCount = pCorridor->corridor.getPathCount();
+
+    // Get the navmesh for portal queries
+    const dtNavMesh* nav = pCorridor->query.getAttachedNavMesh();
+
+    // Create array of {pos, traverseType, polyRef, targetPolyRef, portal data...} tables
     sq_newarray(v, 0);
 
     for (int i = 0; i < cornerCount; i++)
@@ -1201,6 +1208,187 @@ static SQRESULT ServerScript_NavMesh_CorridorGetCorners(HSQUIRRELVM v)
         sq_pushstring(v, "polyRef", -1);
         sq_pushinteger(v, (SQInteger)cornerPolys[i]);
         sq_newslot(v, -3);
+
+        // Find the next polygon in the path for this corner
+        // Search through the path to find where this corner's polygon is
+        dtPolyRef targetPolyRef = 0;
+        for (int j = 0; j < pathCount - 1; j++)
+        {
+            if (pathPolys[j] == cornerPolys[i])
+            {
+                // Found this corner's polygon, next one is the target
+                targetPolyRef = pathPolys[j + 1];
+                break;
+            }
+        }
+
+        sq_pushstring(v, "targetPolyRef", -1);
+        sq_pushinteger(v, (SQInteger)targetPolyRef);
+        sq_newslot(v, -3);
+
+        // If this corner has a traverse type, get portal data
+        const int traverseType = cornerJumps[i] & (DT_MAX_TRAVERSE_TYPES - 1);
+        if (traverseType != 0)
+        {
+            // Get tile and poly for this corner
+            const dtMeshTile* tile = nullptr;
+            const dtPoly* poly = nullptr;
+            nav->getTileAndPolyByRefUnsafe(cornerPolys[i], &tile, &poly);
+
+            if (tile && poly)
+            {
+                // Special handling if corner is ON an off-mesh connection (zipline)
+                if (poly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
+                {
+                    const dtOffMeshConnection* con = nav->getOffMeshConnectionByRef(cornerPolys[i]);
+                    if (con)
+                    {
+                        // For off-mesh, vertices are the connection endpoints
+                        // Use them directly as portal data
+                        sq_pushstring(v, "portalVertA", -1);
+                        const SQVector3D sqVertA(con->posa.x, con->posa.y, con->posa.z);
+                        sq_pushvector(v, &sqVertA);
+                        sq_newslot(v, -3);
+
+                        sq_pushstring(v, "portalVertB", -1);
+                        const SQVector3D sqVertB(con->posb.x, con->posb.y, con->posb.z);
+                        sq_pushvector(v, &sqVertB);
+                        sq_newslot(v, -3);
+
+                        // Determine direction based on path
+                        rdVec3D startPos = con->posa;
+                        rdVec3D endPos = con->posb;
+
+                        // If we have a previous polygon in path, use it to determine direction
+                        for (int j = 0; j < pathCount - 1; j++)
+                        {
+                            if (pathPolys[j + 1] == cornerPolys[i] && j >= 0)
+                            {
+                                // Found this off-mesh in path, get previous polygon
+                                const dtMeshTile* prevTile = nullptr;
+                                const dtPoly* prevPoly = nullptr;
+                                nav->getTileAndPolyByRefUnsafe(pathPolys[j], &prevTile, &prevPoly);
+
+                                if (prevPoly)
+                                {
+                                    // Pick endpoint closer to previous polygon as start
+                                    const float distA = rdVdistSqr(&con->posa, &prevPoly->center);
+                                    const float distB = rdVdistSqr(&con->posb, &prevPoly->center);
+                                    if (distA < distB)
+                                    {
+                                        startPos = con->posa;
+                                        endPos = con->posb;
+                                    }
+                                    else
+                                    {
+                                        startPos = con->posb;
+                                        endPos = con->posa;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+
+                        sq_pushstring(v, "portalStart", -1);
+                        const SQVector3D sqStartPos(startPos.x, startPos.y, startPos.z);
+                        sq_pushvector(v, &sqStartPos);
+                        sq_newslot(v, -3);
+
+                        sq_pushstring(v, "portalEnd", -1);
+                        const SQVector3D sqEndPos(endPos.x, endPos.y, endPos.z);
+                        sq_pushvector(v, &sqEndPos);
+                        sq_newslot(v, -3);
+                    }
+                }
+                else if (targetPolyRef != 0)
+                {
+                    // Regular polygon with traverse link - find the link to targetPolyRef
+                    unsigned int linkIdx = poly->firstLink;
+                    while (linkIdx != DT_NULL_LINK)
+                    {
+                        const dtLink* link = &tile->links[linkIdx];
+
+                        if (link->ref == targetPolyRef && link->hasTraverseType())
+                        {
+                            // Found the portal link - extract geometry
+                            const unsigned char edgeIdx = link->edge;
+                            const unsigned short va = poly->verts[edgeIdx];
+                            const unsigned short vb = poly->verts[(edgeIdx + 1) % poly->vertCount];
+
+                            const rdVec3D* vertA = &tile->verts[va];
+                            const rdVec3D* vertB = &tile->verts[vb];
+
+                            // Calculate edge midpoint
+                            rdVec3D edgeMid;
+                            edgeMid.x = (vertA->x + vertB->x) * 0.5f;
+                            edgeMid.y = (vertA->y + vertB->y) * 0.5f;
+                            edgeMid.z = (vertA->z + vertB->z) * 0.5f;
+
+                            // Get target polygon for endPos
+                            const dtMeshTile* targetTile = nullptr;
+                            const dtPoly* targetPoly = nullptr;
+                            nav->getTileAndPolyByRefUnsafe(targetPolyRef, &targetTile, &targetPoly);
+
+                            rdVec3D startPos = edgeMid;
+                            rdVec3D endPos = edgeMid;
+
+                            if (targetTile && targetPoly)
+                            {
+                                if (targetPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION && targetPoly->vertCount == 2)
+                                {
+                                    // Off-mesh connection - get both endpoints
+                                    const rdVec3D* v0 = &targetTile->verts[targetPoly->verts[0]];
+                                    const rdVec3D* v1 = &targetTile->verts[targetPoly->verts[1]];
+
+                                    const float dist0 = rdVdistSqr(v0, &poly->center);
+                                    const float dist1 = rdVdistSqr(v1, &poly->center);
+                                    if (dist0 < dist1)
+                                    {
+                                        startPos = *v0;
+                                        endPos = *v1;
+                                    }
+                                    else
+                                    {
+                                        startPos = *v1;
+                                        endPos = *v0;
+                                    }
+                                }
+                                else
+                                {
+                                    // Regular polygon - use center
+                                    endPos = targetPoly->center;
+                                }
+                            }
+
+                            // Add portal data to corner table
+                            sq_pushstring(v, "portalVertA", -1);
+                            const SQVector3D sqVertA(vertA->x, vertA->y, vertA->z);
+                            sq_pushvector(v, &sqVertA);
+                            sq_newslot(v, -3);
+
+                            sq_pushstring(v, "portalVertB", -1);
+                            const SQVector3D sqVertB(vertB->x, vertB->y, vertB->z);
+                            sq_pushvector(v, &sqVertB);
+                            sq_newslot(v, -3);
+
+                            sq_pushstring(v, "portalStart", -1);
+                            const SQVector3D sqStartPos(startPos.x, startPos.y, startPos.z);
+                            sq_pushvector(v, &sqStartPos);
+                            sq_newslot(v, -3);
+
+                            sq_pushstring(v, "portalEnd", -1);
+                            const SQVector3D sqEndPos(endPos.x, endPos.y, endPos.z);
+                            sq_pushvector(v, &sqEndPos);
+                            sq_newslot(v, -3);
+
+                            break; // Found the link, done
+                        }
+
+                        linkIdx = link->next;
+                    }
+                }
+            }
+        }
 
         sq_arrayappend(v, -2);
     }
