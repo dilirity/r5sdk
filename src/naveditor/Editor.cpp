@@ -132,6 +132,12 @@ static void initTraverseTableParams()
 	s_traverseTable[29] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, -1.f, false }; // Unused
 	s_traverseTable[30] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, -1.f, false }; // Unused
 	s_traverseTable[31] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, -1.f, false }; // Unused
+
+	for (int i = 0; i < NUM_TRAVERSE_TYPES; ++i)
+	{
+		s_traverseTable[i].maxAngleDeg = 30.0f;
+		s_traverseTable[i].ignoreAngleCheck = true;
+	}
 }
 
 Editor::Editor() :
@@ -543,7 +549,7 @@ bool traverseTypeSupported(void* userData, const unsigned char traverseType)
 	return rdBitCellBit(traverseType) & s_traverseAnimTraverseFlags[traverseTableIndex];
 }
 
-unsigned char GetBestTraverseType(void* userData, const float traverseDist, const float elevation, const float slope, const bool baseOverlaps, const bool landOverlaps)
+unsigned char GetBestTraverseType(void* userData, const float traverseDist, const float elevation, const float slope, const bool baseOverlaps, const bool landOverlaps, const float edgeAngle)
 {
 	TraverseType_e bestTraverseType = INVALID_TRAVERSE_TYPE;
 	float smallestDiff = FLT_MAX;
@@ -579,6 +585,9 @@ unsigned char GetBestTraverseType(void* userData, const float traverseDist, cons
 		{
 			continue;
 		}
+
+		if (!traverseType.ignoreAngleCheck && edgeAngle > traverseType.maxAngleDeg)
+			continue;
 
 		if (traverseType.ovlpTrig > -1 && elevation >= traverseType.ovlpTrig)
 		{
@@ -1220,11 +1229,12 @@ void Editor::renderTraverseTableFineTuners()
 	static int frozenRows = 2;
 	const int rowsCount = NUM_TRAVERSE_TYPES;
 	const float textBaseHeight = ImGui::GetTextLineHeightWithSpacing();
+	const float traverseFineTunerHeight = (textBaseHeight * 20) + 10.f;
 
 	const char* linearColumnNames[] = { "Type", "minDist", "maxDist", "minElev", "maxElev" };
 	const int linearColumnsCount = IM_ARRAYSIZE(linearColumnNames);
 
-	if (ImGui::BeginTable("TraverseTableLinearFineTuner", linearColumnsCount, tableFlags, ImVec2(0.0f, (textBaseHeight * 12) + 10.f)))
+	if (ImGui::BeginTable("TraverseTableLinearFineTuner", linearColumnsCount, tableFlags, ImVec2(0.0f, traverseFineTunerHeight)))
 	{
 		ImGui::TableSetupColumn(linearColumnNames[0], ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_NoReorder);
 		for (int n = 1; n < linearColumnsCount; n++)
@@ -1282,10 +1292,10 @@ void Editor::renderTraverseTableFineTuners()
 		ImGui::EndTable();
 	}
 
-	const char* angularColumnNames[] = { "Type", "minSlope", "maxSlope", "ovlpTrig", "ovlpExcl" };
+	const char* angularColumnNames[] = { "Type", "minSlope", "maxSlope", "maxAng", "ignAng", "ovlpTrig", "ovlpExcl" };
 	const int angularColumnsCount = IM_ARRAYSIZE(angularColumnNames);
 
-	if (ImGui::BeginTable("TraverseTableAngularFineTuner", angularColumnsCount, tableFlags, ImVec2(0.0f, (textBaseHeight * 12) + 10.f)))
+	if (ImGui::BeginTable("TraverseTableAngularFineTuner", angularColumnsCount, tableFlags, ImVec2(0.0f, traverseFineTunerHeight)))
 	{
 		ImGui::TableSetupColumn(angularColumnNames[0], ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_NoReorder);
 		for (int n = 1; n < angularColumnsCount; n++)
@@ -1326,9 +1336,25 @@ void Editor::renderTraverseTableFineTuners()
 						ImGui::SliderFloat("", &trav.maxSlope, 0, 360, "%g");
 						break;
 					case 3:
-						ImGui::SliderFloat("", &trav.ovlpTrig, 0, trav.maxElev, "%g");
+						ImGui::BeginDisabled(trav.ignoreAngleCheck);
+						{
+							int maxAngleStep = (int)rdClamp(rdMathRoundf(trav.maxAngleDeg / 5.0f), 0.0f, 18.0f);
+							const float degLabelWidth = 48.0f;
+							ImGui::SetNextItemWidth(rdMax(1.0f, ImGui::GetContentRegionAvail().x - degLabelWidth));
+							ImGui::SliderInt("##maxAngStep", &maxAngleStep, 0, 18, "", ImGuiSliderFlags_NoInput);
+							trav.maxAngleDeg = (float)(maxAngleStep * 5);
+							ImGui::SameLine(0.0f, 4.0f);
+							ImGui::Text("%d deg", (int)trav.maxAngleDeg);
+						}
+						ImGui::EndDisabled();
 						break;
 					case 4:
+						ImGui::Checkbox("", &trav.ignoreAngleCheck);
+						break;
+					case 5:
+						ImGui::SliderFloat("", &trav.ovlpTrig, 0, trav.maxElev, "%g");
+						break;
+					case 6:
 						ImGui::Checkbox("", &trav.ovlpExcl);
 						break;
 					}
@@ -1349,7 +1375,7 @@ void Editor::renderTraverseTableFineTuners()
 	const int numTraverseTables = NavMesh_GetTraverseTableCountForNavMeshType(m_selectedNavMeshType);
 	const int numColumns = numTraverseTables + 1;
 
-	if (ImGui::BeginTable("TraverseTableMaskSelector", numColumns, tableFlags, ImVec2(0.0f, (textBaseHeight * 12) + 20.f)))
+	if (ImGui::BeginTable("TraverseTableMaskSelector", numColumns, tableFlags, ImVec2(0.0f, traverseFineTunerHeight + 10.f)))
 	{
 		ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoHide | ImGuiTableColumnFlags_NoReorder);
 		const bool smallNavMesh = m_selectedNavMeshType == NAVMESH_SMALL;
@@ -1392,7 +1418,6 @@ void Editor::renderTraverseTableFineTuners()
 						: NavMesh_GetFirstTraverseAnimTypeForType(m_selectedNavMeshType);
 
 					int* const flags = reinterpret_cast<int*>(&s_traverseAnimTraverseFlags[j]);
-
 					ImGui::CheckboxFlags("", flags, 1 << row);
 					ImGui::PopID();
 				}

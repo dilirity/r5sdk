@@ -913,8 +913,14 @@ static dtStatus internalTryEstablishPortalPointsUsingSpatial(const dtTraverseLin
 			const float slopeAngle = rdMathFabsf(rdCalcSlopeAngle(basePolyEdgeMid, &landPolyEdgeMid));
 			const bool baseOverlaps = rdCalcEdgeOverlap2D(baseDetailPolyEdgeSpos, baseDetailPolyEdgeEpos, landDetailPolyEdgeSpos, landDetailPolyEdgeEpos, baseEdgeDir) > params.minEdgeOverlap;
 			const bool landOverlaps = rdCalcEdgeOverlap2D(landDetailPolyEdgeSpos, landDetailPolyEdgeEpos, baseDetailPolyEdgeSpos, baseDetailPolyEdgeEpos, &landEdgeDir) > params.minEdgeOverlap;
+			rdVec3D baseEdgeDirNorm = *baseEdgeDir;
+			rdVec3D landEdgeDirNorm = landEdgeDir;
+			rdVnormalize2D(&baseEdgeDirNorm);
+			rdVnormalize2D(&landEdgeDirNorm);
+			const float edgeDot = rdClamp(rdMathFabsf(rdVdot2D((const rdVec2D*)&baseEdgeDirNorm, (const rdVec2D*)&landEdgeDirNorm)), 0.0f, 1.0f);
+			const float edgeAngle = rdRadToDeg(acosf(edgeDot));
 
-			const unsigned char traverseType = params.getTraverseType(params.userData, dist, elevation, slopeAngle, baseOverlaps, landOverlaps);
+			const unsigned char traverseType = params.getTraverseType(params.userData, dist, elevation, slopeAngle, baseOverlaps, landOverlaps, edgeAngle);
 
 			if (traverseType == DT_NULL_TRAVERSE_TYPE)
 				continue;

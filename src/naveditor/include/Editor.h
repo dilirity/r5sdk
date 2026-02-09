@@ -55,6 +55,8 @@ struct TraverseType_s
 	float maxSlope;
 	float ovlpTrig;
 	bool ovlpExcl;
+	float maxAngleDeg;
+	bool ignoreAngleCheck;
 };
 
 enum TraverseType_e // todo(amos): move elsewhere

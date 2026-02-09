@@ -667,9 +667,10 @@ struct dtTraverseLinkConnectParams
 	///  @param[in]		slopeAngle		The slope angle from base to land position. [Unit: Degrees]
 	///  @param[in]		baseOverlaps	Whether the projection of the base edge overlaps with the land edge.
 	///  @param[in]		landOverlaps	Whether the projection of the land edge overlaps with the base edge.
+	///  @param[in]		edgeAngle		The angle difference between candidate portal edge directions (2D). [Unit: Degrees]
 	/// @return The desired traverse type for provided spatial and logical characteristics.
 	unsigned char(*getTraverseType)(void* userData, const float traverseDist, const float elevation,
-		const float slopeAngle, const bool baseOverlaps, const bool landOverlaps);
+		const float slopeAngle, const bool baseOverlaps, const bool landOverlaps, const float edgeAngle);
 
 	/// User defined callback that returns whether a traverse link based on
 	/// provided spatial characteristics is clear in terms of line-of-sight.
