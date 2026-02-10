@@ -42,6 +42,7 @@ class dtQueryFilter
 public:
 	dtQueryFilter();
 	void resetTraverseCosts();
+	void resetTraverseAngleChecks();
 	
 #ifdef DT_VIRTUAL_QUERYFILTER
 	virtual ~dtQueryFilter() { }
@@ -64,6 +65,13 @@ public:
 	bool traverseFilter(const dtLink* link,
 			const dtMeshTile* tile,
 			const dtPoly* poly) const;
+
+#ifdef DT_VIRTUAL_QUERYFILTER
+	virtual
+#endif
+	bool traverseFilterEx(const dtLink* link,
+			const dtPolyRef fromRef, const dtMeshTile* fromTile, const dtPoly* fromPoly,
+			const dtPolyRef toRef, const dtMeshTile* toTile, const dtPoly* toPoly) const;
 
 
 	/// Returns cost to move from the beginning to the end of a line segment
@@ -99,6 +107,18 @@ public:
 	///  @param[in]		i		The id of the area.
 	///  @param[in]		cost	The new cost of traversing the area.
 	inline void setTraverseCost(const int i, const float cost) { m_traverseCost[i] = cost; }
+
+	/// Returns whether edge-angle gating is disabled for this traverse type.
+	bool getTraverseIgnoreAngle(const int i) const;
+
+	/// Enables/disables edge-angle gating for this traverse type.
+	void setTraverseIgnoreAngle(const int i, const bool ignore);
+
+	/// Returns the max allowed edge angle for this traverse type. [Unit: Degrees]
+	float getTraverseMaxAngleDeg(const int i) const;
+
+	/// Sets the max allowed edge angle for this traverse type. [Unit: Degrees]
+	void setTraverseMaxAngleDeg(const int i, const float deg);
 
 	/// Returns the include flags for the filter.
 	/// Any polygons that include one or more of these flags will be

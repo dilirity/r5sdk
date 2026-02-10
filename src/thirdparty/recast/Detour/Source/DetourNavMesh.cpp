@@ -1296,14 +1296,10 @@ namespace
 			}
 		}
 
-		// This happens when `onlyBoundary` is false and we encountered a
-		// degenerate polygon with no detail boundary edges. Catch these here
-		// and avoid crashing the runtime as `pmin` and `pmax` will be NULL.
+		// Degenerate polygon with no usable detail edges. Return false so
+		// callers handle it gracefully rather than dereferencing null pointers.
 		if (!found)
-		{
-			rdAssert(0);
 			return false;
-		}
 
 		rdVlerp(closest, pmin, pmax, tmin);
 

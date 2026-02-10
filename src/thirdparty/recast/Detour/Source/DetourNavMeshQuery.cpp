@@ -23,6 +23,19 @@
 #include "Shared/Include/SharedCommon.h"
 #include "Shared/Include/SharedAlloc.h"
 #include "Shared/Include/SharedAssert.h"
+#include <unordered_map>
+
+struct dtQueryFilterAngleConfig
+{
+	float maxAngleDeg[DT_MAX_TRAVERSE_TYPES];
+	unsigned char ignoreAngle[DT_MAX_TRAVERSE_TYPES];
+};
+
+// Side storage for angle config; only populated for filters that explicitly
+// enable angle gating (e.g. bot corridor filters).  Engine-owned filters
+// never get entries here.  Callers must call dtQueryFilter::resetTraverseAngleChecks()
+// before the filter is destroyed to avoid stale entries.
+static std::unordered_map<const dtQueryFilter*, dtQueryFilterAngleConfig> s_queryFilterAngleCfg;
 
 /// @class dtQueryFilter
 ///
@@ -71,6 +84,116 @@ void dtQueryFilter::resetTraverseCosts()
 		m_traverseCost[i] = 1.0f;
 }
 
+void dtQueryFilter::resetTraverseAngleChecks()
+{
+	// Remove any angle config for this filter; after this call the filter
+	// behaves as if angle gating is disabled for all traverse types.
+	s_queryFilterAngleCfg.erase(this);
+}
+
+bool dtQueryFilter::getTraverseIgnoreAngle(const int i) const
+{
+	auto it = s_queryFilterAngleCfg.find(this);
+	if (it == s_queryFilterAngleCfg.end())
+		return true; // No config = angle check ignored.
+	return it->second.ignoreAngle[i] != 0;
+}
+
+static dtQueryFilterAngleConfig& dtGetOrCreateAngleCfg(const dtQueryFilter* filter)
+{
+	auto it = s_queryFilterAngleCfg.find(filter);
+	if (it != s_queryFilterAngleCfg.end())
+		return it->second;
+
+	// Initialize with angle checking disabled for all types.
+	dtQueryFilterAngleConfig cfg{};
+	for (int i = 0; i < DT_MAX_TRAVERSE_TYPES; ++i)
+	{
+		cfg.maxAngleDeg[i] = 180.0f;
+		cfg.ignoreAngle[i] = 1;
+	}
+
+	return s_queryFilterAngleCfg.emplace(filter, cfg).first->second;
+}
+
+void dtQueryFilter::setTraverseIgnoreAngle(const int i, const bool ignore)
+{
+	dtGetOrCreateAngleCfg(this).ignoreAngle[i] = ignore ? 1 : 0;
+}
+
+float dtQueryFilter::getTraverseMaxAngleDeg(const int i) const
+{
+	auto it = s_queryFilterAngleCfg.find(this);
+	if (it == s_queryFilterAngleCfg.end())
+		return 180.0f;
+	return it->second.maxAngleDeg[i];
+}
+
+void dtQueryFilter::setTraverseMaxAngleDeg(const int i, const float deg)
+{
+	dtGetOrCreateAngleCfg(this).maxAngleDeg[i] = deg;
+}
+
+static bool dtTryCalcTraverseEdgeAngle(const dtLink* link,
+	const dtPolyRef fromRef, const dtMeshTile* fromTile, const dtPoly* fromPoly,
+	const dtPolyRef /*toRef*/, const dtMeshTile* toTile, const dtPoly* toPoly,
+	float& outEdgeAngle)
+{
+	if (!link || !fromTile || !fromPoly || !toTile || !toPoly)
+		return false;
+
+	if (fromPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION ||
+		toPoly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
+	{
+		return false;
+	}
+
+	if ((int)link->edge >= (int)fromPoly->vertCount)
+		return false;
+
+	const dtLink* reverseLink = nullptr;
+	for (unsigned int i = toPoly->firstLink; i != DT_NULL_LINK; i = toTile->links[i].next)
+	{
+		const dtLink* candidate = &toTile->links[i];
+		if (candidate->ref != fromRef || !candidate->hasTraverseType())
+			continue;
+
+		if (candidate->getTraverseType() == link->getTraverseType())
+		{
+			reverseLink = candidate;
+			break;
+		}
+
+		if (!reverseLink)
+			reverseLink = candidate;
+	}
+
+	if (!reverseLink || (int)reverseLink->edge >= (int)toPoly->vertCount)
+		return false;
+
+	const rdVec3D* fromA = &fromTile->verts[fromPoly->verts[link->edge]];
+	const rdVec3D* fromB = &fromTile->verts[fromPoly->verts[(link->edge + 1) % fromPoly->vertCount]];
+	const rdVec3D* toA = &toTile->verts[toPoly->verts[reverseLink->edge]];
+	const rdVec3D* toB = &toTile->verts[toPoly->verts[(reverseLink->edge + 1) % toPoly->vertCount]];
+
+	rdVec3D fromDir;
+	rdVec3D toDir;
+	rdVsub(&fromDir, fromB, fromA);
+	rdVsub(&toDir, toB, toA);
+
+	const float fromLen2D = fromDir.x * fromDir.x + fromDir.y * fromDir.y;
+	const float toLen2D = toDir.x * toDir.x + toDir.y * toDir.y;
+	if (fromLen2D <= 1e-6f || toLen2D <= 1e-6f)
+		return false;
+
+	rdVnormalize2D(&fromDir);
+	rdVnormalize2D(&toDir);
+
+	const float edgeDot = rdClamp(rdMathFabsf(rdVdot2D((const rdVec2D*)&fromDir, (const rdVec2D*)&toDir)), 0.0f, 1.0f);
+	outEdgeAngle = rdRadToDeg(acosf(edgeDot));
+	return true;
+}
+
 #ifndef DT_VIRTUAL_QUERYFILTER
 rdForceInline
 #endif
@@ -92,6 +215,38 @@ bool dtQueryFilter::traverseFilter(const dtLink* link,
 	{
 		if (!(rdBitCellBit(link->getTraverseType()) & m_traverseFlags))
 			return false;
+	}
+
+	return true;
+}
+
+#ifndef DT_VIRTUAL_QUERYFILTER
+rdForceInline
+#endif
+bool dtQueryFilter::traverseFilterEx(const dtLink* link,
+	const dtPolyRef fromRef, const dtMeshTile* fromTile, const dtPoly* fromPoly,
+	const dtPolyRef toRef, const dtMeshTile* toTile, const dtPoly* toPoly) const
+{
+	if (!traverseFilter(link, fromTile, fromPoly))
+		return false;
+
+	if (link->hasTraverseType())
+	{
+		auto it = s_queryFilterAngleCfg.find(this);
+		if (it != s_queryFilterAngleCfg.end())
+		{
+			const unsigned char traverseType = link->getTraverseType();
+			const dtQueryFilterAngleConfig& cfg = it->second;
+			if (!cfg.ignoreAngle[traverseType])
+			{
+				float edgeAngle = 0.0f;
+				if (!dtTryCalcTraverseEdgeAngle(link, fromRef, fromTile, fromPoly, toRef, toTile, toPoly, edgeAngle))
+					return false;
+
+				if (edgeAngle > cfg.maxAngleDeg[traverseType])
+					return false;
+			}
+		}
 	}
 
 	return true;
@@ -413,7 +568,7 @@ dtStatus dtNavMeshQuery::findRandomPointAroundCircle(dtPolyRef startRef, const r
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(link, neighbourTile, neighbourPoly))
+			if (!filter->traverseFilterEx(link, bestRef, bestTile, bestPoly, neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 			
 			// Find edge and calc distance to the edge.
@@ -1212,7 +1367,7 @@ dtStatus dtNavMeshQuery::findPath(dtPolyRef startRef, dtPolyRef endRef,
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(&bestLink, neighbourTile, neighbourPoly))
+			if (!filter->traverseFilterEx(&bestLink, bestRef, bestTile, bestPoly, neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
 			// deal explicitly with crossing tile boundaries
@@ -1535,7 +1690,7 @@ dtStatus dtNavMeshQuery::updateSlicedFindPath(const int maxIter, int* doneIters,
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 
-			if (!filter->traverseFilter(&bestLink, neighbourTile, neighbourPoly))
+			if (!filter->traverseFilterEx(&bestLink, bestRef, bestTile, bestPoly, neighbourRef, neighbourTile, neighbourPoly))
 				continue;
 			
 			unsigned char crossSide = 0; // See https://github.com/recastnavigation/recastnavigation/issues/438
@@ -2552,7 +2707,7 @@ dtStatus dtNavMeshQuery::moveAlongSurface(dtPolyRef startRef, const rdVec3D* sta
 							const dtPoly* neiPoly = 0;
 							m_nav->getTileAndPolyByRefUnsafe(link->ref, &neiTile, &neiPoly);
 
-							if (filter->passFilter(link->ref, neiTile, neiPoly) && 
+							if (filter->passFilter(link->ref, neiTile, neiPoly) &&
 								filter->traverseFilter(link, neiTile, neiPoly))
 							{
 								if (nneis < MAX_NEIS)
@@ -3280,7 +3435,7 @@ dtStatus dtNavMeshQuery::findPolysAroundCircle(dtPolyRef startRef, const rdVec3D
 			const dtMeshTile* neighbourTile = 0;
 			const dtPoly* neighbourPoly = 0;
 			m_nav->getTileAndPolyByRefUnsafe(neighbourRef, &neighbourTile, &neighbourPoly);
-		
+
 			// Do not advance if the polygon is excluded by the filter.
 			if (!filter->passFilter(neighbourRef, neighbourTile, neighbourPoly))
 				continue;
@@ -3460,7 +3615,7 @@ dtStatus dtNavMeshQuery::findPolysAroundShape(dtPolyRef startRef, const rdVec3D*
 				status |= DT_BUFFER_TOO_SMALL;
 			}
 		}
-		
+
 		for (unsigned int i = bestPoly->firstLink; i != DT_NULL_LINK; i = bestTile->links[i].next)
 		{
 			const dtLink* link = &bestTile->links[i];
@@ -3468,7 +3623,7 @@ dtStatus dtNavMeshQuery::findPolysAroundShape(dtPolyRef startRef, const rdVec3D*
 			// Skip invalid neighbours and do not follow back to parent.
 			if (!neighbourRef || neighbourRef == parentRef)
 				continue;
-			
+
 			// Expand to neighbour
 			const dtMeshTile* neighbourTile = 0;
 			const dtPoly* neighbourPoly = 0;
@@ -3677,7 +3832,7 @@ dtStatus dtNavMeshQuery::findLocalNeighbourhood(dtPolyRef startRef, const rdVec3
 			
 			if (!filter->traverseFilter(link, neighbourTile, neighbourPoly))
 				continue;
-			
+
 			// Find edge and calc distance to the edge.
 			rdVec3D va, vb;
 			if (!getPortalPoints(curRef, curPoly, curTile, neighbourRef, neighbourPoly, neighbourTile, link, &va,&vb))
@@ -4032,7 +4187,7 @@ dtStatus dtNavMeshQuery::findDistanceToWall(dtPolyRef startRef, const rdVec3D* c
 							const dtMeshTile* neiTile = 0;
 							const dtPoly* neiPoly = 0;
 							m_nav->getTileAndPolyByRefUnsafe(link->ref, &neiTile, &neiPoly);
-							if (filter->passFilter(link->ref, neiTile, neiPoly) && 
+							if (filter->passFilter(link->ref, neiTile, neiPoly) &&
 								filter->traverseFilter(link, neiTile, neiPoly))
 								solid = false;
 						}

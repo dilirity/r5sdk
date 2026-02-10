@@ -21,6 +21,7 @@
 #include "pluginsystem/pluginsystem.h"
 #include "vscript/vscript.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
+#include "vscript/languages/squirrel_re/include/sqarray.h"
 
 #include "game/shared/vscript_gamedll_defs.h"
 
@@ -39,6 +40,7 @@
 #include "thirdparty/recast/DetourCrowd/Include/DetourPathCorridor.h"
 #include "public/game/server/ai_agent.h"  // g_traverseAnimDefaultCosts
 #include <unordered_map>
+#include <vector>
 
 //=============================================================================
 // Bot Navigation Corridor System
@@ -938,6 +940,72 @@ static dtNavMesh* Internal_ServerScript_NavMesh_GetNavMesh(
     return nav;
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: parses either an integer traverse type or array<int> of types.
+//-----------------------------------------------------------------------------
+static bool Internal_ServerScript_ParseTraverseTypesArg(
+    HSQUIRRELVM v,
+    const SQInteger argIdx,
+    std::vector<int>& outTypes)
+{
+    outTypes.clear();
+
+    HSQOBJECT obj{};
+    if (SQ_FAILED(sq_getstackobj(v, argIdx, &obj)))
+    {
+        v_SQVM_ScriptError("Failed to read traverse type argument at index %d", argIdx);
+        return false;
+    }
+
+    const SQObjectType type = sq_type(obj);
+    if (type == OT_INTEGER)
+    {
+        SQInteger traverseType = 0;
+        sq_getinteger(v, argIdx, &traverseType);
+        outTypes.push_back((int)traverseType);
+    }
+    else if (type == OT_ARRAY)
+    {
+        const SQArray* arr = _array(obj);
+        if (!arr)
+        {
+            v_SQVM_ScriptError("Traverse types argument is an invalid array");
+            return false;
+        }
+
+        for (SQInteger i = 0; i < arr->Size(); ++i)
+        {
+            const SQObject& item = arr->_values[i];
+            if (sq_isnull(item))
+                continue;
+
+            if (!sq_isinteger(item))
+            {
+                v_SQVM_ScriptError("Traverse types array must contain only integers");
+                return false;
+            }
+
+            outTypes.push_back((int)_integer(item));
+        }
+    }
+    else
+    {
+        v_SQVM_ScriptError("Traverse types must be an integer or array of integers");
+        return false;
+    }
+
+    for (const int traverseType : outTypes)
+    {
+        if (traverseType < 0 || traverseType >= DT_MAX_TRAVERSE_TYPES)
+        {
+            v_SQVM_ScriptError("Traverse type %d out of range [0, %d)", traverseType, DT_MAX_TRAVERSE_TYPES);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 //=============================================================================
 // NavMesh Corridor API
 //=============================================================================
@@ -1021,8 +1089,80 @@ static SQRESULT ServerScript_NavMesh_DestroyCorridor(HSQUIRRELVM v)
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
 
+    it->second->filter.resetTraverseAngleChecks();
     delete it->second;
     g_corridors.erase(it);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: enables edge-angle filtering for one traverse type or array<int>.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_CorridorSetAngleFilter(HSQUIRRELVM v)
+{
+    SQInteger handle = -1;
+    SQFloat maxAngleDeg = 0.0f;
+    sq_getinteger(v, 2, &handle);
+    sq_getfloat(v, 4, &maxAngleDeg);
+    if (maxAngleDeg < 0.0f) maxAngleDeg = 0.0f;
+    if (maxAngleDeg > 180.0f) maxAngleDeg = 180.0f;
+
+    auto it = g_corridors.find((int)handle);
+    if (it == g_corridors.end())
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorSetAngleFilter: invalid corridor handle %d", handle);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    BotCorridor* pCorridor = it->second;
+    if (!pCorridor->initialized)
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorSetAngleFilter: corridor not initialized");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    std::vector<int> traverseTypes;
+    if (!Internal_ServerScript_ParseTraverseTypesArg(v, 3, traverseTypes))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    for (const int traverseType : traverseTypes)
+    {
+        pCorridor->filter.setTraverseMaxAngleDeg(traverseType, (float)maxAngleDeg);
+        pCorridor->filter.setTraverseIgnoreAngle(traverseType, false);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: disables edge-angle filtering for one traverse type or array<int>.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_CorridorClearAngleFilter(HSQUIRRELVM v)
+{
+    SQInteger handle = -1;
+    sq_getinteger(v, 2, &handle);
+
+    auto it = g_corridors.find((int)handle);
+    if (it == g_corridors.end())
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorClearAngleFilter: invalid corridor handle %d", handle);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    BotCorridor* pCorridor = it->second;
+    if (!pCorridor->initialized)
+    {
+        v_SQVM_ScriptError("NavMesh_CorridorClearAngleFilter: corridor not initialized");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    std::vector<int> traverseTypes;
+    if (!Internal_ServerScript_ParseTraverseTypesArg(v, 3, traverseTypes))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    for (const int traverseType : traverseTypes)
+        pCorridor->filter.setTraverseIgnoreAngle(traverseType, true);
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -1088,7 +1228,8 @@ static SQRESULT ServerScript_NavMesh_CorridorSetPath(HSQUIRRELVM v)
         &nearestStart, &nearestTarget, &pCorridor->filter,
         pathPolys, pathJumps, &pathCount, 256);
 
-    if (dtStatusFailed(status) || pathCount == 0)
+    // We don't need a partial path. We either can reach the target or there's no path to it.
+    if (dtStatusFailed(status) || pathCount == 0 || (status & DT_PARTIAL_RESULT))
     {
         sq_pushbool(v, false);
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -2123,6 +2264,16 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "Sets the path in the corridor from start to target. Returns true on success",
         "bool",
         "int handle, vector startPos, vector targetPos", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorSetAngleFilter,
+        "Enables edge-angle filtering for traverse type(s). traverseTypes can be int or array<int>",
+        "void",
+        "int handle, var traverseTypes, float maxAngleDeg", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorClearAngleFilter,
+        "Disables edge-angle filtering for traverse type(s). traverseTypes can be int or array<int>",
+        "void",
+        "int handle, var traverseTypes", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorMove,
         "Updates corridor position as agent moves. Returns true on success",
