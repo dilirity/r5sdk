@@ -503,7 +503,9 @@ static uint64_t ComputeMilesEventHash(const char* eventName)
 // The eventPtr (qword_1655B9658) points to entry + 0x08, which IS the hash
 inline uint64_t GetRealHashFromEventPtr(uint64_t eventPtr)
 {
-	if (eventPtr <= 2) return eventPtr;
+	// Values below a reasonable pointer threshold are likely raw hashes/IDs
+	// User-mode addresses on x64 Windows are typically >= 0x10000
+	if (eventPtr < 0x10000) return eventPtr;
 	// Event pointer points directly to the hash at entry + 0x08
 	return *reinterpret_cast<uint64_t*>(eventPtr);
 }

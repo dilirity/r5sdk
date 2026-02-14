@@ -5,7 +5,7 @@
 #include "tier1/cvar.h"
 
 // ConVars to control debug text for static props
-ConVar debug_staticprop_text("debug_staticprop_text", "1", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Enable debug text for static props");
+ConVar debug_staticprop_text("debug_staticprop_text", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Enable debug text for static props");
 ConVar debug_staticprop_text_duration("debug_staticprop_text_duration", "5.0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT, "Duration (seconds) for static prop debug text");
 
 //-----------------------------------------------------------------------------
