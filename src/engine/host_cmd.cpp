@@ -21,8 +21,8 @@ static const char* const s_paksToLoad[] =
 #ifndef DEDICATED
 	// Used to load UI assets associated with the main menu.
 	"ui_mainmenu.rpak",
-	// Used to load original season 3 ui.dll without overwriting new one.
-	"ui_core.rpak"
+	// Used to load custom sdk ui assets.
+	"ui_sdk.rpak"
 #endif // !DEDICATED
 };
 

@@ -75,7 +75,7 @@ struct CustomPakData_s
 	{
 		// the pak that loads after CommonPakData_t::PAK_TYPE_UI_GM has loaded, and
 		// unloads before CommonPakData_t::PAK_TYPE_UI_GM gets unloaded
-		PAK_TYPE_UI_SDK = 0,
+		// PAK_TYPE_UI_SDK = 0,
 
 		// the total number of base SDK pak files
 		PAK_TYPE_COUNT

@@ -325,12 +325,6 @@ static bool Mod_IsCustomPakLoadFinished(const int commonType)
 {
     switch (commonType)
     {
-    case CommonPakData_s::PakType_e::PAK_TYPE_UI_GM:
-#ifndef DEDICATED
-        return Mod_IsPakLoadFinished(s_customPakData.handles[CustomPakData_s::PakType_e::PAK_TYPE_UI_SDK]);
-#else // Dedicated doesn't load UI paks.
-        return true;
-#endif // DEDICATED
     case CommonPakData_s::PakType_e::PAK_TYPE_COMMON:
         return true;
 
@@ -794,15 +788,6 @@ static bool Mod_HandleCustomPakUnloadForType(const int type)
     // as we use assets within engine pak files.
     switch (type)
     {
-#ifndef DEDICATED
-    case CommonPakData_s::PakType_e::PAK_TYPE_UI_GM:
-    {
-        if (!s_customPakData.UnloadBasePak(CustomPakData_s::PakType_e::PAK_TYPE_UI_SDK))
-            return false;
-
-        break;
-    }
-#endif // !DEDICATED
     case CommonPakData_s::PakType_e::PAK_TYPE_COMMON:
     {
         g_StudioMdlFallbackHandler.Clear();
@@ -936,13 +921,6 @@ static void Mod_HandleCustomPakLoadForType(const int type)
 {
     switch (type)
     {
-#ifndef DEDICATED
-    case CommonPakData_s::PakType_e::PAK_TYPE_UI_GM:
-    {
-        s_customPakData.LoadBasePak("ui_sdk.rpak", CustomPakData_s::PakType_e::PAK_TYPE_UI_SDK);
-        break;
-    }
-#endif // !DEDICATED
     case CommonPakData_s::PakType_e::PAK_TYPE_LOBBY:
     {
         Mod_PreloadAllPaks();
