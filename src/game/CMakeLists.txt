@@ -52,6 +52,8 @@ add_sources( SOURCE_GROUP "Weapon"
     "shared/r1/weapon_bolt.h"
     "shared/r1/grapple.h"
     "shared/r1/smartammo.h"
+    "shared/weapon_script_vars.cpp"
+    "shared/weapon_script_vars.h"
 )
 
 add_sources( SOURCE_GROUP "Network"
@@ -266,6 +268,11 @@ add_sources( SOURCE_GROUP "Utility"
 add_sources( SOURCE_GROUP "Script"
     "client/vscript_client.cpp"
     "client/vscript_client.h"
+)
+
+add_sources( SOURCE_GROUP "Viewmodel"
+    "client/viewmodel_poseparam.cpp"
+    "client/viewmodel_poseparam.h"
 )
 
 add_sources( SOURCE_GROUP "Hud"

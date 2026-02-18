@@ -31,6 +31,7 @@
 #include "vscript_server.h"
 #include "player.h"
 #include "detour_impl.h"
+#include "game/shared/weapon_script_vars.h"
 
 /*
 =====================
@@ -1012,6 +1013,29 @@ static void Script_RegisterServerAIClassFuncs()
     initialized = true;
 }
 //---------------------------------------------------------------------------------
+static SQRESULT ServerScript_SetScriptPoseParam0(HSQUIRRELVM v)
+{
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static SQRESULT ServerScript_GetScriptPoseParam0(HSQUIRRELVM v)
+{
+    sq_pushfloat(v, 0.0f);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static SQRESULT ServerScript_SetScriptPoseParam1(HSQUIRRELVM v)
+{
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static SQRESULT ServerScript_GetScriptPoseParam1(HSQUIRRELVM v)
+{
+    sq_pushfloat(v, 0.0f);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//---------------------------------------------------------------------------------
 static void Script_RegisterServerWeaponClassFuncs()
 {
     v_Script_RegisterServerWeaponClassFuncs();
@@ -1021,6 +1045,44 @@ static void Script_RegisterServerWeaponClassFuncs()
         return;
 
     initialized = true;
+
+    g_serverScriptWeaponStruct->AddFunction(
+        "SetScriptPoseParam0",
+        "Script_SetScriptPoseParam0",
+        "Sets script pose parameter 0 (server no-op)",
+        "void",
+        "float value",
+        false,
+        ServerScript_SetScriptPoseParam0);
+
+    g_serverScriptWeaponStruct->AddFunction(
+        "GetScriptPoseParam0",
+        "Script_GetScriptPoseParam0",
+        "Gets script pose parameter 0 (server always returns 0.0)",
+        "float",
+        "",
+        false,
+        ServerScript_GetScriptPoseParam0);
+
+    g_serverScriptWeaponStruct->AddFunction(
+        "SetScriptPoseParam1",
+        "Script_SetScriptPoseParam1",
+        "Sets script pose parameter 1 (server no-op)",
+        "void",
+        "float value",
+        false,
+        ServerScript_SetScriptPoseParam1);
+
+    g_serverScriptWeaponStruct->AddFunction(
+        "GetScriptPoseParam1",
+        "Script_GetScriptPoseParam1",
+        "Gets script pose parameter 1 (server always returns 0.0)",
+        "float",
+        "",
+        false,
+        ServerScript_GetScriptPoseParam1);
+
+    WeaponScriptVars_RegisterWeaponFuncs(g_serverScriptWeaponStruct);
 }
 //---------------------------------------------------------------------------------
 static void Script_RegisterServerProjectileClassFuncs()
