@@ -173,6 +173,7 @@
 #include "game/client/c_baseentity.h"
 #include "game/client/hud_basechat.h"
 #include "game/client/c_zipline_fix.h"
+#include "game/client/viewmodel_poseparam.h"
 #endif // !DEDICATED
 #include "public/edict.h"
 #ifndef DEDICATED
@@ -705,6 +706,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 #endif // !CLIENT_DLL
 #ifndef DEDICATED
 	REGISTER(VScriptClient);
+	REGISTER(VViewmodelPoseParam);
 #endif // !DEDICATED
 
 	// Squirrel
