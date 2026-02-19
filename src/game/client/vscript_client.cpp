@@ -37,8 +37,6 @@
 #include "game/shared/vscript_debug_overlay_shared.h"
 
 #include "vscript_client.h"
-#include "viewmodel_poseparam.h"
-#include "game/shared/weapon_script_vars.h"
 
 /*
 =====================
@@ -797,9 +795,6 @@ static void Script_RegisterClientWeaponClassFuncs()
         return;
 
     initialized = true;
-
-    ViewmodelPoseParam_RegisterClientWeaponFuncs(g_clientScriptWeaponStruct);
-    WeaponScriptVars_RegisterWeaponFuncs(g_clientScriptWeaponStruct);
 }
 //---------------------------------------------------------------------------------
 static void Script_RegisterClientProjectileClassFuncs()
