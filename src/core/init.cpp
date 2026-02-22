@@ -175,6 +175,7 @@
 #include "game/client/hud_basechat.h"
 #include "game/client/c_zipline_fix.h"
 #include "game/client/clientleafsystem.h"
+#include "game/client/concommandcallback.h"
 #include "game/client/viewmodel_poseparam.h"
 #endif // !DEDICATED
 #include "public/edict.h"
@@ -760,6 +761,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	REGISTER(VHudChat);
 	REGISTER(VZiplineFix);
 	REGISTER(VClientLeafSystem);
+	REGISTER(VConCommandCallback);
 #endif // !DEDICATED
 
 	// Public

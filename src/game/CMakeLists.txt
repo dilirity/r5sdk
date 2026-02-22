@@ -275,6 +275,8 @@ add_sources( SOURCE_GROUP "Utility"
 add_sources( SOURCE_GROUP "Script"
     "client/vscript_client.cpp"
     "client/vscript_client.h"
+    "client/concommandcallback.cpp"
+    "client/concommandcallback.h"
 )
 
 add_sources( SOURCE_GROUP "Viewmodel"
