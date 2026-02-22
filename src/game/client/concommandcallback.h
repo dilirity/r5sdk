@@ -28,7 +28,7 @@
 inline constexpr int CONCOMMAND_CALLBACK_NODE_SIZE = 0x28;  // 40 bytes
 
 // How many extra nodes to allocate each time the pool runs out.
-inline constexpr int CONCOMMAND_CALLBACK_GROW_COUNT = 200;
+inline constexpr int CONCOMMAND_CALLBACK_GROW_COUNT = 50;
 
 //-----------------------------------------------------------------------------
 // Original function pointer

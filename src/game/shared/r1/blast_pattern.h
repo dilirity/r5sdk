@@ -7,6 +7,8 @@
 #ifndef GAME_BLAST_PATTERN_H
 #define GAME_BLAST_PATTERN_H
 
+#include "thirdparty/detours/include/idetour.h"
+
 //-----------------------------------------------------------------------------
 // Blast pattern limits
 //-----------------------------------------------------------------------------
