@@ -38,6 +38,7 @@
 
 #include "vscript_client.h"
 #include "viewmodel_poseparam.h"
+#include "game/client/clientleafsystem.h"
 #include "game/shared/weapon_script_vars.h"
 
 /*
@@ -160,6 +161,42 @@ static SQRESULT ClientScript_DebugScreenTextWithColor(HSQUIRRELVM v)
     }
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the current number of visible objects
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_GetVisibleObjectCount(HSQUIRRELVM v)
+{
+	sq_pushinteger(v, static_cast<SQInteger>(ClientLeafSystem_GetVisibleObjectCount()));
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the maximum number of visible objects (8191)
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_GetVisibleObjectMax(HSQUIRRELVM v)
+{
+	sq_pushinteger(v, static_cast<SQInteger>(ClientLeafSystem_GetVisibleObjectMax()));
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the visible object budget threshold
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_GetVisibleObjectBudget(HSQUIRRELVM v)
+{
+	sq_pushinteger(v, static_cast<SQInteger>(ClientLeafSystem_GetVisibleObjectBudget()));
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: returns whether the visible object system is in overflow
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_IsVisibleObjectOverflow(HSQUIRRELVM v)
+{
+	sq_pushbool(v, ClientLeafSystem_IsOverflowing());
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -692,6 +729,11 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, ClearBoxes, "Clear all debug overlays and boxes", "void", "", false);
 
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetServerID, "Gets the ID of the most recent server", "string", "", false);
+
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetVisibleObjectCount, "Gets the current number of visible objects being rendered", "int", "", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetVisibleObjectMax, "Gets the maximum number of visible objects (8191)", "int", "", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetVisibleObjectBudget, "Gets the visible object budget threshold", "int", "", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, IsVisibleObjectOverflow, "Returns true if the visible object system is in overflow", "bool", "", false);
 }
 
 //---------------------------------------------------------------------------------

@@ -247,6 +247,11 @@ add_sources( SOURCE_GROUP "Input"
     "client/kbutton.h"
 )
 
+add_sources( SOURCE_GROUP "Leaf System"
+    "client/clientleafsystem.cpp"
+    "client/clientleafsystem.h"
+)
+
 add_sources( SOURCE_GROUP "Rendering"
     "client/enginesprite.h"
     "client/hud.h"
