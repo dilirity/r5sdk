@@ -59,6 +59,8 @@
 #include "game/server/gameinterface.h"
 #endif // !CLIENT_DLL
 #include "game/shared/vscript_shared.h"
+#include "game/shared/activity.h"
+#include "game/shared/activitymodifier.h"
 #include <tier2/fileutils.h>
 
 static void SV_ServerPasswordChanged_f(IConVar* pConVar, const char* pOldString, float flOldValue, ChangeUserData_t pUserData);
@@ -728,6 +730,23 @@ void CHostState::State_NewGame(void)
 #endif // !CLIENT_DLL
 
 	Host_UpdateSessionID();
+
+	// Load custom activity modifiers from scripts/activity_modifier_types.txt (only once)
+	static bool s_activityModifiersLoaded = false;
+	if (!s_activityModifiersLoaded && IsActivityModifierSystemInitialized())
+	{
+		LoadCustomActivityModifiersFromFile();
+		s_activityModifiersLoaded = true;
+	}
+
+	// Load custom activities from scripts/activity_types.txt (only once)
+	static bool s_activitiesLoaded = false;
+	if (!s_activitiesLoaded && IsActivitySystemInitialized())
+	{
+		LoadCustomActivitiesFromFile();
+		s_activitiesLoaded = true;
+	}
+
 	SetState(HostStates_t::HS_RUN);
 }
 

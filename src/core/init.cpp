@@ -144,6 +144,8 @@
 #include "game/shared/util_shared.h"
 #include "game/shared/usercmd.h"
 #include "game/shared/animation.h"
+#include "game/shared/activity.h"
+#include "game/shared/activitymodifier.h"
 #include "game/shared/vscript_shared.h"
 #ifndef CLIENT_DLL
 #include "game/server/util_server.h"
@@ -721,6 +723,8 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	// Game/shared
 	REGISTER(VUserCmd);
 	REGISTER(VAnimation);
+	REGISTER(VActivityList);
+	REGISTER(VActivityModifiers);
 	REGISTER(V_UTIL_Shared);
 
 	REGISTER(V_Weapon_Parse);
