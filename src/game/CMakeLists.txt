@@ -29,6 +29,13 @@ add_sources( SOURCE_GROUP "Animation"
     "shared/animation.h"
 )
 
+add_sources( SOURCE_GROUP "Activity"
+    "shared/activity.cpp"
+    "shared/activity.h"
+    "shared/activitymodifier.cpp"
+    "shared/activitymodifier.h"
+)
+
 add_sources( SOURCE_GROUP "Effects"
     "shared/status_effect.h"
     "shared/particleproperty.h"
