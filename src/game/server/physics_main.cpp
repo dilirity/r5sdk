@@ -17,7 +17,11 @@
 static ConVar sv_simulateBots("sv_simulateBots", "1", FCVAR_RELEASE, "Simulate user commands for bots on the server.");
 
 //-----------------------------------------------------------------------------
-// Purpose: Runs the command simulation for fake players
+// Purpose: Runs the command simulation for fake players.
+// Builds a CUserCmd from script input and queues it via ProcessUserCmds
+// so that CPlayer::PhysicsSimulate processes it with full time base
+// management, animation advancement, and weapon state context — the same
+// path real player commands take.
 //-----------------------------------------------------------------------------
 void Physics_RunBotSimulation(bool bSimulating)
 {
@@ -38,16 +42,20 @@ void Physics_RunBotSimulation(bool bSimulating)
 			if (pPlayer->GetLifeState() != 0)
 				continue;
 
+			// Bots have no client to drive animations; force the server
+			// to run animation updates (StudioFrameAdvance, etc.) instead
+			// of waiting for client-side animation replication.
+			if (pPlayer->IsClientSideAnimation())
+				pPlayer->SetClientSideAnimation(false);
+
 			// Create a proper user command
 			CUserCmd cmd;
 
-			float flOldFrameTime = gpGlobals->frameTime;
-			float flOldCurTime = gpGlobals->curTime;
+			cmd.frametime = gpGlobals->frameTime;
+			cmd.command_time = gpGlobals->curTime;
 
-			cmd.frametime = flOldFrameTime;
-			cmd.command_time = flOldCurTime;
-
-			// Set command number
+			// Set command number — must always increase so ProcessUserCmds
+			// doesn't discard the command as a duplicate.
 			static int s_botCommandNumber = 1;
 			cmd.command_number = s_botCommandNumber++;
 			cmd.tick_count = gpGlobals->tickCount;
@@ -96,18 +104,13 @@ void Physics_RunBotSimulation(bool bSimulating)
 				cmd.buttons |= g_botInputs[idx].forcedButtons;
 			}
 
-			// Execute the command
-			pPlayer->SetTimeBase(gpGlobals->curTime);
-			MoveHelperServer()->SetHost(pPlayer);
+			// Auto-acknowledge predicted server events for bots.
+			cmd.predicted_server_event_ack = pPlayer->GetPredictableServerEventCount();
 
-			pPlayer->PlayerRunCommand(&cmd, MoveHelperServer());
-
-			pPlayer->SetLastUserCommand(&cmd);
-
-			gpGlobals->frameTime = flOldFrameTime;
-			gpGlobals->curTime = flOldCurTime;
-
-			MoveHelperServer()->SetHost(NULL);
+			// Queue the command so CPlayer::PhysicsSimulate processes it
+			// during v_Physics_RunThinkFunctions with proper time base,
+			// animation ticks, and weapon state machine context.
+			pPlayer->ProcessUserCmds(&cmd, 1, 1, 0, false);
 		}
 	}
 }

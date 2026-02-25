@@ -212,6 +212,9 @@ public:
 
 	char			GetLifeState(void) const { return m_lifeState; }
 	int            GetTeamNum(void) const { return m_iTeamNum; }
+
+	inline int GetPredictableServerEventCount() const { return m_predictableServerEventCount; }
+
 private:
 	char m_szNetname[256];
 	bool m_zoomViewdriftDebounceEnabled;

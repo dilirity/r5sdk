@@ -29,6 +29,9 @@ public:
 	CStudioHdr*			GetModelPtr(void);
 	float				GetModelScale() const { return m_flModelScale; }
 
+	bool				IsClientSideAnimation() const { return m_bClientSideAnimation; }
+	void				SetClientSideAnimation(bool bEnable) { m_bClientSideAnimation = bEnable; m_bReallyClientSideAnimation = bEnable; }
+
 protected:
 	void* __vftable;
 	bool m_markedForServerInterpolation;
