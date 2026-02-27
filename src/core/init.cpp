@@ -147,6 +147,9 @@
 #include "game/shared/activity.h"
 #include "game/shared/activitymodifier.h"
 #include "game/shared/vscript_shared.h"
+#ifndef DEDICATED
+#include "game/shared/scriptremotefunctions.h"
+#endif // !DEDICATED
 #ifndef CLIENT_DLL
 #include "game/server/util_server.h"
 #include "game/server/ai_node.h"
@@ -613,6 +616,9 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	// Particles
 	REGISTER(VParticles);
 	REGISTER(VParticleOverlay);
+
+	// Script Remote Functions
+	REGISTER(VScriptRemoteFunctions);
 
 	// Client
 	REGISTER(HVEngineClient);
