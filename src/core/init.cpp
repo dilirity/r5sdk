@@ -80,6 +80,7 @@
 #include "rtech/pak/pakstream.h"
 #include "rtech/stryder/stryder.h"
 #include "rtech/playlists/playlists.h"
+#include "rtech/datatable/datatable.h"
 #ifndef DEDICATED
 #include "rtech/rui/rui.h"
 #include "engine/client/cl_ents_parse.h"
@@ -657,6 +658,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 
 	REGISTER(VStryder);
 	REGISTER(VPlaylists);
+	REGISTER(V_Datatable);
 
 #ifndef DEDICATED
 	REGISTER(V_Rui);
