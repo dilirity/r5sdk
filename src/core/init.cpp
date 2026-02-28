@@ -183,6 +183,7 @@
 #include "game/client/clientleafsystem.h"
 #include "game/client/concommandcallback.h"
 #include "game/client/viewmodel_poseparam.h"
+#include "game/client/ruitracks.h"
 #endif // !DEDICATED
 #include "public/edict.h"
 #ifndef DEDICATED
@@ -304,6 +305,10 @@ void Systems_Init()
 #ifndef SERVER_DLL
 	ClientScriptRegister_Callback = Script_RegisterClientFunctions;
 	UiScriptRegister_Callback =  Script_RegisterUIFunctions;
+
+	// Register custom RUI track enums for extended compatibility
+	ClientScriptRegisterEnum_Callback = RuiTracks_RegisterMissingEnums;
+	UIScriptRegisterEnum_Callback = RuiTracks_RegisterMissingEnums;
 
 #ifndef CLIENT_DLL
 	UiServerScriptRegister_Callback = Script_RegisterUIServerFunctions;
@@ -772,6 +777,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	REGISTER(VC_BaseEntity);
 	REGISTER(VHudChat);
 	REGISTER(VZiplineFix);
+	REGISTER(VRuiTracks);
 	REGISTER(VClientLeafSystem);
 	REGISTER(VConCommandCallback);
 #endif // !DEDICATED

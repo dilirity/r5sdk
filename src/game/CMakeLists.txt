@@ -301,6 +301,11 @@ add_sources( SOURCE_GROUP "Zipline"
     "client/c_zipline_fix.h"
 )
 
+add_sources( SOURCE_GROUP "RUI"
+    "client/ruitracks.cpp"
+    "client/ruitracks.h"
+)
+
 file( GLOB GAME_CLIENT_PUBLIC_HEADERS
     "${ENGINE_SOURCE_DIR}/public/game/client/*"
 )
