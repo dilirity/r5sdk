@@ -124,6 +124,7 @@ target_link_libraries( ${PROJECT_NAME} PRIVATE
     "vguimatsurface"
     "vgui"
     "rui"
+    "datatable"
 
     "particles"
 
