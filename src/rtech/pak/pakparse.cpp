@@ -100,6 +100,96 @@ static void Pak_TryLogMaterialDependency(const PakFile_s* const pak, const PakAs
 }
 
 static ConVar pak_debugchannel("pak_debugchannel", "4", FCVAR_DEVELOPMENTONLY | FCVAR_ACCESSIBLE_FROM_THREADS, "Log RPAK files loaded or unloaded with this channel ID", false, 0.f, false, 0.f, "0 = disabled, -1 = all");
+static ConVar pak_debugassetunload("pak_debugassetunload", "0", FCVAR_DEVELOPMENTONLY | FCVAR_ACCESSIBLE_FROM_THREADS, "Log individual asset unloads in real time (per-asset callback)");
+
+//-----------------------------------------------------------------------------
+// asset unload callback wrapper system
+// wraps each asset type's unloadAssetFunc to log when assets are unloaded
+//-----------------------------------------------------------------------------
+typedef void(*UnloadAssetFunc_t)(void*);
+static UnloadAssetFunc_t s_originalUnloadFuncs[PAK_MAX_TRACKED_TYPES] = {};
+static bool s_unloadWrappersInstalled[PAK_MAX_TRACKED_TYPES] = {};
+
+template<int SLOT>
+static void Pak_UnloadAssetWrapper(void* assetHeader)
+{
+    if (pak_debugassetunload.GetBool() && g_pakGlobals)
+    {
+        const PakAssetBinding_s& binding = g_pakGlobals->assetBindings[SLOT];
+        FourCCString_t ext;
+        FourCCToString(ext, binding.extension);
+
+        const char* desc = binding.description ? binding.description : "<unknown>";
+
+        // find the guid by scanning loadedAssets for matching head pointer
+        PakGuid_t guid = 0;
+
+        for (int i = 0; i < PAK_MAX_LOADED_ASSETS; i++)
+        {
+            const PakAssetShort_s& asset = g_pakGlobals->loadedAssets[i];
+
+            if (asset.head == assetHeader && asset.guid != 0)
+            {
+                guid = asset.guid;
+                break;
+            }
+        }
+
+        Msg(eDLL_T::RTECH, "Asset unload: type '%.4s' (%s) guid 0x%llX header %p\n", ext, desc, guid, assetHeader);
+    }
+
+    if (s_originalUnloadFuncs[SLOT])
+        s_originalUnloadFuncs[SLOT](assetHeader);
+}
+
+// generate wrapper function pointers for all 64 slots via recursive template
+template<int N>
+struct UnloadWrapperTable
+{
+    static void Init(UnloadAssetFunc_t* table)
+    {
+        table[N] = &Pak_UnloadAssetWrapper<N>;
+        UnloadWrapperTable<N - 1>::Init(table);
+    }
+};
+
+template<>
+struct UnloadWrapperTable<0>
+{
+    static void Init(UnloadAssetFunc_t* table)
+    {
+        table[0] = &Pak_UnloadAssetWrapper<0>;
+    }
+};
+
+static UnloadAssetFunc_t s_unloadWrappers[PAK_MAX_TRACKED_TYPES];
+static bool s_unloadWrapperTableInit = false;
+
+static void Pak_InstallUnloadWrappers()
+{
+    if (!g_pakGlobals)
+        return;
+
+    if (!s_unloadWrapperTableInit)
+    {
+        UnloadWrapperTable<PAK_MAX_TRACKED_TYPES - 1>::Init(s_unloadWrappers);
+        s_unloadWrapperTableInit = true;
+    }
+
+    for (int i = 0; i < PAK_MAX_TRACKED_TYPES; i++)
+    {
+        PakAssetBinding_s& binding = g_pakGlobals->assetBindings[i];
+
+        if (binding.unloadAssetFunc
+            && binding.unloadAssetFunc != (void*)s_unloadWrappers[i]
+            && !s_unloadWrappersInstalled[i])
+        {
+            s_originalUnloadFuncs[i] = (UnloadAssetFunc_t)binding.unloadAssetFunc;
+            binding.unloadAssetFunc = (void*)s_unloadWrappers[i];
+            s_unloadWrappersInstalled[i] = true;
+        }
+    }
+}
 
 //-----------------------------------------------------------------------------
 // resolve the target guid from lookup table
@@ -817,6 +907,9 @@ static bool Pak_ProcessAssets(PakLoadedInfo_s* const loadedInfo)
         sub_14043D870(loadedInfo, 0);
 
     loadedInfo->status = PakStatus_e::PAK_STATUS_LOADED;
+
+    // install unload wrappers for any newly registered asset types
+    Pak_InstallUnloadWrappers();
 
     return true;
 }
