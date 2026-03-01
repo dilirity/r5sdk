@@ -3,6 +3,8 @@
 // Purpose: pak file loading and unloading
 //
 //=============================================================================//
+#include <unordered_map>
+
 #include "tier2/zstdutils.h"
 
 #include "rtech/ipakfile.h"
@@ -110,6 +112,10 @@ typedef void(*UnloadAssetFunc_t)(void*);
 static UnloadAssetFunc_t s_originalUnloadFuncs[PAK_MAX_TRACKED_TYPES] = {};
 static bool s_unloadWrappersInstalled[PAK_MAX_TRACKED_TYPES] = {};
 
+// maps asset memPage pointer (trackedAssets[].memPage) -> guid, populated at load time
+// the unload callback receives memPage (raw slab header), not loadedAssets[].head
+static std::unordered_map<void*, PakGuid_t> s_assetHeadToGuid;
+
 template<int SLOT>
 static void Pak_UnloadAssetWrapper(void* assetHeader)
 {
@@ -121,18 +127,14 @@ static void Pak_UnloadAssetWrapper(void* assetHeader)
 
         const char* desc = binding.description ? binding.description : "<unknown>";
 
-        // find the guid by scanning loadedAssets for matching head pointer
+        // look up the guid from our load-time map
         PakGuid_t guid = 0;
+        auto it = s_assetHeadToGuid.find(assetHeader);
 
-        for (int i = 0; i < PAK_MAX_LOADED_ASSETS; i++)
+        if (it != s_assetHeadToGuid.end())
         {
-            const PakAssetShort_s& asset = g_pakGlobals->loadedAssets[i];
-
-            if (asset.head == assetHeader && asset.guid != 0)
-            {
-                guid = asset.guid;
-                break;
-            }
+            guid = it->second;
+            s_assetHeadToGuid.erase(it);
         }
 
         Msg(eDLL_T::RTECH, "Asset unload: type '%.4s' (%s) guid 0x%llX header %p\n", ext, desc, guid, assetHeader);
@@ -910,6 +912,27 @@ static bool Pak_ProcessAssets(PakLoadedInfo_s* const loadedInfo)
 
     // install unload wrappers for any newly registered asset types
     Pak_InstallUnloadWrappers();
+
+    // register memPage -> guid mappings for all assets in this pak so the
+    // unload wrapper can log the guid. the unload callback receives
+    // trackedAssets[].memPage (the raw slab header ptr), NOT
+    // loadedAssets[].head (the materialized runtime ptr), so we must
+    // key on memPage.
+    for (uint32_t assetIdx = 0; assetIdx < loadedInfo->assetCount; assetIdx++)
+    {
+        const int loadedIndex = pak->memoryData.loadedAssetIndices[assetIdx];
+        const PakAssetShort_s& loadedAsset = g_pakGlobals->loadedAssets[loadedIndex];
+        const uint32_t trackerIdx = loadedAsset.trackerIndex;
+
+        if (trackerIdx >= PAK_MAX_TRACKED_ASSETS)
+            continue;
+
+        void* const memPage = g_pakGlobals->trackedAssets[trackerIdx].memPage;
+        const PakGuid_t guid = loadedInfo->assetGuids[assetIdx];
+
+        if (memPage && guid)
+            s_assetHeadToGuid[memPage] = guid;
+    }
 
     return true;
 }
