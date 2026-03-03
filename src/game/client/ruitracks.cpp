@@ -14,6 +14,7 @@
 #include "engine/client/vengineclient_impl.h"
 #include "public/globalvars_base.h"
 #include "public/inetchannel.h"
+#include "game/shared/weapon_script_vars.h"
 
 extern CGlobalVarsBase* gpGlobals;
 
@@ -52,19 +53,47 @@ enum CustomTrackId
     TRACK_POISE_FRACTION = 103,
     TRACK_WEAPON_LAST_PRIMARY_ATTACK_TIME = 104,
     TRACK_PLAYER_IS_DRIVING_HOVER_VEHICLE = 105,
+	
     TRACK_NETGRAPH_FPS = 106,
     TRACK_NETGRAPH_SPING = 107,
     TRACK_NETGRAPH_PACKETLOSS = 108,
+	
     TRACK_NET_ISSUE_CONGESTION = 109,
     TRACK_NET_ISSUE_LATENCY = 110,
     TRACK_NET_ISSUE_PACKETLOSS = 111,
+	
     TRACK_NETGRAPH_BANDWIDTH_IN = 112,
     TRACK_NETGRAPH_BANDWIDTH_OUT = 113,
     TRACK_NETGRAPH_PACKETCHOKE = 114,
+	
     TRACK_NET_ISSUE_PREDICTION_ERROR = 115,
+    TRACK_WEAPON_CHARGE_FRACTION_CURVED = 116,
+    TRACK_WEAPON_SCRIPT_FLOAT_0 = 117,
+    TRACK_GRENADE_DIST_FROM_IMPACT = 118,
+	
+    TRACK_NETGRAPH_PINGVAR = 119,
+    TRACK_NETGRAPH_REMOTEFPS = 120,
+    TRACK_NETGRAPH_USRCMD = 121,
+	
+    TRACK_VIEWCONE_MINPITCH = 122,
+    TRACK_VIEWCONE_MAXPITCH = 123,
+    TRACK_VIEWCONE_MINYAW = 124,
+    TRACK_VIEWCONE_MAXYAW = 125,
+	
+    TRACK_AUDIO_ISSUE_DATA = 126,
+    TRACK_AUDIO_ISSUE_LIMITS = 127,
+    TRACK_AUDIO_ISSUE_MARKER_INSERTED = 128,
+    TRACK_AUDIO_ISSUE_STARVATION = 129,
+	
+    TRACK_NETGRAPH_PACKETLOSS_IN = 130,
+    TRACK_NETGRAPH_PACKETLOSS_OUT = 131,
+    TRACK_NETGRAPH_PACKETCHOKE_IN = 132,
+    TRACK_NETGRAPH_PACKETCHOKE_OUT = 133,
+    TRACK_NETGRAPH_DATABLOCK_SIZE = 134,
+    TRACK_NETGRAPH_DATABLOCK_PERCENT_DONE = 135,
 
     TRACK_CUSTOM_MIN = 100,
-    TRACK_CUSTOM_MAX = 115
+    TRACK_CUSTOM_MAX = 135
 };
 
 //-----------------------------------------------------------------------------
@@ -97,6 +126,26 @@ static const TrackDef s_customTracks[] = {
     { "RUI_TRACK_NETGRAPH_BANDWIDTH_IN", TRACK_NETGRAPH_BANDWIDTH_IN },
     { "RUI_TRACK_NETGRAPH_BANDWIDTH_OUT", TRACK_NETGRAPH_BANDWIDTH_OUT },
     { "RUI_TRACK_NETGRAPH_PACKETCHOKE", TRACK_NETGRAPH_PACKETCHOKE },
+    { "RUI_TRACK_WEAPON_CHARGE_FRACTION_CURVED", TRACK_WEAPON_CHARGE_FRACTION_CURVED },
+    { "RUI_TRACK_WEAPON_SCRIPT_FLOAT_0", TRACK_WEAPON_SCRIPT_FLOAT_0 },
+    { "RUI_TRACK_GRENADE_DIST_FROM_IMPACT", TRACK_GRENADE_DIST_FROM_IMPACT },
+    { "RUI_TRACK_NETGRAPH_PINGVAR", TRACK_NETGRAPH_PINGVAR },
+    { "RUI_TRACK_NETGRAPH_REMOTEFPS", TRACK_NETGRAPH_REMOTEFPS },
+    { "RUI_TRACK_NETGRAPH_USRCMD", TRACK_NETGRAPH_USRCMD },
+    { "RUI_TRACK_VIEWCONE_MINPITCH", TRACK_VIEWCONE_MINPITCH },
+    { "RUI_TRACK_VIEWCONE_MAXPITCH", TRACK_VIEWCONE_MAXPITCH },
+    { "RUI_TRACK_VIEWCONE_MINYAW", TRACK_VIEWCONE_MINYAW },
+    { "RUI_TRACK_VIEWCONE_MAXYAW", TRACK_VIEWCONE_MAXYAW },
+    { "RUI_TRACK_AUDIO_ISSUE_DATA", TRACK_AUDIO_ISSUE_DATA },
+    { "RUI_TRACK_AUDIO_ISSUE_LIMITS", TRACK_AUDIO_ISSUE_LIMITS },
+    { "RUI_TRACK_AUDIO_ISSUE_MARKER_INSERTED", TRACK_AUDIO_ISSUE_MARKER_INSERTED },
+    { "RUI_TRACK_AUDIO_ISSUE_STARVATION", TRACK_AUDIO_ISSUE_STARVATION },
+    { "RUI_TRACK_NETGRAPH_PACKETLOSS_IN", TRACK_NETGRAPH_PACKETLOSS_IN },
+    { "RUI_TRACK_NETGRAPH_PACKETLOSS_OUT", TRACK_NETGRAPH_PACKETLOSS_OUT },
+    { "RUI_TRACK_NETGRAPH_PACKETCHOKE_IN", TRACK_NETGRAPH_PACKETCHOKE_IN },
+    { "RUI_TRACK_NETGRAPH_PACKETCHOKE_OUT", TRACK_NETGRAPH_PACKETCHOKE_OUT },
+    { "RUI_TRACK_NETGRAPH_DATABLOCK_SIZE", TRACK_NETGRAPH_DATABLOCK_SIZE },
+    { "RUI_TRACK_NETGRAPH_DATABLOCK_PERCENT_DONE", TRACK_NETGRAPH_DATABLOCK_PERCENT_DONE },
     { nullptr, 0 }
 };
 
@@ -284,6 +333,35 @@ static float GetTrack_WeaponLastAttackTime(__int64 entity)
     return weapon->GetLastPrimaryAttack();
 }
 
+static float GetTrack_WeaponScriptFloat0(__int64 entity)
+{
+    C_WeaponX* weapon = nullptr;
+
+    if (entity)
+    {
+        void* entityPtr = reinterpret_cast<void*>(entity);
+        if (!IsValidReadPointer(entityPtr, sizeof(void*))) return 0.0f;
+        weapon = reinterpret_cast<C_WeaponX*>(entity);
+    }
+    else
+    {
+        if (!g_pEngineClient || !g_pClientEntityList) return 0.0f;
+
+        int localIdx = g_pEngineClient->GetLocalPlayer();
+        if (localIdx <= 0) return 0.0f;
+
+        IClientEntity* pLocal = g_pClientEntityList->GetClientEntity(localIdx);
+        if (!pLocal || !IsValidReadPointer(pLocal, sizeof(void*))) return 0.0f;
+
+        C_BaseCombatCharacter* pOwner = reinterpret_cast<C_BaseCombatCharacter*>(pLocal);
+        weapon = C_BaseCombatCharacter__GetActiveWeapon(pOwner);
+    }
+
+    if (!weapon || !IsValidReadPointer(weapon, sizeof(C_WeaponX))) return 0.0f;
+
+    return WeaponScriptVars_GetScriptFloat0(weapon);
+}
+
 //-----------------------------------------------------------------------------
 // Int track getters
 //-----------------------------------------------------------------------------
@@ -337,6 +415,54 @@ static int GetTrack_PacketChoke()
     if (!pChan) return 0;
 
     int choke = static_cast<int>(pChan->GetAvgChoke(FLOW_INCOMING) * 100.0f + 0.5f);
+    return (choke < 0) ? 0 : ((choke > 100) ? 100 : choke);
+}
+
+static int GetTrack_PingVar()
+{
+    CNetChan* pChan = RuiTracks_GetNetChannel();
+    if (!pChan) return 0;
+
+    // Approximate jitter as absolute difference between current and average latency
+    float avgMs = pChan->GetAvgLatency(FLOW_OUTGOING) * 1000.0f;
+    float curMs = pChan->GetLatency(FLOW_OUTGOING) * 1000.0f;
+    int variance = static_cast<int>(fabsf(curMs - avgMs) + 0.5f);
+    return (variance < 0) ? 0 : ((variance > 9999) ? 9999 : variance);
+}
+
+static int GetTrack_PacketLossIn()
+{
+    CNetChan* pChan = RuiTracks_GetNetChannel();
+    if (!pChan) return 0;
+
+    int loss = static_cast<int>(pChan->GetAvgLoss(FLOW_INCOMING) * 100.0f + 0.5f);
+    return (loss < 0) ? 0 : ((loss > 100) ? 100 : loss);
+}
+
+static int GetTrack_PacketLossOut()
+{
+    CNetChan* pChan = RuiTracks_GetNetChannel();
+    if (!pChan) return 0;
+
+    int loss = static_cast<int>(pChan->GetAvgLoss(FLOW_OUTGOING) * 100.0f + 0.5f);
+    return (loss < 0) ? 0 : ((loss > 100) ? 100 : loss);
+}
+
+static int GetTrack_PacketChokeIn()
+{
+    CNetChan* pChan = RuiTracks_GetNetChannel();
+    if (!pChan) return 0;
+
+    int choke = static_cast<int>(pChan->GetAvgChoke(FLOW_INCOMING) * 100.0f + 0.5f);
+    return (choke < 0) ? 0 : ((choke > 100) ? 100 : choke);
+}
+
+static int GetTrack_PacketChokeOut()
+{
+    CNetChan* pChan = RuiTracks_GetNetChannel();
+    if (!pChan) return 0;
+
+    int choke = static_cast<int>(pChan->GetAvgChoke(FLOW_OUTGOING) * 100.0f + 0.5f);
     return (choke < 0) ? 0 : ((choke > 100) ? 100 : choke);
 }
 
@@ -402,6 +528,73 @@ static __int64 RuiTrack_Fallback_Hook(__int64 entity, int trackId, unsigned int 
             case TRACK_NETGRAPH_PACKETCHOKE:
                 *output = GetTrack_PacketChoke();
                 return 0;
+
+            // S11 float tracks
+            case TRACK_WEAPON_CHARGE_FRACTION_CURVED:
+                // Non-linear charge curve; reuse linear fraction as approximation
+                *(float*)output = GetTrack_WeaponChargeFraction(entity);
+                return 0;
+            case TRACK_WEAPON_SCRIPT_FLOAT_0:
+                *(float*)output = GetTrack_WeaponScriptFloat0(entity);
+                return 0;
+            case TRACK_GRENADE_DIST_FROM_IMPACT:
+                *(float*)output = 0.0f;
+                return 0;
+
+            // S11 int tracks
+            case TRACK_NETGRAPH_PINGVAR:
+                *output = GetTrack_PingVar();
+                return 0;
+            case TRACK_NETGRAPH_REMOTEFPS:
+            case TRACK_NETGRAPH_USRCMD:
+                *output = 0;
+                return 0;
+
+            // S11 viewcone tracks (full range = no culling, safe defaults)
+            case TRACK_VIEWCONE_MINPITCH:
+                *(float*)output = -90.0f;
+                return 0;
+            case TRACK_VIEWCONE_MAXPITCH:
+                *(float*)output = 90.0f;
+                return 0;
+            case TRACK_VIEWCONE_MINYAW:
+                *(float*)output = -180.0f;
+                return 0;
+            case TRACK_VIEWCONE_MAXYAW:
+                *(float*)output = 180.0f;
+                return 0;
+
+            // S11 audio issue tracks (no issues = 0)
+            case TRACK_AUDIO_ISSUE_DATA:
+            case TRACK_AUDIO_ISSUE_LIMITS:
+            case TRACK_AUDIO_ISSUE_MARKER_INSERTED:
+            case TRACK_AUDIO_ISSUE_STARVATION:
+                *reinterpret_cast<unsigned char*>(output) = 0;
+                return 0;
+
+            // S12 directional netgraph tracks
+            case TRACK_NETGRAPH_PACKETLOSS_IN:
+                *output = GetTrack_PacketLossIn();
+                return 0;
+            case TRACK_NETGRAPH_PACKETLOSS_OUT:
+                *output = GetTrack_PacketLossOut();
+                return 0;
+            case TRACK_NETGRAPH_PACKETCHOKE_IN:
+                *output = GetTrack_PacketChokeIn();
+                return 0;
+            case TRACK_NETGRAPH_PACKETCHOKE_OUT:
+                *output = GetTrack_PacketChokeOut();
+                return 0;
+
+            // S12 datablock transfer tracks
+            case TRACK_NETGRAPH_DATABLOCK_SIZE:
+                *output = 0;
+                return 0;
+            case TRACK_NETGRAPH_DATABLOCK_PERCENT_DONE:
+                *(float*)output = 0.0f;
+                return 0;
+
+            // Bool tracks
             case TRACK_PLAYER_IS_DRIVING_HOVER_VEHICLE:
             case TRACK_NET_ISSUE_CONGESTION:
             case TRACK_NET_ISSUE_PREDICTION_ERROR:
@@ -487,20 +680,54 @@ static void CC_RuiTrackDebug_f(const CCommand& args)
     Msg(eDLL_T::CLIENT, "  [%3d] WEAPON_LAST_PRIMARY_ATTACK    = %12.4f %s\n",
         TRACK_WEAPON_LAST_PRIMARY_ATTACK_TIME, GetTrack_WeaponLastAttackTime(0),
         "(game time)");
+    Msg(eDLL_T::CLIENT, "  [%3d] WEAPON_CHARGE_FRACTION_CURVED = %12.4f %s\n",
+        TRACK_WEAPON_CHARGE_FRACTION_CURVED, GetTrack_WeaponChargeFraction(0),
+        "(reuses linear)");
+    Msg(eDLL_T::CLIENT, "  [%3d] WEAPON_SCRIPT_FLOAT_0         = %12.4f %s\n",
+        TRACK_WEAPON_SCRIPT_FLOAT_0, GetTrack_WeaponScriptFloat0(0),
+        "(from WeaponScriptVars)");
+    Msg(eDLL_T::CLIENT, "  [%3d] GRENADE_DIST_FROM_IMPACT      = %12.4f %s\n",
+        TRACK_GRENADE_DIST_FROM_IMPACT, 0.0f, "(STUB)");
+    Msg(eDLL_T::CLIENT, "  [%3d] VIEWCONE_MINPITCH             = %12.4f\n",
+        TRACK_VIEWCONE_MINPITCH, -90.0f);
+    Msg(eDLL_T::CLIENT, "  [%3d] VIEWCONE_MAXPITCH             = %12.4f\n",
+        TRACK_VIEWCONE_MAXPITCH, 90.0f);
+    Msg(eDLL_T::CLIENT, "  [%3d] VIEWCONE_MINYAW               = %12.4f\n",
+        TRACK_VIEWCONE_MINYAW, -180.0f);
+    Msg(eDLL_T::CLIENT, "  [%3d] VIEWCONE_MAXYAW               = %12.4f\n",
+        TRACK_VIEWCONE_MAXYAW, 180.0f);
+    Msg(eDLL_T::CLIENT, "  [%3d] DATABLOCK_PERCENT_DONE        = %12.4f %s\n",
+        TRACK_NETGRAPH_DATABLOCK_PERCENT_DONE, 0.0f, "(STUB)");
 
     Msg(eDLL_T::CLIENT, "\n-- Int Tracks --\n");
     Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_FPS                  = %12d\n",
         TRACK_NETGRAPH_FPS, GetTrack_FPS());
     Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_SPING                = %12d ms\n",
         TRACK_NETGRAPH_SPING, GetTrack_Ping());
+    Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_PINGVAR              = %12d ms\n",
+        TRACK_NETGRAPH_PINGVAR, GetTrack_PingVar());
     Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_PACKETLOSS           = %12d %%\n",
         TRACK_NETGRAPH_PACKETLOSS, GetTrack_PacketLoss());
+    Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_PACKETLOSS_IN        = %12d %%\n",
+        TRACK_NETGRAPH_PACKETLOSS_IN, GetTrack_PacketLossIn());
+    Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_PACKETLOSS_OUT       = %12d %%\n",
+        TRACK_NETGRAPH_PACKETLOSS_OUT, GetTrack_PacketLossOut());
     Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_BANDWIDTH_IN         = %12d bytes/s\n",
         TRACK_NETGRAPH_BANDWIDTH_IN, GetTrack_BandwidthIn());
     Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_BANDWIDTH_OUT        = %12d bytes/s\n",
         TRACK_NETGRAPH_BANDWIDTH_OUT, GetTrack_BandwidthOut());
     Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_PACKETCHOKE          = %12d %%\n",
         TRACK_NETGRAPH_PACKETCHOKE, GetTrack_PacketChoke());
+    Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_PACKETCHOKE_IN       = %12d %%\n",
+        TRACK_NETGRAPH_PACKETCHOKE_IN, GetTrack_PacketChokeIn());
+    Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_PACKETCHOKE_OUT      = %12d %%\n",
+        TRACK_NETGRAPH_PACKETCHOKE_OUT, GetTrack_PacketChokeOut());
+    Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_REMOTEFPS            = %12d %s\n",
+        TRACK_NETGRAPH_REMOTEFPS, 0, "(STUB)");
+    Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_USRCMD               = %12d %s\n",
+        TRACK_NETGRAPH_USRCMD, 0, "(STUB)");
+    Msg(eDLL_T::CLIENT, "  [%3d] NETGRAPH_DATABLOCK_SIZE       = %12d %s\n",
+        TRACK_NETGRAPH_DATABLOCK_SIZE, 0, "(STUB)");
 
     Msg(eDLL_T::CLIENT, "\n-- Bool Tracks --\n");
     Msg(eDLL_T::CLIENT, "  [%3d] PLAYER_IS_DRIVING_HOVER       = %12s %s\n",
@@ -515,6 +742,14 @@ static void CC_RuiTrackDebug_f(const CCommand& args)
         "(>5%)");
     Msg(eDLL_T::CLIENT, "  [%3d] NET_ISSUE_PREDICTION_ERROR    = %12s %s\n",
         TRACK_NET_ISSUE_PREDICTION_ERROR, "false", "(STUB)");
+    Msg(eDLL_T::CLIENT, "  [%3d] AUDIO_ISSUE_DATA              = %12s %s\n",
+        TRACK_AUDIO_ISSUE_DATA, "false", "(STUB)");
+    Msg(eDLL_T::CLIENT, "  [%3d] AUDIO_ISSUE_LIMITS            = %12s %s\n",
+        TRACK_AUDIO_ISSUE_LIMITS, "false", "(STUB)");
+    Msg(eDLL_T::CLIENT, "  [%3d] AUDIO_ISSUE_MARKER_INSERTED   = %12s %s\n",
+        TRACK_AUDIO_ISSUE_MARKER_INSERTED, "false", "(STUB)");
+    Msg(eDLL_T::CLIENT, "  [%3d] AUDIO_ISSUE_STARVATION        = %12s %s\n",
+        TRACK_AUDIO_ISSUE_STARVATION, "false", "(STUB)");
 
     Msg(eDLL_T::CLIENT, "\n-- Internal State --\n");
     Msg(eDLL_T::CLIENT, "  Initialized     : %s\n", s_bInitialized ? "yes" : "no");

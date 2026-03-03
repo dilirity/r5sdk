@@ -124,6 +124,17 @@ static SQRESULT Script_GetScriptTime1(HSQUIRRELVM v)
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+float WeaponScriptVars_GetScriptFloat0(void* pWeapon)
+{
+	if (!pWeapon) return 0.0f;
+
+	const uintptr_t key = reinterpret_cast<uintptr_t>(pWeapon);
+	auto it = s_weaponScriptVars.find(key);
+	if (it == s_weaponScriptVars.end()) return 0.0f;
+
+	return it->second.scriptFloat0;
+}
+
 void WeaponScriptVars_RegisterWeaponFuncs(ScriptClassDescriptor_t* weaponStruct)
 {
 	weaponStruct->AddFunction(
