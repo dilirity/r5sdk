@@ -17,6 +17,9 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s);
 inline SQRESULT(*v_ClientScript_DebugScreenText)(HSQUIRRELVM v);
 inline SQRESULT(*v_ClientScript_DebugScreenTextWithColor)(HSQUIRRELVM v);
 
+inline void* v_GetNetworkVarIndexFromName = nullptr;
+inline void* g_pScriptNetVarTable = nullptr;
+
 inline void (*v_Script_RegisterClientEntityClassFuncs)();
 inline void (*v_Script_RegisterClientPlayerClassFuncs)();
 inline void (*v_Script_RegisterClientCombatCharacterClassFuncs)();
@@ -51,6 +54,7 @@ class VScriptClient : public IDetour
 		LogFunAdr("Script_RegisterClientTitanSoulClassFuncs", v_Script_RegisterClientTitanSoulClassFuncs);
 		LogFunAdr("Script_RegisterClientPlayerDecoyClassFuncs", v_Script_RegisterClientPlayerDecoyClassFuncs);
 		LogFunAdr("Script_RegisterClientFirstPersonProxyClassFuncs", v_Script_RegisterClientFirstPersonProxyClassFuncs);
+		LogFunAdr("GetNetworkVarIndexFromName", v_GetNetworkVarIndexFromName);
 
 		LogVarAdr("g_clientScriptEntityStruct", g_clientScriptEntityStruct);
 		LogVarAdr("g_clientScriptPlayerStruct", g_clientScriptPlayerStruct);
@@ -61,6 +65,7 @@ class VScriptClient : public IDetour
 		LogVarAdr("g_clientScriptTitanSoulStruct", g_clientScriptTitanSoulStruct);
 		LogVarAdr("g_clientScriptPlayerDecoyStruct", g_clientScriptPlayerDecoyStruct);
 		LogVarAdr("g_clientScriptFirstPersonProxyStruct", g_clientScriptFirstPersonProxyStruct);
+		LogVarAdr("g_pScriptNetVarTable", g_pScriptNetVarTable);
 	}
 	virtual void GetFun(void) const
 	{
@@ -96,10 +101,16 @@ class VScriptClient : public IDetour
 
 		Module_FindPattern(g_GameDll, "48 83 EC ?? 80 3D ?? ?? ?? ?? ?? 0F 85 ?? ?? ?? ?? 48 8B 0D ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 05 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 74 24 ?? 33 F6 48 89 05 ?? ?? ?? ?? 48 89 7C 24 ?? 48 63 3D ?? ?? ?? ?? 4C 89 74 24 ?? 8D 6E ?? 4C 8D 35 ?? ?? ?? ?? C6 05 ?? ?? ?? ?? ?? 4C 89 35 ?? ?? ?? ?? 8D 47 ?? 48 89 35 ?? ?? ?? ?? 4C 63 C0")
 			.GetPtr(v_Script_RegisterClientFirstPersonProxyClassFuncs);
+
+		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 30 4C 8B D2 49 63 D9")
+			.GetPtr(v_GetNetworkVarIndexFromName);
 	}
 	virtual void GetVar(void) const
 	{
 		CMemory(v_Script_RegisterClientEntityClassFuncs).FindPatternSelf("48 89 05", CMemory::Direction::DOWN, 150, 2).ResolveRelativeAddressSelf(0x3, 0x7).GetPtr(g_clientScriptEntityStruct);
+
+		if (v_GetNetworkVarIndexFromName)
+			CMemory(v_GetNetworkVarIndexFromName).FindPatternSelf("4C 8D 0D", CMemory::Direction::DOWN, 100).ResolveRelativeAddressSelf(0x3, 0x7).GetPtr(g_pScriptNetVarTable);
 		CMemory(v_Script_RegisterClientPlayerClassFuncs).FindPatternSelf("48 89 05", CMemory::Direction::DOWN, 150, 2).ResolveRelativeAddressSelf(0x3, 0x7).GetPtr(g_clientScriptPlayerStruct);
 		CMemory(v_Script_RegisterClientCombatCharacterClassFuncs).FindPatternSelf("48 89 05", CMemory::Direction::DOWN, 150, 2).ResolveRelativeAddressSelf(0x3, 0x7).GetPtr(g_clientScriptCombatCharacterStruct);
 		CMemory(v_Script_RegisterClientAIClassFuncs).FindPatternSelf("48 89 05", CMemory::Direction::DOWN, 150, 2).ResolveRelativeAddressSelf(0x3, 0x7).GetPtr(g_clientScriptAIStruct);

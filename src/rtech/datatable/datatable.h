@@ -54,6 +54,7 @@ struct DiskDatatable
 // Engine functions
 //-----------------------------------------------------------------------------
 inline __int64(*v_Script_GetDatatable)(__int64 sqvm);
+inline __int64(*v_Script_GetDatatableRowCount)(__int64 sqvm);
 inline uint64_t(*v_HashNameAligned)(const char* name);
 inline uint64_t(*v_HashNameUnaligned)(const char* name);
 
@@ -69,6 +70,7 @@ class V_Datatable : public IDetour
 	virtual void GetAdr(void) const
 	{
 		LogFunAdr("Script_GetDatatable", v_Script_GetDatatable);
+		LogFunAdr("Script_GetDatatableRowCount", v_Script_GetDatatableRowCount);
 		LogFunAdr("HashNameAligned", v_HashNameAligned);
 		LogFunAdr("HashNameUnaligned", v_HashNameUnaligned);
 		LogVarAdr("g_pPakAssetHashTable", g_pPakAssetHashTable);
@@ -78,6 +80,8 @@ class V_Datatable : public IDetour
 	{
 		v_Script_GetDatatable = reinterpret_cast<decltype(v_Script_GetDatatable)>(
 			g_GameDll.GetModuleBase() + 0x7F19A0);
+		v_Script_GetDatatableRowCount = reinterpret_cast<decltype(v_Script_GetDatatableRowCount)>(
+			g_GameDll.GetModuleBase() + 0x842070);
 		v_HashNameAligned = reinterpret_cast<decltype(v_HashNameAligned)>(
 			g_GameDll.GetModuleBase() + 0x46CD80);
 		v_HashNameUnaligned = reinterpret_cast<decltype(v_HashNameUnaligned)>(

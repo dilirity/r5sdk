@@ -14,6 +14,9 @@ public:
 
 	inline bool IsWeaponMelee() const { return (unsigned int)(*(_DWORD*)&m_modVars[3952] - 4) <= 1; }
 
+	// Checks fireMode == 4 (eWeaponFireMode.offhandMelee)
+	inline bool IsWeaponOffhandMelee() const { return *(_DWORD*)&m_modVars[3952] == 4; }
+
 	// Exposed for RUI track system (ruitracks.cpp)
 	inline float GetLastPrimaryAttack() const { return m_lastPrimaryAttack; }
 

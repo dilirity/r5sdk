@@ -32,6 +32,7 @@
 #include "player.h"
 #include "detour_impl.h"
 #include "game/shared/weapon_script_vars.h"
+#include "game/client/vscript_remotefunctions.h"
 
 /*
 =====================
@@ -920,6 +921,8 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetNearestPosInBounds, "Finds the nearest position to the provided point on the hull's NavMesh using provided bounds as extents", "vector ornull", "vector searchPoint, vector halfExtents, int hullType", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SaveRecordedAnimation, "Saves an anim_recording asset to be used by bakery. (dev only)", "void", "var recordedAnim, string fileName", false);
+
+    Script_RegisterRemoteFunctionServerNatives(s);
 }
 
 //---------------------------------------------------------------------------------
@@ -957,6 +960,8 @@ static void Script_RegisterServerEntityClassFuncs()
         return;
 
     initialized = true;
+
+    WeaponScriptVars_RegisterEntityFuncs(g_serverScriptEntityStruct);
 }
 //---------------------------------------------------------------------------------
 static void Script_RegisterServerPlayerClassFuncs()

@@ -523,10 +523,27 @@ static int Datatable_LoadSingleFile(const char* csvPath, const char* subdir, con
 	V_snprintf(fullRpakPath, sizeof(fullRpakPath), "datatable/%s%s.rpak", subdir, stem);
 
 	uint64_t guid;
-	if ((reinterpret_cast<uintptr_t>(fullRpakPath) & 3) == 0)
-		guid = v_HashNameAligned(fullRpakPath);
-	else
-		guid = v_HashNameUnaligned(fullRpakPath);
+	bool isGuidFilename = false;
+
+	// Support 0x<GUID>.csv filenames for direct GUID overrides
+	if (stem[0] == '0' && (stem[1] == 'x' || stem[1] == 'X'))
+	{
+		char* endPtr;
+		uint64_t parsedGuid = strtoull(stem + 2, &endPtr, 16);
+		if (*endPtr == '\0' && endPtr != stem + 2)
+		{
+			guid = parsedGuid;
+			isGuidFilename = true;
+		}
+	}
+
+	if (!isGuidFilename)
+	{
+		if ((reinterpret_cast<uintptr_t>(fullRpakPath) & 3) == 0)
+			guid = v_HashNameAligned(fullRpakPath);
+		else
+			guid = v_HashNameUnaligned(fullRpakPath);
+	}
 
 	auto it = g_diskDatatables.find(guid);
 	if (it != g_diskDatatables.end())

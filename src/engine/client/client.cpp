@@ -12,6 +12,7 @@
 #include "mathlib/bitvec.h"
 #include "tier1/cvar.h"
 #include "tier1/strtools.h"
+#include "common/netmessages.h"
 #include "engine/server/server.h"
 #include "engine/client/client.h"
 #ifndef CLIENT_DLL
@@ -35,6 +36,8 @@
 #define STEAM_DEBUG_ENABLED() (steam_debug_auth.GetBool())
 #endif
 #include "game/server/gameinterface.h"
+#ifndef CLIENT_DLL
+#endif
 
 // Absolute max string cmd length, any character past this will be NULLED.
 #define STRINGCMD_MAX_LEN 512
@@ -437,6 +440,9 @@ void CClient::VActivatePlayer(CClient* pClient)
 //---------------------------------------------------------------------------------
 void CClient::RegisterNetMsgs(CNetChan* chan)
 {
+#ifndef CLIENT_DLL
+	REGISTER_NET_MSG(ScriptMessage);
+#endif
 }
 
 //---------------------------------------------------------------------------------
@@ -591,6 +597,7 @@ bool CClient::VProcessStringCmd(CClient* pClient, NET_StringCmd* pMsg)
 		pClient_Adj->Disconnect(Reputation_t::REP_MARK_BAD, "#DISCONNECT_STRINGCMD_OVERFLOW");
 		return true;
 	}
+
 #endif // !CLIENT_DLL
 
 	return CClient__ProcessStringCmd(pClient, pMsg);

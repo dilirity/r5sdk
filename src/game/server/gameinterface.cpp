@@ -22,6 +22,10 @@
 #include "game/server/util_server.h"
 #include "pluginsystem/pluginsystem.h"
 #include "game/server/recipientfilter.h"
+#include "game/shared/weapon_script_vars.h"
+#ifndef DEDICATED
+#include "game/client/vscript_remotefunctions.h"
+#endif
 
 //-----------------------------------------------------------------------------
 // Purpose: retrieves the index of the client that issued the last command
@@ -87,6 +91,11 @@ void CServerGameDLL::PrecompileScriptsJob(void)
 //-----------------------------------------------------------------------------
 void CServerGameDLL::LevelShutdown(void)
 {
+	WeaponScriptVars_LevelShutdown();
+#ifndef DEDICATED
+	Script_ClearRemoteFunctionRegistrations();
+#endif
+
 	const static int index = 8;
 	CallVFunc<void>(index, this);
 }

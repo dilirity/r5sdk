@@ -26,6 +26,7 @@
 
 #include "core/stdafx.h"
 #include "rtech/playlists/playlists.h"
+#include "rtech/datatable/datatable.h"
 #include "engine/client/cl_main.h"
 #include "engine/cmodel_bsp.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
@@ -99,9 +100,18 @@ static SQRESULT SharedScript_ScriptError(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: alias for engine's GetDatatableRowCount (lowercase 't') to match
+//          script naming convention GetDataTableRowCount (uppercase 'T')
+//-----------------------------------------------------------------------------
+static SQRESULT SharedScript_GetDataTableRowCount(HSQUIRRELVM v)
+{
+	return (SQRESULT)v_Script_GetDatatableRowCount((__int64)v);
+}
+
 //---------------------------------------------------------------------------------
 // Purpose: common script abstractions
-// Input  : *s - 
+// Input  : *s -
 //---------------------------------------------------------------------------------
 void Script_RegisterCommonAbstractions(CSquirrelVM* s)
 {
@@ -111,6 +121,9 @@ void Script_RegisterCommonAbstractions(CSquirrelVM* s)
     DEFINE_SHARED_SCRIPTFUNC_NAMED(s, GetAvailablePlaylists, "Gets an array of all available playlists", "array< string >", "", false);
 
     DEFINE_SHARED_SCRIPTFUNC_NAMED(s, ScriptError, "Throws a script error", "void", "string format, ...", true);
+
+    // Scripts use GetDataTableRowCount (uppercase T), engine registers GetDatatableRowCount (lowercase t)
+    DEFINE_SHARED_SCRIPTFUNC_NAMED(s, GetDataTableRowCount, "Returns the number of rows in the datatable", "int", "var datatable", false);
 
     Script_RegisterModSystemFunctions(s);
 
