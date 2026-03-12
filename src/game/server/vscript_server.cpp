@@ -32,6 +32,7 @@
 #include "player.h"
 #include "detour_impl.h"
 #include "game/shared/weapon_script_vars.h"
+#include "game/shared/status_effects_sdk.h"
 #include "game/client/vscript_remotefunctions.h"
 
 /*
@@ -923,6 +924,9 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, SaveRecordedAnimation, "Saves an anim_recording asset to be used by bakery. (dev only)", "void", "var recordedAnim, string fileName", false);
 
     Script_RegisterRemoteFunctionServerNatives(s);
+
+    // StatusEffect_GetTotalSeverity (S22+ compatibility)
+    StatusEffects_SDK_RegisterServerFunctions(s);
 }
 
 //---------------------------------------------------------------------------------

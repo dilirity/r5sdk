@@ -41,11 +41,15 @@
 #include "vscript_remotefunctions.h"
 #include "scriptnetdata_client.h"
 #include "viewmodel_poseparam.h"
+#include "rui_walltime.h"
 #include "game/client/clientleafsystem.h"
 #include "game/client/c_baseentity.h"
 #include "game/shared/weapon_script_vars.h"
+#include "game/shared/status_effects_sdk.h"
+#include "particle_effects_sdk.h"
 #include "vscript/languages/squirrel_re/include/sqarray.h"
 #include "public/globalvars_base.h"
+#include "inputsystem/inputsystem.h"
 
 extern CGlobalVarsBase* gpGlobals;
 
@@ -339,6 +343,337 @@ static uintptr_t GetClientScriptHud()
 static uintptr_t GetUIScriptHud()
 {
     return *reinterpret_cast<uintptr_t*>(EngineBase() + 0xD423B18);
+}
+
+// qword_14D40B358: g_pVGuiPanel
+static uintptr_t GetVGuiPanel()
+{
+    return *reinterpret_cast<uintptr_t*>(EngineBase() + 0xD40B358);
+}
+
+// qword_14D40B3B0: g_pVGuiInput
+static uintptr_t GetVGuiInput()
+{
+    return *reinterpret_cast<uintptr_t*>(EngineBase() + 0xD40B3B0);
+}
+
+// SDK-managed menu stack (S3 engine doesn't have native MenuStack functions)
+static std::vector<uintptr_t> s_menuStack;
+
+//-----------------------------------------------------------------------------
+// Purpose: returns the currently focused HUD element (CLIENT context)
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_GetFocus(HSQUIRRELVM v)
+{
+    const uintptr_t clientScriptHud = GetClientScriptHud();
+    if (!clientScriptHud)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const uintptr_t vguiInput = GetVGuiInput();
+    const uintptr_t vguiPanel = GetVGuiPanel();
+    if (!vguiInput || !vguiPanel)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Call g_pVGuiInput->GetFocus() - vtable offset +0x20
+    typedef uintptr_t(__fastcall* GetFocusFn)(uintptr_t);
+    GetFocusFn pfnGetFocus = reinterpret_cast<GetFocusFn>(
+        *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(vguiInput) + 0x20));
+    uintptr_t focusHandle = pfnGetFocus(vguiInput);
+
+    if (!focusHandle)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Call g_pVGuiPanel->GetPanel(focusHandle, "ClientDLL") - vtable offset +624
+    typedef uintptr_t(__fastcall* GetPanelFn)(uintptr_t, uintptr_t, const char*);
+    GetPanelFn pfnGetPanel = reinterpret_cast<GetPanelFn>(
+        *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(vguiPanel) + 624));
+    uintptr_t panel = pfnGetPanel(vguiPanel, focusHandle, "ClientDLL");
+
+    if (!panel)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Convert to script handle via HudElementForPanel
+    uintptr_t hudElement = GetHudElementForPanel()(clientScriptHud, panel);
+    if (!hudElement)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Push the SQObject stored at hudElement+48
+    SQObject* storedObj = *reinterpret_cast<SQObject**>(hudElement + 48);
+    if (storedObj && storedObj->_type == OT_INSTANCE && storedObj->_unVal.pInstance)
+    {
+        sq_pushobject(v, *storedObj);
+    }
+    else
+    {
+        sq_pushnull(v);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: returns the currently focused HUD element (UI context)
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetFocus(HSQUIRRELVM v)
+{
+    const uintptr_t uiScriptHud = GetUIScriptHud();
+    if (!uiScriptHud)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const uintptr_t vguiInput = GetVGuiInput();
+    const uintptr_t vguiPanel = GetVGuiPanel();
+    if (!vguiInput || !vguiPanel)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Call g_pVGuiInput->GetFocus() - vtable offset +0x20
+    typedef uintptr_t(__fastcall* GetFocusFn)(uintptr_t);
+    GetFocusFn pfnGetFocus = reinterpret_cast<GetFocusFn>(
+        *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(vguiInput) + 0x20));
+    uintptr_t focusHandle = pfnGetFocus(vguiInput);
+
+    if (!focusHandle)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Call g_pVGuiPanel->GetPanel(focusHandle, "UIDLL") - vtable offset +624
+    typedef uintptr_t(__fastcall* GetPanelFn)(uintptr_t, uintptr_t, const char*);
+    GetPanelFn pfnGetPanel = reinterpret_cast<GetPanelFn>(
+        *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(vguiPanel) + 624));
+    uintptr_t panel = pfnGetPanel(vguiPanel, focusHandle, "UIDLL");
+
+    if (!panel)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Convert to script handle via HudElementForPanel
+    uintptr_t hudElement = GetHudElementForPanel()(uiScriptHud, panel);
+    if (!hudElement)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Push the SQObject stored at hudElement+48
+    SQObject* storedObj = *reinterpret_cast<SQObject**>(hudElement + 48);
+    if (storedObj && storedObj->_type == OT_INSTANCE && storedObj->_unVal.pInstance)
+    {
+        sq_pushobject(v, *storedObj);
+    }
+    else
+    {
+        sq_pushnull(v);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: sets the mouse cursor position (CLIENT context)
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_SetCursorPosition(HSQUIRRELVM v)
+{
+    const SQVector3D* pos;
+    sq_getvector(v, 2, &pos);
+
+    if (g_pInputSystem)
+    {
+        g_pInputSystem->SetCursorPosition(static_cast<int>(pos->x), static_cast<int>(pos->y));
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: sets the mouse cursor position (UI context)
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_SetCursorPosition(HSQUIRRELVM v)
+{
+    const SQVector3D* pos;
+    sq_getvector(v, 2, &pos);
+
+    if (g_pInputSystem)
+    {
+        g_pInputSystem->SetCursorPosition(static_cast<int>(pos->x), static_cast<int>(pos->y));
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: gets the mouse cursor position (CLIENT/UI shared)
+//-----------------------------------------------------------------------------
+static SQRESULT Script_GetCursorPosition_Impl(HSQUIRRELVM v)
+{
+    int x = 0, y = 0;
+    if (g_pInputSystem)
+    {
+        g_pInputSystem->GetCursorPosition(&x, &y);
+    }
+
+    // Return as vector with z=0
+    SQVector3D result(static_cast<SQFloat>(x), static_cast<SQFloat>(y), 0.0f);
+    sq_pushvector(v, &result);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+static SQRESULT ClientScript_GetCursorPosition(HSQUIRRELVM v) { return Script_GetCursorPosition_Impl(v); }
+static SQRESULT UIScript_GetCursorPosition(HSQUIRRELVM v) { return Script_GetCursorPosition_Impl(v); }
+
+//-----------------------------------------------------------------------------
+// Purpose: returns the HUD element under the mouse cursor (CLIENT context)
+//-----------------------------------------------------------------------------
+static SQRESULT ClientScript_GetMouseFocus(HSQUIRRELVM v)
+{
+    const uintptr_t clientScriptHud = GetClientScriptHud();
+    if (!clientScriptHud)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const uintptr_t vguiInput = GetVGuiInput();
+    const uintptr_t vguiPanel = GetVGuiPanel();
+    if (!vguiInput || !vguiPanel)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Call g_pVGuiInput->GetMouseFocus() - vtable offset +0x28 (follows GetFocus at +0x20)
+    typedef uintptr_t(__fastcall* GetMouseFocusFn)(uintptr_t);
+    GetMouseFocusFn pfnGetMouseFocus = reinterpret_cast<GetMouseFocusFn>(
+        *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(vguiInput) + 0x28));
+    uintptr_t focusHandle = pfnGetMouseFocus(vguiInput);
+
+    if (!focusHandle)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Call g_pVGuiPanel->GetPanel(focusHandle, "ClientDLL") - vtable offset +624
+    typedef uintptr_t(__fastcall* GetPanelFn)(uintptr_t, uintptr_t, const char*);
+    GetPanelFn pfnGetPanel = reinterpret_cast<GetPanelFn>(
+        *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(vguiPanel) + 624));
+    uintptr_t panel = pfnGetPanel(vguiPanel, focusHandle, "ClientDLL");
+
+    if (!panel)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Convert to script handle via HudElementForPanel
+    uintptr_t hudElement = GetHudElementForPanel()(clientScriptHud, panel);
+    if (!hudElement)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Push the SQObject stored at hudElement+48
+    SQObject* storedObj = *reinterpret_cast<SQObject**>(hudElement + 48);
+    if (storedObj && storedObj->_type == OT_INSTANCE && storedObj->_unVal.pInstance)
+    {
+        sq_pushobject(v, *storedObj);
+    }
+    else
+    {
+        sq_pushnull(v);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: returns the HUD element under the mouse cursor (UI context)
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_GetMouseFocus(HSQUIRRELVM v)
+{
+    const uintptr_t uiScriptHud = GetUIScriptHud();
+    if (!uiScriptHud)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    const uintptr_t vguiInput = GetVGuiInput();
+    const uintptr_t vguiPanel = GetVGuiPanel();
+    if (!vguiInput || !vguiPanel)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Call g_pVGuiInput->GetMouseFocus() - vtable offset +0x28
+    typedef uintptr_t(__fastcall* GetMouseFocusFn)(uintptr_t);
+    GetMouseFocusFn pfnGetMouseFocus = reinterpret_cast<GetMouseFocusFn>(
+        *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(vguiInput) + 0x28));
+    uintptr_t focusHandle = pfnGetMouseFocus(vguiInput);
+
+    if (!focusHandle)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Call g_pVGuiPanel->GetPanel(focusHandle, "UIDLL") - vtable offset +624
+    typedef uintptr_t(__fastcall* GetPanelFn)(uintptr_t, uintptr_t, const char*);
+    GetPanelFn pfnGetPanel = reinterpret_cast<GetPanelFn>(
+        *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(vguiPanel) + 624));
+    uintptr_t panel = pfnGetPanel(vguiPanel, focusHandle, "UIDLL");
+
+    if (!panel)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Convert to script handle via HudElementForPanel
+    uintptr_t hudElement = GetHudElementForPanel()(uiScriptHud, panel);
+    if (!hudElement)
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Push the SQObject stored at hudElement+48
+    SQObject* storedObj = *reinterpret_cast<SQObject**>(hudElement + 48);
+    if (storedObj && storedObj->_type == OT_INSTANCE && storedObj->_unVal.pInstance)
+    {
+        sq_pushobject(v, *storedObj);
+    }
+    else
+    {
+        sq_pushnull(v);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -681,6 +1016,184 @@ static SQRESULT UIScript_GetParentMenu(HSQUIRRELVM v)
     }
 
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Helper: push a menu element (from raw pointer) onto the Squirrel stack
+//-----------------------------------------------------------------------------
+static void PushMenuElement(HSQUIRRELVM v, uintptr_t scriptHud, uintptr_t menuPtr)
+{
+    uintptr_t hudElement = GetHudElementForPanel()(scriptHud, menuPtr);
+    if (!hudElement)
+    {
+        sq_pushnull(v);
+        return;
+    }
+
+    SQObject* storedObj = *reinterpret_cast<SQObject**>(hudElement + 48);
+    if (storedObj && storedObj->_type == OT_INSTANCE && storedObj->_unVal.pInstance)
+        sq_pushobject(v, *storedObj);
+    else
+        sq_pushnull(v);
+}
+
+//-----------------------------------------------------------------------------
+// Helper: extract menu pointer from Squirrel stack slot 2
+//-----------------------------------------------------------------------------
+static uintptr_t ExtractMenuFromStack(HSQUIRRELVM v)
+{
+    SQObject menuObj;
+    if (SQ_FAILED(sq_getstackobj(v, 2, &menuObj)))
+        return 0;
+
+    SQObject* menuPtr = (menuObj._type == OT_NULL) ? nullptr : &menuObj;
+    return GetHscriptToMenu()(menuPtr);
+}
+
+//-----------------------------------------------------------------------------
+// MenuStack_Contains [UI] - checks if a menu is in the stack
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_MenuStack_Contains(HSQUIRRELVM v)
+{
+    uintptr_t menu = ExtractMenuFromStack(v);
+    if (!menu)
+    {
+        sq_pushbool(v, SQFalse);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    for (size_t i = 0; i < s_menuStack.size(); i++)
+    {
+        if (s_menuStack[i] == menu)
+        {
+            sq_pushbool(v, SQTrue);
+            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+        }
+    }
+
+    sq_pushbool(v, SQFalse);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// MenuStack_GetLength [UI] - returns number of menus on the stack
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_MenuStack_GetLength(HSQUIRRELVM v)
+{
+    sq_pushinteger(v, static_cast<SQInteger>(s_menuStack.size()));
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// MenuStack_Push [UI] - push a menu onto the top of the stack
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_MenuStack_Push(HSQUIRRELVM v)
+{
+    uintptr_t menu = ExtractMenuFromStack(v);
+    if (!menu)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+    s_menuStack.push_back(menu);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// MenuStack_Remove [UI] - remove a menu from the stack by value
+//-----------------------------------------------------------------------------
+static SQRESULT UIScript_MenuStack_Remove(HSQUIRRELVM v)
+{
+    uintptr_t menu = ExtractMenuFromStack(v);
+    if (!menu)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+    for (auto it = s_menuStack.begin(); it != s_menuStack.end(); ++it)
+    {
+        if (*it == menu)
+        {
+            s_menuStack.erase(it);
+            break;
+        }
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// MenuStack_Pop [CLIENT|UI] - remove and return top menu
+//-----------------------------------------------------------------------------
+static SQRESULT MenuStack_Pop_Internal(HSQUIRRELVM v, uintptr_t scriptHud)
+{
+    if (s_menuStack.empty())
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    uintptr_t elem = s_menuStack.back();
+    s_menuStack.pop_back();
+    PushMenuElement(v, scriptHud, elem);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static SQRESULT UIScript_MenuStack_Pop(HSQUIRRELVM v)
+{
+    return MenuStack_Pop_Internal(v, GetUIScriptHud());
+}
+
+static SQRESULT ClientScript_MenuStack_Pop(HSQUIRRELVM v)
+{
+    return MenuStack_Pop_Internal(v, GetClientScriptHud());
+}
+
+//-----------------------------------------------------------------------------
+// MenuStack_Top [CLIENT|UI] - return top menu without removing
+//-----------------------------------------------------------------------------
+static SQRESULT MenuStack_Top_Internal(HSQUIRRELVM v, uintptr_t scriptHud)
+{
+    if (s_menuStack.empty())
+    {
+        sq_pushnull(v);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    PushMenuElement(v, scriptHud, s_menuStack.back());
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static SQRESULT UIScript_MenuStack_Top(HSQUIRRELVM v)
+{
+    return MenuStack_Top_Internal(v, GetUIScriptHud());
+}
+
+static SQRESULT ClientScript_MenuStack_Top(HSQUIRRELVM v)
+{
+    return MenuStack_Top_Internal(v, GetClientScriptHud());
+}
+
+//-----------------------------------------------------------------------------
+// MenuStack_GetCopy [CLIENT|UI] - return array copy of the stack
+//-----------------------------------------------------------------------------
+static SQRESULT MenuStack_GetCopy_Internal(HSQUIRRELVM v, uintptr_t scriptHud)
+{
+    sq_newarray(v, 0);
+
+    for (size_t i = 0; i < s_menuStack.size(); i++)
+    {
+        PushMenuElement(v, scriptHud, s_menuStack[i]);
+        sq_arrayappend(v, -2);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static SQRESULT UIScript_MenuStack_GetCopy(HSQUIRRELVM v)
+{
+    return MenuStack_GetCopy_Internal(v, GetUIScriptHud());
+}
+
+static SQRESULT ClientScript_MenuStack_GetCopy(HSQUIRRELVM v)
+{
+    return MenuStack_GetCopy_Internal(v, GetClientScriptHud());
 }
 
 //-----------------------------------------------------------------------------
@@ -1304,7 +1817,7 @@ static SQRESULT UIScript_DestroyServer(HSQUIRRELVM v)
 
 //---------------------------------------------------------------------------------
 // Purpose: registers script functions in CLIENT context
-// Input  : *s - 
+// Input  : *s -
 //---------------------------------------------------------------------------------
 void Script_RegisterClientFunctions(CSquirrelVM* s)
 {
@@ -1345,6 +1858,9 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
 	
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetElementsByClassname, "Gets a list of elements within the given menu matching a classname", "array< var >", "var menu, string classname", false);
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetParentMenu, "Gets the menu that the element is contained in", "var", "var elem", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, MenuStack_GetCopy, "Returns a copy of the menu stack", "array< var >", "", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, MenuStack_Pop, "Removes and returns the top menu from the menu stack", "var", "", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, MenuStack_Top, "Returns the top menu from the menu stack without removing", "var", "", false);
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetEntitiesFromArrayNearPos, "Filters entity array by proximity to a position", "array< entity >", "array< entity > entities, vector pos, float range", false);
 
     Script_RegisterColorPaletteFunctions(s);
@@ -1354,6 +1870,20 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     ScriptNetData_RegisterClientFunctions(s);
 
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetNetworkedVariableCategory, "Gets the category of a registered networked variable", "int", "string varName", false);
+
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetFocus, "Returns the currently focused HUD element", "var", "", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetMouseFocus, "Returns the HUD element under the mouse cursor", "var", "", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, SetCursorPosition, "Sets the mouse cursor position", "void", "vector pos", false);
+    DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetCursorPosition, "Gets the mouse cursor position as a vector", "vector", "", false);
+
+    // RUI wall time natives (S16+ compatibility)
+    RuiWallTime_RegisterNatives(s);
+
+    // StatusEffect_GetTotalSeverity (S22+ compatibility)
+    StatusEffects_SDK_RegisterClientFunctions(s);
+
+    // Particle effect functions (EffectRestart, EffectSetDistanceCullingScalar)
+    ParticleEffects_SDK_RegisterClientFunctions(s);
 }
 
 //---------------------------------------------------------------------------------
@@ -1397,6 +1927,17 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     // UI element functions (using g_uiScriptHud)
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetElementsByClassname, "Gets a list of elements within the given menu matching a classname", "array< var >", "var menu, string classname", false);
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetParentMenu, "Gets the menu that the element is contained in", "var", "var elem", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, MenuStack_Contains, "Checks if a menu is in the menu stack", "bool", "var menu", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, MenuStack_GetLength, "Returns the number of menus on the menu stack", "int", "", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, MenuStack_Push, "Push a menu onto the top of the menu stack", "void", "var menu", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, MenuStack_Remove, "Removes a menu from the menu stack", "void", "var menu", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, MenuStack_GetCopy, "Returns a copy of the menu stack", "array< var >", "", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, MenuStack_Pop, "Removes and returns the top menu from the menu stack", "var", "", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, MenuStack_Top, "Returns the top menu from the menu stack without removing", "var", "", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, GetFocus, "Returns the currently focused HUD element", "var", "", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, GetMouseFocus, "Returns the HUD element under the mouse cursor", "var", "", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, SetCursorPosition, "Sets the mouse cursor position", "void", "vector pos", false);
+    DEFINE_UI_SCRIPTFUNC_NAMED(s, GetCursorPosition, "Gets the mouse cursor position as a vector", "vector", "", false);
 
     Script_RegisterColorPaletteUIFunctions(s);
     Script_RegisterRemoteFunctionUINatives(s);
@@ -1405,6 +1946,12 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     ScriptNetData_RegisterUIFunctions(s);
 
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetNetworkedVariableCategory, "Gets the category of a registered networked variable", "int", "string varName", false);
+
+    // RUI wall time natives (S16+ compatibility)
+    RuiWallTime_RegisterNatives(s);
+
+    // StatusEffect_GetTotalSeverity (S22+ compatibility)
+    StatusEffects_SDK_RegisterUIFunctions(s);
 
     // NOTE: plugin functions must always come after SDK functions!
     for (auto& callback : !PluginSystem()->GetRegisterUIScriptFuncsCallbacks())
@@ -1429,6 +1976,9 @@ static ConVar settings_antilag("settings_antilag", "1", FCVAR_RELEASE, "Selected
 // NOTE: if we want to make a certain promo only show once, add the playerprofile flag to the cvar below. Current behavior = always show after game restart.
 static ConVar promo_version_accepted("promo_version_accepted", "0", FCVAR_RELEASE, "The accepted promo version.");
 
+static ConVar customMatch_enabled("customMatch_enabled", "0", FCVAR_RELEASE, "Enable custom match features.");
+static ConVar gladCards_debug("gladCards_debug", "0", FCVAR_RELEASE, "Enable gladiator card debug logging.");
+
 //---------------------------------------------------------------------------------
 // Purpose: returns true if entity has a model (model index != 0)
 //---------------------------------------------------------------------------------
@@ -1441,6 +1991,27 @@ static SQRESULT Script_HasModel(HSQUIRRELVM v)
     // m_nModelIndex at offset 0x60 for client entities
     const short modelIndex = *reinterpret_cast<short*>(reinterpret_cast<char*>(pEntity) + 0x60);
     sq_pushbool(v, modelIndex != 0);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//---------------------------------------------------------------------------------
+// Purpose: sets the lighting origin for a dynamic prop entity (stub)
+//---------------------------------------------------------------------------------
+static SQRESULT Script_SetLightingOrigin(HSQUIRRELVM v)
+{
+    void* pEntity = nullptr;
+    if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pEntity)))
+        return SQ_ERROR;
+
+    const SQVector3D* pVec = nullptr;
+    sq_getvector(v, 2, &pVec);
+
+    if (!pVec)
+    {
+        v_SQVM_RaiseError(v, "SetLightingOrigin requires a vector argument");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -1465,6 +2036,15 @@ static void Script_RegisterClientEntityClassFuncs()
         "",
         false,
         Script_HasModel);
+
+    g_clientScriptEntityStruct->AddFunction(
+        "SetLightingOrigin",
+        "Script_SetLightingOrigin",
+        "Sets the lighting origin for entity rendering",
+        "void",
+        "vector lightingOrigin",
+        false,
+        Script_SetLightingOrigin);
 
     WeaponScriptVars_RegisterEntityFuncs(g_clientScriptEntityStruct);
 }

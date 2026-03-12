@@ -38,6 +38,8 @@ add_sources( SOURCE_GROUP "Activity"
 
 add_sources( SOURCE_GROUP "Effects"
     "shared/status_effect.h"
+    "shared/status_effects_sdk.cpp"
+    "shared/status_effects_sdk.h"
     "shared/particleproperty.h"
     "shared/particle_parse.h"
 )
@@ -294,8 +296,12 @@ add_sources( SOURCE_GROUP "Script"
     "client/vscript_remotefunctions.h"
     "client/concommandcallback.cpp"
     "client/concommandcallback.h"
+    "client/convar_stubs.cpp"
+    "client/convar_stubs.h"
     "client/scriptnetdata_client.cpp"
     "client/scriptnetdata_client.h"
+    "client/particle_effects_sdk.cpp"
+    "client/particle_effects_sdk.h"
 )
 
 add_sources( SOURCE_GROUP "Viewmodel"
@@ -316,6 +322,8 @@ add_sources( SOURCE_GROUP "Zipline"
 add_sources( SOURCE_GROUP "RUI"
     "client/ruitracks.cpp"
     "client/ruitracks.h"
+    "client/rui_walltime.cpp"
+    "client/rui_walltime.h"
 )
 
 file( GLOB GAME_CLIENT_PUBLIC_HEADERS

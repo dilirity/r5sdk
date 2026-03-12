@@ -184,6 +184,7 @@
 #include "game/client/concommandcallback.h"
 #include "game/client/viewmodel_poseparam.h"
 #include "game/client/ruitracks.h"
+#include "game/client/rui_walltime.h"
 #endif // !DEDICATED
 #include "public/edict.h"
 #ifndef DEDICATED
@@ -778,6 +779,7 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	REGISTER(VHudChat);
 	REGISTER(VZiplineFix);
 	REGISTER(VRuiTracks);
+	REGISTER(VRuiWallTime);
 	REGISTER(VClientLeafSystem);
 	REGISTER(VConCommandCallback);
 #endif // !DEDICATED

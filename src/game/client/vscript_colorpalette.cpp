@@ -41,6 +41,9 @@ static ConVar reticle_color("reticle_color", "", FCVAR_RELEASE,
 	"Reticle color override as 'R G B' (0-255). Empty to reset.",
 	&ReticleColorChangeCB);
 
+static ConVar lobby_theme_color("lobby_theme_color", "199 21 11", FCVAR_RELEASE | FCVAR_ARCHIVE,
+	"Lobby theme color as 'R G B' (0-255). Default: 199 21 11.");
+
 //=============================================================================
 // Color palette storage
 //=============================================================================
@@ -790,7 +793,6 @@ static SQRESULT UIScript_FormatAndLocalizeNumber(HSQUIRRELVM v)
 // Group F: Player functions
 //-----------------------------------------------------------------------------
 
-// S3 C_Player m_playerFlags offset (from recv table string xref)
 static constexpr int CPLAYER_M_PLAYERFLAGS_OFFSET = 0x2CAC;
 
 //-----------------------------------------------------------------------------
@@ -816,12 +818,12 @@ static SQRESULT Script_IsConnectionActive(HSQUIRRELVM v)
 // HUD element helpers
 //=============================================================================
 
-// CClientScriptHudElement layout offsets (verified from S3 decompilation)
-static constexpr ptrdiff_t HUDELEMENT_PANEL_OFFSET   = 0x28; // panel pointer
-static constexpr ptrdiff_t HUDELEMENT_HANDLE_OFFSET   = 0x30; // script handle (HSCRIPT)
-static constexpr ptrdiff_t HUDELEMENT_OWNER_OFFSET    = 0x38; // hud owner (CClientScriptHud*)
+// CClientScriptHudElement layout offsets
+static constexpr ptrdiff_t HUDELEMENT_PANEL_OFFSET   = 0x28;
+static constexpr ptrdiff_t HUDELEMENT_SQOBJECT_OFFSET = 0x30;
+static constexpr ptrdiff_t HUDELEMENT_OWNER_OFFSET    = 0x38;
 
-// S3 VGUI Panel vtable offsets (verified via decompilation)
+// VGUI Panel vtable offsets
 static constexpr ptrdiff_t PANEL_VT_GETNAME           = 0xC0;  // GetClientPanelName
 static constexpr ptrdiff_t PANEL_VT_ISBUTTON          = 0x610; // IsButton
 static constexpr ptrdiff_t PANEL_VT_ISLABEL           = 0x608; // IsLabel
@@ -839,15 +841,21 @@ static constexpr int BTNSTATE_LOCKED  = 5;
 static constexpr int BTNSTATE_NEW     = 6;
 static constexpr int BTNSTATE_CHECKED = 7;
 
-// S3 GridButtonListPanel field offsets (verified from S3 sub_14092FDE0)
+static constexpr ptrdiff_t BUTTON_STATE_BITMASK = 0x460;
+
+// GridButtonListPanel field offsets
 static constexpr ptrdiff_t GRID_BUTTONS_ARRAY  = 0x2D8; // m_Buttons.m_Memory (ptr to ptr array)
 static constexpr ptrdiff_t GRID_BUTTONS_COUNT  = 0x2F0; // m_Buttons.m_Size (int)
-static constexpr ptrdiff_t GRID_SCROLL_OFFSET  = 0x2F8; // scroll offset (int)
+static constexpr ptrdiff_t GRID_SCROLL_PANEL   = 0x2F8; // m_pScrollPanel (EditablePanel*, NOT an int!)
+static constexpr ptrdiff_t GRID_SCROLL_BAR     = 0x300; // m_pScrollBar (ScrollBar*)
 
-// S3 TextEntry field offset
-static constexpr ptrdiff_t TEXTENTRY_HIDDEN    = 0x495; // textHidden byte
+// ScrollBar vtable offsets
+static constexpr ptrdiff_t SCROLLBAR_VT_SETVALUE = 0x778; // ScrollBar::SetValue(int) - vtable[239]
+static constexpr ptrdiff_t SCROLLBAR_VT_GETVALUE = 0x780; // ScrollBar::GetValue() -> int - vtable[240]
 
-// S3 TextEntry vtable offsets for GetText(wchar)
+static constexpr ptrdiff_t TEXTENTRY_HIDDEN    = 0x495;
+
+// TextEntry vtable offsets
 static constexpr ptrdiff_t PANEL_VT_TEXTENTRY_GETTEXT_W = 0x788;
 static constexpr ptrdiff_t PANEL_VT_BUTTON_GETTEXT_W    = 0x778;
 
@@ -865,6 +873,29 @@ typedef uintptr_t(__fastcall* GetHudElementFn)(uintptr_t, uintptr_t, uintptr_t);
 static GetHudElementFn s_fnGetHudElement = nullptr;
 static uintptr_t s_hudElemTypeDesc = 0;
 
+static void FixButtonStateArgNameTable(uintptr_t base)
+{
+	static const char* s_szIsChecked = "isChecked";
+
+	// Button state arg name table; entry 7 is uninitialized — patch to "isChecked"
+	uintptr_t* table = reinterpret_cast<uintptr_t*>(base + 0x131A9D0);
+
+	const char* entry2 = reinterpret_cast<const char*>(table[2]);
+	if (!entry2 || strcmp(entry2, "isDisabled") != 0)
+	{
+		Warning(eDLL_T::CLIENT, "ButtonState: table validation failed at entry 2\n");
+		return;
+	}
+
+	DWORD oldProtect;
+	VirtualProtect(&table[7], sizeof(uintptr_t), PAGE_READWRITE, &oldProtect);
+	table[7] = reinterpret_cast<uintptr_t>(s_szIsChecked);
+	VirtualProtect(&table[7], sizeof(uintptr_t), oldProtect, &oldProtect);
+
+	Msg(eDLL_T::CLIENT, "ButtonState: patched arg name table entry 7 -> \"%s\"\n",
+		s_szIsChecked);
+}
+
 static void InitHudElementResolver()
 {
 	static bool s_initialized = false;
@@ -873,10 +904,10 @@ static void InitHudElementResolver()
 	s_initialized = true;
 
 	const uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandleA(nullptr));
-	// sub_141056980: validates hud element from SQVM, returns CClientScriptHudElement*
 	s_fnGetHudElement = reinterpret_cast<GetHudElementFn>(base + 0x1056980);
-	// qword_142337A70: g_CClientScriptHudElement_ScriptDesc type descriptor
 	s_hudElemTypeDesc = base + 0x2337A70;
+
+	FixButtonStateArgNameTable(base);
 }
 
 static uintptr_t GetHudElement(HSQUIRRELVM v)
@@ -919,7 +950,7 @@ static uintptr_t GetHudOwner(uintptr_t hudElem)
 	return *reinterpret_cast<uintptr_t*>(hudElem + HUDELEMENT_OWNER_OFFSET);
 }
 
-// S3 sub_14098E380: CClientScriptHud::CreateHudElementForPanel
+// CClientScriptHud::CreateHudElementForPanel
 typedef uintptr_t(__fastcall* CreateHudElemForPanelFn)(uintptr_t, uintptr_t);
 static CreateHudElemForPanelFn s_fnCreateHudElemForPanel = nullptr;
 
@@ -934,7 +965,7 @@ static void InitCreateHudElemForPanel()
 	s_fnCreateHudElemForPanel = reinterpret_cast<CreateHudElemForPanelFn>(base + 0x98E380);
 }
 
-// S3 RemoveAllListItems for DialogListButton - pattern scanned
+// DialogListButton::RemoveAllListItems
 typedef void(__fastcall* RemoveAllListItemsFn)(uintptr_t);
 static RemoveAllListItemsFn s_fnRemoveAllListItems = nullptr;
 
@@ -945,7 +976,7 @@ static void InitRemoveAllListItems()
 		return;
 	s_initialized = true;
 
-	// Find DialogListButton::RemoveAllListItems in S3 via pattern
+	// DialogListButton::RemoveAllListItems
 	CMemory result = Module_FindPattern(g_GameDll,
 		"40 53 48 83 EC 20 48 8B D9 E8 ?? ?? ?? ?? 33 D2 48 8B CB E8");
 	if (result)
@@ -1035,14 +1066,11 @@ static SQRESULT Script_Hud_GetButton_Impl(HSQUIRRELVM v)
 		uintptr_t buttonHudElem = s_fnCreateHudElemForPanel(hudOwner, buttonPanel);
 		if (buttonHudElem)
 		{
-			uintptr_t scriptHandle = *reinterpret_cast<uintptr_t*>(buttonHudElem + HUDELEMENT_HANDLE_OFFSET);
-			if (scriptHandle)
+			// hudElement+0x30 contains a POINTER to an SQObject (allocated by sub_141056680)
+			SQObject* storedObj = *reinterpret_cast<SQObject**>(buttonHudElem + HUDELEMENT_SQOBJECT_OFFSET);
+			if (storedObj && storedObj->_type == OT_INSTANCE && storedObj->_unVal.pInstance)
 			{
-				SQObject obj;
-				obj._type = OT_INSTANCE;
-				obj._pad = 0;
-				obj._unVal.pInstance = reinterpret_cast<SQInstance*>(scriptHandle);
-				sq_pushobject(v, obj);
+				sq_pushobject(v, *storedObj);
 				SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 			}
 		}
@@ -1091,14 +1119,11 @@ static SQRESULT Script_Hud_GetSelectedButton_Impl(HSQUIRRELVM v)
 				uintptr_t btnHudElem = s_fnCreateHudElemForPanel(hudOwner, btn);
 				if (btnHudElem)
 				{
-					uintptr_t handle = *reinterpret_cast<uintptr_t*>(btnHudElem + HUDELEMENT_HANDLE_OFFSET);
-					if (handle)
+					// hudElement+0x30 contains a POINTER to an SQObject (allocated by sub_141056680)
+					SQObject* storedObj = *reinterpret_cast<SQObject**>(btnHudElem + HUDELEMENT_SQOBJECT_OFFSET);
+					if (storedObj && storedObj->_type == OT_INSTANCE && storedObj->_unVal.pInstance)
 					{
-						SQObject obj;
-						obj._type = OT_INSTANCE;
-						obj._pad = 0;
-						obj._unVal.pInstance = reinterpret_cast<SQInstance*>(handle);
-						sq_pushobject(v, obj);
+						sq_pushobject(v, *storedObj);
 						SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 					}
 				}
@@ -1114,7 +1139,7 @@ static SQRESULT UIScript_Hud_GetSelectedButton(HSQUIRRELVM v) { return Script_Hu
 
 //-----------------------------------------------------------------------------
 // Hud_SetChecked(var hudElement, bool checked)
-// Sets the checked state on a button panel via SetButtonState(7, checked)
+// Writes the checked bit directly to avoid SetButtonState listener overflow.
 //-----------------------------------------------------------------------------
 static SQRESULT Script_Hud_SetChecked_Impl(HSQUIRRELVM v)
 {
@@ -1135,16 +1160,43 @@ static SQRESULT Script_Hud_SetChecked_Impl(HSQUIRRELVM v)
 		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
-	// SetButtonState(panel, BTNSTATE_CHECKED, value)
-	uintptr_t vtable = *reinterpret_cast<uintptr_t*>(panel);
-	typedef void(__fastcall* SetBtnStateFn)(uintptr_t, int, int);
-	reinterpret_cast<SetBtnStateFn>(*reinterpret_cast<uintptr_t*>(vtable + PANEL_VT_SETBUTTONSTATE))(
-		panel, BTNSTATE_CHECKED, checked ? 1 : 0);
+	DWORD* bitmask = reinterpret_cast<DWORD*>(panel + BUTTON_STATE_BITMASK);
+	if (checked)
+		*bitmask |= (1 << BTNSTATE_CHECKED);
+	else
+		*bitmask &= ~(1 << BTNSTATE_CHECKED);
 
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 static SQRESULT ClientScript_Hud_SetChecked(HSQUIRRELVM v) { return Script_Hud_SetChecked_Impl(v); }
 static SQRESULT UIScript_Hud_SetChecked(HSQUIRRELVM v) { return Script_Hud_SetChecked_Impl(v); }
+
+//-----------------------------------------------------------------------------
+// Hud_IsChecked(var hudElement) -> bool
+// Returns whether a button element has the checked state set.
+//-----------------------------------------------------------------------------
+static SQRESULT Script_Hud_IsChecked_Impl(HSQUIRRELVM v)
+{
+	uintptr_t hudElem = GetHudElement(v);
+	if (!hudElem)
+	{
+		v_SQVM_ScriptError("First parameter is not a hud element");
+		SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+	}
+
+	uintptr_t panel = GetPanel(hudElem);
+	if (!PanelVtableBool(panel, PANEL_VT_ISBUTTON))
+	{
+		sq_pushbool(v, SQFalse);
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+	}
+
+	DWORD bitmask = *reinterpret_cast<DWORD*>(panel + BUTTON_STATE_BITMASK);
+	sq_pushbool(v, (bitmask & (1 << BTNSTATE_CHECKED)) ? SQTrue : SQFalse);
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+static SQRESULT ClientScript_Hud_IsChecked(HSQUIRRELVM v) { return Script_Hud_IsChecked_Impl(v); }
+static SQRESULT UIScript_Hud_IsChecked(HSQUIRRELVM v) { return Script_Hud_IsChecked_Impl(v); }
 
 //-----------------------------------------------------------------------------
 // Hud_ClearEventHandlers(var hudElement, int eventType)
@@ -1208,7 +1260,7 @@ static SQRESULT UIScript_Hud_GetTextHidden(HSQUIRRELVM v) { return Script_Hud_Ge
 
 //-----------------------------------------------------------------------------
 // Hud_SetTextHidden(var hudElement, bool hidden)
-// Sets text hidden state on a TextEntry panel via vtable
+// Direct field write; vtable call uses an invalid RUI arg lookup.
 //-----------------------------------------------------------------------------
 static SQRESULT Script_Hud_SetTextHidden_Impl(HSQUIRRELVM v)
 {
@@ -1229,11 +1281,8 @@ static SQRESULT Script_Hud_SetTextHidden_Impl(HSQUIRRELVM v)
 		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
-	// Call SetTextHidden via vtable
-	uintptr_t vtable = *reinterpret_cast<uintptr_t*>(panel);
-	typedef void(__fastcall* SetTextHiddenFn)(uintptr_t, bool);
-	reinterpret_cast<SetTextHiddenFn>(*reinterpret_cast<uintptr_t*>(vtable + PANEL_VT_SETTEXTHIDDEN))(
-		panel, hidden != 0);
+	// Direct field write; vtable SetTextHidden (0x8E0) uses an invalid RUI arg lookup
+	*reinterpret_cast<uint8_t*>(panel + TEXTENTRY_HIDDEN) = hidden ? 1 : 0;
 
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -1242,7 +1291,16 @@ static SQRESULT UIScript_Hud_SetTextHidden(HSQUIRRELVM v) { return Script_Hud_Se
 
 //-----------------------------------------------------------------------------
 // Hud_ScrollToTop(var hudElement)
-// Scrolls a GridButtonListPanel to the top
+// Scrolls a GridButtonListPanel to the top by calling ScrollBar::SetValue(0)
+//
+// BUG FIX: Previously wrote int(0) to offset 0x2F8, which is the ScrollPanel
+// POINTER (not a scroll offset). This zeroed the lower 32 bits of the 64-bit
+// pointer, corrupting it to e.g. 0x0000027000000000. The next call to
+// Hud_InitGridButtons would read this corrupted pointer as the parent for new
+// GridButtons, crashing in vgui::Panel constructor when dereferencing vtable=1.
+//
+// The actual scroll position lives in the ScrollBar widget at offset 0x300.
+// ScrollToItem calls ScrollBar::SetValue() at vtable[239] and GetValue() at [240].
 //-----------------------------------------------------------------------------
 static SQRESULT Script_Hud_ScrollToTop_Impl(HSQUIRRELVM v)
 {
@@ -1260,8 +1318,21 @@ static SQRESULT Script_Hud_ScrollToTop_Impl(HSQUIRRELVM v)
 		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
-	// Set scroll offset to 0 (same field used by Hud_ScrollToItemIndex)
-	*reinterpret_cast<int*>(panel + GRID_SCROLL_OFFSET) = 0;
+	// Get the ScrollBar at offset 0x300 and call SetValue(0) via vtable[239]
+	uintptr_t scrollBar = *reinterpret_cast<uintptr_t*>(panel + GRID_SCROLL_BAR);
+	if (scrollBar)
+	{
+		uintptr_t scrollBarVtable = *reinterpret_cast<uintptr_t*>(scrollBar);
+		auto SetValue = reinterpret_cast<void(__fastcall*)(uintptr_t, int)>(
+			*reinterpret_cast<uintptr_t*>(scrollBarVtable + SCROLLBAR_VT_SETVALUE));
+		SetValue(scrollBar, 0);
+	}
+
+	// Trigger layout refresh
+	uintptr_t vtable = *reinterpret_cast<uintptr_t*>(panel);
+	auto InvalidateLayout = reinterpret_cast<void(__fastcall*)(uintptr_t)>(
+		*reinterpret_cast<uintptr_t*>(vtable + 0x28)); // vtable[5] = InvalidateLayout
+	InvalidateLayout(panel);
 
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -1468,6 +1539,10 @@ void Script_RegisterColorPaletteFunctions(CSquirrelVM* s)
 		"Sets the checked state on a button element",
 		"void", "var hudElement, bool checked", false);
 
+	DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, Hud_IsChecked,
+		"Returns whether a button element is checked",
+		"bool", "var hudElement", false);
+
 	DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, Hud_ClearEventHandlers,
 		"Clears event handlers for the given event type",
 		"void", "var hudElement, int eventType", false);
@@ -1577,6 +1652,10 @@ void Script_RegisterColorPaletteUIFunctions(CSquirrelVM* s)
 	DEFINE_UI_SCRIPTFUNC_NAMED(s, Hud_SetChecked,
 		"Sets the checked state on a button element",
 		"void", "var hudElement, bool checked", false);
+
+	DEFINE_UI_SCRIPTFUNC_NAMED(s, Hud_IsChecked,
+		"Returns whether a button element is checked",
+		"bool", "var hudElement", false);
 
 	DEFINE_UI_SCRIPTFUNC_NAMED(s, Hud_ClearEventHandlers,
 		"Clears event handlers for the given event type",
