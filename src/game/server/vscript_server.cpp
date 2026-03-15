@@ -59,6 +59,10 @@ struct BotCorridor
 static std::unordered_map<int, BotCorridor*> g_corridors;
 static int g_nextCorridorHandle = 1;
 
+// Banned traverse links: stores original traverseType so links can be restored.
+// Key: (sourcePolyRef << 32 | targetPolyRef), Value: original traverseType byte
+static std::unordered_map<uint64_t, unsigned char> g_bannedTraverseLinks;
+
 /*
 =====================
 SQVM_ServerScript_f
@@ -1908,6 +1912,165 @@ static SQRESULT ServerScript_NavMesh_GetPortalsFromPoly(HSQUIRRELVM v)
 }
 
 //=============================================================================
+// NavMesh Traverse Link Ban API
+//=============================================================================
+
+// Banned traverse type marker — type 31 is not in the corridor's traverseFlags
+// (0x8013F), so traverseFilter rejects it during pathfinding.
+static const unsigned char TRAVERSE_TYPE_BANNED = 31;
+
+//-----------------------------------------------------------------------------
+// Purpose: bans a single directional traverse link (sourceRef -> targetRef).
+// Returns true if the link was found and banned.
+//-----------------------------------------------------------------------------
+static bool Internal_BanTraverseLinkOneWay(dtNavMesh* nav, dtPolyRef sourceRef, dtPolyRef targetRef)
+{
+    const dtMeshTile* constTile = nullptr;
+    const dtPoly* constPoly = nullptr;
+    nav->getTileAndPolyByRefUnsafe(sourceRef, &constTile, &constPoly);
+
+    if (!constTile || !constPoly)
+        return false;
+
+    dtMeshTile* tile = const_cast<dtMeshTile*>(constTile);
+
+    unsigned int linkIdx = constPoly->firstLink;
+    while (linkIdx != DT_NULL_LINK)
+    {
+        dtLink& link = tile->links[linkIdx];
+
+        if (link.ref == targetRef && link.hasTraverseType())
+        {
+            const uint64_t key = ((uint64_t)sourceRef << 32) | (uint64_t)targetRef;
+            g_bannedTraverseLinks[key] = link.traverseType;
+
+            link.traverseType = (link.traverseType & 0xE0) | TRAVERSE_TYPE_BANNED;
+            return true;
+        }
+
+        linkIdx = link.next;
+    }
+
+    return false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: bans a traverse link in both directions (A->B and B->A).
+// Returns true if at least one direction was found and banned.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_BanTraverseLink(HSQUIRRELVM v)
+{
+    SQInteger sourcePolyRefInt;
+    SQInteger targetPolyRefInt;
+    SQInteger hullIdx;
+
+    sq_getinteger(v, 2, &sourcePolyRefInt);
+    sq_getinteger(v, 3, &targetPolyRefInt);
+    sq_getinteger(v, 4, &hullIdx);
+
+    if (!Internal_ServerScript_ValidateHull(hullIdx))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const Hull_e hullType = Hull_e(hullIdx);
+    const NavMeshType_e navType = NAI_Hull::NavMeshType(hullType);
+    dtNavMesh* const nav = Detour_GetNavMeshByType(navType);
+
+    if (!nav)
+    {
+        v_SQVM_ScriptError("NavMesh_BanTraverseLink: navmesh not loaded for hull type %d", hullIdx);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const dtPolyRef sourceRef = (dtPolyRef)sourcePolyRefInt;
+    const dtPolyRef targetRef = (dtPolyRef)targetPolyRefInt;
+
+    // Ban both directions
+    bool fwd = Internal_BanTraverseLinkOneWay(nav, sourceRef, targetRef);
+    bool rev = Internal_BanTraverseLinkOneWay(nav, targetRef, sourceRef);
+
+    sq_pushbool(v, fwd || rev);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: unbans a single directional traverse link by restoring its original
+// traverseType. Returns true if the link was found and restored.
+//-----------------------------------------------------------------------------
+static bool Internal_UnbanTraverseLinkOneWay(dtNavMesh* nav, dtPolyRef sourceRef, dtPolyRef targetRef)
+{
+    const uint64_t key = ((uint64_t)sourceRef << 32) | (uint64_t)targetRef;
+    auto it = g_bannedTraverseLinks.find(key);
+
+    if (it == g_bannedTraverseLinks.end())
+        return false;
+
+    const unsigned char originalType = it->second;
+
+    const dtMeshTile* constTile = nullptr;
+    const dtPoly* constPoly = nullptr;
+    nav->getTileAndPolyByRefUnsafe(sourceRef, &constTile, &constPoly);
+
+    if (!constTile || !constPoly)
+        return false;
+
+    dtMeshTile* tile = const_cast<dtMeshTile*>(constTile);
+
+    unsigned int linkIdx = constPoly->firstLink;
+    while (linkIdx != DT_NULL_LINK)
+    {
+        dtLink& link = tile->links[linkIdx];
+
+        if (link.ref == targetRef)
+        {
+            link.traverseType = originalType;
+            g_bannedTraverseLinks.erase(it);
+            return true;
+        }
+
+        linkIdx = link.next;
+    }
+
+    return false;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: unbans a previously banned traverse link in both directions.
+// Returns true if at least one direction was restored.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_UnbanTraverseLink(HSQUIRRELVM v)
+{
+    SQInteger sourcePolyRefInt;
+    SQInteger targetPolyRefInt;
+    SQInteger hullIdx;
+
+    sq_getinteger(v, 2, &sourcePolyRefInt);
+    sq_getinteger(v, 3, &targetPolyRefInt);
+    sq_getinteger(v, 4, &hullIdx);
+
+    if (!Internal_ServerScript_ValidateHull(hullIdx))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const Hull_e hullType = Hull_e(hullIdx);
+    const NavMeshType_e navType = NAI_Hull::NavMeshType(hullType);
+    dtNavMesh* const nav = Detour_GetNavMeshByType(navType);
+
+    if (!nav)
+    {
+        v_SQVM_ScriptError("NavMesh_UnbanTraverseLink: navmesh not loaded for hull type %d", hullIdx);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    const dtPolyRef sourceRef = (dtPolyRef)sourcePolyRefInt;
+    const dtPolyRef targetRef = (dtPolyRef)targetPolyRefInt;
+
+    bool fwd = Internal_UnbanTraverseLinkOneWay(nav, sourceRef, targetRef);
+    bool rev = Internal_UnbanTraverseLinkOneWay(nav, targetRef, sourceRef);
+
+    sq_pushbool(v, fwd || rev);
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//=============================================================================
 // Bot Control API
 //=============================================================================
 
@@ -2294,6 +2457,17 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "Gets traversal portals from a specific polygon reference (from corridor corner). Returns array of portal info",
         "array",
         "int polyRef, int hullType", false);
+
+    // NavMesh Traverse Link Ban API
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_BanTraverseLink,
+        "Bans a traverse link between two polygons. Pathfinding will skip it. Returns true on success",
+        "bool",
+        "int sourcePolyRef, int targetPolyRef, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_UnbanTraverseLink,
+        "Restores a previously banned traverse link. Returns true on success",
+        "bool",
+        "int sourcePolyRef, int targetPolyRef, int hullType", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, Bot_Create,
         "Creates a bot player, returns edict index (-1 on failure). Use GetEntByIndex() to get entity",
