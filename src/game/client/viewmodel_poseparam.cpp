@@ -8,6 +8,7 @@
 #include "vscript/languages/squirrel_re/include/sqvm.h"
 #include "vscript/languages/squirrel_re/vsquirrel.h"
 #include "game/shared/vscript_gamedll_defs.h"
+#include "game/shared/weapon_heat.h"
 #include "viewmodel_poseparam.h"
 
 static constexpr __int64 VIEWMODEL_STUDIOHDR_OFFSET = 0x10E0;
@@ -44,6 +45,8 @@ static __int64 Hook_C_BaseViewModel_OnModelChanged(__int64 viewmodel)
 static __int64 Hook_C_BaseViewModel_UpdatePoseParameters(__int64 viewmodel, __int64 player)
 {
 	const __int64 result = v_C_BaseViewModel_UpdatePoseParameters(viewmodel, player);
+
+	WeaponHeat_UpdateAll();
 
 	const __int64 studioHdr = *(__int64*)(viewmodel + VIEWMODEL_STUDIOHDR_OFFSET);
 

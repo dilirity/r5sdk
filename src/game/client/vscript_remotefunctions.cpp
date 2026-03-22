@@ -169,7 +169,7 @@ static SQRESULT ClientScript_Remote_RegisterServerFunction(HSQUIRRELVM v)
 
 		if (strcmp(pszType, "int") == 0)
 		{
-			// "int", min, max — need 2 more args
+			// "int", min, max[, precision] — need 2+ more args
 			param.type = ScriptRemoteParamType_e::SRP_INT;
 			if (idx + 2 > nTop)
 			{
@@ -188,11 +188,11 @@ static SQRESULT ClientScript_Remote_RegisterServerFunction(HSQUIRRELVM v)
 		}
 		else if (strcmp(pszType, "float") == 0)
 		{
-			// "float", min, max — need 2 more args
+			// "float", min, max, bits — need 3 more args
 			param.type = ScriptRemoteParamType_e::SRP_FLOAT;
-			if (idx + 2 > nTop)
+			if (idx + 3 > nTop)
 			{
-				v_SQVM_RaiseError(v, "Remote_RegisterServerFunction: '%s' float param missing min/max\n",
+				v_SQVM_RaiseError(v, "Remote_RegisterServerFunction: '%s' float param needs min, max, bits\n",
 					pszFuncName);
 				SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 			}
@@ -201,19 +201,92 @@ static SQRESULT ClientScript_Remote_RegisterServerFunction(HSQUIRRELVM v)
 			sq_getfloat(v, idx + 1, &fMin);
 			sq_getfloat(v, idx + 2, &fMax);
 
+			SQInteger bits = 32;
+			sq_getinteger(v, idx + 3, &bits);
+
+			if (bits < 1 || bits > 32)
+			{
+				v_SQVM_RaiseError(v, "Remote_RegisterServerFunction: '%s' float bit count must be 1-32\n",
+					pszFuncName);
+				SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+			}
+
 			param.floatMin = fMin;
 			param.floatMax = fMax;
-			idx += 3;
+			param.floatBits = static_cast<int>(bits);
+			idx += 4;
 		}
 		else if (strcmp(pszType, "bool") == 0)
 		{
 			param.type = ScriptRemoteParamType_e::SRP_BOOL;
 			idx += 1;
 		}
-		else if (strcmp(pszType, "string") == 0)
+		else if (strcmp(pszType, "vector") == 0)
 		{
-			param.type = ScriptRemoteParamType_e::SRP_STRING;
+			// "vector", min, max, bits — same format as float
+			param.type = ScriptRemoteParamType_e::SRP_VECTOR;
+			if (idx + 3 > nTop)
+			{
+				v_SQVM_RaiseError(v, "Remote_RegisterServerFunction: '%s' vector param needs min, max, bits\n",
+					pszFuncName);
+				SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+			}
+
+			SQFloat fMin = 0.0f, fMax = 0.0f;
+			sq_getfloat(v, idx + 1, &fMin);
+			sq_getfloat(v, idx + 2, &fMax);
+
+			SQInteger bits = 32;
+			sq_getinteger(v, idx + 3, &bits);
+
+			if (bits < 1 || bits > 32)
+			{
+				v_SQVM_RaiseError(v, "Remote_RegisterServerFunction: '%s' vector bit count must be 1-32\n",
+					pszFuncName);
+				SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+			}
+
+			param.floatMin = fMin;
+			param.floatMax = fMax;
+			param.floatBits = static_cast<int>(bits);
+			idx += 4;
+		}
+		else if (strcmp(pszType, "entity") == 0)
+		{
+			param.type = ScriptRemoteParamType_e::SRP_ENTITY;
 			idx += 1;
+		}
+		else if (strcmp(pszType, "typed_entity") == 0)
+		{
+			param.type = ScriptRemoteParamType_e::SRP_TYPED_ENTITY;
+			idx += 2;
+		}
+		else if (strcmp(pszType, "itemflavor") == 0)
+		{
+			// "itemflavor", int [, int] — 2 or 3 args (single type or range)
+			param.type = ScriptRemoteParamType_e::SRP_ITEMFLAVOR;
+			if (idx + 1 > nTop)
+			{
+				v_SQVM_RaiseError(v, "Remote_RegisterServerFunction: '%s' itemflavor needs at least 1 int\n",
+					pszFuncName);
+				SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+			}
+
+			SQInteger itemType1 = 0;
+			sq_getinteger(v, idx + 1, &itemType1);
+			param.intMin = static_cast<int>(itemType1);
+			idx += 2;
+
+			// Optional second int (range max)
+			if (idx <= nTop)
+			{
+				SQInteger testVal;
+				if (SQ_SUCCEEDED(sq_getinteger(v, idx, &testVal)))
+				{
+					param.intMax = static_cast<int>(testVal);
+					idx++;
+				}
+			}
 		}
 		else
 		{
@@ -304,14 +377,21 @@ static SQRESULT ClientScript_Remote_ServerCallFunction(HSQUIRRELVM v)
 			SQInteger val = 0;
 			sq_getinteger(v, sqIdx, &val);
 
-			if (val < paramDesc.intMin || val > paramDesc.intMax)
+			int intVal = static_cast<int>(val);
+			if (intVal < paramDesc.intMin || intVal > paramDesc.intMax)
 			{
-				v_SQVM_RaiseError(v, "Remote_ServerCallFunction: '%s' arg %d value %lld out of range [%d, %d]\n",
-					pszFuncName, i, val, paramDesc.intMin, paramDesc.intMax);
+				v_SQVM_RaiseError(v, "Remote_ServerCallFunction: '%s' arg %d value %d out of range [%d, %d)\n",
+					pszFuncName, i, intVal, paramDesc.intMin, paramDesc.intMax);
 				SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
 			}
 
-			msg.m_DataOut.WriteLong(static_cast<int>(val));
+			// Variable-width bit encoding — compute bits needed for range
+			unsigned int range = static_cast<unsigned int>(paramDesc.intMax - paramDesc.intMin);
+			int bits = 0;
+			for (unsigned int r = range; r; r >>= 1)
+				bits++;
+
+			msg.m_DataOut.WriteUBitLong(intVal - paramDesc.intMin, bits);
 			break;
 		}
 		case ScriptRemoteParamType_e::SRP_FLOAT:
@@ -319,33 +399,92 @@ static SQRESULT ClientScript_Remote_ServerCallFunction(HSQUIRRELVM v)
 			SQFloat val = 0.0f;
 			sq_getfloat(v, sqIdx, &val);
 
-			if (val < paramDesc.floatMin || val > paramDesc.floatMax)
+			if (paramDesc.floatBits >= 32)
 			{
-				v_SQVM_RaiseError(v, "Remote_ServerCallFunction: '%s' arg %d value %f out of range [%f, %f]\n",
-					pszFuncName, i, val, paramDesc.floatMin, paramDesc.floatMax);
-				SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+				msg.m_DataOut.WriteFloat(val);
 			}
+			else
+			{
+				if (val < paramDesc.floatMin || val > paramDesc.floatMax)
+				{
+					v_SQVM_RaiseError(v, "Remote_ServerCallFunction: '%s' arg %d value %f out of range [%f, %f]\n",
+						pszFuncName, i, val, paramDesc.floatMin, paramDesc.floatMax);
+					SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+				}
 
-			msg.m_DataOut.WriteFloat(val);
+				float range = paramDesc.floatMax - paramDesc.floatMin;
+				unsigned int maxVal = (1u << paramDesc.floatBits) - 1;
+				unsigned int encoded = static_cast<unsigned int>(
+					((val - paramDesc.floatMin) / range) * maxVal + 0.5f);
+
+				msg.m_DataOut.WriteUBitLong(encoded, paramDesc.floatBits);
+			}
 			break;
 		}
-		case ScriptRemoteParamType_e::SRP_STRING:
+		case ScriptRemoteParamType_e::SRP_VECTOR:
 		{
-			const SQChar* pszVal = nullptr;
-			sq_getstring(v, sqIdx, &pszVal);
+			const SQVector3D* vec = nullptr;
+			sq_getvector(v, sqIdx, &vec);
 
-			if (!pszVal)
-				pszVal = "";
-
-			const size_t nStrLen = strlen(pszVal);
-			if (nStrLen > SCRIPT_REMOTE_SERVER_MAX_STRING_LEN)
+			if (!vec)
 			{
-				v_SQVM_RaiseError(v, "Remote_ServerCallFunction: '%s' arg %d string too long\n",
-					pszFuncName, i);
-				SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+				for (int c = 0; c < 3; c++)
+					msg.m_DataOut.WriteFloat(0.0f);
+				break;
 			}
 
-			msg.m_DataOut.WriteString(pszVal);
+			float components[3] = { vec->x, vec->y, vec->z };
+
+			if (paramDesc.floatBits >= 32)
+			{
+				for (int c = 0; c < 3; c++)
+					msg.m_DataOut.WriteFloat(components[c]);
+			}
+			else
+			{
+				for (int c = 0; c < 3; c++)
+				{
+					if (components[c] < paramDesc.floatMin || components[c] > paramDesc.floatMax)
+					{
+						v_SQVM_RaiseError(v, "Remote_ServerCallFunction: '%s' arg %d vector component %d out of range\n",
+							pszFuncName, i, c);
+						SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+					}
+
+					float range = paramDesc.floatMax - paramDesc.floatMin;
+					unsigned int maxVal = (1u << paramDesc.floatBits) - 1;
+					unsigned int encoded = static_cast<unsigned int>(
+						((components[c] - paramDesc.floatMin) / range) * maxVal + 0.5f);
+
+					msg.m_DataOut.WriteUBitLong(encoded, paramDesc.floatBits);
+				}
+			}
+			break;
+		}
+		case ScriptRemoteParamType_e::SRP_ENTITY:
+		case ScriptRemoteParamType_e::SRP_TYPED_ENTITY:
+		{
+			// Writes entity.m_RefEHandle.m_Index via WriteLong
+			void* pEnt = nullptr;
+			if (v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pEnt)) && pEnt)
+			{
+				// m_RefEHandle.m_Index is at entity + 0x8 (IHandleEntity vtable)
+				// But in R5 the EHANDLE is accessed via GetRefEHandle
+				// The entity index field for networking uses m_Index from CBaseHandle
+				int ehandle = *reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(pEnt) + 8);
+				msg.m_DataOut.WriteLong(ehandle);
+			}
+			else
+			{
+				msg.m_DataOut.WriteLong(0);
+			}
+			break;
+		}
+		case ScriptRemoteParamType_e::SRP_ITEMFLAVOR:
+		{
+			SQInteger val = 0;
+			sq_getinteger(v, sqIdx, &val);
+			msg.m_DataOut.WriteLong(static_cast<int>(val));
 			break;
 		}
 		default:

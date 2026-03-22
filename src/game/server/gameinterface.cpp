@@ -23,6 +23,10 @@
 #include "pluginsystem/pluginsystem.h"
 #include "game/server/recipientfilter.h"
 #include "game/shared/weapon_script_vars.h"
+#include "game/shared/weapon_heat.h"
+#include "game/shared/globalnonrewind_vars.h"
+#include "game/shared/deathfield_system.h"
+#include "game/shared/highlight_context.h"
 #ifndef DEDICATED
 #include "game/client/vscript_remotefunctions.h"
 #endif
@@ -92,6 +96,10 @@ void CServerGameDLL::PrecompileScriptsJob(void)
 void CServerGameDLL::LevelShutdown(void)
 {
 	WeaponScriptVars_LevelShutdown();
+	WeaponHeat_LevelShutdown();
+	GlobalNonRewind_LevelShutdown();
+	DeathField_LevelShutdown();
+	HighlightContext_LevelShutdown();
 #ifndef DEDICATED
 	Script_ClearRemoteFunctionRegistrations();
 #endif

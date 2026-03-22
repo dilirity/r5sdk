@@ -3,7 +3,7 @@
 
 //------------------------------------------------------------------------------
 // ScriptNetData - Networked Variable Change Callbacks for CLIENT/UI
-// S3 engine only registers these for CLIENT VM, SDK provides them for UI VM
+// Engine only registers these for CLIENT VM; SDK provides them for UI VM too
 //------------------------------------------------------------------------------
 
 #include "vscript/vscript.h"

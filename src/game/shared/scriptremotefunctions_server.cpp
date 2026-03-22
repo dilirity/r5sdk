@@ -27,9 +27,7 @@ bool ScriptRemoteServer_ProcessMessage(CClient* pClient, NET_ScriptMessage* pMsg
 	in.ReadLong(); // reserved
 
 	ScriptVariant_t scriptArgs[SCRIPT_REMOTE_SERVER_MAX_PARAMS + 1];
-	char stringBuffers[SCRIPT_REMOTE_SERVER_MAX_PARAMS][SCRIPT_REMOTE_SERVER_MAX_STRING_LEN + 1];
 	int nScriptArgCount = 0;
-	int nStringCount = 0;
 
 	CPlayer* pPlayer = UTIL_PlayerByIndex(pClient->GetHandle());
 	if (!pPlayer)
@@ -80,18 +78,6 @@ bool ScriptRemoteServer_ProcessMessage(CClient* pClient, NET_ScriptMessage* pMsg
 				return false;
 			}
 			scriptArgs[nScriptArgCount++] = val;
-			break;
-		}
-		case ScriptRemoteParamType_e::SRP_STRING:
-		{
-			char* pBuffer = stringBuffers[nStringCount++];
-			if (!in.ReadString(pBuffer, SCRIPT_REMOTE_SERVER_MAX_STRING_LEN + 1) || strlen(pBuffer) > SCRIPT_REMOTE_SERVER_MAX_STRING_LEN)
-			{
-				Warning(eDLL_T::SERVER, "ScriptRemoteServer: '%s' param %d string invalid (client #%d)\n",
-					pFunc->szName, i, pClient->GetUserID());
-				return false;
-			}
-			scriptArgs[nScriptArgCount++] = pBuffer;
 			break;
 		}
 		default:

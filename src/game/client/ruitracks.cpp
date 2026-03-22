@@ -13,6 +13,7 @@
 #include "engine/client/clientstate.h"
 #include "engine/client/vengineclient_impl.h"
 #include "public/globalvars_base.h"
+#include "game/shared/weapon_heat.h"
 #include "public/inetchannel.h"
 #include "game/shared/weapon_script_vars.h"
 
@@ -529,11 +530,16 @@ static __int64 RuiTrack_Fallback_Hook(__int64 entity, int trackId, unsigned int 
                 *output = GetTrack_PacketChoke();
                 return 0;
 
-            // S11 float tracks
+            // Extended float tracks
             case TRACK_WEAPON_CHARGE_FRACTION_CURVED:
-                // Non-linear charge curve; reuse linear fraction as approximation
-                *(float*)output = GetTrack_WeaponChargeFraction(entity);
+            {
+                float curved = WeaponHeat_GetCurvedChargeFraction(reinterpret_cast<void*>(entity));
+                if (curved > 0.0f)
+                    *(float*)output = curved;
+                else
+                    *(float*)output = GetTrack_WeaponChargeFraction(entity);
                 return 0;
+            }
             case TRACK_WEAPON_SCRIPT_FLOAT_0:
                 *(float*)output = GetTrack_WeaponScriptFloat0(entity);
                 return 0;
@@ -541,7 +547,7 @@ static __int64 RuiTrack_Fallback_Hook(__int64 entity, int trackId, unsigned int 
                 *(float*)output = 0.0f;
                 return 0;
 
-            // S11 int tracks
+            // Extended int tracks
             case TRACK_NETGRAPH_PINGVAR:
                 *output = GetTrack_PingVar();
                 return 0;
@@ -550,7 +556,7 @@ static __int64 RuiTrack_Fallback_Hook(__int64 entity, int trackId, unsigned int 
                 *output = 0;
                 return 0;
 
-            // S11 viewcone tracks (full range = no culling, safe defaults)
+            // Viewcone tracks (full range = no culling, safe defaults)
             case TRACK_VIEWCONE_MINPITCH:
                 *(float*)output = -90.0f;
                 return 0;
@@ -564,7 +570,7 @@ static __int64 RuiTrack_Fallback_Hook(__int64 entity, int trackId, unsigned int 
                 *(float*)output = 180.0f;
                 return 0;
 
-            // S11 audio issue tracks (no issues = 0)
+            // Audio issue tracks (no issues = 0)
             case TRACK_AUDIO_ISSUE_DATA:
             case TRACK_AUDIO_ISSUE_LIMITS:
             case TRACK_AUDIO_ISSUE_MARKER_INSERTED:
@@ -681,8 +687,8 @@ static void CC_RuiTrackDebug_f(const CCommand& args)
         TRACK_WEAPON_LAST_PRIMARY_ATTACK_TIME, GetTrack_WeaponLastAttackTime(0),
         "(game time)");
     Msg(eDLL_T::CLIENT, "  [%3d] WEAPON_CHARGE_FRACTION_CURVED = %12.4f %s\n",
-        TRACK_WEAPON_CHARGE_FRACTION_CURVED, GetTrack_WeaponChargeFraction(0),
-        "(reuses linear)");
+        TRACK_WEAPON_CHARGE_FRACTION_CURVED, WeaponHeat_GetCurvedChargeFraction(nullptr),
+        "(cubic curve)");
     Msg(eDLL_T::CLIENT, "  [%3d] WEAPON_SCRIPT_FLOAT_0         = %12.4f %s\n",
         TRACK_WEAPON_SCRIPT_FLOAT_0, GetTrack_WeaponScriptFloat0(0),
         "(from WeaponScriptVars)");

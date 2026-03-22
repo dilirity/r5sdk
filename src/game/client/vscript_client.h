@@ -20,6 +20,19 @@ inline SQRESULT(*v_ClientScript_DebugScreenTextWithColor)(HSQUIRRELVM v);
 inline void* v_GetNetworkVarIndexFromName = nullptr;
 inline void* g_pScriptNetVarTable = nullptr;
 
+// WeaponInfoFileKeyField native handlers - engine functions used by CLIENT/SERVER VMs
+// Reused for UI VM since they only access global weapon data tables (no entity context needed)
+inline void* v_GetWeaponInfoFileKeyField_Global = nullptr;
+inline void* v_GetWeaponInfoFileKeyField_WithMods_Global = nullptr;
+inline void* v_GetWeaponInfoFileKeyFieldAsset_Global = nullptr;
+
+// RegisterScriptClass: creates a Squirrel class type from a ScriptClassDescriptor_t
+// Used by the engine during CLIENT/SERVER VM init to register entity/player/weapon classes
+// Parameters: (HSQUIRRELVM, className, shortName, descriptor, parentDescriptor)
+inline __int64 (*v_RegisterScriptClass)(HSQUIRRELVM v, const char* className,
+	const char* shortName, ScriptClassDescriptor_t* descriptor,
+	ScriptClassDescriptor_t* parentDescriptor);
+
 inline void (*v_Script_RegisterClientEntityClassFuncs)();
 inline void (*v_Script_RegisterClientPlayerClassFuncs)();
 inline void (*v_Script_RegisterClientCombatCharacterClassFuncs)();
@@ -55,6 +68,10 @@ class VScriptClient : public IDetour
 		LogFunAdr("Script_RegisterClientPlayerDecoyClassFuncs", v_Script_RegisterClientPlayerDecoyClassFuncs);
 		LogFunAdr("Script_RegisterClientFirstPersonProxyClassFuncs", v_Script_RegisterClientFirstPersonProxyClassFuncs);
 		LogFunAdr("GetNetworkVarIndexFromName", v_GetNetworkVarIndexFromName);
+		LogFunAdr("RegisterScriptClass", v_RegisterScriptClass);
+		LogFunAdr("GetWeaponInfoFileKeyField_Global", v_GetWeaponInfoFileKeyField_Global);
+		LogFunAdr("GetWeaponInfoFileKeyField_WithMods_Global", v_GetWeaponInfoFileKeyField_WithMods_Global);
+		LogFunAdr("GetWeaponInfoFileKeyFieldAsset_Global", v_GetWeaponInfoFileKeyFieldAsset_Global);
 
 		LogVarAdr("g_clientScriptEntityStruct", g_clientScriptEntityStruct);
 		LogVarAdr("g_clientScriptPlayerStruct", g_clientScriptPlayerStruct);
@@ -104,6 +121,20 @@ class VScriptClient : public IDetour
 
 		Module_FindPattern(g_GameDll, "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 30 4C 8B D2 49 63 D9")
 			.GetPtr(v_GetNetworkVarIndexFromName);
+
+		// RegisterScriptClass - found via callsite in CLIENT VM init (entity class registration)
+		// Pattern: call RegisterScriptClass; lea r9, <playerDesc>; mov [rsp+20h], rsi
+		Module_FindPattern(g_GameDll, "E8 ?? ?? ?? ?? 4C 8D 0D ?? ?? ?? ?? 48 89 74 24 20 4C 8D 05")
+			.FollowNearCallSelf().GetPtr(v_RegisterScriptClass);
+
+		// WeaponInfoFileKeyField natives - SQRESULT handlers from engine
+		// Each pattern has 2 matches (server + client); both are functionally identical
+		Module_FindPattern(g_GameDll, "40 57 48 83 EC 30 48 8B 41 58 48 8B F9 45 33 C0 48 8D 4C 24 20 4C 8B 48 28")
+			.GetPtr(v_GetWeaponInfoFileKeyField_Global);
+		Module_FindPattern(g_GameDll, "40 57 48 83 EC 40 48 8B 51 58 4C 8D 44 24 20 48 8B F9 33 C9 4C 8B 4A 38")
+			.GetPtr(v_GetWeaponInfoFileKeyField_WithMods_Global);
+		Module_FindPattern(g_GameDll, "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 30 48 8B 41 58 48 8B D9 45 33 C0 48 8D 4C 24 20")
+			.GetPtr(v_GetWeaponInfoFileKeyFieldAsset_Global);
 	}
 	virtual void GetVar(void) const
 	{

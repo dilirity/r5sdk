@@ -1,5 +1,5 @@
 //=============================================================================//
-// Purpose: RUI Wall Time script natives for S16+ compatibility
+// Purpose: RUI Wall Time script natives
 //
 // Registers RuiSetWallTimeWithOffset, RuiSetWallTimeBad, RuiSetWallTimeWithNow
 // and their IfExists variants. Uses UIDT_WALLTIME (type 10) with uint64

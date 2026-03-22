@@ -2,7 +2,7 @@
 #define SCRIPTREMOTEFUNCTIONS_H
 #include "thirdparty/detours/include/idetour.h"
 
-constexpr int SCRIPT_REMOTE_ARG_BUFFER_SIZE = 2048;
+constexpr int SCRIPT_REMOTE_ARG_BUFFER_SIZE = 8192;
 
 inline char(*v_ScriptRemote_AddEntry)(__int64 a1, __int64 a2, char a3, char a4, char a5, void* Src);
 inline __int64(*v_ScriptRemote_RegisterName)(__int64 a1, unsigned char* a2);

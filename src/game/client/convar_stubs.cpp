@@ -1,6 +1,6 @@
 //=============================================================================//
 //
-// Purpose: ConVar stubs for S16+ script compatibility
+// Purpose: ConVar stubs for script compatibility
 //
 // Scripts reference these ConVars via GetConVarInt/GetConVarString/etc.
 // If the ConVar doesn't exist, the script call fails or returns wrong values.

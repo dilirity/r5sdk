@@ -18,7 +18,7 @@
 extern CGlobalVarsBase* gpGlobals;
 
 //------------------------------------------------------------------------------
-// Engine entity extraction function (sub_141056980)
+// Engine entity extraction function
 //------------------------------------------------------------------------------
 typedef void* (__fastcall *EntityExtractFn_t)(HSQUIRRELVM vm, SQObject* sqobj, void* typeDescAddr);
 static EntityExtractFn_t s_fnEntityExtract = nullptr;
@@ -62,7 +62,7 @@ static const StatusEffectContextInfo s_clientInfo = {
 	{ 2928,  10, 3168,  10 },  // NPC
 };
 
-static constexpr int STATUS_EFFECT_TYPE_MAX = 128;
+static constexpr int STATUS_EFFECT_TYPE_MAX = 256;
 static uintptr_t s_moduleBase = 0;
 
 //------------------------------------------------------------------------------
@@ -172,7 +172,7 @@ static float GetStatusEffectTotalSeverity(
 	for (int i = 0; i < entInfo->timedCount; i++)
 	{
 		const int comboVars = timedArr[i].seComboVars;
-		if (((comboVars >> 25) & 0x7F) == effectType)
+		if (((comboVars >> 24) & 0xFF) == effectType)
 		{
 			totalSeverity += GetSeverityForTimedItem(&timedArr[i], curTime);
 		}
@@ -185,7 +185,7 @@ static float GetStatusEffectTotalSeverity(
 	for (int i = 0; i < entInfo->endlessCount; i++)
 	{
 		const int comboVars = endlessArr[i].seComboVars;
-		if (comboVars != 0 && ((comboVars >> 25) & 0x7F) == effectType)
+		if (comboVars != 0 && ((comboVars >> 24) & 0xFF) == effectType)
 		{
 			const float severity = static_cast<float>(
 				static_cast<unsigned char>(comboVars >> 7)) / 255.0f;

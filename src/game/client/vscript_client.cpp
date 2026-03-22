@@ -45,6 +45,10 @@
 #include "game/client/clientleafsystem.h"
 #include "game/client/c_baseentity.h"
 #include "game/shared/weapon_script_vars.h"
+#include "game/shared/weapon_heat.h"
+#include "game/shared/globalnonrewind_vars.h"
+#include "game/shared/deathfield_system.h"
+#include "game/shared/highlight_context.h"
 #include "game/shared/status_effects_sdk.h"
 #include "particle_effects_sdk.h"
 #include "vscript/languages/squirrel_re/include/sqarray.h"
@@ -357,7 +361,7 @@ static uintptr_t GetVGuiInput()
     return *reinterpret_cast<uintptr_t*>(EngineBase() + 0xD40B3B0);
 }
 
-// SDK-managed menu stack (S3 engine doesn't have native MenuStack functions)
+// SDK-managed menu stack
 static std::vector<uintptr_t> s_menuStack;
 
 //-----------------------------------------------------------------------------
@@ -1866,8 +1870,61 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     Script_RegisterColorPaletteFunctions(s);
     Script_RegisterRemoteFunctionNatives(s);
 
-    // Networked variable callback system (SNDC_GLOBAL_NON_REWIND constant + TriggerNetVarCallbacks)
+    s->RegisterConstant("SHIELD_CHANGE_SOURCE_DIRECT", 0);
+    s->RegisterConstant("SHIELD_CHANGE_SOURCE_REGEN", 1);
+    s->RegisterConstant("FX_PATTACH_WEAPON_CHARGE_FRACTION_CURVED", 0x18);
+    s->RegisterConstant("FORCE_STANCE_STAND", 0);
+    s->RegisterConstant("FORCE_STANCE_CROUCH", 1);
+    s->RegisterConstant("WT_GADGET", 9);
+
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_SAME_TEAM", 0x80);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_DIFFERENT_TEAM", 0x100);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_FRIENDLY_TEAM", 0x200);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_ENEMY_TEAM", 0x400);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_LOW_MOVEMENT", 0x1000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_HIGH_MOVEMENT", 0x2000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_CHECK_OFTEN", 0x4000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_CHECK_NEXT_FRAME", 0x8000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_DISABLE_DEATH_FADE", 0x10000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_TEAM_AGNOSTIC", 0x20000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_ADDITIONAL_LOS_CHECKS", 0x80000);
+    s->RegisterConstant("HIGHLIGHT_VIS_LOS_ENTSONLY_BLOCKSCAN", 7);
+
+    HighlightContext_RegisterDrawFuncEnum(s->GetVM());
+
+    Script_RegisterFuncNamed(s, "HighlightContext_GetId", "Script_HighlightContext_GetId", "Get highlight context id by name", "int", "string name", false, Script_HighlightContext_GetId);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetParam", "Script_HighlightContext_SetParam", "Set highlight param", "void", "int contextId, int paramIndex, int value", false, Script_HighlightContext_SetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetParam", "Script_HighlightContext_GetParam", "Get highlight param", "int", "int contextId, int paramIndex", false, Script_HighlightContext_GetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetDrawFunc", "Script_HighlightContext_SetDrawFunc", "Set draw function", "void", "int contextId, int drawFuncId", false, Script_HighlightContext_SetDrawFunc);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetDrawFunc", "Script_HighlightContext_GetDrawFunc", "Get draw function", "int", "int contextId", false, Script_HighlightContext_GetDrawFunc);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetRadius", "Script_HighlightContext_SetRadius", "Set outline radius", "void", "int contextId, float radius", false, Script_HighlightContext_SetRadius);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetOutlineRadius", "Script_HighlightContext_GetOutlineRadius", "Get outline radius", "float", "int contextId", false, Script_HighlightContext_GetOutlineRadius);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetInsideFunction", "Script_HighlightContext_GetInsideFunction", "Get inside function", "int", "int contextId", false, Script_HighlightContext_GetInsideFunction);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetOutlineFunction", "Script_HighlightContext_GetOutlineFunction", "Get outline function", "int", "int contextId", false, Script_HighlightContext_GetOutlineFunction);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetFlags", "Script_HighlightContext_SetFlags", "Set flags", "void", "int contextId, int flags", false, Script_HighlightContext_SetFlags);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetNearFadeDistance", "Script_HighlightContext_SetNearFadeDistance", "Set near fade distance", "void", "int contextId, float distance", false, Script_HighlightContext_SetNearFadeDistance);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetFarFadeDistance", "Script_HighlightContext_SetFarFadeDistance", "Set far fade distance", "void", "int contextId, float distance", false, Script_HighlightContext_SetFarFadeDistance);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetFocusedColor", "Script_HighlightContext_SetFocusedColor", "Set focused color", "void", "int contextId, vector color", false, Script_HighlightContext_SetFocusedColor);
+    Script_RegisterFuncNamed(s, "HighlightContext_IsEntityVisible", "Script_HighlightContext_IsEntityVisible", "Is entity visible", "bool", "int contextId", false, Script_HighlightContext_IsEntityVisible);
+    Script_RegisterFuncNamed(s, "HighlightContext_IsAfterPostProcess", "Script_HighlightContext_IsAfterPostProcess", "Is after post process", "bool", "int contextId", false, Script_HighlightContext_IsAfterPostProcess);
+
+    // Weapon base class lookup (global functions)
+    Script_RegisterFuncNamed(s, "Weapon_GetBaseClassName", "Script_Global_Weapon_GetBaseClassName", "Returns baseclass or the weapon's classname", "string", "string weaponClassName", false, Script_Global_Weapon_GetBaseClassName);
+    Script_RegisterFuncNamed(s, "Weapon_GetBaseClassNameOrEmpty", "Script_Global_Weapon_GetBaseClassNameOrEmpty", "Returns baseclass or empty string", "string", "string weaponClassName", false, Script_Global_Weapon_GetBaseClassNameOrEmpty);
+
     ScriptNetData_RegisterClientFunctions(s);
+
+    // GlobalNonRewind variable system - getters for CLIENT VM
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetBool", "Script_GetGlobalNonRewindNetBool", "Gets a global non-rewind bool", "bool", "string name", false, Script_GetGlobalNonRewindNetBool);
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetInt", "Script_GetGlobalNonRewindNetInt", "Gets a global non-rewind int", "int", "string name", false, Script_GetGlobalNonRewindNetInt);
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetFloat", "Script_GetGlobalNonRewindNetFloat", "Gets a global non-rewind float", "float", "string name", false, Script_GetGlobalNonRewindNetFloat);
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetTime", "Script_GetGlobalNonRewindNetTime", "Gets a global non-rewind time", "float", "string name", false, Script_GetGlobalNonRewindNetTime);
+
+    // Multi-index deathfield system
+    Script_RegisterFuncNamed(s, "DeathField_IsActive", "Script_DeathField_IsActive", "Returns whether a deathfield is active", "bool", "int deathFieldIndex", false, Script_DeathField_IsActive);
+    Script_RegisterFuncNamed(s, "DeathField_PointDistanceFromFrontier", "Script_DeathField_PointDistanceFromFrontier", "Distance from deathfield frontier", "float", "vector point, int deathFieldIndex", false, Script_DeathField_PointDistanceFromFrontier);
+    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForNow", "Script_DeathField_GetRadiusForNow", "Gets current deathfield radius", "float", "int deathFieldIndex", false, Script_DeathField_GetRadiusForNow);
+    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForTime", "Script_DeathField_GetRadiusForTime", "Gets deathfield radius at given time", "float", "float time, int deathFieldIndex", false, Script_DeathField_GetRadiusForTime);
 
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetNetworkedVariableCategory, "Gets the category of a registered networked variable", "int", "string varName", false);
 
@@ -1876,22 +1933,34 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, SetCursorPosition, "Sets the mouse cursor position", "void", "vector pos", false);
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetCursorPosition, "Gets the mouse cursor position as a vector", "vector", "", false);
 
-    // RUI wall time natives (S16+ compatibility)
     RuiWallTime_RegisterNatives(s);
-
-    // StatusEffect_GetTotalSeverity (S22+ compatibility)
     StatusEffects_SDK_RegisterClientFunctions(s);
 
     // Particle effect functions (EffectRestart, EffectSetDistanceCullingScalar)
     ParticleEffects_SDK_RegisterClientFunctions(s);
 }
 
+
 //---------------------------------------------------------------------------------
 // Purpose: registers script functions in UI context
-// Input  : *s - 
+// Input  : *s -
 //---------------------------------------------------------------------------------
 void Script_RegisterUIFunctions(CSquirrelVM* s)
 {
+    // Register entity/player classes in UI VM so that entity method syntax
+    // (e.g. player.GetPlayerNetInt("name")) compiles without errors.
+    // The engine only registers these classes for CLIENT/SERVER VMs.
+    // Methods are lazily resolved from the class descriptors.
+    if (v_RegisterScriptClass && g_clientScriptEntityStruct && g_clientScriptPlayerStruct)
+    {
+        HSQUIRRELVM v = s->GetVM();
+        v_RegisterScriptClass(v, "ClientEntityStruct", "e",
+            g_clientScriptEntityStruct, nullptr);
+        v_RegisterScriptClass(v, "ClientPlayerStruct", "p",
+            g_clientScriptPlayerStruct, g_clientScriptEntityStruct);
+        DevMsg(eDLL_T::CLIENT, "[VScriptUI] Registered entity/player classes in UI VM\n");
+    }
+
     Script_RegisterCommonAbstractions(s);
 
     DEFINE_UI_SCRIPTFUNC_NAMED(s, ClientTime, "Returns the current client time", "float", "", false);
@@ -1942,16 +2011,81 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     Script_RegisterColorPaletteUIFunctions(s);
     Script_RegisterRemoteFunctionUINatives(s);
 
-    // Register ScriptNetData constants (SNDC_*, SNVT_*) for UI
+    s->RegisterConstant("SHIELD_CHANGE_SOURCE_DIRECT", 0);
+    s->RegisterConstant("SHIELD_CHANGE_SOURCE_REGEN", 1);
+    s->RegisterConstant("FX_PATTACH_WEAPON_CHARGE_FRACTION_CURVED", 0x18);
+    s->RegisterConstant("FORCE_STANCE_STAND", 0);
+    s->RegisterConstant("FORCE_STANCE_CROUCH", 1);
+    s->RegisterConstant("WT_GADGET", 9);
+
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_SAME_TEAM", 0x80);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_DIFFERENT_TEAM", 0x100);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_FRIENDLY_TEAM", 0x200);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_ENEMY_TEAM", 0x400);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_LOW_MOVEMENT", 0x1000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_HIGH_MOVEMENT", 0x2000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_CHECK_OFTEN", 0x4000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_CHECK_NEXT_FRAME", 0x8000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_DISABLE_DEATH_FADE", 0x10000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_TEAM_AGNOSTIC", 0x20000);
+    s->RegisterConstant("HIGHLIGHT_FLAG_ADDITIONAL_LOS_CHECKS", 0x80000);
+    s->RegisterConstant("HIGHLIGHT_VIS_LOS_ENTSONLY_BLOCKSCAN", 7);
+
+    HighlightContext_RegisterDrawFuncEnum(s->GetVM());
+
+    Script_RegisterFuncNamed(s, "HighlightContext_GetId", "Script_HighlightContext_GetId", "Get highlight context id by name", "int", "string name", false, Script_HighlightContext_GetId);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetParam", "Script_HighlightContext_SetParam", "Set highlight param", "void", "int contextId, int paramIndex, int value", false, Script_HighlightContext_SetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetParam", "Script_HighlightContext_GetParam", "Get highlight param", "int", "int contextId, int paramIndex", false, Script_HighlightContext_GetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetDrawFunc", "Script_HighlightContext_SetDrawFunc", "Set draw function", "void", "int contextId, int drawFuncId", false, Script_HighlightContext_SetDrawFunc);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetDrawFunc", "Script_HighlightContext_GetDrawFunc", "Get draw function", "int", "int contextId", false, Script_HighlightContext_GetDrawFunc);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetRadius", "Script_HighlightContext_SetRadius", "Set outline radius", "void", "int contextId, float radius", false, Script_HighlightContext_SetRadius);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetOutlineRadius", "Script_HighlightContext_GetOutlineRadius", "Get outline radius", "float", "int contextId", false, Script_HighlightContext_GetOutlineRadius);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetInsideFunction", "Script_HighlightContext_GetInsideFunction", "Get inside function", "int", "int contextId", false, Script_HighlightContext_GetInsideFunction);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetOutlineFunction", "Script_HighlightContext_GetOutlineFunction", "Get outline function", "int", "int contextId", false, Script_HighlightContext_GetOutlineFunction);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetFlags", "Script_HighlightContext_SetFlags", "Set flags", "void", "int contextId, int flags", false, Script_HighlightContext_SetFlags);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetNearFadeDistance", "Script_HighlightContext_SetNearFadeDistance", "Set near fade distance", "void", "int contextId, float distance", false, Script_HighlightContext_SetNearFadeDistance);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetFarFadeDistance", "Script_HighlightContext_SetFarFadeDistance", "Set far fade distance", "void", "int contextId, float distance", false, Script_HighlightContext_SetFarFadeDistance);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetFocusedColor", "Script_HighlightContext_SetFocusedColor", "Set focused color", "void", "int contextId, vector color", false, Script_HighlightContext_SetFocusedColor);
+    Script_RegisterFuncNamed(s, "HighlightContext_IsEntityVisible", "Script_HighlightContext_IsEntityVisible", "Is entity visible", "bool", "int contextId", false, Script_HighlightContext_IsEntityVisible);
+    Script_RegisterFuncNamed(s, "HighlightContext_IsAfterPostProcess", "Script_HighlightContext_IsAfterPostProcess", "Is after post process", "bool", "int contextId", false, Script_HighlightContext_IsAfterPostProcess);
+
+    Script_RegisterFuncNamed(s, "Weapon_GetBaseClassName", "Script_Global_Weapon_GetBaseClassName", "Returns baseclass or the weapon's classname", "string", "string weaponClassName", false, Script_Global_Weapon_GetBaseClassName);
+    Script_RegisterFuncNamed(s, "Weapon_GetBaseClassNameOrEmpty", "Script_Global_Weapon_GetBaseClassNameOrEmpty", "Returns baseclass or empty string", "string", "string weaponClassName", false, Script_Global_Weapon_GetBaseClassNameOrEmpty);
+
     ScriptNetData_RegisterUIFunctions(s);
+
+    // GlobalNonRewind variable system - getters for UI VM
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetBool", "Script_GetGlobalNonRewindNetBool", "Gets a global non-rewind bool", "bool", "string name", false, Script_GetGlobalNonRewindNetBool);
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetInt", "Script_GetGlobalNonRewindNetInt", "Gets a global non-rewind int", "int", "string name", false, Script_GetGlobalNonRewindNetInt);
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetFloat", "Script_GetGlobalNonRewindNetFloat", "Gets a global non-rewind float", "float", "string name", false, Script_GetGlobalNonRewindNetFloat);
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetTime", "Script_GetGlobalNonRewindNetTime", "Gets a global non-rewind time", "float", "string name", false, Script_GetGlobalNonRewindNetTime);
+
+    // Multi-index deathfield system
+    Script_RegisterFuncNamed(s, "DeathField_IsActive", "Script_DeathField_IsActive", "Returns whether a deathfield is active", "bool", "int deathFieldIndex", false, Script_DeathField_IsActive);
+    Script_RegisterFuncNamed(s, "DeathField_PointDistanceFromFrontier", "Script_DeathField_PointDistanceFromFrontier", "Distance from deathfield frontier", "float", "vector point, int deathFieldIndex", false, Script_DeathField_PointDistanceFromFrontier);
+    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForNow", "Script_DeathField_GetRadiusForNow", "Gets current deathfield radius", "float", "int deathFieldIndex", false, Script_DeathField_GetRadiusForNow);
+    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForTime", "Script_DeathField_GetRadiusForTime", "Gets deathfield radius at given time", "float", "float time, int deathFieldIndex", false, Script_DeathField_GetRadiusForTime);
 
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetNetworkedVariableCategory, "Gets the category of a registered networked variable", "int", "string varName", false);
 
-    // RUI wall time natives (S16+ compatibility)
     RuiWallTime_RegisterNatives(s);
-
-    // StatusEffect_GetTotalSeverity (S22+ compatibility)
     StatusEffects_SDK_RegisterUIFunctions(s);
+
+    // Weapon info natives - reuse engine's CLIENT/SERVER handlers for UI VM
+    // Script wrappers (IsWeaponKeyFieldDefined, *_GlobalString, *_GlobalInt, etc.)
+    // are defined in sh_utility_all.gnut and call through to these base natives.
+    if (v_GetWeaponInfoFileKeyField_Global)
+        Script_RegisterFuncNamed(s, "GetWeaponInfoFileKeyField_Global", "Native_GetWeaponInfoFileKeyField_Global",
+            "Gets weapon info field by weapon name and key", "var", "string weapon, string field", false,
+            v_GetWeaponInfoFileKeyField_Global);
+    if (v_GetWeaponInfoFileKeyField_WithMods_Global)
+        Script_RegisterFuncNamed(s, "GetWeaponInfoFileKeyField_WithMods_Global", "Native_GetWeaponInfoFileKeyField_WithMods_Global",
+            "Gets weapon info field with mods by weapon name", "var", "string weapon, string mods, string field", false,
+            v_GetWeaponInfoFileKeyField_WithMods_Global);
+    if (v_GetWeaponInfoFileKeyFieldAsset_Global)
+        Script_RegisterFuncNamed(s, "GetWeaponInfoFileKeyFieldAsset_Global", "Native_GetWeaponInfoFileKeyFieldAsset_Global",
+            "Gets weapon info asset field by weapon name and key", "asset", "string weapon, string field", false,
+            v_GetWeaponInfoFileKeyFieldAsset_Global);
 
     // NOTE: plugin functions must always come after SDK functions!
     for (auto& callback : !PluginSystem()->GetRegisterUIScriptFuncsCallbacks())
@@ -2012,6 +2146,7 @@ static SQRESULT Script_SetLightingOrigin(HSQUIRRELVM v)
         SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
     }
 
+    DevMsg(eDLL_T::CLIENT, "SetLightingOrigin called - stub\n");
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -2085,6 +2220,7 @@ static void Script_RegisterClientWeaponClassFuncs()
 
     ViewmodelPoseParam_RegisterClientWeaponFuncs(g_clientScriptWeaponStruct);
     WeaponScriptVars_RegisterWeaponFuncs(g_clientScriptWeaponStruct);
+    WeaponHeat_RegisterWeaponFuncs(g_clientScriptWeaponStruct);
 }
 //---------------------------------------------------------------------------------
 static void Script_RegisterClientProjectileClassFuncs()
