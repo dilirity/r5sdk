@@ -59,12 +59,15 @@ struct BotInput
 	bool hasInput;  // true = script provided input this frame
 	int forcedButtons; // persistent buttons from BotButtonPress/BotButtonRelease
 
-	// Persistent movement input - used when hasInput is false
-	// This ensures continuous input across frames (critical for wall climbing)
+	// Persistent input - used when hasInput is false (e.g. RunNullCommand's
+	// second RunCommand call in the same frame, or frames between script ticks).
+	// This ensures continuous input across calls (critical for wall climbing,
+	// holding USE for revive, etc.)
 	bool hasPersistentInput;
 	QAngle persistentViewAngles;
 	float persistentForwardMove;
 	float persistentSideMove;
+	int persistentButtons;
 
 	void Reset()
 	{
@@ -84,6 +87,7 @@ struct BotInput
 		persistentViewAngles.Init();
 		persistentForwardMove = 0.f;
 		persistentSideMove = 0.f;
+		persistentButtons = 0;
 	}
 };
 
