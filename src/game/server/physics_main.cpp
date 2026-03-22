@@ -70,7 +70,10 @@ void Physics_RunBotSimulation(bool bSimulating)
 			// Get current eye angles
 			pPlayer->EyeAngles(&cmd.viewangles);
 
-			// Apply script-provided bot input if available
+			// Build a complete command from script input, just like a real
+			// client builds a complete CUserCmd before sending it.
+			// NOTE: we do NOT clear hasInput here — StaticRunCommand will
+			// also read it (as a safety net) and is responsible for clearing.
 			const int idx = pPlayer->GetEdict() - 1;
 			if (idx >= 0 && idx < MAX_PLAYERS)
 			{
@@ -81,26 +84,9 @@ void Physics_RunBotSimulation(bool bSimulating)
 					cmd.sidemove = g_botInputs[idx].sideMove;
 					cmd.upmove = g_botInputs[idx].upMove;
 					cmd.buttons = g_botInputs[idx].buttons;
-
-					// Save as persistent input for subsequent frames
-					g_botInputs[idx].hasPersistentInput = true;
-					g_botInputs[idx].persistentViewAngles = g_botInputs[idx].viewAngles;
-					g_botInputs[idx].persistentForwardMove = g_botInputs[idx].forwardMove;
-					g_botInputs[idx].persistentSideMove = g_botInputs[idx].sideMove;
-
-					g_botInputs[idx].hasInput = false;
-				}
-				else if (g_botInputs[idx].hasPersistentInput)
-				{
-					// Use persistent input when no new input provided
-					// This ensures continuous movement for wall climbing etc.
-					cmd.viewangles = g_botInputs[idx].persistentViewAngles;
-					cmd.forwardmove = g_botInputs[idx].persistentForwardMove;
-					cmd.sidemove = g_botInputs[idx].persistentSideMove;
-					cmd.buttons = g_botInputs[idx].forcedButtons; // Use forced buttons as base
 				}
 
-				// Always merge persistent forced buttons (from BotButtonPress)
+				// Always merge persistent forced buttons
 				cmd.buttons |= g_botInputs[idx].forcedButtons;
 			}
 
