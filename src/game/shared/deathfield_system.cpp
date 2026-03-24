@@ -9,6 +9,7 @@
 
 #include "core/stdafx.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
+#include "vscript/languages/squirrel_re/vsquirrel.h"
 #include "vscript/languages/squirrel_re/include/squirrel.h"
 #include "game/shared/vscript_gamedll_defs.h"
 #include "deathfield_system.h"
@@ -131,7 +132,7 @@ SQRESULT Script_DeathFieldIndex(HSQUIRRELVM v)
 
 	auto it = s_playerDeathFieldIndex.find(reinterpret_cast<uintptr_t>(pPlayer));
 	sq_pushinteger(v, (it != s_playerDeathFieldIndex.end()) ? it->second : 0);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_SetDeathFieldIndex(HSQUIRRELVM v)
@@ -147,11 +148,11 @@ SQRESULT Script_SetDeathFieldIndex(HSQUIRRELVM v)
 	{
 		Warning(eDLL_T::SERVER, "SetDeathFieldIndex: index %d out of range [0, %d)\n",
 			static_cast<int>(index), MAX_DEATHFIELDS);
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
 	s_playerDeathFieldIndex[reinterpret_cast<uintptr_t>(pPlayer)] = static_cast<int>(index);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -164,7 +165,7 @@ SQRESULT Script_DeathField_IsActive(HSQUIRRELVM v)
 
 	const DeathFieldData_t& df = GetDeathField(static_cast<int>(index));
 	sq_pushbool(v, df.isActive);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_DeathField_PointDistanceFromFrontier(HSQUIRRELVM v)
@@ -181,7 +182,7 @@ SQRESULT Script_DeathField_PointDistanceFromFrontier(HSQUIRRELVM v)
 	if (!gpGlobals)
 	{
 		sq_pushfloat(v, 0.0f);
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
 	float radius = GetCurrentRadius(df, gpGlobals->curTime);
@@ -190,7 +191,7 @@ SQRESULT Script_DeathField_PointDistanceFromFrontier(HSQUIRRELVM v)
 	float dist2D = sqrtf(dx * dx + dy * dy);
 
 	sq_pushfloat(v, radius - dist2D);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_DeathField_GetRadiusForNow(HSQUIRRELVM v)
@@ -201,12 +202,12 @@ SQRESULT Script_DeathField_GetRadiusForNow(HSQUIRRELVM v)
 	if (!gpGlobals)
 	{
 		sq_pushfloat(v, 3.4028235e38f);
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
 	const DeathFieldData_t& df = GetDeathField(static_cast<int>(index));
 	sq_pushfloat(v, GetCurrentRadius(df, gpGlobals->curTime));
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_DeathField_GetRadiusForTime(HSQUIRRELVM v)
@@ -219,7 +220,7 @@ SQRESULT Script_DeathField_GetRadiusForTime(HSQUIRRELVM v)
 
 	const DeathFieldData_t& df = GetDeathField(static_cast<int>(index));
 	sq_pushfloat(v, GetCurrentRadius(df, static_cast<float>(time)));
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -236,7 +237,7 @@ SQRESULT Script_DeathField_SetActive(HSQUIRRELVM v)
 	if (index >= 0 && index < MAX_DEATHFIELDS)
 		s_deathFields[index].isActive = (active != 0);
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_DeathField_SetOrigin(HSQUIRRELVM v)
@@ -255,7 +256,7 @@ SQRESULT Script_DeathField_SetOrigin(HSQUIRRELVM v)
 		s_deathFields[index].originZ = origin->z;
 	}
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_DeathField_SetRadiusStartEnd(HSQUIRRELVM v)
@@ -273,7 +274,7 @@ SQRESULT Script_DeathField_SetRadiusStartEnd(HSQUIRRELVM v)
 		s_deathFields[index].radiusEnd = static_cast<float>(end);
 	}
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_DeathField_SetTimeStartEnd(HSQUIRRELVM v)
@@ -291,7 +292,7 @@ SQRESULT Script_DeathField_SetTimeStartEnd(HSQUIRRELVM v)
 		s_deathFields[index].timeEnd = static_cast<float>(end);
 	}
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------

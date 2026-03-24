@@ -10,6 +10,7 @@
 
 #include "core/stdafx.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
+#include "vscript/languages/squirrel_re/vsquirrel.h"
 #include "vscript/languages/squirrel_re/include/squirrel.h"
 #include "game/shared/vscript_gamedll_defs.h"
 #include "highlight_context.h"
@@ -31,7 +32,7 @@ struct HighlightContextData_t
 	int insideFunction = 0;
 	int outsideFunction = 0;
 	float outlineRadius = 0.0f;
-	int params[MAX_HIGHLIGHT_PARAMS] = {};
+	float params[MAX_HIGHLIGHT_PARAMS][3] = {};
 	int drawFunc = 0;
 	int flags = 0;
 	float nearFadeDistance = 0.0f;
@@ -84,7 +85,7 @@ SQRESULT Script_HighlightContext_GetId(HSQUIRRELVM v)
 
 	int id = FindOrCreateContext(name);
 	sq_pushinteger(v, id);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -92,15 +93,21 @@ SQRESULT Script_HighlightContext_GetId(HSQUIRRELVM v)
 //-----------------------------------------------------------------------------
 SQRESULT Script_HighlightContext_SetParam(HSQUIRRELVM v)
 {
-	SQInteger contextId, paramIdx, value;
+	SQInteger contextId, paramIdx;
 	sq_getinteger(v, 2, &contextId);
 	sq_getinteger(v, 3, &paramIdx);
-	sq_getinteger(v, 4, &value);
 
-	if (IsValidContext(static_cast<int>(contextId)) && paramIdx >= 0 && paramIdx < MAX_HIGHLIGHT_PARAMS)
-		s_contexts[contextId].params[paramIdx] = static_cast<int>(value);
+	const SQVector3D* vec = nullptr;
+	sq_getvector(v, 4, &vec);
 
-	return SQ_OK;
+	if (IsValidContext(static_cast<int>(contextId)) && paramIdx >= 0 && paramIdx < MAX_HIGHLIGHT_PARAMS && vec)
+	{
+		s_contexts[contextId].params[paramIdx][0] = vec->x;
+		s_contexts[contextId].params[paramIdx][1] = vec->y;
+		s_contexts[contextId].params[paramIdx][2] = vec->z;
+	}
+
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_HighlightContext_GetParam(HSQUIRRELVM v)
@@ -109,12 +116,17 @@ SQRESULT Script_HighlightContext_GetParam(HSQUIRRELVM v)
 	sq_getinteger(v, 2, &contextId);
 	sq_getinteger(v, 3, &paramIdx);
 
-	int result = 0;
+	float x = 0.0f, y = 0.0f, z = 0.0f;
 	if (IsValidContext(static_cast<int>(contextId)) && paramIdx >= 0 && paramIdx < MAX_HIGHLIGHT_PARAMS)
-		result = s_contexts[contextId].params[paramIdx];
+	{
+		x = s_contexts[contextId].params[paramIdx][0];
+		y = s_contexts[contextId].params[paramIdx][1];
+		z = s_contexts[contextId].params[paramIdx][2];
+	}
 
-	sq_pushinteger(v, result);
-	return SQ_OK;
+	SQVector3D result_vec(x, y, z);
+	sq_pushvector(v, &result_vec);
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -129,7 +141,7 @@ SQRESULT Script_HighlightContext_SetDrawFunc(HSQUIRRELVM v)
 	if (IsValidContext(static_cast<int>(contextId)))
 		s_contexts[contextId].drawFunc = static_cast<int>(drawFunc);
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_HighlightContext_GetDrawFunc(HSQUIRRELVM v)
@@ -142,7 +154,7 @@ SQRESULT Script_HighlightContext_GetDrawFunc(HSQUIRRELVM v)
 		result = s_contexts[contextId].drawFunc;
 
 	sq_pushinteger(v, result);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -158,7 +170,7 @@ SQRESULT Script_HighlightContext_SetRadius(HSQUIRRELVM v)
 	if (IsValidContext(static_cast<int>(contextId)))
 		s_contexts[contextId].outlineRadius = static_cast<float>(radius);
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_HighlightContext_GetOutlineRadius(HSQUIRRELVM v)
@@ -171,7 +183,7 @@ SQRESULT Script_HighlightContext_GetOutlineRadius(HSQUIRRELVM v)
 		result = s_contexts[contextId].outlineRadius;
 
 	sq_pushfloat(v, result);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -187,7 +199,7 @@ SQRESULT Script_HighlightContext_GetInsideFunction(HSQUIRRELVM v)
 		result = s_contexts[contextId].insideFunction;
 
 	sq_pushinteger(v, result);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_HighlightContext_GetOutlineFunction(HSQUIRRELVM v)
@@ -200,7 +212,7 @@ SQRESULT Script_HighlightContext_GetOutlineFunction(HSQUIRRELVM v)
 		result = s_contexts[contextId].outsideFunction;
 
 	sq_pushinteger(v, result);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -215,7 +227,7 @@ SQRESULT Script_HighlightContext_SetFlags(HSQUIRRELVM v)
 	if (IsValidContext(static_cast<int>(contextId)))
 		s_contexts[contextId].flags = static_cast<int>(flags);
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -231,7 +243,7 @@ SQRESULT Script_HighlightContext_SetNearFadeDistance(HSQUIRRELVM v)
 	if (IsValidContext(static_cast<int>(contextId)))
 		s_contexts[contextId].nearFadeDistance = static_cast<float>(dist);
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_HighlightContext_SetFarFadeDistance(HSQUIRRELVM v)
@@ -244,7 +256,7 @@ SQRESULT Script_HighlightContext_SetFarFadeDistance(HSQUIRRELVM v)
 	if (IsValidContext(static_cast<int>(contextId)))
 		s_contexts[contextId].farFadeDistance = static_cast<float>(dist);
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -265,7 +277,7 @@ SQRESULT Script_HighlightContext_SetFocusedColor(HSQUIRRELVM v)
 		s_contexts[contextId].focusedColor[2] = color->z;
 	}
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -281,7 +293,7 @@ SQRESULT Script_HighlightContext_IsEntityVisible(HSQUIRRELVM v)
 		result = s_contexts[contextId].isEntityVisible;
 
 	sq_pushbool(v, result);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_HighlightContext_IsAfterPostProcess(HSQUIRRELVM v)
@@ -294,7 +306,7 @@ SQRESULT Script_HighlightContext_IsAfterPostProcess(HSQUIRRELVM v)
 		result = s_contexts[contextId].isAfterPostProcess;
 
 	sq_pushbool(v, result);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -341,6 +353,75 @@ void HighlightContext_RegisterDrawFuncEnum(HSQUIRRELVM v)
 
 	sq_newslot(v, -3);
 	sq_endconsttable(v);
+}
+
+//-----------------------------------------------------------------------------
+// Virtual→Physical context slot remapping
+//-----------------------------------------------------------------------------
+static constexpr int HIGHLIGHT_REMAP_PHYSICAL_SLOT = 7;
+
+static constexpr int ENT_HIGHLIGHT_PARAMS_BASE       = 440;
+static constexpr int ENT_HIGHLIGHT_FUNCTIONBITS_BASE  = 632;
+static constexpr int ENT_HIGHLIGHT_TIMESTAMP          = 748;
+
+static void WriteContextToEntitySlot(void* entity, int physicalSlot, int virtualId)
+{
+	if (virtualId < 0 || virtualId >= MAX_HIGHLIGHT_CONTEXTS || !s_contexts[virtualId].registered)
+		return;
+
+	const auto& ctx = s_contexts[virtualId];
+	uintptr_t ent = reinterpret_cast<uintptr_t>(entity);
+
+	// Write m_highlightFunctionBits[physicalSlot]
+	// Pack: byte0=insideFunc, byte1=outlineFunc, byte2=encodedRadius, byte3=drawFunc/flags
+	uint8_t encodedRadius = 0;
+	if (ctx.outlineRadius >= 1.0f && ctx.outlineRadius <= 8.0f)
+		encodedRadius = static_cast<uint8_t>((ctx.outlineRadius * 255.0f / 8.0f) + 0.5f);
+
+	uint32_t packed = static_cast<uint8_t>(ctx.insideFunction)
+	                | (static_cast<uint8_t>(ctx.outsideFunction) << 8)
+	                | (static_cast<uint32_t>(encodedRadius) << 16)
+	                | (static_cast<uint32_t>(ctx.drawFunc & 0x3F) << 24);
+
+	*reinterpret_cast<uint32_t*>(ent + ENT_HIGHLIGHT_FUNCTIONBITS_BASE + 4 * physicalSlot) = packed;
+
+	// Write m_highlightParams — 2 params per context, each vec3 (12 bytes)
+	for (int p = 0; p < 2 && p < MAX_HIGHLIGHT_PARAMS; p++)
+	{
+		float* dst = reinterpret_cast<float*>(
+			ent + ENT_HIGHLIGHT_PARAMS_BASE + 12 * (p + 2 * physicalSlot));
+		dst[0] = ctx.params[p][0];
+		dst[1] = ctx.params[p][1];
+		dst[2] = ctx.params[p][2];
+	}
+}
+
+static void h_Highlight_SetCurrentContext(void* entity, int contextId)
+{
+	if (!entity)
+	{
+		v_Highlight_SetCurrentContext(entity, contextId);
+		return;
+	}
+
+	if (contextId > 7 && contextId < MAX_HIGHLIGHT_CONTEXTS)
+	{
+		// Virtual context — write data to physical slot 7, then activate slot 7
+		WriteContextToEntitySlot(entity, HIGHLIGHT_REMAP_PHYSICAL_SLOT, contextId);
+		v_Highlight_SetCurrentContext(entity, HIGHLIGHT_REMAP_PHYSICAL_SLOT);
+	}
+	else
+	{
+		v_Highlight_SetCurrentContext(entity, contextId);
+	}
+}
+
+void VHighlightContext::Detour(const bool bAttach) const
+{
+	if (v_Highlight_SetCurrentContext)
+	{
+		DetourSetup(&v_Highlight_SetCurrentContext, &h_Highlight_SetCurrentContext, bAttach);
+	}
 }
 
 //-----------------------------------------------------------------------------

@@ -37,7 +37,7 @@
 #include "detour_impl.h"
 #include "game/shared/weapon_script_vars.h"
 #include "game/shared/status_effects_sdk.h"
-#include "game/client/vscript_colorpalette.h"
+#include "game/client/vscript_player.h"
 #include "game/client/vscript_remotefunctions.h"
 
 /*
@@ -937,6 +937,17 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     s->RegisterConstant("FORCE_STANCE_CROUCH", 1);
     s->RegisterConstant("WT_GADGET", 9);
 
+    s->RegisterConstant("PHASETYPE_DEFAULT", 0);
+    s->RegisterConstant("PHASETYPE_BALANCE", 1);
+    s->RegisterConstant("PHASETYPE_TUNNEL", 2);
+    s->RegisterConstant("PHASETYPE_DASH", 3);
+    s->RegisterConstant("PHASETYPE_GATE", 4);
+    s->RegisterConstant("PHASETYPE_BREACH", 5);
+    s->RegisterConstant("PHASETYPE_TRANSPORT", 6);
+    s->RegisterConstant("PHASETYPE_DOOR", 7);
+    s->RegisterConstant("PHASETYPE_TELEPORTER", 8);
+    s->RegisterConstant("PHASETYPE_REWIND", 9);
+
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_SAME_TEAM", 0x80);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_DIFFERENT_TEAM", 0x100);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_FRIENDLY_TEAM", 0x200);
@@ -953,8 +964,8 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     HighlightContext_RegisterDrawFuncEnum(s->GetVM());
 
     Script_RegisterFuncNamed(s, "HighlightContext_GetId", "Script_HighlightContext_GetId", "Get highlight context id by name", "int", "string name", false, Script_HighlightContext_GetId);
-    Script_RegisterFuncNamed(s, "HighlightContext_SetParam", "Script_HighlightContext_SetParam", "Set highlight param", "void", "int contextId, int paramIndex, int value", false, Script_HighlightContext_SetParam);
-    Script_RegisterFuncNamed(s, "HighlightContext_GetParam", "Script_HighlightContext_GetParam", "Get highlight param", "int", "int contextId, int paramIndex", false, Script_HighlightContext_GetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetParam", "Script_HighlightContext_SetParam", "Set highlight param", "void", "int contextId, int paramIndex, vector value", false, Script_HighlightContext_SetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetParam", "Script_HighlightContext_GetParam", "Get highlight param", "vector", "int contextId, int paramIndex", false, Script_HighlightContext_GetParam);
     Script_RegisterFuncNamed(s, "HighlightContext_SetDrawFunc", "Script_HighlightContext_SetDrawFunc", "Set draw function", "void", "int contextId, int drawFuncId", false, Script_HighlightContext_SetDrawFunc);
     Script_RegisterFuncNamed(s, "HighlightContext_GetDrawFunc", "Script_HighlightContext_GetDrawFunc", "Get draw function", "int", "int contextId", false, Script_HighlightContext_GetDrawFunc);
     Script_RegisterFuncNamed(s, "HighlightContext_SetRadius", "Script_HighlightContext_SetRadius", "Set outline radius", "void", "int contextId, float radius", false, Script_HighlightContext_SetRadius);
@@ -982,6 +993,8 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetInt", "Script_GetGlobalNonRewindNetInt", "Gets a global non-rewind int", "int", "string name", false, Script_GetGlobalNonRewindNetInt);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetFloat", "Script_GetGlobalNonRewindNetFloat", "Gets a global non-rewind float", "float", "string name", false, Script_GetGlobalNonRewindNetFloat);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetTime", "Script_GetGlobalNonRewindNetTime", "Gets a global non-rewind time", "float", "string name", false, Script_GetGlobalNonRewindNetTime);
+    Script_RegisterFuncNamed(s, "SetGlobalNonRewindNetEnt", "Script_SetGlobalNonRewindNetEnt", "Sets a global non-rewind entity", "void", "string name, entity ent", false, Script_SetGlobalNonRewindNetEnt);
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetEnt", "Script_GetGlobalNonRewindNetEnt", "Gets a global non-rewind entity", "entity ornull", "string name", false, Script_GetGlobalNonRewindNetEnt);
 
     // Deathfield system
     Script_RegisterFuncNamed(s, "DeathField_IsActive", "Script_DeathField_IsActive", "Returns whether a deathfield is active", "bool", "int deathFieldIndex", false, Script_DeathField_IsActive);
@@ -1078,6 +1091,10 @@ static void Script_RegisterServerPlayerClassFuncs()
 
     // Register shared player functions (PushForcedStance, GetLastTimeDamaged, skydive, etc.)
     Script_RegisterPlayerScriptFunctions(g_serverScriptPlayerStruct);
+    WeaponScriptVars_RegisterPhaseShiftOverride(g_serverScriptPlayerStruct);
+
+    // Register SERVER-ONLY player setters (NonRewind setters must not be on CLIENT)
+    Script_RegisterPlayerScriptSetters(g_serverScriptPlayerStruct);
 }
 //---------------------------------------------------------------------------------
 static void Script_RegisterServerAIClassFuncs()
@@ -1161,6 +1178,7 @@ static void Script_RegisterServerWeaponClassFuncs()
         ServerScript_GetScriptPoseParam1);
 
     WeaponScriptVars_RegisterWeaponFuncs(g_serverScriptWeaponStruct);
+    WeaponScriptVars_RegisterWeaponLockedSetSetter(g_serverScriptWeaponStruct);
     WeaponHeat_RegisterWeaponFuncs(g_serverScriptWeaponStruct);
 }
 //---------------------------------------------------------------------------------

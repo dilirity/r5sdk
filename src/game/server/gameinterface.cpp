@@ -29,6 +29,8 @@
 #include "game/shared/highlight_context.h"
 #ifndef DEDICATED
 #include "game/client/vscript_remotefunctions.h"
+#include "game/client/vscript_colorpalette.h"
+#include "game/client/vscript_player.h"
 #endif
 
 //-----------------------------------------------------------------------------
@@ -96,11 +98,15 @@ void CServerGameDLL::PrecompileScriptsJob(void)
 void CServerGameDLL::LevelShutdown(void)
 {
 	WeaponScriptVars_LevelShutdown();
+	WeaponScriptVars_PhaseShift_LevelShutdown();
+	WeaponScriptVars_WeaponLockedSet_LevelShutdown();
 	WeaponHeat_LevelShutdown();
 	GlobalNonRewind_LevelShutdown();
 	DeathField_LevelShutdown();
 	HighlightContext_LevelShutdown();
 #ifndef DEDICATED
+	ColorPalette_LevelShutdown();
+	VScriptPlayer_LevelShutdown();
 	Script_ClearRemoteFunctionRegistrations();
 #endif
 

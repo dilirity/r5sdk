@@ -1,5 +1,6 @@
 #include "tier1/cvar.h"
-#include "game/client/convar_stubs.h"
+
+extern void ConVarStubs_Init();
 
 static bool CVar_Connect(CCvar* thisptr, CreateInterfaceFn factory)
 {
@@ -10,7 +11,7 @@ static bool CVar_Connect(CCvar* thisptr, CreateInterfaceFn factory)
 	ConCommand_InitShipped();
 	ConCommand_PurgeShipped();
 
-	// ConVarStubs_LogExisting(); // Check which stubs the engine already has, BEFORE we register ours
+	ConVarStubs_Init();
 	ConVar_Register();
 
 	// CCvar::Connect() always returns true in the implementation of the engine

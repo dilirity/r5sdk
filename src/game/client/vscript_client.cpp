@@ -38,6 +38,8 @@
 
 #include "vscript_client.h"
 #include "vscript_colorpalette.h"
+#include "vscript_hud.h"
+#include "vscript_player.h"
 #include "vscript_remotefunctions.h"
 #include "scriptnetdata_client.h"
 #include "viewmodel_poseparam.h"
@@ -1868,6 +1870,7 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetEntitiesFromArrayNearPos, "Filters entity array by proximity to a position", "array< entity >", "array< entity > entities, vector pos, float range", false);
 
     Script_RegisterColorPaletteFunctions(s);
+    Script_RegisterHudFunctions(s);
     Script_RegisterRemoteFunctionNatives(s);
 
     s->RegisterConstant("SHIELD_CHANGE_SOURCE_DIRECT", 0);
@@ -1876,6 +1879,17 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     s->RegisterConstant("FORCE_STANCE_STAND", 0);
     s->RegisterConstant("FORCE_STANCE_CROUCH", 1);
     s->RegisterConstant("WT_GADGET", 9);
+
+    s->RegisterConstant("PHASETYPE_DEFAULT", 0);
+    s->RegisterConstant("PHASETYPE_BALANCE", 1);
+    s->RegisterConstant("PHASETYPE_TUNNEL", 2);
+    s->RegisterConstant("PHASETYPE_DASH", 3);
+    s->RegisterConstant("PHASETYPE_GATE", 4);
+    s->RegisterConstant("PHASETYPE_BREACH", 5);
+    s->RegisterConstant("PHASETYPE_TRANSPORT", 6);
+    s->RegisterConstant("PHASETYPE_DOOR", 7);
+    s->RegisterConstant("PHASETYPE_TELEPORTER", 8);
+    s->RegisterConstant("PHASETYPE_REWIND", 9);
 
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_SAME_TEAM", 0x80);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_DIFFERENT_TEAM", 0x100);
@@ -1893,8 +1907,8 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     HighlightContext_RegisterDrawFuncEnum(s->GetVM());
 
     Script_RegisterFuncNamed(s, "HighlightContext_GetId", "Script_HighlightContext_GetId", "Get highlight context id by name", "int", "string name", false, Script_HighlightContext_GetId);
-    Script_RegisterFuncNamed(s, "HighlightContext_SetParam", "Script_HighlightContext_SetParam", "Set highlight param", "void", "int contextId, int paramIndex, int value", false, Script_HighlightContext_SetParam);
-    Script_RegisterFuncNamed(s, "HighlightContext_GetParam", "Script_HighlightContext_GetParam", "Get highlight param", "int", "int contextId, int paramIndex", false, Script_HighlightContext_GetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetParam", "Script_HighlightContext_SetParam", "Set highlight param", "void", "int contextId, int paramIndex, vector value", false, Script_HighlightContext_SetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetParam", "Script_HighlightContext_GetParam", "Get highlight param", "vector", "int contextId, int paramIndex", false, Script_HighlightContext_GetParam);
     Script_RegisterFuncNamed(s, "HighlightContext_SetDrawFunc", "Script_HighlightContext_SetDrawFunc", "Set draw function", "void", "int contextId, int drawFuncId", false, Script_HighlightContext_SetDrawFunc);
     Script_RegisterFuncNamed(s, "HighlightContext_GetDrawFunc", "Script_HighlightContext_GetDrawFunc", "Get draw function", "int", "int contextId", false, Script_HighlightContext_GetDrawFunc);
     Script_RegisterFuncNamed(s, "HighlightContext_SetRadius", "Script_HighlightContext_SetRadius", "Set outline radius", "void", "int contextId, float radius", false, Script_HighlightContext_SetRadius);
@@ -1914,11 +1928,12 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
 
     ScriptNetData_RegisterClientFunctions(s);
 
-    // GlobalNonRewind variable system - getters for CLIENT VM
+    // GlobalNonRewind variable system - getters only for CLIENT VM (setters are SERVER-only)
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetBool", "Script_GetGlobalNonRewindNetBool", "Gets a global non-rewind bool", "bool", "string name", false, Script_GetGlobalNonRewindNetBool);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetInt", "Script_GetGlobalNonRewindNetInt", "Gets a global non-rewind int", "int", "string name", false, Script_GetGlobalNonRewindNetInt);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetFloat", "Script_GetGlobalNonRewindNetFloat", "Gets a global non-rewind float", "float", "string name", false, Script_GetGlobalNonRewindNetFloat);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetTime", "Script_GetGlobalNonRewindNetTime", "Gets a global non-rewind time", "float", "string name", false, Script_GetGlobalNonRewindNetTime);
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetEnt", "Script_GetGlobalNonRewindNetEnt", "Gets a global non-rewind entity", "entity ornull", "string name", false, Script_GetGlobalNonRewindNetEnt);
 
     // Multi-index deathfield system
     Script_RegisterFuncNamed(s, "DeathField_IsActive", "Script_DeathField_IsActive", "Returns whether a deathfield is active", "bool", "int deathFieldIndex", false, Script_DeathField_IsActive);
@@ -2009,6 +2024,7 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetCursorPosition, "Gets the mouse cursor position as a vector", "vector", "", false);
 
     Script_RegisterColorPaletteUIFunctions(s);
+    Script_RegisterHudUIFunctions(s);
     Script_RegisterRemoteFunctionUINatives(s);
 
     s->RegisterConstant("SHIELD_CHANGE_SOURCE_DIRECT", 0);
@@ -2017,6 +2033,17 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     s->RegisterConstant("FORCE_STANCE_STAND", 0);
     s->RegisterConstant("FORCE_STANCE_CROUCH", 1);
     s->RegisterConstant("WT_GADGET", 9);
+
+    s->RegisterConstant("PHASETYPE_DEFAULT", 0);
+    s->RegisterConstant("PHASETYPE_BALANCE", 1);
+    s->RegisterConstant("PHASETYPE_TUNNEL", 2);
+    s->RegisterConstant("PHASETYPE_DASH", 3);
+    s->RegisterConstant("PHASETYPE_GATE", 4);
+    s->RegisterConstant("PHASETYPE_BREACH", 5);
+    s->RegisterConstant("PHASETYPE_TRANSPORT", 6);
+    s->RegisterConstant("PHASETYPE_DOOR", 7);
+    s->RegisterConstant("PHASETYPE_TELEPORTER", 8);
+    s->RegisterConstant("PHASETYPE_REWIND", 9);
 
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_SAME_TEAM", 0x80);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_DIFFERENT_TEAM", 0x100);
@@ -2034,8 +2061,8 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     HighlightContext_RegisterDrawFuncEnum(s->GetVM());
 
     Script_RegisterFuncNamed(s, "HighlightContext_GetId", "Script_HighlightContext_GetId", "Get highlight context id by name", "int", "string name", false, Script_HighlightContext_GetId);
-    Script_RegisterFuncNamed(s, "HighlightContext_SetParam", "Script_HighlightContext_SetParam", "Set highlight param", "void", "int contextId, int paramIndex, int value", false, Script_HighlightContext_SetParam);
-    Script_RegisterFuncNamed(s, "HighlightContext_GetParam", "Script_HighlightContext_GetParam", "Get highlight param", "int", "int contextId, int paramIndex", false, Script_HighlightContext_GetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_SetParam", "Script_HighlightContext_SetParam", "Set highlight param", "void", "int contextId, int paramIndex, vector value", false, Script_HighlightContext_SetParam);
+    Script_RegisterFuncNamed(s, "HighlightContext_GetParam", "Script_HighlightContext_GetParam", "Get highlight param", "vector", "int contextId, int paramIndex", false, Script_HighlightContext_GetParam);
     Script_RegisterFuncNamed(s, "HighlightContext_SetDrawFunc", "Script_HighlightContext_SetDrawFunc", "Set draw function", "void", "int contextId, int drawFuncId", false, Script_HighlightContext_SetDrawFunc);
     Script_RegisterFuncNamed(s, "HighlightContext_GetDrawFunc", "Script_HighlightContext_GetDrawFunc", "Get draw function", "int", "int contextId", false, Script_HighlightContext_GetDrawFunc);
     Script_RegisterFuncNamed(s, "HighlightContext_SetRadius", "Script_HighlightContext_SetRadius", "Set outline radius", "void", "int contextId, float radius", false, Script_HighlightContext_SetRadius);
@@ -2054,11 +2081,12 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
 
     ScriptNetData_RegisterUIFunctions(s);
 
-    // GlobalNonRewind variable system - getters for UI VM
+    // GlobalNonRewind variable system - getters only for UI VM (setters are SERVER-only)
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetBool", "Script_GetGlobalNonRewindNetBool", "Gets a global non-rewind bool", "bool", "string name", false, Script_GetGlobalNonRewindNetBool);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetInt", "Script_GetGlobalNonRewindNetInt", "Gets a global non-rewind int", "int", "string name", false, Script_GetGlobalNonRewindNetInt);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetFloat", "Script_GetGlobalNonRewindNetFloat", "Gets a global non-rewind float", "float", "string name", false, Script_GetGlobalNonRewindNetFloat);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetTime", "Script_GetGlobalNonRewindNetTime", "Gets a global non-rewind time", "float", "string name", false, Script_GetGlobalNonRewindNetTime);
+    Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetEnt", "Script_GetGlobalNonRewindNetEnt", "Gets a global non-rewind entity", "entity ornull", "string name", false, Script_GetGlobalNonRewindNetEnt);
 
     // Multi-index deathfield system
     Script_RegisterFuncNamed(s, "DeathField_IsActive", "Script_DeathField_IsActive", "Returns whether a deathfield is active", "bool", "int deathFieldIndex", false, Script_DeathField_IsActive);
@@ -2195,6 +2223,7 @@ static void Script_RegisterClientPlayerClassFuncs()
     initialized = true;
 
     Script_RegisterPlayerScriptFunctions(g_clientScriptPlayerStruct);
+    WeaponScriptVars_RegisterPhaseShiftOverride(g_clientScriptPlayerStruct);
 }
 //---------------------------------------------------------------------------------
 static void Script_RegisterClientAIClassFuncs()

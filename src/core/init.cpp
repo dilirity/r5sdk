@@ -178,6 +178,8 @@
 #include "game/client/cliententitylist.h"
 #include "game/client/c_player.h"
 #include "game/client/c_baseentity.h"
+#include "game/shared/weapon_script_vars.h"
+#include "game/shared/highlight_context.h"
 #include "game/client/hud_basechat.h"
 #include "game/client/c_zipline_fix.h"
 #include "game/client/clientleafsystem.h"
@@ -776,6 +778,8 @@ void DetourRegister() // Register detour classes to be searched and hooked.
 	REGISTER(VClientEntityList);
 	REGISTER(V_Player);
 	REGISTER(VC_BaseEntity);
+	REGISTER(VWeaponScriptVars);
+	REGISTER(VHighlightContext);
 	REGISTER(VHudChat);
 	REGISTER(VZiplineFix);
 	REGISTER(VRuiTracks);

@@ -6,15 +6,14 @@
 // If the ConVar doesn't exist, the script call fails or returns wrong values.
 // These stubs ensure the ConVars exist with safe defaults.
 //
-// At startup, ConVarStubs_LogExisting() prints which ones the engine already
-// had registered -- those entries can then be removed from this file.
-//
 //=============================================================================//
 
 #include "core/stdafx.h"
 #include "tier1/convar.h"
-#include "tier1/cvar.h"
-#include "convar_stubs.h"
+
+// Forces the linker to include this object file. Without an exported symbol,
+// the static ConVar constructors would be stripped from the final binary.
+void ConVarStubs_Init() {}
 
 //-----------------------------------------------------------------------------
 // Matchmaking / Party
@@ -156,143 +155,3 @@ static ConVar motion_ads_advanced_sensitivity_scalar_6("motion_ads_advanced_sens
 static ConVar motion_ads_advanced_sensitivity_scalar_7("motion_ads_advanced_sensitivity_scalar_7", "1.0", FCVAR_RELEASE | FCVAR_ARCHIVE, "Motion ADS sensitivity scalar 7.");
 static ConVar motion_use_per_scope_sensitivity_scalars("motion_use_per_scope_sensitivity_scalars", "0", FCVAR_RELEASE | FCVAR_ARCHIVE, "Use per-scope motion sensitivity scalars.");
 
-//-----------------------------------------------------------------------------
-// Diagnostics: log which stubs were already engine-registered
-//-----------------------------------------------------------------------------
-
-struct ConVarStubEntry
-{
-	const char* name;
-	ConVar* pVar;
-};
-
-// Macro to reduce boilerplate
-#define STUB_ENTRY(var) { #var, &var }
-
-static ConVarStubEntry s_StubEntries[] = {
-	// Matchmaking / Party
-	STUB_ENTRY(match_jip),
-	STUB_ENTRY(match_roleToken),
-	STUB_ENTRY(party_nofill_selected),
-	STUB_ENTRY(orientation_matches_disabled),
-	STUB_ENTRY(skip_training),
-	STUB_ENTRY(ftue_flow_enabled),
-	// Custom Match
-	STUB_ENTRY(customMatch_public_enabled),
-	STUB_ENTRY(customMatch_playerToken),
-	STUB_ENTRY(customMatch_startMatchmakingDelay),
-	// Ranked
-	STUB_ENTRY(ranked_disable_placement_matches),
-	STUB_ENTRY(ranked_disable_point_gain),
-	STUB_ENTRY(ranked_current_period_start_score),
-	STUB_ENTRY(ranked_disable_promo_trials),
-	// MTX
-	STUB_ENTRY(mtx_hardenDirtyOffers),
-	STUB_ENTRY(mtx_allowClearUnackedRewards),
-	STUB_ENTRY(mtx_allow_pending_grants_for_item_ownership),
-	STUB_ENTRY(mtx_escrow_trusted_level),
-	STUB_ENTRY(mtx_store_sections_enabled),
-	STUB_ENTRY(mtx_allowPersistenceBadgeConversion),
-	STUB_ENTRY(mtx_purchaseBPLevelsWithLegendTokensEnabled),
-	STUB_ENTRY(mtx_purchaseBPLevelsWithLegendTokensEndDaysOffset),
-	STUB_ENTRY(mtx_purchaseBPLevelsWithLegendTokensLimit),
-	STUB_ENTRY(mtx_purchaseBPLevelsWithLegendTokensMinLevel),
-	STUB_ENTRY(mtx_purchaseBPLevelsWithLegendTokensStartDaysOffset),
-	STUB_ENTRY(client_boostcount),
-	STUB_ENTRY(escrow_is_player_trusted),
-	// Observer / Tournament
-	STUB_ENTRY(cl_observer_preset_playerHash),
-	STUB_ENTRY(cl_observer_preset_playerSlot),
-	STUB_ENTRY(cl_observer_preset_team),
-	STUB_ENTRY(sv_private_assist_style_override),
-	STUB_ENTRY(sv_tournament_assist_style_override),
-	// UI / Settings
-	STUB_ENTRY(autoConnect),
-	STUB_ENTRY(skipIntroVideos),
-	STUB_ENTRY(lobby_battlepass_milestone_enabled),
-	STUB_ENTRY(hud_setting_anonymousMode),
-	STUB_ENTRY(net_netGraph2),
-	STUB_ENTRY(AoCLanguageNeeded),
-	STUB_ENTRY(NewAoCDownloadComplete),
-	// Social / Clubs
-	STUB_ENTRY(Clubs_oldJoinFlow),
-	STUB_ENTRY(clubs_showInvites),
-	STUB_ENTRY(CrossPlay_user_optin),
-	STUB_ENTRY(crossPlay_enabled),
-	STUB_ENTRY(friends_joinUsePresence),
-	STUB_ENTRY(allow_comms_filter),
-	STUB_ENTRY(cl_comms_filter),
-	STUB_ENTRY(communicationBlock_warning_fade),
-	STUB_ENTRY(communicationBlock_warning_sustain),
-	// Gameplay
-	STUB_ENTRY(artifacts_tier_override),
-	STUB_ENTRY(bot_use_loadout_datatables),
-	STUB_ENTRY(player_setting_enable_heartbeat_sounds),
-	// Season Quest
-	STUB_ENTRY(seasonquest_force_missionscleared_count),
-	STUB_ENTRY(seasonquest_force_pages_read_count),
-	STUB_ENTRY(seasonquest_force_treasurepacks_count),
-	// Automation / Dev
-	STUB_ENTRY(ui_automation_enabled),
-	STUB_ENTRY(ui_automation_playlist),
-	STUB_ENTRY(script_R5DEV_220022_Disconnect),
-	// Gamepad / Input
-	STUB_ENTRY(gamepad_aim_assist_ads_high_power_scopes),
-	STUB_ENTRY(gamepad_aim_assist_ads_low_power_scopes),
-	STUB_ENTRY(gamepad_aim_assist_hip_high_power_scopes),
-	STUB_ENTRY(gamepad_aim_assist_hip_low_power_scopes),
-	STUB_ENTRY(gamepad_aim_assist_melee),
-	STUB_ENTRY(gamepad_custom_assist_style),
-	// Laser Sight
-	STUB_ENTRY(laserSightColor),
-	STUB_ENTRY(laserSightColorCustomized),
-	// Audio
-	STUB_ENTRY(miles_channels_menuoption),
-	STUB_ENTRY(miles_output_device),
-	STUB_ENTRY(voice_input_device),
-	// NX / Motion
-	STUB_ENTRY(nx_is_control_spawn_menu_open),
-	STUB_ENTRY(nx_six_axis_ads_horizontalScale),
-	STUB_ENTRY(nx_six_axis_ads_sensitivity),
-	STUB_ENTRY(nx_six_axis_ads_verticalScale),
-	STUB_ENTRY(nx_six_axis_control_on),
-	STUB_ENTRY(nx_six_axis_horizontalScale),
-	STUB_ENTRY(nx_six_axis_sensitivity),
-	STUB_ENTRY(nx_six_axis_verticalScale),
-	STUB_ENTRY(motion_ads_advanced_sensitivity_scalar_0),
-	STUB_ENTRY(motion_ads_advanced_sensitivity_scalar_1),
-	STUB_ENTRY(motion_ads_advanced_sensitivity_scalar_2),
-	STUB_ENTRY(motion_ads_advanced_sensitivity_scalar_3),
-	STUB_ENTRY(motion_ads_advanced_sensitivity_scalar_4),
-	STUB_ENTRY(motion_ads_advanced_sensitivity_scalar_5),
-	STUB_ENTRY(motion_ads_advanced_sensitivity_scalar_6),
-	STUB_ENTRY(motion_ads_advanced_sensitivity_scalar_7),
-	STUB_ENTRY(motion_use_per_scope_sensitivity_scalars),
-};
-
-#undef STUB_ENTRY
-
-// Called BEFORE ConVar_Register() so our stubs aren't registered yet.
-// Any FindVar hit means the engine already has this ConVar natively.
-void ConVarStubs_LogExisting()
-{
-	if (!g_pCVar)
-		return;
-
-	int nDuplicates = 0;
-	const int nTotal = ARRAYSIZE(s_StubEntries);
-
-	for (int i = 0; i < nTotal; i++)
-	{
-		ConVar* pExisting = g_pCVar->FindVar(s_StubEntries[i].name);
-		if (pExisting)
-		{
-			Msg(eDLL_T::CLIENT, "[ConVarStubs] '%s' already exists in engine (remove from stubs)\n",
-				s_StubEntries[i].name);
-			nDuplicates++;
-		}
-	}
-
-	Msg(eDLL_T::CLIENT, "[ConVarStubs] %d/%d stubs needed (%d already existed in engine)\n",
-		nTotal - nDuplicates, nTotal, nDuplicates);
-}

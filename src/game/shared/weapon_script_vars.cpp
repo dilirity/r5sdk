@@ -243,6 +243,10 @@ void WeaponScriptVars_SetScriptFloat0(void* pWeapon, float value)
 	GetWeaponVars(pWeapon).scriptFloat0 = value;
 }
 
+// Forward declarations for weapon locked set (defined after PhaseShift block)
+static SQRESULT Script_GetWeaponLockedSet(HSQUIRRELVM v);
+static SQRESULT Script_SetWeaponLockedSet(HSQUIRRELVM v);
+
 void WeaponScriptVars_RegisterWeaponFuncs(ScriptClassDescriptor_t* weaponStruct)
 {
 	DevMsg(eDLL_T::CLIENT, "[WeaponScriptVars] Registering weapon script variable functions\n");
@@ -363,6 +367,16 @@ void WeaponScriptVars_RegisterWeaponFuncs(ScriptClassDescriptor_t* weaponStruct)
 		"string activity, int flags, float duration, string thirdPersonActivity",
 		false,
 		Script_StartCustomActivityDetailed);
+
+	// WeaponLockedSet — getter on all VMs (SetWeaponLockedSet is SERVER-only, registered separately)
+	weaponStruct->AddFunction(
+		"GetWeaponLockedSet",
+		"Script_GetWeaponLockedSet",
+		"Get the weapon's locked set",
+		"int",
+		"",
+		false,
+		Script_GetWeaponLockedSet);
 }
 
 //-----------------------------------------------------------------------------
@@ -550,7 +564,8 @@ static SQRESULT Script_Highlight_SetGenericHighlightContext(HSQUIRRELVM v)
 
 	auto& data = s_entityGenericHighlights[reinterpret_cast<uintptr_t>(pEntity)];
 
-	if (contextId > 0xFF)
+	// Store -1 (HIGHLIGHT_INVALID_ID) as 0xFF internally
+	if (contextId < 0 || contextId > 0xFE)
 		data.contexts[genericType] = 0xFF;
 	else
 		data.contexts[genericType] = static_cast<uint8_t>(contextId);
@@ -572,12 +587,15 @@ static SQRESULT Script_Highlight_GetGenericHighlightContext(HSQUIRRELVM v)
 	SQInteger genericType;
 	sq_getinteger(v, 2, &genericType);
 
-	int result = 0xFF;
+	int result = -1; // HIGHLIGHT_INVALID_ID — no context set
 	if (genericType >= 0 && genericType < MAX_GENERIC_HIGHLIGHT_TYPES)
 	{
 		auto it = s_entityGenericHighlights.find(reinterpret_cast<uintptr_t>(pEntity));
 		if (it != s_entityGenericHighlights.end())
-			result = it->second.contexts[genericType];
+		{
+			uint8_t raw = it->second.contexts[genericType];
+			result = (raw == 0xFF) ? -1 : static_cast<int>(raw);
+		}
 	}
 
 	sq_pushinteger(v, result);
@@ -616,8 +634,15 @@ static SQRESULT Script_SetCylinderRadius(HSQUIRRELVM v)
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pEntity)))
 		return SQ_ERROR;
 
-	SQFloat radius;
-	sq_getfloat(v, 2, &radius);
+	// Accept both int and float (scripts pass either)
+	SQFloat radius = 0.0f;
+	if (SQ_FAILED(sq_getfloat(v, 2, &radius)))
+	{
+		SQInteger iRadius;
+		if (SQ_FAILED(sq_getinteger(v, 2, &iRadius)))
+			return SQ_ERROR;
+		radius = static_cast<SQFloat>(iRadius);
+	}
 
 	if (v_CBaseEntity_SetRadius && pEntity)
 		v_CBaseEntity_SetRadius(pEntity, static_cast<float>(radius));
@@ -687,6 +712,149 @@ static SQRESULT Script_GetChildren(HSQUIRRELVM v)
 	return 1;
 }
 
+//-----------------------------------------------------------------------------
+// PhaseShift type system — per-entity phaseShiftType via side-table.
+// PhaseShiftBegin override accepts 3rd param then calls engine's native.
+//-----------------------------------------------------------------------------
+static constexpr int PHASESHIFT_REFEHANDLE_OFFSET = 0x08;
+static constexpr uint32_t PHASESHIFT_INVALID_EHANDLE = 0xFFFFFFFF;
+
+static std::unordered_map<uint32_t, int> s_phaseShiftType;
+
+static uint32_t PhaseShift_GetEntityEHandle(void* pEntity)
+{
+	if (!pEntity)
+		return PHASESHIFT_INVALID_EHANDLE;
+	return static_cast<uint32_t>(
+		*reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(pEntity) + PHASESHIFT_REFEHANDLE_OFFSET));
+}
+
+static SQRESULT Script_GetPhaseShiftType(HSQUIRRELVM v)
+{
+	void* pEntity = nullptr;
+	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pEntity)) || !pEntity)
+		return SQ_ERROR;
+
+	const uint32_t ehandle = PhaseShift_GetEntityEHandle(pEntity);
+	auto it = s_phaseShiftType.find(ehandle);
+	int type = (it != s_phaseShiftType.end()) ? it->second : 0;
+
+	sq_pushinteger(v, type);
+	return SQ_OK;
+}
+
+// PhaseShiftBegin override: accepts 3rd param (phaseShiftType), stores it,
+// then calls engine's native 2-param PhaseShiftBegin for actual mechanics.
+static SQRESULT Script_PhaseShiftBegin_Override(HSQUIRRELVM v)
+{
+	void* pEntity = nullptr;
+	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pEntity)) || !pEntity)
+		return SQ_ERROR;
+
+	SQFloat warmup, duration;
+	sq_getfloat(v, 2, &warmup);
+	sq_getfloat(v, 3, &duration);
+
+	// 3rd param is optional for backwards compat
+	SQInteger phaseType = 0;
+	if (sq_gettop(v) >= 4)
+		sq_getinteger(v, 4, &phaseType);
+
+	// Store type in side-table
+	const uint32_t ehandle = PhaseShift_GetEntityEHandle(pEntity);
+	if (ehandle != PHASESHIFT_INVALID_EHANDLE)
+		s_phaseShiftType[ehandle] = static_cast<int>(phaseType);
+
+	// Call engine's native PhaseShiftBegin(entity, warmup, duration)
+	if (v_PhaseShiftBegin_Native)
+		v_PhaseShiftBegin_Native(pEntity, static_cast<float>(warmup), static_cast<float>(duration));
+
+	return SQ_OK;
+}
+
+void WeaponScriptVars_PhaseShift_LevelShutdown()
+{
+	s_phaseShiftType.clear();
+}
+
+// Registered on PLAYER struct (not entity) so it overrides the engine's
+// 2-param BCC registration which happens before entity struct init.
+void WeaponScriptVars_RegisterPhaseShiftOverride(ScriptClassDescriptor_t* playerStruct)
+{
+	playerStruct->AddFunction(
+		"PhaseShiftBegin",
+		"Script_PhaseShiftBegin_Override",
+		"Begins phase shift with warmup, duration, and type",
+		"void",
+		"float warmupDuration, float duration, int phaseShiftType",
+		false,
+		Script_PhaseShiftBegin_Override);
+}
+
+//-----------------------------------------------------------------------------
+// WeaponLockedSet — weapon attachment tier lock system.
+// Per-weapon EHANDLE-keyed side-table.
+//-----------------------------------------------------------------------------
+static constexpr int WEAPONLOCKEDSET_REFEHANDLE_OFFSET = 0x08;
+static constexpr uint32_t WEAPONLOCKEDSET_INVALID_EHANDLE = 0xFFFFFFFF;
+
+static std::unordered_map<uint32_t, int> s_weaponLockedSet;
+
+static uint32_t WeaponLockedSet_GetEHandle(void* pWeapon)
+{
+	if (!pWeapon)
+		return WEAPONLOCKEDSET_INVALID_EHANDLE;
+	return static_cast<uint32_t>(
+		*reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(pWeapon) + WEAPONLOCKEDSET_REFEHANDLE_OFFSET));
+}
+
+static SQRESULT Script_GetWeaponLockedSet(HSQUIRRELVM v)
+{
+	void* pWeapon = nullptr;
+	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pWeapon)) || !pWeapon)
+		return SQ_ERROR;
+
+	const uint32_t ehandle = WeaponLockedSet_GetEHandle(pWeapon);
+	auto it = s_weaponLockedSet.find(ehandle);
+	int lockedSet = (it != s_weaponLockedSet.end()) ? it->second : 0; // 0 = INVALID (no locked set)
+
+	sq_pushinteger(v, lockedSet);
+	return SQ_OK;
+}
+
+static SQRESULT Script_SetWeaponLockedSet(HSQUIRRELVM v)
+{
+	void* pWeapon = nullptr;
+	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pWeapon)) || !pWeapon)
+		return SQ_ERROR;
+
+	SQInteger lockedSet;
+	sq_getinteger(v, 2, &lockedSet);
+
+	const uint32_t ehandle = WeaponLockedSet_GetEHandle(pWeapon);
+	if (ehandle != WEAPONLOCKEDSET_INVALID_EHANDLE)
+		s_weaponLockedSet[ehandle] = static_cast<int>(lockedSet);
+
+	return SQ_OK;
+}
+
+void WeaponScriptVars_WeaponLockedSet_LevelShutdown()
+{
+	s_weaponLockedSet.clear();
+}
+
+void WeaponScriptVars_RegisterWeaponLockedSetSetter(ScriptClassDescriptor_t* weaponStruct)
+{
+	weaponStruct->AddFunction(
+		"SetWeaponLockedSet",
+		"Script_SetWeaponLockedSet",
+		"Set the weapon's locked set",
+		"void",
+		"int lockedSet",
+		false,
+		Script_SetWeaponLockedSet);
+}
+
 void WeaponScriptVars_RegisterEntityFuncs(ScriptClassDescriptor_t* entityStruct)
 {
 	DevMsg(eDLL_T::CLIENT, "[WeaponScriptVars] Registering entity highlight functions\n");
@@ -723,7 +891,7 @@ void WeaponScriptVars_RegisterEntityFuncs(ScriptClassDescriptor_t* entityStruct)
 		"Script_SetCylinderRadius",
 		"Sets the entity's collision cylinder radius",
 		"void",
-		"float radius",
+		"var radius",
 		false,
 		Script_SetCylinderRadius);
 
@@ -789,6 +957,16 @@ void WeaponScriptVars_RegisterEntityFuncs(ScriptClassDescriptor_t* entityStruct)
 		"int genericType",
 		false,
 		Script_Highlight_GetGenericHighlightContext);
+
+	// PhaseShift type system - GetPhaseShiftType on entity level
+	entityStruct->AddFunction(
+		"GetPhaseShiftType",
+		"Script_GetPhaseShiftType",
+		"Returns the phase shift type enum value",
+		"int",
+		"",
+		false,
+		Script_GetPhaseShiftType);
 }
 
 static void WeaponScriptVars_ClearHighlightMaps()
@@ -796,4 +974,129 @@ static void WeaponScriptVars_ClearHighlightMaps()
 	s_entityHighlightTeams.clear();
 	s_entityHighlightOverrides.clear();
 	s_entityGenericHighlights.clear();
+}
+
+//-----------------------------------------------------------------------------
+// WeaponType enum table expansion
+// Engine has 9 entries (default..inventory). We add "gadget" as index 9.
+// Both CLIENT and SERVER parsers reference the same static string pointer
+// table via two consecutive LEA instructions:
+//   lea r11, [rip+off]   ; table start
+//   lea r14, [rip+off]   ; table end (exclusive)
+// We create a new 10-entry table and patch the LEA offsets.
+//-----------------------------------------------------------------------------
+static const char* s_weaponTypeNames[] = {
+	"default",
+	"sidearm",
+	"anti_titan",
+	"melee",
+	"shoulder",
+	"titan_core",
+	"defense",
+	"tactical",
+	"inventory",
+	"gadget",
+};
+static constexpr int WEAPON_TYPE_COUNT = sizeof(s_weaponTypeNames) / sizeof(s_weaponTypeNames[0]);
+
+// Allocated near the engine so RIP-relative LEA can reach it
+static const char** s_nearTablePtr = nullptr;
+
+static const char** AllocNearTable(void* nearAddr)
+{
+	if (s_nearTablePtr)
+		return s_nearTablePtr;
+
+	// Allocate within ±2GB of nearAddr so RIP-relative offsets fit in int32
+	uintptr_t base = reinterpret_cast<uintptr_t>(nearAddr);
+	uintptr_t lo = (base > 0x70000000) ? base - 0x70000000 : 0x10000;
+	uintptr_t hi = base + 0x70000000;
+
+	for (uintptr_t addr = lo; addr < hi; addr += 0x10000)
+	{
+		void* p = VirtualAlloc(reinterpret_cast<void*>(addr),
+			4096, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+		if (p)
+		{
+			s_nearTablePtr = reinterpret_cast<const char**>(p);
+			for (int i = 0; i < WEAPON_TYPE_COUNT; i++)
+				s_nearTablePtr[i] = s_weaponTypeNames[i];
+			return s_nearTablePtr;
+		}
+	}
+	return nullptr;
+}
+
+static void PatchWeaponTypeLEAPair(CMemory leaPair, const char** nearTable)
+{
+	uint8_t* pLeaStart = reinterpret_cast<uint8_t*>(leaPair.GetPtr());
+	uint8_t* pLeaEnd   = pLeaStart + 7;
+
+	if (pLeaStart[0] != 0x4C || pLeaStart[1] != 0x8D || pLeaStart[2] != 0x1D ||
+	    pLeaEnd[0]   != 0x4C || pLeaEnd[1]   != 0x8D || pLeaEnd[2]   != 0x35)
+	{
+		Warning(eDLL_T::SERVER, "WeaponType: LEA opcode mismatch at %p\n", pLeaStart);
+		return;
+	}
+
+	uintptr_t tableStart = reinterpret_cast<uintptr_t>(&nearTable[0]);
+	uintptr_t tableEnd   = reinterpret_cast<uintptr_t>(&nearTable[WEAPON_TYPE_COUNT]);
+
+	int64_t relStart64 = static_cast<int64_t>(tableStart - (reinterpret_cast<uintptr_t>(pLeaStart) + 7));
+	int64_t relEnd64   = static_cast<int64_t>(tableEnd   - (reinterpret_cast<uintptr_t>(pLeaEnd)   + 7));
+
+	if (relStart64 > INT32_MAX || relStart64 < INT32_MIN ||
+	    relEnd64   > INT32_MAX || relEnd64   < INT32_MIN)
+	{
+		Warning(eDLL_T::SERVER, "WeaponType: RIP offset overflow at %p\n", pLeaStart);
+		return;
+	}
+
+	int32_t relStart = static_cast<int32_t>(relStart64);
+	int32_t relEnd   = static_cast<int32_t>(relEnd64);
+
+	DWORD oldProtect;
+	VirtualProtect(pLeaStart, 14, PAGE_EXECUTE_READWRITE, &oldProtect);
+	memcpy(pLeaStart + 3, &relStart, 4);
+	memcpy(pLeaEnd   + 3, &relEnd,   4);
+	VirtualProtect(pLeaStart, 14, oldProtect, &oldProtect);
+}
+
+void WeaponScriptVars_PatchWeaponTypeTable()
+{
+	int patched = 0;
+
+	// CLIENT parser: 44 38 20 74 3D 4C 8D 1D ?? ?? ?? ?? 4C 8D 35
+	CMemory clientMatch = Module_FindPattern(g_GameDll,
+		"44 38 20 74 3D 4C 8D 1D ?? ?? ?? ?? 4C 8D 35");
+
+	// Allocate table near engine code so RIP-relative LEA can reach it
+	if (!clientMatch)
+	{
+		Warning(eDLL_T::SERVER, "WeaponType: CLIENT parser pattern not found\n");
+		return;
+	}
+	void* nearAddr = reinterpret_cast<void*>(clientMatch.GetPtr());
+	const char** nearTable = AllocNearTable(nearAddr);
+	if (!nearTable)
+	{
+		Warning(eDLL_T::SERVER, "WeaponType: failed to allocate near table\n");
+		return;
+	}
+
+	if (clientMatch)
+		PatchWeaponTypeLEAPair(clientMatch.Offset(5), nearTable);
+
+	// SERVER parser: 44 38 28 74 3D 4C 8D 1D ?? ?? ?? ?? 4C 8D 35
+	CMemory serverMatch = Module_FindPattern(g_GameDll,
+		"44 38 28 74 3D 4C 8D 1D ?? ?? ?? ?? 4C 8D 35");
+	if (serverMatch)
+		PatchWeaponTypeLEAPair(serverMatch.Offset(5), nearTable);
+
+	// Count
+	patched = (clientMatch ? 1 : 0) + (serverMatch ? 1 : 0);
+	if (patched < 2)
+		Warning(eDLL_T::SERVER, "WeaponType table: only %d of 2 parsers patched\n", patched);
+	else
+		Warning(eDLL_T::SERVER, "WeaponType table expanded to %d entries\n", WEAPON_TYPE_COUNT);
 }

@@ -1,7 +1,6 @@
 #ifndef VSCRIPT_COLORPALETTE_H
 #define VSCRIPT_COLORPALETTE_H
 
-struct ScriptClassDescriptor_t;
 class Vector3D;
 
 //-----------------------------------------------------------------------------
@@ -9,7 +8,7 @@ class Vector3D;
 //-----------------------------------------------------------------------------
 void Script_RegisterColorPaletteFunctions(CSquirrelVM* s);
 void Script_RegisterColorPaletteUIFunctions(CSquirrelVM* s);
-void Script_RegisterPlayerScriptFunctions(ScriptClassDescriptor_t* playerStruct);
+void ColorPalette_LevelShutdown();
 
 //-----------------------------------------------------------------------------
 // Native C++ ColorPalette API (callable from ConVar callbacks, other systems)
