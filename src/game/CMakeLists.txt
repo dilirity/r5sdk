@@ -73,6 +73,8 @@ add_sources( SOURCE_GROUP "Weapon"
     "shared/deathfield_system.h"
     "shared/highlight_context.cpp"
     "shared/highlight_context.h"
+    "shared/dt_injection.cpp"
+    "shared/dt_injection.h"
 )
 
 add_sources( SOURCE_GROUP "Network"

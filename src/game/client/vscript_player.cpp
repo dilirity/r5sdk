@@ -14,6 +14,7 @@
 #include "game/shared/deathfield_system.h"
 #include "game/shared/weapon_script_vars.h"
 #include "public/globalvars_base.h"
+#include "game/shared/dt_injection.h"
 #include "vscript_player.h"
 
 #include <unordered_map>
@@ -74,35 +75,35 @@ static SQRESULT Script_Player_IsSkywardLaunching(HSQUIRRELVM v)
 {
 	DevMsg(eDLL_T::CLIENT, "Player_IsSkywardLaunching called - stub\n");
 	sq_pushbool(v, false);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 static SQRESULT Script_Player_IsSkywardFollowing(HSQUIRRELVM v)
 {
 	DevMsg(eDLL_T::CLIENT, "Player_IsSkywardFollowing called - stub\n");
 	sq_pushbool(v, false);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 static SQRESULT Script_Player_IsSkywardDiving(HSQUIRRELVM v)
 {
 	DevMsg(eDLL_T::CLIENT, "Player_IsSkywardDiving called - stub\n");
 	sq_pushbool(v, false);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 static SQRESULT Script_Skydive_IsFromUpdraft(HSQUIRRELVM v)
 {
 	DevMsg(eDLL_T::CLIENT, "Skydive_IsFromUpdraft called - stub\n");
 	sq_pushbool(v, false);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 static SQRESULT Script_Skydive_IsFromSkywardLaunch(HSQUIRRELVM v)
 {
 	DevMsg(eDLL_T::CLIENT, "Skydive_IsFromSkywardLaunch called - stub\n");
 	sq_pushbool(v, false);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //=============================================================================
@@ -164,7 +165,7 @@ static SQRESULT Script_PushForcedStance(HSQUIRRELVM v)
 	if (stanceType < 0 || stanceType > 1)
 	{
 		sq_pushinteger(v, -1);
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
 	auto& ss = s_stanceStacks[reinterpret_cast<uintptr_t>(pPlayer)];
@@ -178,7 +179,7 @@ static SQRESULT Script_PushForcedStance(HSQUIRRELVM v)
 	UpdateForceStanceField(pPlayer, ss);
 
 	sq_pushinteger(v, handle);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 static SQRESULT Script_RemoveForcedStance(HSQUIRRELVM v)
@@ -205,28 +206,20 @@ static SQRESULT Script_RemoveForcedStance(HSQUIRRELVM v)
 		UpdateForceStanceField(pPlayer, it->second);
 	}
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //=============================================================================
-// Extra shield system - per-player storage
+// Extra shield system
 //=============================================================================
-struct ExtraShieldData_t
-{
-	int health = 0;
-	int tier = 0;
-};
-
-static std::unordered_map<uintptr_t, ExtraShieldData_t> s_extraShieldData;
-
 static SQRESULT Script_GetExtraShieldHealth(HSQUIRRELVM v)
 {
 	void* pPlayer = nullptr;
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
 		return SQ_ERROR;
 
-	auto it = s_extraShieldData.find(reinterpret_cast<uintptr_t>(pPlayer));
-	sq_pushinteger(v, (it != s_extraShieldData.end()) ? it->second.health : 0);
+	const int offset = DTInject_GetPlayerClientOffset("m_extraShieldHealth");
+	sq_pushinteger(v, DTInject_ReadInt(pPlayer, offset));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -236,8 +229,8 @@ static SQRESULT Script_GetExtraShieldTier(HSQUIRRELVM v)
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
 		return SQ_ERROR;
 
-	auto it = s_extraShieldData.find(reinterpret_cast<uintptr_t>(pPlayer));
-	sq_pushinteger(v, (it != s_extraShieldData.end()) ? it->second.tier : 0);
+	const int offset = DTInject_GetPlayerClientOffset("m_extraShieldTier");
+	sq_pushinteger(v, DTInject_ReadInt(pPlayer, offset));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -250,7 +243,10 @@ static SQRESULT Script_SetExtraShieldHealth(HSQUIRRELVM v)
 	SQInteger val;
 	sq_getinteger(v, 2, &val);
 
-	s_extraShieldData[reinterpret_cast<uintptr_t>(pPlayer)].health = static_cast<int>(val);
+	if (val < 0) val = 0;
+
+	const int offset = DTInject_GetPlayerClientOffset("m_extraShieldHealth");
+	DTInject_WriteInt(pPlayer, offset, static_cast<int>(val));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -263,7 +259,11 @@ static SQRESULT Script_SetExtraShieldTier(HSQUIRRELVM v)
 	SQInteger val;
 	sq_getinteger(v, 2, &val);
 
-	s_extraShieldData[reinterpret_cast<uintptr_t>(pPlayer)].tier = static_cast<int>(val);
+	if (val < 0 || val > 1023)
+		val = (val < 0) ? 0 : 1023;
+
+	const int offset = DTInject_GetPlayerClientOffset("m_extraShieldTier");
+	DTInject_WriteInt(pPlayer, offset, static_cast<int>(val));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -351,7 +351,7 @@ static SQRESULT Script_IsMostRecentShieldChangeFromSingleSource(HSQUIRRELVM v)
 	if (it == s_shieldHistory.end())
 	{
 		sq_pushbool(v, true);
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
 	const auto& hist = it->second;
@@ -376,13 +376,13 @@ static SQRESULT Script_IsMostRecentShieldChangeFromSingleSource(HSQUIRRELVM v)
 			if (s != static_cast<int>(sourceType) && entry.changePerSource[s] != 0)
 			{
 				sq_pushbool(v, false);
-				return SQ_OK;
+				SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 			}
 		}
 	}
 
 	sq_pushbool(v, true);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //=============================================================================
@@ -571,6 +571,15 @@ void Script_RegisterPlayerScriptSetters(ScriptClassDescriptor_t* playerStruct)
 void VScriptPlayer_LevelShutdown()
 {
 	s_stanceStacks.clear();
-	s_extraShieldData.clear();
 	s_shieldHistory.clear();
+}
+
+int VScriptPlayer_GetExtraShieldHealth(void* pPlayer)
+{
+	return DTInject_ReadInt(pPlayer, DTInject_GetPlayerClientOffset("m_extraShieldHealth"));
+}
+
+int VScriptPlayer_GetExtraShieldTier(void* pPlayer)
+{
+	return DTInject_ReadInt(pPlayer, DTInject_GetPlayerClientOffset("m_extraShieldTier"));
 }

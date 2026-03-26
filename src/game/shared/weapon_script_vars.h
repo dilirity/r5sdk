@@ -14,6 +14,9 @@ void WeaponScriptVars_PhaseShift_LevelShutdown();
 void WeaponScriptVars_WeaponLockedSet_LevelShutdown();
 void WeaponScriptVars_RegisterPhaseShiftOverride(ScriptClassDescriptor_t* playerStruct);
 void WeaponScriptVars_RegisterWeaponLockedSetSetter(ScriptClassDescriptor_t* weaponStruct);
+void WeaponScriptVars_RegisterInfiniteAmmoFuncs(ScriptClassDescriptor_t* weaponStruct);
+void WeaponScriptVars_RegisterInfiniteAmmoSetter(ScriptClassDescriptor_t* weaponStruct);
+void WeaponScriptVars_InfiniteAmmo_LevelShutdown();
 
 // Engine: CBaseEntity::SetRadius(float) - sets collision cylinder radius
 inline void(*v_CBaseEntity_SetRadius)(void* entity, float radius) = nullptr;

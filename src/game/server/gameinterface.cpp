@@ -100,6 +100,7 @@ void CServerGameDLL::LevelShutdown(void)
 	WeaponScriptVars_LevelShutdown();
 	WeaponScriptVars_PhaseShift_LevelShutdown();
 	WeaponScriptVars_WeaponLockedSet_LevelShutdown();
+	WeaponScriptVars_InfiniteAmmo_LevelShutdown();
 	WeaponHeat_LevelShutdown();
 	GlobalNonRewind_LevelShutdown();
 	DeathField_LevelShutdown();

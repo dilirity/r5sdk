@@ -1891,6 +1891,9 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     s->RegisterConstant("PHASETYPE_TELEPORTER", 8);
     s->RegisterConstant("PHASETYPE_REWIND", 9);
 
+    s->RegisterConstant("INFINITEAMMO_NONE", 0);
+    s->RegisterConstant("INFINITEAMMO_CLIPS", 1);
+
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_SAME_TEAM", 0x80);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_DIFFERENT_TEAM", 0x100);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_FRIENDLY_TEAM", 0x200);
@@ -1935,11 +1938,8 @@ void Script_RegisterCoreClientFunctions(CSquirrelVM* s)
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetTime", "Script_GetGlobalNonRewindNetTime", "Gets a global non-rewind time", "float", "string name", false, Script_GetGlobalNonRewindNetTime);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetEnt", "Script_GetGlobalNonRewindNetEnt", "Gets a global non-rewind entity", "entity ornull", "string name", false, Script_GetGlobalNonRewindNetEnt);
 
-    // Multi-index deathfield system
-    Script_RegisterFuncNamed(s, "DeathField_IsActive", "Script_DeathField_IsActive", "Returns whether a deathfield is active", "bool", "int deathFieldIndex", false, Script_DeathField_IsActive);
-    Script_RegisterFuncNamed(s, "DeathField_PointDistanceFromFrontier", "Script_DeathField_PointDistanceFromFrontier", "Distance from deathfield frontier", "float", "vector point, int deathFieldIndex", false, Script_DeathField_PointDistanceFromFrontier);
-    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForNow", "Script_DeathField_GetRadiusForNow", "Gets current deathfield radius", "float", "int deathFieldIndex", false, Script_DeathField_GetRadiusForNow);
-    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForTime", "Script_DeathField_GetRadiusForTime", "Gets deathfield radius at given time", "float", "float time, int deathFieldIndex", false, Script_DeathField_GetRadiusForTime);
+
+    DeathField_RegisterOnVM(s);
 
     DEFINE_CLIENT_SCRIPTFUNC_NAMED(s, GetNetworkedVariableCategory, "Gets the category of a registered networked variable", "int", "string varName", false);
 
@@ -2045,6 +2045,9 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     s->RegisterConstant("PHASETYPE_TELEPORTER", 8);
     s->RegisterConstant("PHASETYPE_REWIND", 9);
 
+    s->RegisterConstant("INFINITEAMMO_NONE", 0);
+    s->RegisterConstant("INFINITEAMMO_CLIPS", 1);
+
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_SAME_TEAM", 0x80);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_DIFFERENT_TEAM", 0x100);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_FRIENDLY_TEAM", 0x200);
@@ -2088,11 +2091,8 @@ void Script_RegisterUIFunctions(CSquirrelVM* s)
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetTime", "Script_GetGlobalNonRewindNetTime", "Gets a global non-rewind time", "float", "string name", false, Script_GetGlobalNonRewindNetTime);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetEnt", "Script_GetGlobalNonRewindNetEnt", "Gets a global non-rewind entity", "entity ornull", "string name", false, Script_GetGlobalNonRewindNetEnt);
 
-    // Multi-index deathfield system
-    Script_RegisterFuncNamed(s, "DeathField_IsActive", "Script_DeathField_IsActive", "Returns whether a deathfield is active", "bool", "int deathFieldIndex", false, Script_DeathField_IsActive);
-    Script_RegisterFuncNamed(s, "DeathField_PointDistanceFromFrontier", "Script_DeathField_PointDistanceFromFrontier", "Distance from deathfield frontier", "float", "vector point, int deathFieldIndex", false, Script_DeathField_PointDistanceFromFrontier);
-    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForNow", "Script_DeathField_GetRadiusForNow", "Gets current deathfield radius", "float", "int deathFieldIndex", false, Script_DeathField_GetRadiusForNow);
-    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForTime", "Script_DeathField_GetRadiusForTime", "Gets deathfield radius at given time", "float", "float time, int deathFieldIndex", false, Script_DeathField_GetRadiusForTime);
+
+    DeathField_RegisterOnVM(s);
 
     DEFINE_UI_SCRIPTFUNC_NAMED(s, GetNetworkedVariableCategory, "Gets the category of a registered networked variable", "int", "string varName", false);
 
@@ -2249,6 +2249,7 @@ static void Script_RegisterClientWeaponClassFuncs()
 
     ViewmodelPoseParam_RegisterClientWeaponFuncs(g_clientScriptWeaponStruct);
     WeaponScriptVars_RegisterWeaponFuncs(g_clientScriptWeaponStruct);
+    WeaponScriptVars_RegisterInfiniteAmmoFuncs(g_clientScriptWeaponStruct);
     WeaponHeat_RegisterWeaponFuncs(g_clientScriptWeaponStruct);
 }
 //---------------------------------------------------------------------------------

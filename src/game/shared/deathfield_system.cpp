@@ -9,10 +9,11 @@
 
 #include "core/stdafx.h"
 #include "vscript/languages/squirrel_re/include/sqvm.h"
-#include "vscript/languages/squirrel_re/vsquirrel.h"
 #include "vscript/languages/squirrel_re/include/squirrel.h"
 #include "game/shared/vscript_gamedll_defs.h"
+#include "vscript/languages/squirrel_re/vsquirrel.h"
 #include "deathfield_system.h"
+#include "dt_injection.h"
 #include "public/globalvars_base.h"
 
 #ifndef CLIENT_DLL
@@ -23,7 +24,6 @@ extern CGlobalVarsBase* gpGlobals;
 #endif
 
 #include <cmath>
-#include <unordered_map>
 
 //-----------------------------------------------------------------------------
 // Constants
@@ -54,21 +54,10 @@ struct DeathFieldData_t
 };
 
 static DeathFieldData_t s_deathFields[MAX_DEATHFIELDS];
-static std::unordered_map<uintptr_t, int> s_playerDeathFieldIndex;
 
 //-----------------------------------------------------------------------------
 // Helpers
 //-----------------------------------------------------------------------------
-static inline float GraphCapped(float val, float inMin, float inMax, float outMin, float outMax)
-{
-	if (inMax <= inMin)
-		return outMax;
-	float t = (val - inMin) / (inMax - inMin);
-	if (t < 0.0f) t = 0.0f;
-	if (t > 1.0f) t = 1.0f;
-	return outMin + (outMax - outMin) * t;
-}
-
 static inline void* GetWorldEntity()
 {
 	if (!g_ppWorldEntity || !*g_ppWorldEntity)
@@ -76,49 +65,65 @@ static inline void* GetWorldEntity()
 	return *g_ppWorldEntity;
 }
 
-static bool ReadEngineDeathField(DeathFieldData_t& out)
-{
-	void* worldEnt = GetWorldEntity();
-	if (!worldEnt)
-		return false;
-
-	const uintptr_t base = reinterpret_cast<uintptr_t>(worldEnt);
-	out.isActive    = *(bool*)(base + WORLD_DF_ISACTIVE);
-	out.originX     = *(float*)(base + WORLD_DF_ORIGIN);
-	out.originY     = *(float*)(base + WORLD_DF_ORIGIN + 4);
-	out.originZ     = *(float*)(base + WORLD_DF_ORIGIN + 8);
-	out.radiusStart = *(float*)(base + WORLD_DF_RADIUS_START);
-	out.radiusEnd   = *(float*)(base + WORLD_DF_RADIUS_END);
-	out.timeStart   = *(float*)(base + WORLD_DF_TIME_START);
-	out.timeEnd     = *(float*)(base + WORLD_DF_TIME_END);
-	return true;
-}
-
-static const DeathFieldData_t& GetDeathField(int index)
-{
-	static DeathFieldData_t s_engineField;
-
-	if (index == 0)
-	{
-		ReadEngineDeathField(s_engineField);
-		return s_engineField;
-	}
-
-	if (index < 0 || index >= MAX_DEATHFIELDS)
-	{
-		static DeathFieldData_t s_empty;
-		return s_empty;
-	}
-
-	return s_deathFields[index];
-}
-
-static float GetCurrentRadius(const DeathFieldData_t& df, float time)
+static float GetCurrentRadius_SideTable(const DeathFieldData_t& df, float time)
 {
 	if (!df.isActive)
 		return 3.4028235e38f;
 
-	return GraphCapped(time, df.timeStart, df.timeEnd, df.radiusStart, df.radiusEnd);
+	if (df.timeEnd <= df.timeStart)
+	{
+		if ((time - df.timeEnd) < 0.0f)
+			return df.radiusStart;
+		return df.radiusEnd;
+	}
+
+	float t = (time - df.timeStart) / (df.timeEnd - df.timeStart);
+	if (t < 0.0f) t = 0.0f;
+	if (t > 1.0f) t = 1.0f;
+	return df.radiusStart + (df.radiusEnd - df.radiusStart) * t;
+}
+
+static float GetCurrentRadius(int index, float time)
+{
+	if (index == 0 && v_DeathField_GetCurrentRadius)
+		return v_DeathField_GetCurrentRadius(time);
+
+	if (index < 0 || index >= MAX_DEATHFIELDS)
+		return 3.4028235e38f;
+
+	return GetCurrentRadius_SideTable(s_deathFields[index], time);
+}
+
+static bool GetDeathFieldIsActive(int index)
+{
+	if (index == 0)
+	{
+		void* worldEnt = GetWorldEntity();
+		if (!worldEnt) return false;
+		return *(bool*)(reinterpret_cast<uintptr_t>(worldEnt) + WORLD_DF_ISACTIVE);
+	}
+
+	if (index < 0 || index >= MAX_DEATHFIELDS)
+		return false;
+
+	return s_deathFields[index].isActive;
+}
+
+static void GetDeathFieldOrigin(int index, float& outX, float& outY)
+{
+	if (index == 0)
+	{
+		void* worldEnt = GetWorldEntity();
+		if (!worldEnt) { outX = 0; outY = 0; return; }
+		const uintptr_t base = reinterpret_cast<uintptr_t>(worldEnt);
+		outX = *(float*)(base + WORLD_DF_ORIGIN);
+		outY = *(float*)(base + WORLD_DF_ORIGIN + 4);
+		return;
+	}
+
+	if (index < 0 || index >= MAX_DEATHFIELDS) { outX = 0; outY = 0; return; }
+	outX = s_deathFields[index].originX;
+	outY = s_deathFields[index].originY;
 }
 
 //-----------------------------------------------------------------------------
@@ -130,8 +135,8 @@ SQRESULT Script_DeathFieldIndex(HSQUIRRELVM v)
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
 		return SQ_ERROR;
 
-	auto it = s_playerDeathFieldIndex.find(reinterpret_cast<uintptr_t>(pPlayer));
-	sq_pushinteger(v, (it != s_playerDeathFieldIndex.end()) ? it->second : 0);
+	const int offset = DTInject_GetPlayerClientOffset("m_deathFieldIndex");
+	sq_pushinteger(v, DTInject_ReadInt(pPlayer, offset));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -151,7 +156,8 @@ SQRESULT Script_SetDeathFieldIndex(HSQUIRRELVM v)
 		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
-	s_playerDeathFieldIndex[reinterpret_cast<uintptr_t>(pPlayer)] = static_cast<int>(index);
+	const int offset = DTInject_GetPlayerClientOffset("m_deathFieldIndex");
+	DTInject_WriteInt(pPlayer, offset, static_cast<int>(index));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -163,8 +169,7 @@ SQRESULT Script_DeathField_IsActive(HSQUIRRELVM v)
 	SQInteger index;
 	sq_getinteger(v, 2, &index);
 
-	const DeathFieldData_t& df = GetDeathField(static_cast<int>(index));
-	sq_pushbool(v, df.isActive);
+	sq_pushbool(v, GetDeathFieldIsActive(static_cast<int>(index)));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -177,17 +182,16 @@ SQRESULT Script_DeathField_PointDistanceFromFrontier(HSQUIRRELVM v)
 	SQInteger index;
 	sq_getinteger(v, 3, &index);
 
-	const DeathFieldData_t& df = GetDeathField(static_cast<int>(index));
+	const int idx = static_cast<int>(index);
+	const float curTime = gpGlobals ? gpGlobals->curTime : 0.0f;
 
-	if (!gpGlobals)
-	{
-		sq_pushfloat(v, 0.0f);
-		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-	}
+	float radius = GetCurrentRadius(idx, curTime);
 
-	float radius = GetCurrentRadius(df, gpGlobals->curTime);
-	float dx = point->x - df.originX;
-	float dy = point->y - df.originY;
+	float originX, originY;
+	GetDeathFieldOrigin(idx, originX, originY);
+
+	float dx = point->x - originX;
+	float dy = point->y - originY;
 	float dist2D = sqrtf(dx * dx + dy * dy);
 
 	sq_pushfloat(v, radius - dist2D);
@@ -199,14 +203,8 @@ SQRESULT Script_DeathField_GetRadiusForNow(HSQUIRRELVM v)
 	SQInteger index;
 	sq_getinteger(v, 2, &index);
 
-	if (!gpGlobals)
-	{
-		sq_pushfloat(v, 3.4028235e38f);
-		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-	}
-
-	const DeathFieldData_t& df = GetDeathField(static_cast<int>(index));
-	sq_pushfloat(v, GetCurrentRadius(df, gpGlobals->curTime));
+	const float curTime = gpGlobals ? gpGlobals->curTime : 0.0f;
+	sq_pushfloat(v, GetCurrentRadius(static_cast<int>(index), curTime));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -218,8 +216,7 @@ SQRESULT Script_DeathField_GetRadiusForTime(HSQUIRRELVM v)
 	SQInteger index;
 	sq_getinteger(v, 3, &index);
 
-	const DeathFieldData_t& df = GetDeathField(static_cast<int>(index));
-	sq_pushfloat(v, GetCurrentRadius(df, static_cast<float>(time)));
+	sq_pushfloat(v, GetCurrentRadius(static_cast<int>(index), static_cast<float>(time)));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
@@ -302,6 +299,38 @@ void DeathField_LevelShutdown()
 {
 	for (int i = 0; i < MAX_DEATHFIELDS; i++)
 		s_deathFields[i] = DeathFieldData_t();
-
-	s_playerDeathFieldIndex.clear();
 }
+
+//-----------------------------------------------------------------------------
+// Re-register indexed DeathField functions over engine's no-index versions.
+// Called from our detoured VM init orchestrators, after the engine has
+// registered its versions but before scripts compile.
+//-----------------------------------------------------------------------------
+void DeathField_RegisterOnVM(CSquirrelVM* s)
+{
+	Script_RegisterFuncNamed(s, "DeathField_IsActiveForIndex",
+		"Script_DeathField_IsActive",
+		"Returns whether a deathfield is active by index",
+		"bool", "int deathFieldIndex", false,
+		Script_DeathField_IsActive);
+
+	Script_RegisterFuncNamed(s, "DeathField_PointDistanceFromFrontierForIndex",
+		"Script_DeathField_PointDistanceFromFrontier",
+		"Distance from deathfield frontier by index",
+		"float", "vector point, int deathFieldIndex", false,
+		Script_DeathField_PointDistanceFromFrontier);
+
+	Script_RegisterFuncNamed(s, "DeathField_GetRadiusForNowForIndex",
+		"Script_DeathField_GetRadiusForNow",
+		"Gets current deathfield radius by index",
+		"float", "int deathFieldIndex", false,
+		Script_DeathField_GetRadiusForNow);
+
+	Script_RegisterFuncNamed(s, "DeathField_GetRadiusForTimeForIndex",
+		"Script_DeathField_GetRadiusForTime",
+		"Gets deathfield radius at given time by index",
+		"float", "float time, int deathFieldIndex", false,
+		Script_DeathField_GetRadiusForTime);
+}
+
+void VDeathFieldSystem::Detour(const bool bAttach) const { }

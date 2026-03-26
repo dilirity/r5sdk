@@ -10,6 +10,7 @@
 #include "vscript/languages/squirrel_re/include/squirrel.h"
 #include "game/shared/vscript_gamedll_defs.h"
 #include "weapon_script_vars.h"
+#include "dt_injection.h"
 #ifndef CLIENT_DLL
 #include "game/server/r1/weapon_x.h"
 #else
@@ -410,7 +411,7 @@ static SQRESULT Script_HighlightEnableForTeam(HSQUIRRELVM v)
 	sq_getinteger(v, 3, &team);
 
 	if (contextId < 0 || contextId > 254 || team < 0 || team > 31)
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 
 	auto& data = s_entityHighlightTeams[reinterpret_cast<uintptr_t>(pEntity)];
 
@@ -438,7 +439,7 @@ static SQRESULT Script_HighlightEnableForTeam(HSQUIRRELVM v)
 	}
 
 	if (slot < 0)
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 
 	data.teamBits[slot] |= (1u << static_cast<int>(team));
 	data.teamIndex[slot] = static_cast<uint8_t>(contextId);
@@ -457,11 +458,11 @@ static SQRESULT Script_HighlightDisableForTeam(HSQUIRRELVM v)
 	sq_getinteger(v, 3, &team);
 
 	if (contextId < 0 || contextId > 254 || team < 0 || team > 31)
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 
 	auto it = s_entityHighlightTeams.find(reinterpret_cast<uintptr_t>(pEntity));
 	if (it == s_entityHighlightTeams.end())
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 
 	auto& data = it->second;
 	for (int i = 0; i < HIGHLIGHT_TEAM_MAX_SLOTS; i++)
@@ -560,7 +561,7 @@ static SQRESULT Script_Highlight_SetGenericHighlightContext(HSQUIRRELVM v)
 	sq_getbool(v, 4, &focused);
 
 	if (genericType < 0 || genericType >= MAX_GENERIC_HIGHLIGHT_TYPES)
-		return SQ_OK;
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 
 	auto& data = s_entityGenericHighlights[reinterpret_cast<uintptr_t>(pEntity)];
 
@@ -713,34 +714,18 @@ static SQRESULT Script_GetChildren(HSQUIRRELVM v)
 }
 
 //-----------------------------------------------------------------------------
-// PhaseShift type system — per-entity phaseShiftType via side-table.
+// PhaseShift type system — per-entity phaseShiftType via DT injection.
 // PhaseShiftBegin override accepts 3rd param then calls engine's native.
 //-----------------------------------------------------------------------------
-static constexpr int PHASESHIFT_REFEHANDLE_OFFSET = 0x08;
-static constexpr uint32_t PHASESHIFT_INVALID_EHANDLE = 0xFFFFFFFF;
-
-static std::unordered_map<uint32_t, int> s_phaseShiftType;
-
-static uint32_t PhaseShift_GetEntityEHandle(void* pEntity)
-{
-	if (!pEntity)
-		return PHASESHIFT_INVALID_EHANDLE;
-	return static_cast<uint32_t>(
-		*reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(pEntity) + PHASESHIFT_REFEHANDLE_OFFSET));
-}
-
 static SQRESULT Script_GetPhaseShiftType(HSQUIRRELVM v)
 {
 	void* pEntity = nullptr;
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pEntity)) || !pEntity)
 		return SQ_ERROR;
 
-	const uint32_t ehandle = PhaseShift_GetEntityEHandle(pEntity);
-	auto it = s_phaseShiftType.find(ehandle);
-	int type = (it != s_phaseShiftType.end()) ? it->second : 0;
-
-	sq_pushinteger(v, type);
-	return SQ_OK;
+	const int offset = DTInject_GetPlayerClientOffset("m_phaseShiftType");
+	sq_pushinteger(v, DTInject_ReadInt(pEntity, offset));
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 // PhaseShiftBegin override: accepts 3rd param (phaseShiftType), stores it,
@@ -760,21 +745,19 @@ static SQRESULT Script_PhaseShiftBegin_Override(HSQUIRRELVM v)
 	if (sq_gettop(v) >= 4)
 		sq_getinteger(v, 4, &phaseType);
 
-	// Store type in side-table
-	const uint32_t ehandle = PhaseShift_GetEntityEHandle(pEntity);
-	if (ehandle != PHASESHIFT_INVALID_EHANDLE)
-		s_phaseShiftType[ehandle] = static_cast<int>(phaseType);
+	if (phaseType < 0 || phaseType > 1023)
+		phaseType = 0;
 
-	// Call engine's native PhaseShiftBegin(entity, warmup, duration)
+	const int offset = DTInject_GetPlayerClientOffset("m_phaseShiftType");
+	DTInject_WriteInt(pEntity, offset, static_cast<int>(phaseType));
 	if (v_PhaseShiftBegin_Native)
 		v_PhaseShiftBegin_Native(pEntity, static_cast<float>(warmup), static_cast<float>(duration));
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 void WeaponScriptVars_PhaseShift_LevelShutdown()
 {
-	s_phaseShiftType.clear();
 }
 
 // Registered on PLAYER struct (not entity) so it overrides the engine's
@@ -792,34 +775,17 @@ void WeaponScriptVars_RegisterPhaseShiftOverride(ScriptClassDescriptor_t* player
 }
 
 //-----------------------------------------------------------------------------
-// WeaponLockedSet — weapon attachment tier lock system.
-// Per-weapon EHANDLE-keyed side-table.
+// WeaponLockedSet — weapon attachment tier lock via DT injection.
 //-----------------------------------------------------------------------------
-static constexpr int WEAPONLOCKEDSET_REFEHANDLE_OFFSET = 0x08;
-static constexpr uint32_t WEAPONLOCKEDSET_INVALID_EHANDLE = 0xFFFFFFFF;
-
-static std::unordered_map<uint32_t, int> s_weaponLockedSet;
-
-static uint32_t WeaponLockedSet_GetEHandle(void* pWeapon)
-{
-	if (!pWeapon)
-		return WEAPONLOCKEDSET_INVALID_EHANDLE;
-	return static_cast<uint32_t>(
-		*reinterpret_cast<int*>(reinterpret_cast<uintptr_t>(pWeapon) + WEAPONLOCKEDSET_REFEHANDLE_OFFSET));
-}
-
 static SQRESULT Script_GetWeaponLockedSet(HSQUIRRELVM v)
 {
 	void* pWeapon = nullptr;
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pWeapon)) || !pWeapon)
 		return SQ_ERROR;
 
-	const uint32_t ehandle = WeaponLockedSet_GetEHandle(pWeapon);
-	auto it = s_weaponLockedSet.find(ehandle);
-	int lockedSet = (it != s_weaponLockedSet.end()) ? it->second : 0; // 0 = INVALID (no locked set)
-
-	sq_pushinteger(v, lockedSet);
-	return SQ_OK;
+	const int offset = DTInject_GetWeaponClientOffset("m_weaponLockedSet");
+	sq_pushinteger(v, DTInject_ReadInt(pWeapon, offset));
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 static SQRESULT Script_SetWeaponLockedSet(HSQUIRRELVM v)
@@ -831,16 +797,16 @@ static SQRESULT Script_SetWeaponLockedSet(HSQUIRRELVM v)
 	SQInteger lockedSet;
 	sq_getinteger(v, 2, &lockedSet);
 
-	const uint32_t ehandle = WeaponLockedSet_GetEHandle(pWeapon);
-	if (ehandle != WEAPONLOCKEDSET_INVALID_EHANDLE)
-		s_weaponLockedSet[ehandle] = static_cast<int>(lockedSet);
+	if (lockedSet < 0 || lockedSet > 1023)
+		lockedSet = (lockedSet < 0) ? 0 : 1023;
 
-	return SQ_OK;
+	const int offset = DTInject_GetWeaponClientOffset("m_weaponLockedSet");
+	DTInject_WriteInt(pWeapon, offset, static_cast<int>(lockedSet));
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 void WeaponScriptVars_WeaponLockedSet_LevelShutdown()
 {
-	s_weaponLockedSet.clear();
 }
 
 void WeaponScriptVars_RegisterWeaponLockedSetSetter(ScriptClassDescriptor_t* weaponStruct)
@@ -853,6 +819,68 @@ void WeaponScriptVars_RegisterWeaponLockedSetSetter(ScriptClassDescriptor_t* wea
 		"int lockedSet",
 		false,
 		Script_SetWeaponLockedSet);
+}
+
+//-----------------------------------------------------------------------------
+// InfiniteAmmoState — per-weapon state via DT injection.
+//-----------------------------------------------------------------------------
+static constexpr int INFINITEAMMO_NONE = 0;
+static constexpr int INFINITEAMMO_CLIPS = 1;
+
+static SQRESULT Script_GetInfiniteAmmoState(HSQUIRRELVM v)
+{
+	void* pWeapon = nullptr;
+	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pWeapon)))
+		return SQ_ERROR;
+
+	const int offset = DTInject_GetWeaponClientOffset("m_infiniteAmmoState");
+	sq_pushinteger(v, DTInject_ReadInt(pWeapon, offset));
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+static SQRESULT Script_SetInfiniteAmmoState(HSQUIRRELVM v)
+{
+	void* pWeapon = nullptr;
+	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pWeapon)))
+		return SQ_ERROR;
+
+	SQInteger state;
+	sq_getinteger(v, 2, &state);
+
+	if (state < INFINITEAMMO_NONE || state > INFINITEAMMO_CLIPS)
+		state = INFINITEAMMO_NONE;
+
+	const int offset = DTInject_GetWeaponClientOffset("m_infiniteAmmoState");
+	DTInject_WriteInt(pWeapon, offset, static_cast<int>(state));
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+void WeaponScriptVars_InfiniteAmmo_LevelShutdown()
+{
+}
+
+void WeaponScriptVars_RegisterInfiniteAmmoFuncs(ScriptClassDescriptor_t* weaponStruct)
+{
+	weaponStruct->AddFunction(
+		"GetInfiniteAmmoState",
+		"Script_GetInfiniteAmmoState",
+		"Gets the infinite ammo state of the weapon",
+		"int",
+		"",
+		false,
+		Script_GetInfiniteAmmoState);
+}
+
+void WeaponScriptVars_RegisterInfiniteAmmoSetter(ScriptClassDescriptor_t* weaponStruct)
+{
+	weaponStruct->AddFunction(
+		"SetInfiniteAmmoState",
+		"Script_SetInfiniteAmmoState",
+		"Sets the infinite ammo state of the weapon",
+		"void",
+		"int state",
+		false,
+		Script_SetInfiniteAmmoState);
 }
 
 void WeaponScriptVars_RegisterEntityFuncs(ScriptClassDescriptor_t* entityStruct)

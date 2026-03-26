@@ -948,6 +948,9 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     s->RegisterConstant("PHASETYPE_TELEPORTER", 8);
     s->RegisterConstant("PHASETYPE_REWIND", 9);
 
+    s->RegisterConstant("INFINITEAMMO_NONE", 0);
+    s->RegisterConstant("INFINITEAMMO_CLIPS", 1);
+
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_SAME_TEAM", 0x80);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_DIFFERENT_TEAM", 0x100);
     s->RegisterConstant("HIGHLIGHT_FLAG_REQUIRE_FRIENDLY_TEAM", 0x200);
@@ -996,11 +999,10 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
     Script_RegisterFuncNamed(s, "SetGlobalNonRewindNetEnt", "Script_SetGlobalNonRewindNetEnt", "Sets a global non-rewind entity", "void", "string name, entity ent", false, Script_SetGlobalNonRewindNetEnt);
     Script_RegisterFuncNamed(s, "GetGlobalNonRewindNetEnt", "Script_GetGlobalNonRewindNetEnt", "Gets a global non-rewind entity", "entity ornull", "string name", false, Script_GetGlobalNonRewindNetEnt);
 
-    // Deathfield system
-    Script_RegisterFuncNamed(s, "DeathField_IsActive", "Script_DeathField_IsActive", "Returns whether a deathfield is active", "bool", "int deathFieldIndex", false, Script_DeathField_IsActive);
-    Script_RegisterFuncNamed(s, "DeathField_PointDistanceFromFrontier", "Script_DeathField_PointDistanceFromFrontier", "Distance from deathfield frontier (positive=inside)", "float", "vector point, int deathFieldIndex", false, Script_DeathField_PointDistanceFromFrontier);
-    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForNow", "Script_DeathField_GetRadiusForNow", "Gets current deathfield radius", "float", "int deathFieldIndex", false, Script_DeathField_GetRadiusForNow);
-    Script_RegisterFuncNamed(s, "DeathField_GetRadiusForTime", "Script_DeathField_GetRadiusForTime", "Gets deathfield radius at given time", "float", "float time, int deathFieldIndex", false, Script_DeathField_GetRadiusForTime);
+
+    // Indexed deathfield query functions
+    DeathField_RegisterOnVM(s);
+
     // Deathfield configuration
     Script_RegisterFuncNamed(s, "DeathField_SetActive", "Script_DeathField_SetActive", "Sets a deathfield active state", "void", "int deathFieldIndex, bool active", false, Script_DeathField_SetActive);
     Script_RegisterFuncNamed(s, "DeathField_SetOrigin", "Script_DeathField_SetOrigin", "Sets a deathfield center origin", "void", "int deathFieldIndex, vector origin", false, Script_DeathField_SetOrigin);
@@ -1179,6 +1181,8 @@ static void Script_RegisterServerWeaponClassFuncs()
 
     WeaponScriptVars_RegisterWeaponFuncs(g_serverScriptWeaponStruct);
     WeaponScriptVars_RegisterWeaponLockedSetSetter(g_serverScriptWeaponStruct);
+    WeaponScriptVars_RegisterInfiniteAmmoFuncs(g_serverScriptWeaponStruct);
+    WeaponScriptVars_RegisterInfiniteAmmoSetter(g_serverScriptWeaponStruct);
     WeaponHeat_RegisterWeaponFuncs(g_serverScriptWeaponStruct);
 }
 //---------------------------------------------------------------------------------

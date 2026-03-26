@@ -16,6 +16,7 @@
 #include "game/shared/weapon_heat.h"
 #include "public/inetchannel.h"
 #include "game/shared/weapon_script_vars.h"
+#include "game/client/vscript_player.h"
 
 extern CGlobalVarsBase* gpGlobals;
 
@@ -93,8 +94,11 @@ enum CustomTrackId
     TRACK_NETGRAPH_DATABLOCK_SIZE = 134,
     TRACK_NETGRAPH_DATABLOCK_PERCENT_DONE = 135,
 
+    TRACK_EXTRA_SHIELD_INT = 136,
+    TRACK_EXTRA_SHIELD_TIER_INT = 137,
+
     TRACK_CUSTOM_MIN = 100,
-    TRACK_CUSTOM_MAX = 135
+    TRACK_CUSTOM_MAX = 137
 };
 
 //-----------------------------------------------------------------------------
@@ -147,6 +151,8 @@ static const TrackDef s_customTracks[] = {
     { "RUI_TRACK_NETGRAPH_PACKETCHOKE_OUT", TRACK_NETGRAPH_PACKETCHOKE_OUT },
     { "RUI_TRACK_NETGRAPH_DATABLOCK_SIZE", TRACK_NETGRAPH_DATABLOCK_SIZE },
     { "RUI_TRACK_NETGRAPH_DATABLOCK_PERCENT_DONE", TRACK_NETGRAPH_DATABLOCK_PERCENT_DONE },
+    { "RUI_TRACK_EXTRA_SHIELD_INT", TRACK_EXTRA_SHIELD_INT },
+    { "RUI_TRACK_EXTRA_SHIELD_TIER_INT", TRACK_EXTRA_SHIELD_TIER_INT },
     { nullptr, 0 }
 };
 
@@ -612,6 +618,14 @@ static __int64 RuiTrack_Fallback_Hook(__int64 entity, int trackId, unsigned int 
             case TRACK_NET_ISSUE_PACKETLOSS:
                 *reinterpret_cast<unsigned char*>(output) = GetTrack_PacketLossIssue() ? 1 : 0;
                 return 0;
+
+            case TRACK_EXTRA_SHIELD_INT:
+                *output = entity ? VScriptPlayer_GetExtraShieldHealth(reinterpret_cast<void*>(entity)) : 0;
+                return 0;
+            case TRACK_EXTRA_SHIELD_TIER_INT:
+                *output = entity ? VScriptPlayer_GetExtraShieldTier(reinterpret_cast<void*>(entity)) : 0;
+                return 0;
+
             default:
                 *output = 0;
                 return 0;

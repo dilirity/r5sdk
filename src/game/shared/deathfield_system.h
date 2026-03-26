@@ -16,8 +16,11 @@ SQRESULT Script_DeathField_SetRadiusStartEnd(HSQUIRRELVM v);
 SQRESULT Script_DeathField_SetTimeStartEnd(HSQUIRRELVM v);
 
 void DeathField_LevelShutdown();
+void DeathField_RegisterOnVM(CSquirrelVM* s);
 
 inline void** g_ppWorldEntity = nullptr;
+inline float(*v_DeathField_GetCurrentRadius)(float time) = nullptr;
+
 
 ///////////////////////////////////////////////////////////////////////////////
 class VDeathFieldSystem : public IDetour
@@ -25,8 +28,15 @@ class VDeathFieldSystem : public IDetour
 	virtual void GetAdr(void) const
 	{
 		LogVarAdr("g_pWorldEntity", g_ppWorldEntity);
+		LogFunAdr("DeathField_GetCurrentRadius", v_DeathField_GetCurrentRadius);
 	}
-	virtual void GetFun(void) const { }
+	virtual void GetFun(void) const
+	{
+		Module_FindPattern(g_GameDll,
+			"48 8B 05 ?? ?? ?? ?? 0F 28 C8 80 B8 40 0A 00 00 00")
+			.GetPtr(v_DeathField_GetCurrentRadius);
+
+	}
 	virtual void GetVar(void) const
 	{
 		g_ppWorldEntity = Module_FindPattern(g_GameDll,
@@ -34,7 +44,7 @@ class VDeathFieldSystem : public IDetour
 			.ResolveRelativeAddressSelf(0x9, 0xD).RCast<void**>();
 	}
 	virtual void GetCon(void) const { }
-	virtual void Detour(const bool bAttach) const { }
+	virtual void Detour(const bool bAttach) const;
 };
 ///////////////////////////////////////////////////////////////////////////////
 
