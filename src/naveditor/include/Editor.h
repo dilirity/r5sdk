@@ -235,6 +235,12 @@ struct EditorToolState {
 	virtual void handleUpdate(const float dt) = 0;
 };
 
+struct TraverseLinkBuildContext
+{
+	class Editor* editor;
+	std::shared_mutex* polyMapMutex;
+};
+
 class Editor
 {
 protected:
@@ -292,7 +298,9 @@ protected:
 
 	EditorDebugDraw m_dd;
 	duDisplayList m_inputMeshCache;
+	duDisplayList m_navMeshCache;
 	bool m_inputMeshCacheDirty;
+	bool m_navMeshCacheDirty;
 	unsigned int m_navMeshDrawFlags;
 	duDrawTraverseLinkParams m_traverseLinkDrawParams;
 	rdVec3D m_recastDrawOffset;
@@ -345,9 +353,9 @@ public:
 	inline float getCellHeight() const { return m_cellHeight; }
 	
 	inline unsigned int getNavMeshDrawFlags() const { return m_navMeshDrawFlags; }
-	inline void setNavMeshDrawFlags(unsigned int flags) { m_navMeshDrawFlags = flags; }
+	inline void setNavMeshDrawFlags(unsigned int flags) { m_navMeshDrawFlags = flags; m_navMeshCacheDirty = true; }
 
-	inline void toggleNavMeshDrawFlag(unsigned int flag) { m_navMeshDrawFlags ^= flag; }
+	inline void toggleNavMeshDrawFlag(unsigned int flag) { m_navMeshDrawFlags ^= flag; m_navMeshCacheDirty = true; }
 
 	inline NavMeshType_e getSelectedNavMeshType() const { return m_selectedNavMeshType; }
 	inline NavMeshType_e getLoadedNavMeshType() const { return m_loadedNavMeshType; }
@@ -379,6 +387,10 @@ public:
 
 	void updateTraverseLinkRenderParams();
 	void drawInputMeshCached(float maxSlope, float texScale);
+	void drawNavMeshCached(unsigned int flags);
+	void invalidateNavMeshCache() { m_navMeshCacheDirty = true; }
+
+	static void drawDisplayListFast(duDisplayList& dl, duDebugDraw* dd);
 
 	void createTraverseLinkParams(dtTraverseLinkConnectParams& params);
 

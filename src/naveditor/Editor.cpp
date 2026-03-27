@@ -163,6 +163,7 @@ Editor::Editor() :
 	m_loadedNavMeshType(NAVMESH_SMALL),
 	m_navmeshName(NavMesh_GetNameForType(NAVMESH_SMALL)),
 	m_inputMeshCacheDirty(true),
+	m_navMeshCacheDirty(true),
 	m_tool(0),
 	m_ctx(0)
 {
@@ -330,6 +331,53 @@ void Editor::updateTraverseLinkRenderParams()
 	m_traverseLinkDrawParams.dynamicOffset = m_traverseRayDynamicOffset;
 }
 
+void Editor::drawDisplayListFast(duDisplayList& dl, duDebugDraw* dd)
+{
+	const int numSegs = dl.segmentCount();
+	if (!numSegs) return;
+
+	// DU_DRAW_UNDEFINED=0, DU_DRAW_POINTS=1, DU_DRAW_LINES=2, DU_DRAW_TRIS=3, DU_DRAW_QUADS=4
+	static const GLenum s_glPrims[] = { 0, GL_POINTS, GL_LINES, GL_TRIANGLES, GL_QUADS };
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_COLOR_ARRAY);
+	glVertexPointer(3, GL_FLOAT, sizeof(rdVec3D), dl.getPositions());
+	glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(unsigned int), dl.getColors());
+
+	for (int s = 0; s < numSegs; ++s)
+	{
+		const duDisplayList::Segment& seg = dl.getSegment(s);
+
+		if (seg.textured)
+		{
+			dd->texture(true);
+			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+			glTexCoordPointer(2, GL_FLOAT, sizeof(rdVec2D), dl.getUVs());
+		}
+
+		if (seg.prim == DU_DRAW_LINES)
+			glLineWidth(seg.primSize);
+		else if (seg.prim == DU_DRAW_POINTS)
+			glPointSize(seg.primSize);
+
+		glDrawArrays(s_glPrims[seg.prim], seg.startIndex, seg.count);
+
+		if (seg.prim == DU_DRAW_LINES)
+			glLineWidth(1.0f);
+		else if (seg.prim == DU_DRAW_POINTS)
+			glPointSize(1.0f);
+
+		if (seg.textured)
+		{
+			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+			dd->texture(false);
+		}
+	}
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_COLOR_ARRAY);
+}
+
 void Editor::drawInputMeshCached(float maxSlope, float texScale)
 {
 	if (!m_geom || !m_geom->getMesh())
@@ -337,6 +385,7 @@ void Editor::drawInputMeshCached(float maxSlope, float texScale)
 
 	if (m_inputMeshCacheDirty)
 	{
+		m_inputMeshCache.clear();
 		duDebugDrawTriMeshSlope(&m_inputMeshCache,
 			m_geom->getMesh()->getVerts(), m_geom->getMesh()->getVertCount(),
 			m_geom->getMesh()->getTris(), m_geom->getMesh()->getNormals(),
@@ -345,46 +394,23 @@ void Editor::drawInputMeshCached(float maxSlope, float texScale)
 		m_inputMeshCacheDirty = false;
 	}
 
-	const int count = m_inputMeshCache.size();
-	if (!count) return;
+	drawDisplayListFast(m_inputMeshCache, &m_dd);
+}
 
-	// Use GL vertex arrays to draw cached data in one shot
-	// instead of per-vertex immediate mode calls.
-	if (m_inputMeshCache.isTextured())
-		m_dd.texture(true);
+void Editor::drawNavMeshCached(unsigned int flags)
+{
+	if (!m_navMesh || !m_navQuery)
+		return;
 
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_COLOR_ARRAY);
-
-	glVertexPointer(3, GL_FLOAT, sizeof(rdVec3D), m_inputMeshCache.getPositions());
-	glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(unsigned int), m_inputMeshCache.getColors());
-
-	if (m_inputMeshCache.isTextured())
+	if (m_navMeshCacheDirty)
 	{
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-		glTexCoordPointer(2, GL_FLOAT, sizeof(rdVec2D), m_inputMeshCache.getUVs());
+		m_navMeshCache.clear();
+		duDebugDrawNavMeshWithClosedList(&m_navMeshCache, *m_navMesh, *m_navQuery,
+			&m_detourDrawOffset, flags, m_traverseLinkDrawParams);
+		m_navMeshCacheDirty = false;
 	}
 
-	GLenum glPrim = GL_TRIANGLES;
-	switch (m_inputMeshCache.getPrim())
-	{
-	case DU_DRAW_POINTS: glPrim = GL_POINTS; break;
-	case DU_DRAW_LINES:  glPrim = GL_LINES; break;
-	case DU_DRAW_TRIS:   glPrim = GL_TRIANGLES; break;
-	case DU_DRAW_QUADS:  glPrim = GL_QUADS; break;
-	default: break;
-	}
-
-	glDrawArrays(glPrim, 0, count);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_COLOR_ARRAY);
-
-	if (m_inputMeshCache.isTextured())
-	{
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-		m_dd.texture(false);
-	}
+	drawDisplayListFast(m_navMeshCache, &m_dd);
 }
 
 void Editor::handleCommonSettings()
@@ -587,15 +613,9 @@ void Editor::handleUpdate(const float dt)
 	updateToolStates(dt);
 }
 
-struct TraverseLinkBuildContext
-{
-	Editor* editor;
-	std::shared_mutex* polyMapMutex;
-};
-
 bool traverseTypeSupported(void* userData, const unsigned char traverseType)
 {
-	const Editor* editor = ((const TraverseLinkBuildContext*)userData)->editor;
+	const Editor* editor = (const Editor*)userData;
 	const NavMeshType_e navMeshType = editor->getSelectedNavMeshType();
 
 	if (navMeshType == NavMeshType_e::NAVMESH_SMALL)
@@ -848,7 +868,7 @@ static bool traverseLinkIntersectsOverhangOverPoint(const InputGeom* geom, const
 static bool traverseLinkInLOS(void* userData, const rdVec3D* lowPos, const rdVec3D* highPos, const rdVec2D* lowNorm,
 	const rdVec2D* highNorm, const float walkableHeight, const float walkableRadius, const float slopeAngle)
 {
-	Editor* editor = ((TraverseLinkBuildContext*)userData)->editor;
+	Editor* editor = (Editor*)userData;
 	InputGeom* geom = editor->getInputGeom();
 
 	const float extraOffset = editor->getTraverseRayExtraOffset();
@@ -969,12 +989,10 @@ static bool traverseLinkInLOS(void* userData, const rdVec3D* lowPos, const rdVec
 
 static unsigned int* findFromPolyMap(void* userData, const dtPolyRef basePolyRef, const dtPolyRef landPolyRef)
 {
-	TraverseLinkBuildContext* ctx = (TraverseLinkBuildContext*)userData;
-	std::shared_lock<std::shared_mutex> lock(*ctx->polyMapMutex);
+	Editor* editor = (Editor*)userData;
+	auto it = editor->getTraverseLinkPolyMap().find(TraverseLinkPolyPair(basePolyRef, landPolyRef));
 
-	auto it = ctx->editor->getTraverseLinkPolyMap().find(TraverseLinkPolyPair(basePolyRef, landPolyRef));
-
-	if (it == ctx->editor->getTraverseLinkPolyMap().end())
+	if (it == editor->getTraverseLinkPolyMap().end())
 		return nullptr;
 
 	return &it->second;
@@ -982,12 +1000,11 @@ static unsigned int* findFromPolyMap(void* userData, const dtPolyRef basePolyRef
 
 static int addToPolyMap(void* userData, const dtPolyRef basePolyRef, const dtPolyRef landPolyRef, const unsigned int traverseTypeBit)
 {
-	TraverseLinkBuildContext* ctx = (TraverseLinkBuildContext*)userData;
-	std::unique_lock<std::shared_mutex> lock(*ctx->polyMapMutex);
+	Editor* editor = (Editor*)userData;
 
 	try
 	{
-		const auto ret = ctx->editor->getTraverseLinkPolyMap().emplace(TraverseLinkPolyPair(basePolyRef, landPolyRef), traverseTypeBit);
+		const auto ret = editor->getTraverseLinkPolyMap().emplace(TraverseLinkPolyPair(basePolyRef, landPolyRef), traverseTypeBit);
 		if (!ret.second)
 		{
 			rdAssert(ret.second); // Called 'addToPolyMap' while poly link already exists.
@@ -1009,9 +1026,7 @@ void Editor::createTraverseLinkParams(dtTraverseLinkConnectParams& params)
 	params.findPolyLink = &findFromPolyMap;
 	params.addPolyLink = &addToPolyMap;
 
-	// NOTE: userData is now set by createTraverseLinks() to point to
-	// a TraverseLinkBuildContext instead of directly to this Editor.
-	params.userData = nullptr;
+	params.userData = this;
 	params.minEdgeOverlap = m_traverseEdgeMinOverlap;
 	params.maxPortalAlign = m_traversePortalMaxAlign;
 	params.singlePortalPerPair = m_traverseLinkSinglePortalPerPolyPair;
@@ -1022,123 +1037,25 @@ bool Editor::createTraverseLinks()
 	rdAssert(m_navMesh);
 	m_traverseLinkPolyMap.clear();
 
-	std::shared_mutex polyMapMutex;
-	TraverseLinkBuildContext buildCtx;
-	buildCtx.editor = this;
-	buildCtx.polyMapMutex = &polyMapMutex;
-
 	dtTraverseLinkConnectParams params;
 	createTraverseLinkParams(params);
-	params.userData = &buildCtx;
+	params.userData = this;
 
 	const int maxTiles = m_navMesh->getMaxTiles();
-	const int numWorkers = rdMax(1, (int)std::thread::hardware_concurrency() - 1);
-
-	// Collect active tiles and group by position for the neighbor pass.
-	struct TileInfo { int tileIndex; dtTileRef ref; int tx; int ty; };
-	std::vector<TileInfo> activeTiles;
 
 	for (int i = 0; i < maxTiles; i++)
 	{
-		dtMeshTile* tile = m_navMesh->getTile(i);
-		if (!tile || !tile->header)
+		dtMeshTile* baseTile = m_navMesh->getTile(i);
+		if (!baseTile || !baseTile->header)
 			continue;
 
-		TileInfo info;
-		info.tileIndex = i;
-		info.ref = m_navMesh->getTileRef(tile);
-		info.tx = tile->header->x;
-		info.ty = tile->header->y;
-		activeTiles.push_back(info);
+		const dtTileRef baseTileRef = m_navMesh->getTileRef(baseTile);
+
+		params.linkToNeighbor = false;
+		m_navMesh->connectTraverseLinks(baseTileRef, params);
+		params.linkToNeighbor = true;
+		m_navMesh->connectTraverseLinks(baseTileRef, params);
 	}
-
-	rdTimeType withinStart = getPerfTime();
-
-	// Phase 1: Within-tile pass — all tiles in parallel.
-	// Each tile only modifies its own link array. The poly map is mutex-protected.
-	{
-		std::atomic<int> nextIdx(0);
-		const int tileCount = (int)activeTiles.size();
-
-		auto worker = [&]()
-		{
-			// Each thread gets its own copy of params (they share the same userData/callbacks).
-			dtTraverseLinkConnectParams threadParams = params;
-			threadParams.linkToNeighbor = false;
-
-			for (;;)
-			{
-				const int idx = nextIdx.fetch_add(1);
-				if (idx >= tileCount)
-					break;
-
-				m_navMesh->connectTraverseLinks(activeTiles[idx].ref, threadParams);
-			}
-		};
-
-		std::vector<std::thread> workers;
-		for (int i = 0; i < numWorkers; i++)
-			workers.emplace_back(worker);
-		for (auto& w : workers)
-			w.join();
-	}
-
-	rdTimeType neighborStart = getPerfTime();
-
-	// Phase 2: Neighbor-tile pass — 3x3 tile grouping for safe parallelism.
-	// Tiles in the same group are spaced 3 apart in both axes, so no two tiles
-	// in a group share a neighbor (even diagonally). This means parallel threads
-	// within a group never write to the same tile's link array.
-	{
-		for (int gy = 0; gy < 3; gy++)
-		{
-			for (int gx = 0; gx < 3; gx++)
-			{
-				std::vector<int> groupIndices;
-				for (int i = 0; i < (int)activeTiles.size(); i++)
-				{
-					// Modulo that handles negative tile coordinates correctly.
-					int mx = ((activeTiles[i].tx % 3) + 3) % 3;
-					int my = ((activeTiles[i].ty % 3) + 3) % 3;
-					if (mx == gx && my == gy)
-						groupIndices.push_back(i);
-				}
-
-				if (groupIndices.empty())
-					continue;
-
-				std::atomic<int> nextIdx(0);
-				const int groupSize = (int)groupIndices.size();
-
-				auto worker = [&]()
-				{
-					dtTraverseLinkConnectParams threadParams = params;
-					threadParams.linkToNeighbor = true;
-
-					for (;;)
-					{
-						const int idx = nextIdx.fetch_add(1);
-						if (idx >= groupSize)
-							break;
-
-						m_navMesh->connectTraverseLinks(activeTiles[groupIndices[idx]].ref, threadParams);
-					}
-				};
-
-				const int groupWorkers = rdMin(numWorkers, groupSize);
-				std::vector<std::thread> workers;
-				for (int i = 0; i < groupWorkers; i++)
-					workers.emplace_back(worker);
-				for (auto& w : workers)
-					w.join();
-			}
-		}
-	}
-
-	rdTimeType endTime = getPerfTime();
-
-	m_ctx->log(RC_LOG_PROGRESS, ">>   Within-tile:    %.1fms", getPerfTimeUsec(neighborStart - withinStart) / 1000.0f);
-	m_ctx->log(RC_LOG_PROGRESS, ">>   Neighbor-tile:  %.1fms", getPerfTimeUsec(endTime - neighborStart) / 1000.0f);
 
 	return true;
 }

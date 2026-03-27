@@ -776,6 +776,7 @@ void Editor_TileMesh::buildTile(const rdVec3D* pos)
 	}
 	
 	m_ctx->dumpLog("Build Tile (%d,%d):", tx,ty);
+	invalidateNavMeshCache();
 }
 
 void Editor_TileMesh::getTileExtents(int tx, int ty, rdVec3D* tmin, rdVec3D* tmax)
@@ -836,6 +837,7 @@ void Editor_TileMesh::removeTile(const rdVec3D* pos)
 		}
 
 		createStaticPathingData();
+		invalidateNavMeshCache();
 	}
 }
 
@@ -1287,6 +1289,7 @@ void Editor_TileMesh::buildAllTiles()
 
 	m_totalBuildTimeMs = m_ctx->getAccumulatedTime(RC_TIMER_TEMP)/1000.0f;
 	m_tileCol = duRGBA(0,0,0,64);
+	invalidateNavMeshCache();
 }
 
 void Editor_TileMesh::removeAllTiles()
@@ -1308,6 +1311,7 @@ void Editor_TileMesh::removeAllTiles()
 
 	m_traverseLinkPolyMap.clear();
 	createStaticPathingData();
+	invalidateNavMeshCache();
 }
 
 void Editor_TileMesh::buildAllHulls()
