@@ -762,8 +762,14 @@ void Editor_TileMesh::buildTile(const rdVec3D* pos)
 			if (m_buildTraversePortals)
 			{
 				// Reconnect the traverse links.
+				std::shared_mutex polyMapMutex;
+				TraverseLinkBuildContext buildCtx;
+				buildCtx.editor = this;
+				buildCtx.polyMapMutex = &polyMapMutex;
+
 				dtTraverseLinkConnectParams params;
 				createTraverseLinkParams(params);
+				params.userData = &buildCtx;
 
 				params.linkToNeighbor = false;
 				m_navMesh->connectTraverseLinks(tileRef, params);
@@ -1198,6 +1204,7 @@ void Editor_TileMesh::buildAllTiles()
 	params.cfg.ignoreWindingOrder = m_ignoreWindingOrder;
 
 	// Start the build process.
+	m_ctx->resetTimers();
 	m_ctx->startTimer(RC_TIMER_TEMP);
 
 	// Phase 1: Build all tile data in parallel.
@@ -1290,6 +1297,21 @@ void Editor_TileMesh::buildAllTiles()
 	m_totalBuildTimeMs = m_ctx->getAccumulatedTime(RC_TIMER_TEMP)/1000.0f;
 	m_tileCol = duRGBA(0,0,0,64);
 	invalidateNavMeshCache();
+
+	// Rebuild the last tile using the member-function path to populate
+	// intermediate results (m_solid, m_chf, m_cset, m_pmesh, m_dmesh)
+	// for the debug visualization options.
+	if (m_keepInterResults && totalTiles > 0)
+	{
+		const int lastIdx = totalTiles - 1;
+		const int lastTx = lastIdx % tw;
+		const int lastTy = lastIdx / tw;
+		getTileExtents(lastTx, lastTy, &m_lastBuiltTileBmin, &m_lastBuiltTileBmax);
+		int tempSize = 0;
+		unsigned char* tempData = buildTileMesh(lastTx, lastTy, &m_lastBuiltTileBmin, &m_lastBuiltTileBmax, tempSize);
+		if (tempData)
+			rdFree(tempData); // Discard the tile data; we only wanted the intermediates.
+	}
 }
 
 void Editor_TileMesh::removeAllTiles()
