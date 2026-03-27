@@ -27,6 +27,7 @@
 #include "DebugUtils/Include/DetourDebugDraw.h"
 #include "NavEditor/Include/InputGeom.h"
 #include "NavEditor/Include/Editor.h"
+#include "NavEditor/Include/PerfTimer.h"
 
 #include "game/server/ai_navmesh.h"
 #include "game/server/ai_hull.h"
@@ -586,9 +587,15 @@ void Editor::handleUpdate(const float dt)
 	updateToolStates(dt);
 }
 
+struct TraverseLinkBuildContext
+{
+	Editor* editor;
+	std::shared_mutex* polyMapMutex;
+};
+
 bool traverseTypeSupported(void* userData, const unsigned char traverseType)
 {
-	const Editor* editor = (const Editor*)userData;
+	const Editor* editor = ((const TraverseLinkBuildContext*)userData)->editor;
 	const NavMeshType_e navMeshType = editor->getSelectedNavMeshType();
 
 	if (navMeshType == NavMeshType_e::NAVMESH_SMALL)
@@ -841,7 +848,7 @@ static bool traverseLinkIntersectsOverhangOverPoint(const InputGeom* geom, const
 static bool traverseLinkInLOS(void* userData, const rdVec3D* lowPos, const rdVec3D* highPos, const rdVec2D* lowNorm,
 	const rdVec2D* highNorm, const float walkableHeight, const float walkableRadius, const float slopeAngle)
 {
-	Editor* editor = (Editor*)userData;
+	Editor* editor = ((TraverseLinkBuildContext*)userData)->editor;
 	InputGeom* geom = editor->getInputGeom();
 
 	const float extraOffset = editor->getTraverseRayExtraOffset();
@@ -962,10 +969,12 @@ static bool traverseLinkInLOS(void* userData, const rdVec3D* lowPos, const rdVec
 
 static unsigned int* findFromPolyMap(void* userData, const dtPolyRef basePolyRef, const dtPolyRef landPolyRef)
 {
-	Editor* editor = (Editor*)userData;
-	auto it = editor->getTraverseLinkPolyMap().find(TraverseLinkPolyPair(basePolyRef, landPolyRef));
+	TraverseLinkBuildContext* ctx = (TraverseLinkBuildContext*)userData;
+	std::shared_lock<std::shared_mutex> lock(*ctx->polyMapMutex);
 
-	if (it == editor->getTraverseLinkPolyMap().end())
+	auto it = ctx->editor->getTraverseLinkPolyMap().find(TraverseLinkPolyPair(basePolyRef, landPolyRef));
+
+	if (it == ctx->editor->getTraverseLinkPolyMap().end())
 		return nullptr;
 
 	return &it->second;
@@ -973,11 +982,12 @@ static unsigned int* findFromPolyMap(void* userData, const dtPolyRef basePolyRef
 
 static int addToPolyMap(void* userData, const dtPolyRef basePolyRef, const dtPolyRef landPolyRef, const unsigned int traverseTypeBit)
 {
-	Editor* editor = (Editor*)userData;
+	TraverseLinkBuildContext* ctx = (TraverseLinkBuildContext*)userData;
+	std::unique_lock<std::shared_mutex> lock(*ctx->polyMapMutex);
 
 	try
 	{
-		const auto ret = editor->getTraverseLinkPolyMap().emplace(TraverseLinkPolyPair(basePolyRef, landPolyRef), traverseTypeBit);
+		const auto ret = ctx->editor->getTraverseLinkPolyMap().emplace(TraverseLinkPolyPair(basePolyRef, landPolyRef), traverseTypeBit);
 		if (!ret.second)
 		{
 			rdAssert(ret.second); // Called 'addToPolyMap' while poly link already exists.
@@ -999,7 +1009,9 @@ void Editor::createTraverseLinkParams(dtTraverseLinkConnectParams& params)
 	params.findPolyLink = &findFromPolyMap;
 	params.addPolyLink = &addToPolyMap;
 
-	params.userData = this;
+	// NOTE: userData is now set by createTraverseLinks() to point to
+	// a TraverseLinkBuildContext instead of directly to this Editor.
+	params.userData = nullptr;
 	params.minEdgeOverlap = m_traverseEdgeMinOverlap;
 	params.maxPortalAlign = m_traversePortalMaxAlign;
 	params.singlePortalPerPair = m_traverseLinkSinglePortalPerPolyPair;
@@ -1010,24 +1022,123 @@ bool Editor::createTraverseLinks()
 	rdAssert(m_navMesh);
 	m_traverseLinkPolyMap.clear();
 
+	std::shared_mutex polyMapMutex;
+	TraverseLinkBuildContext buildCtx;
+	buildCtx.editor = this;
+	buildCtx.polyMapMutex = &polyMapMutex;
+
 	dtTraverseLinkConnectParams params;
 	createTraverseLinkParams(params);
+	params.userData = &buildCtx;
 
 	const int maxTiles = m_navMesh->getMaxTiles();
+	const int numWorkers = rdMax(1, (int)std::thread::hardware_concurrency() - 1);
+
+	// Collect active tiles and group by position for the neighbor pass.
+	struct TileInfo { int tileIndex; dtTileRef ref; int tx; int ty; };
+	std::vector<TileInfo> activeTiles;
 
 	for (int i = 0; i < maxTiles; i++)
 	{
-		dtMeshTile* baseTile = m_navMesh->getTile(i);
-		if (!baseTile || !baseTile->header)
+		dtMeshTile* tile = m_navMesh->getTile(i);
+		if (!tile || !tile->header)
 			continue;
 
-		const dtTileRef baseTileRef = m_navMesh->getTileRef(baseTile);
-
-		params.linkToNeighbor = false;
-		m_navMesh->connectTraverseLinks(baseTileRef, params);
-		params.linkToNeighbor = true;
-		m_navMesh->connectTraverseLinks(baseTileRef, params);
+		TileInfo info;
+		info.tileIndex = i;
+		info.ref = m_navMesh->getTileRef(tile);
+		info.tx = tile->header->x;
+		info.ty = tile->header->y;
+		activeTiles.push_back(info);
 	}
+
+	rdTimeType withinStart = getPerfTime();
+
+	// Phase 1: Within-tile pass — all tiles in parallel.
+	// Each tile only modifies its own link array. The poly map is mutex-protected.
+	{
+		std::atomic<int> nextIdx(0);
+		const int tileCount = (int)activeTiles.size();
+
+		auto worker = [&]()
+		{
+			// Each thread gets its own copy of params (they share the same userData/callbacks).
+			dtTraverseLinkConnectParams threadParams = params;
+			threadParams.linkToNeighbor = false;
+
+			for (;;)
+			{
+				const int idx = nextIdx.fetch_add(1);
+				if (idx >= tileCount)
+					break;
+
+				m_navMesh->connectTraverseLinks(activeTiles[idx].ref, threadParams);
+			}
+		};
+
+		std::vector<std::thread> workers;
+		for (int i = 0; i < numWorkers; i++)
+			workers.emplace_back(worker);
+		for (auto& w : workers)
+			w.join();
+	}
+
+	rdTimeType neighborStart = getPerfTime();
+
+	// Phase 2: Neighbor-tile pass — 3x3 tile grouping for safe parallelism.
+	// Tiles in the same group are spaced 3 apart in both axes, so no two tiles
+	// in a group share a neighbor (even diagonally). This means parallel threads
+	// within a group never write to the same tile's link array.
+	{
+		for (int gy = 0; gy < 3; gy++)
+		{
+			for (int gx = 0; gx < 3; gx++)
+			{
+				std::vector<int> groupIndices;
+				for (int i = 0; i < (int)activeTiles.size(); i++)
+				{
+					// Modulo that handles negative tile coordinates correctly.
+					int mx = ((activeTiles[i].tx % 3) + 3) % 3;
+					int my = ((activeTiles[i].ty % 3) + 3) % 3;
+					if (mx == gx && my == gy)
+						groupIndices.push_back(i);
+				}
+
+				if (groupIndices.empty())
+					continue;
+
+				std::atomic<int> nextIdx(0);
+				const int groupSize = (int)groupIndices.size();
+
+				auto worker = [&]()
+				{
+					dtTraverseLinkConnectParams threadParams = params;
+					threadParams.linkToNeighbor = true;
+
+					for (;;)
+					{
+						const int idx = nextIdx.fetch_add(1);
+						if (idx >= groupSize)
+							break;
+
+						m_navMesh->connectTraverseLinks(activeTiles[groupIndices[idx]].ref, threadParams);
+					}
+				};
+
+				const int groupWorkers = rdMin(numWorkers, groupSize);
+				std::vector<std::thread> workers;
+				for (int i = 0; i < groupWorkers; i++)
+					workers.emplace_back(worker);
+				for (auto& w : workers)
+					w.join();
+			}
+		}
+	}
+
+	rdTimeType endTime = getPerfTime();
+
+	m_ctx->log(RC_LOG_PROGRESS, ">>   Within-tile:    %.1fms", getPerfTimeUsec(neighborStart - withinStart) / 1000.0f);
+	m_ctx->log(RC_LOG_PROGRESS, ">>   Neighbor-tile:  %.1fms", getPerfTimeUsec(endTime - neighborStart) / 1000.0f);
 
 	return true;
 }
@@ -1057,18 +1168,145 @@ bool Editor::createStaticPathingData()
 	params.canTraverse = animTypeSupportsTraverseLink;
 	params.collapseGroups = m_collapseLinkedPolyGroups;
 
+	// Phase 1: Build disjoint poly groups (sequential — flood fill).
 	if (!dtCreateDisjointPolyGroups(&params))
 	{
 		m_ctx->log(RC_LOG_ERROR, "createStaticPathingData: Failed to build disjoint poly groups.");
 		return false;
 	}
 
-	if (!dtCreateTraverseTableData(&params))
+	// Phase 2: Build traverse table data with per-table parallelism.
+	const int tableCount = params.tableCount;
+
+	m_navMesh->freeTraverseTables();
+	if (!m_navMesh->allocTraverseTables(tableCount))
 	{
-		m_ctx->log(RC_LOG_ERROR, "createStaticPathingData: Failed to build traverse table data.");
+		m_ctx->log(RC_LOG_ERROR, "createStaticPathingData: Failed to allocate traverse tables.");
 		return false;
 	}
+	m_navMesh->setTraverseTableCount(tableCount);
 
+	// Copy base disjoint set and union traverse-linked poly groups per table.
+	// Each table has its own disjoint set — independent work.
+	{
+		dtDisjointSet& baseSet = params.sets[0];
+
+		for (int i = 0; i < tableCount; i++)
+		{
+			dtDisjointSet& targetSet = params.sets[i];
+			if (i > 0)
+				baseSet.copy(targetSet);
+		}
+
+		// Union traverse-linked poly groups in parallel (each table uses its own set).
+		std::atomic<int> nextTable(0);
+		const int numWorkers = rdMin(tableCount, rdMax(1, (int)std::thread::hardware_concurrency() - 1));
+
+		auto unionWorker = [&]()
+		{
+			for (;;)
+			{
+				const int t = nextTable.fetch_add(1);
+				if (t >= tableCount)
+					break;
+
+				dtDisjointSet& set = params.sets[t];
+				if (!set.getSetCount())
+					continue;
+
+				const int maxTiles = m_navMesh->getMaxTiles();
+				for (int i = 0; i < maxTiles; ++i)
+				{
+					dtMeshTile* tile = m_navMesh->getTile(i);
+					if (!tile->header)
+						continue;
+
+					const int pcount = tile->header->polyCount;
+					for (int j = 0; j < pcount; j++)
+					{
+						dtPoly& poly = tile->polys[j];
+						for (unsigned int k = poly.firstLink; k != DT_NULL_LINK; k = tile->links[k].next)
+						{
+							const dtLink* link = &tile->links[k];
+							const dtMeshTile* landTile;
+							const dtPoly* landPoly;
+							m_navMesh->getTileAndPolyByRefUnsafe(link->ref, &landTile, &landPoly);
+
+							if (poly.groupId != landPoly->groupId && params.canTraverse(&params, link, t))
+								set.setUnion(poly.groupId, landPoly->groupId);
+						}
+					}
+				}
+			}
+		};
+
+		std::vector<std::thread> workers;
+		for (int i = 0; i < numWorkers; i++)
+			workers.emplace_back(unionWorker);
+		for (auto& w : workers)
+			w.join();
+	}
+
+	const int polyGroupCount = params.sets[0].getSetCount();
+	rdAssert(polyGroupCount <= DT_MAX_POLY_GROUP_COUNT);
+
+	const int tableSize = dtCalcTraverseTableSize(polyGroupCount);
+	m_navMesh->setTraverseTableSize(tableSize);
+
+	// Fill traverse tables in parallel (each table is independent).
+	{
+		// Pre-allocate all tables sequentially (rdAlloc may not be thread-safe).
+		std::vector<int*> tables(tableCount);
+		for (int i = 0; i < tableCount; i++)
+		{
+			const rdSizeType bufferSize = sizeof(int) * tableSize;
+			tables[i] = (int*)rdAlloc(bufferSize, RD_ALLOC_PERM);
+			if (!tables[i])
+			{
+				m_ctx->log(RC_LOG_ERROR, "createStaticPathingData: Failed to allocate traverse table %d.", i);
+				return false;
+			}
+			memset(tables[i], 0, bufferSize);
+			m_navMesh->setTraverseTable(i, tables[i]);
+		}
+
+		std::atomic<int> nextTable(0);
+		const int numWorkers = rdMin(tableCount, rdMax(1, (int)std::thread::hardware_concurrency() - 1));
+
+		auto fillWorker = [&]()
+		{
+			for (;;)
+			{
+				const int t = nextTable.fetch_add(1);
+				if (t >= tableCount)
+					break;
+
+				int* const traverseTable = tables[t];
+				const dtDisjointSet& set = params.sets[t];
+
+				for (unsigned short j = 0; j < polyGroupCount; j++)
+				{
+					for (unsigned short k = 0; k < polyGroupCount; k++)
+					{
+						const bool isReachable = j == k || set.find(j) == set.find(k);
+						if (isReachable)
+						{
+							const int index = dtCalcTraverseTableCellIndex(polyGroupCount, j, k);
+							traverseTable[index] |= 1 << (k & 31);
+						}
+					}
+				}
+			}
+		};
+
+		std::vector<std::thread> workers;
+		for (int i = 0; i < numWorkers; i++)
+			workers.emplace_back(fillWorker);
+		for (auto& w : workers)
+			w.join();
+	}
+
+	m_navMesh->setPolyGroupCount(params.sets[0].getSetCount());
 	return true;
 }
 
