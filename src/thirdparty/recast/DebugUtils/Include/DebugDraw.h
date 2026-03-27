@@ -200,6 +200,17 @@ void duAppendCylinder(struct duDebugDraw* dd, float minx, float miny, float minz
 
 class duDisplayList : public duDebugDraw
 {
+public:
+	struct Segment
+	{
+		duDebugDrawPrimitives prim;
+		float primSize;
+		int startIndex;
+		int count;
+		bool textured;
+	};
+
+private:
 	rdVec3D* m_pos;
 	unsigned int* m_color;
 	rdVec2D* m_uv;
@@ -207,8 +218,8 @@ class duDisplayList : public duDebugDraw
 	int m_size;
 	int m_cap;
 
-	duDebugDrawPrimitives m_prim;
-	float m_primSize;
+	Segment m_curSeg;
+	std::vector<Segment> m_segments;
 
 	rdVec3D m_drawOffset;
 	bool m_depthMask;
@@ -230,11 +241,11 @@ public:
 	void clear();
 	bool empty() const { return m_size == 0; }
 	int size() const { return m_size; }
+	int segmentCount() const { return (int)m_segments.size(); }
+	const Segment& getSegment(int i) const { return m_segments[i]; }
 	const rdVec3D* getPositions() const { return m_pos; }
 	const unsigned int* getColors() const { return m_color; }
 	const rdVec2D* getUVs() const { return m_uv; }
-	duDebugDrawPrimitives getPrim() const { return m_prim; }
-	bool isTextured() const { return m_textured; }
 	void draw(struct duDebugDraw* dd);
 private:
 	// Explicitly disabled copy constructor and copy assignment operator.

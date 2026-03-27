@@ -531,8 +531,6 @@ void duAppendCross(struct duDebugDraw* dd, const float x, const float y, const f
 }
 
 duDisplayList::duDisplayList(int cap) :
-	m_prim(DU_DRAW_UNDEFINED),
-	m_primSize(1.0f),
 	m_pos(0),
 	m_color(0),
 	m_uv(0),
@@ -545,6 +543,7 @@ duDisplayList::duDisplayList(int cap) :
 		cap = 8;
 	resize(cap);
 	rdVset(&m_drawOffset, 0.0f,0.0f,0.0f);
+	memset(&m_curSeg, 0, sizeof(m_curSeg));
 }
 
 duDisplayList::~duDisplayList()
@@ -580,6 +579,8 @@ void duDisplayList::resize(int cap)
 void duDisplayList::clear()
 {
 	m_size = 0;
+	m_segments.clear();
+	memset(&m_curSeg, 0, sizeof(m_curSeg));
 }
 
 void duDisplayList::depthMask(bool state)
@@ -596,9 +597,12 @@ void duDisplayList::begin(const duDebugDrawPrimitives prim, const float size, co
 {
 	rdAssert(prim != DU_DRAW_UNDEFINED);
 
-	clear();
-	m_prim = prim;
-	m_primSize = size;
+	m_curSeg.prim = prim;
+	m_curSeg.primSize = size;
+	m_curSeg.startIndex = m_size;
+	m_curSeg.count = 0;
+	m_curSeg.textured = m_textured;
+
 	if (offset)
 		rdVcopy(&m_drawOffset, offset);
 }
@@ -615,6 +619,7 @@ void duDisplayList::vertex(const float x, const float y, const float z, unsigned
 	t->x = 0.0f;
 	t->y = 0.0f;
 	m_size++;
+	m_curSeg.count++;
 }
 
 void duDisplayList::vertex(const rdVec3D* pos, unsigned int color)
@@ -632,6 +637,7 @@ void duDisplayList::vertex(const rdVec3D* pos, unsigned int color, const rdVec2D
 	m_color[m_size] = color;
 	m_uv[m_size] = *uv;
 	m_size++;
+	m_curSeg.count++;
 }
 
 void duDisplayList::vertex(const float x, const float y, const float z, unsigned int color, const float u, const float v)
@@ -646,32 +652,47 @@ void duDisplayList::vertex(const float x, const float y, const float z, unsigned
 	t->x = u;
 	t->y = v;
 	m_size++;
+	m_curSeg.count++;
 }
 
 void duDisplayList::end()
 {
+	if (m_curSeg.count > 0)
+		m_segments.push_back(m_curSeg);
+
 	rdVset(&m_drawOffset, 0.0f,0.0f,0.0f);
 }
 
 void duDisplayList::draw(struct duDebugDraw* dd)
 {
 	if (!dd) return;
-	if (!m_size) return;
+	if (m_segments.empty()) return;
+
 	dd->depthMask(m_depthMask);
-	if (m_textured)
-		dd->texture(true);
-	dd->begin(m_prim, m_primSize);
-	if (m_textured)
+
+	for (int s = 0; s < (int)m_segments.size(); ++s)
 	{
-		for (int i = 0; i < m_size; ++i)
-			dd->vertex(&m_pos[i], m_color[i], &m_uv[i]);
+		const Segment& seg = m_segments[s];
+		if (seg.textured)
+			dd->texture(true);
+
+		dd->begin(seg.prim, seg.primSize);
+		const int end = seg.startIndex + seg.count;
+
+		if (seg.textured)
+		{
+			for (int i = seg.startIndex; i < end; ++i)
+				dd->vertex(&m_pos[i], m_color[i], &m_uv[i]);
+		}
+		else
+		{
+			for (int i = seg.startIndex; i < end; ++i)
+				dd->vertex(&m_pos[i], m_color[i]);
+		}
+
+		dd->end();
+		if (seg.textured)
+			dd->texture(false);
 	}
-	else
-	{
-		for (int i = 0; i < m_size; ++i)
-			dd->vertex(&m_pos[i], m_color[i]);
-	}
-	dd->end();
-	if (m_textured)
-		dd->texture(false);
 }
+
