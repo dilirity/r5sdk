@@ -25,14 +25,6 @@
 #include "DetourTileCache/Include/DetourTileCache.h"
 #include "include/ShapeVolumeTool.h"
 
-static void EditorCommon_DrawInputGeometry(duDebugDraw* const dd, const InputGeom* const geom,
-	const float maxSlope, const float textureScale)
-{
-	duDebugDrawTriMeshSlope(dd, geom->getMesh()->getVerts(), geom->getMesh()->getVertCount(),
-		geom->getMesh()->getTris(), geom->getMesh()->getNormals(), geom->getMesh()->getTriCount(),
-		maxSlope, textureScale, nullptr);
-}
-
 static void EditorCommon_DrawBoundingBox(duDebugDraw* const dd, const InputGeom* const geom)
 {
 	const rdVec3D* const origBmin = geom->getMeshBoundsMin();
@@ -277,9 +269,9 @@ void Editor_StaticTileMeshCommon::renderTileMeshData()
 
 	const float texScale = 1.0f / (m_cellSize * 10.0f);
 
-	// Draw input mesh
+	// Draw input mesh (cached — only recomputed when mesh changes)
 	if (getTileMeshDrawFlags() & DU_DRAW_RECASTMESH_INPUT_MESH)
-		EditorCommon_DrawInputGeometry(&m_dd, m_geom, m_agentMaxSlope, texScale);
+		drawInputMeshCached(m_agentMaxSlope, texScale);
 
 	glDepthMask(GL_FALSE);
 
@@ -562,9 +554,9 @@ void Editor_DynamicTileMeshCommon::renderTileMeshData()
 	const rdVec3D* recastDrawOffset = getRecastDrawOffset();
 	const rdVec3D* detourDrawOffset = getDetourDrawOffset();
 
-	// Draw input mesh
+	// Draw input mesh (cached — only recomputed when mesh changes)
 	if (recastDrawFlags & DU_DRAW_RECASTMESH_INPUT_MESH)
-		EditorCommon_DrawInputGeometry(&m_dd, m_geom, m_agentMaxSlope, texScale);
+		drawInputMeshCached(m_agentMaxSlope, texScale);
 
 	// Draw bounds
 	EditorCommon_DrawBoundingBox(&m_dd, m_geom);
