@@ -155,6 +155,7 @@ Editor::Editor() :
 	m_selectedNavMeshType(NAVMESH_SMALL),
 	m_loadedNavMeshType(NAVMESH_SMALL),
 	m_navmeshName(NavMesh_GetNameForType(NAVMESH_SMALL)),
+	m_inputMeshCacheDirty(true),
 	m_tool(0),
 	m_ctx(0)
 {
@@ -220,6 +221,7 @@ void Editor::handleRenderOverlay(double* /*model*/, double* /*proj*/, int* /*vie
 void Editor::handleMeshChanged(InputGeom* geom)
 {
 	m_geom = geom;
+	m_inputMeshCacheDirty = true;
 
 	const BuildSettings* buildSettings = geom->getBuildSettings();
 	if (buildSettings)
@@ -319,6 +321,63 @@ void Editor::updateTraverseLinkRenderParams()
 	m_traverseLinkDrawParams.cellHeight = m_cellHeight;
 	m_traverseLinkDrawParams.extraOffset = (m_agentRadius*2) + m_traverseRayExtraOffset;
 	m_traverseLinkDrawParams.dynamicOffset = m_traverseRayDynamicOffset;
+}
+
+void Editor::drawInputMeshCached(float maxSlope, float texScale)
+{
+	if (!m_geom || !m_geom->getMesh())
+		return;
+
+	if (m_inputMeshCacheDirty)
+	{
+		duDebugDrawTriMeshSlope(&m_inputMeshCache,
+			m_geom->getMesh()->getVerts(), m_geom->getMesh()->getVertCount(),
+			m_geom->getMesh()->getTris(), m_geom->getMesh()->getNormals(),
+			m_geom->getMesh()->getTriCount(),
+			maxSlope, texScale, nullptr);
+		m_inputMeshCacheDirty = false;
+	}
+
+	const int count = m_inputMeshCache.size();
+	if (!count) return;
+
+	// Use GL vertex arrays to draw cached data in one shot
+	// instead of per-vertex immediate mode calls.
+	if (m_inputMeshCache.isTextured())
+		m_dd.texture(true);
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_COLOR_ARRAY);
+
+	glVertexPointer(3, GL_FLOAT, sizeof(rdVec3D), m_inputMeshCache.getPositions());
+	glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(unsigned int), m_inputMeshCache.getColors());
+
+	if (m_inputMeshCache.isTextured())
+	{
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		glTexCoordPointer(2, GL_FLOAT, sizeof(rdVec2D), m_inputMeshCache.getUVs());
+	}
+
+	GLenum glPrim = GL_TRIANGLES;
+	switch (m_inputMeshCache.getPrim())
+	{
+	case DU_DRAW_POINTS: glPrim = GL_POINTS; break;
+	case DU_DRAW_LINES:  glPrim = GL_LINES; break;
+	case DU_DRAW_TRIS:   glPrim = GL_TRIANGLES; break;
+	case DU_DRAW_QUADS:  glPrim = GL_QUADS; break;
+	default: break;
+	}
+
+	glDrawArrays(glPrim, 0, count);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_COLOR_ARRAY);
+
+	if (m_inputMeshCache.isTextured())
+	{
+		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+		m_dd.texture(false);
+	}
 }
 
 void Editor::handleCommonSettings()
