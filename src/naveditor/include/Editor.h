@@ -21,6 +21,7 @@
 
 #include "Recast/Include/Recast.h"
 #include "NavEditor/Include/EditorInterfaces.h"
+#include "DebugUtils/Include/DebugDraw.h"
 #include "DebugUtils/Include/RecastDebugDraw.h"
 #include "DebugUtils/Include/DetourDebugDraw.h"
 
@@ -290,6 +291,8 @@ protected:
 	std::map<TraverseLinkPolyPair, unsigned int> m_traverseLinkPolyMap;
 
 	EditorDebugDraw m_dd;
+	duDisplayList m_inputMeshCache;
+	bool m_inputMeshCacheDirty;
 	unsigned int m_navMeshDrawFlags;
 	duDrawTraverseLinkParams m_traverseLinkDrawParams;
 	rdVec3D m_recastDrawOffset;
@@ -375,6 +378,7 @@ public:
 	void handleCommonSettings();
 
 	void updateTraverseLinkRenderParams();
+	void drawInputMeshCached(float maxSlope, float texScale);
 
 	void createTraverseLinkParams(dtTraverseLinkConnectParams& params);
 
