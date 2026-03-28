@@ -449,7 +449,7 @@ bool InputGeom::saveGeomSet(const BuildSettings* settings)
 }
 
 static const int MAX_CHUNK_INDICES = 0xffff;
-static int s_chunkIndices[MAX_CHUNK_INDICES];
+static thread_local int s_chunkIndices[MAX_CHUNK_INDICES];
 
 bool InputGeom::raycastMesh(const rdVec3D* src, const rdVec3D* dst, const unsigned int mask, int* vidx, float* tmin) const
 {
