@@ -186,6 +186,12 @@ Editor::~Editor()
 	delete m_tool;
 	for (int i = 0; i < MAX_TOOLS; i++)
 		delete m_toolStates[i];
+	if (m_inputMeshCache.vboPos) glDeleteBuffers(1, &m_inputMeshCache.vboPos);
+	if (m_inputMeshCache.vboColor) glDeleteBuffers(1, &m_inputMeshCache.vboColor);
+	if (m_inputMeshCache.vboUV) glDeleteBuffers(1, &m_inputMeshCache.vboUV);
+	if (m_navMeshCache.vboPos) glDeleteBuffers(1, &m_navMeshCache.vboPos);
+	if (m_navMeshCache.vboColor) glDeleteBuffers(1, &m_navMeshCache.vboColor);
+	if (m_navMeshCache.vboUV) glDeleteBuffers(1, &m_navMeshCache.vboUV);
 }
 
 void Editor::setTool(EditorTool* tool)
@@ -331,18 +337,46 @@ void Editor::updateTraverseLinkRenderParams()
 	m_traverseLinkDrawParams.dynamicOffset = m_traverseRayDynamicOffset;
 }
 
-void Editor::drawDisplayListFast(duDisplayList& dl, duDebugDraw* dd)
+void Editor::drawDisplayListFast(DisplayListCache& cache, duDebugDraw* dd)
 {
+	duDisplayList& dl = cache.list;
 	const int numSegs = dl.segmentCount();
 	if (!numSegs) return;
+
+	// Upload to VBOs if data has changed.
+	if (cache.vboDirty)
+	{
+		if (!cache.vboPos)
+		{
+			glGenBuffers(1, &cache.vboPos);
+			glGenBuffers(1, &cache.vboColor);
+			glGenBuffers(1, &cache.vboUV);
+		}
+
+		glBindBuffer(GL_ARRAY_BUFFER, cache.vboPos);
+		glBufferData(GL_ARRAY_BUFFER, dl.size() * sizeof(rdVec3D), dl.getPositions(), GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, cache.vboColor);
+		glBufferData(GL_ARRAY_BUFFER, dl.size() * sizeof(unsigned int), dl.getColors(), GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, cache.vboUV);
+		glBufferData(GL_ARRAY_BUFFER, dl.size() * sizeof(rdVec2D), dl.getUVs(), GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		cache.vboDirty = false;
+	}
 
 	// DU_DRAW_UNDEFINED=0, DU_DRAW_POINTS=1, DU_DRAW_LINES=2, DU_DRAW_TRIS=3, DU_DRAW_QUADS=4
 	static const GLenum s_glPrims[] = { 0, GL_POINTS, GL_LINES, GL_TRIANGLES, GL_QUADS };
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
-	glVertexPointer(3, GL_FLOAT, sizeof(rdVec3D), dl.getPositions());
-	glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(unsigned int), dl.getColors());
+
+	glBindBuffer(GL_ARRAY_BUFFER, cache.vboPos);
+	glVertexPointer(3, GL_FLOAT, sizeof(rdVec3D), 0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, cache.vboColor);
+	glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(unsigned int), 0);
 
 	for (int s = 0; s < numSegs; ++s)
 	{
@@ -352,7 +386,8 @@ void Editor::drawDisplayListFast(duDisplayList& dl, duDebugDraw* dd)
 		{
 			dd->texture(true);
 			glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-			glTexCoordPointer(2, GL_FLOAT, sizeof(rdVec2D), dl.getUVs());
+			glBindBuffer(GL_ARRAY_BUFFER, cache.vboUV);
+			glTexCoordPointer(2, GL_FLOAT, sizeof(rdVec2D), 0);
 		}
 
 		if (seg.prim == DU_DRAW_LINES)
@@ -374,6 +409,7 @@ void Editor::drawDisplayListFast(duDisplayList& dl, duDebugDraw* dd)
 		}
 	}
 
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_COLOR_ARRAY);
 }
@@ -385,13 +421,14 @@ void Editor::drawInputMeshCached(float maxSlope, float texScale)
 
 	if (m_inputMeshCacheDirty)
 	{
-		m_inputMeshCache.clear();
-		duDebugDrawTriMeshSlope(&m_inputMeshCache,
+		m_inputMeshCache.list.clear();
+		duDebugDrawTriMeshSlope(&m_inputMeshCache.list,
 			m_geom->getMesh()->getVerts(), m_geom->getMesh()->getVertCount(),
 			m_geom->getMesh()->getTris(), m_geom->getMesh()->getNormals(),
 			m_geom->getMesh()->getTriCount(),
 			maxSlope, texScale, nullptr);
 		m_inputMeshCacheDirty = false;
+		m_inputMeshCache.vboDirty = true;
 	}
 
 	drawDisplayListFast(m_inputMeshCache, &m_dd);
@@ -404,10 +441,11 @@ void Editor::drawNavMeshCached(unsigned int flags)
 
 	if (m_navMeshCacheDirty)
 	{
-		m_navMeshCache.clear();
-		duDebugDrawNavMeshWithClosedList(&m_navMeshCache, *m_navMesh, *m_navQuery,
+		m_navMeshCache.list.clear();
+		duDebugDrawNavMeshWithClosedList(&m_navMeshCache.list, *m_navMesh, *m_navQuery,
 			&m_detourDrawOffset, flags, m_traverseLinkDrawParams);
 		m_navMeshCacheDirty = false;
+		m_navMeshCache.vboDirty = true;
 	}
 
 	drawDisplayListFast(m_navMeshCache, &m_dd);
