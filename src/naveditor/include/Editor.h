@@ -295,8 +295,20 @@ protected:
 	std::map<TraverseLinkPolyPair, unsigned int> m_traverseLinkPolyMap;
 
 	EditorDebugDraw m_dd;
-	duDisplayList m_inputMeshCache;
-	duDisplayList m_navMeshCache;
+
+	struct DisplayListCache
+	{
+		duDisplayList list;
+		unsigned int vboPos;
+		unsigned int vboColor;
+		unsigned int vboUV;
+		bool vboDirty;
+
+		DisplayListCache() : vboPos(0), vboColor(0), vboUV(0), vboDirty(true) {}
+	};
+
+	DisplayListCache m_inputMeshCache;
+	DisplayListCache m_navMeshCache;
 	bool m_inputMeshCacheDirty;
 	bool m_navMeshCacheDirty;
 	unsigned int m_navMeshDrawFlags;
@@ -388,7 +400,7 @@ public:
 	void drawNavMeshCached(unsigned int flags);
 	void invalidateNavMeshCache() { m_navMeshCacheDirty = true; }
 
-	static void drawDisplayListFast(duDisplayList& dl, duDebugDraw* dd);
+	static void drawDisplayListFast(DisplayListCache& cache, duDebugDraw* dd);
 
 	void createTraverseLinkParams(dtTraverseLinkConnectParams& params);
 

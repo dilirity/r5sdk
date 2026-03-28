@@ -330,15 +330,37 @@ bool rcMeshLoaderObj::load(const std::string& filename)
 
 	delete [] buf;
 
-	// Calculate normals.
+	// Calculate normals in parallel.
 	m_normals = new rdVec3D[m_triCount];
-	for (int i = 0; i < m_triCount; i++)
 	{
-		const rdVec3D* v0 = &m_verts[m_tris[i*3]];
-		const rdVec3D* v1 = &m_verts[m_tris[i*3+1]];
-		const rdVec3D* v2 = &m_verts[m_tris[i*3+2]];
+		const int numWorkers = rdMax(1, (int)std::thread::hardware_concurrency() - 1);
+		std::atomic<int> nextChunk(0);
+		const int chunkSize = 4096;
+		const int triCount = m_triCount;
 
-		rdTriNormal(v0, v1, v2, &m_normals[i]);
+		auto worker = [&]()
+		{
+			for (;;)
+			{
+				const int start = nextChunk.fetch_add(chunkSize);
+				if (start >= triCount)
+					break;
+				const int end = rdMin(start + chunkSize, triCount);
+				for (int i = start; i < end; i++)
+				{
+					const rdVec3D* v0 = &m_verts[m_tris[i*3]];
+					const rdVec3D* v1 = &m_verts[m_tris[i*3+1]];
+					const rdVec3D* v2 = &m_verts[m_tris[i*3+2]];
+					rdTriNormal(v0, v1, v2, &m_normals[i]);
+				}
+			}
+		};
+
+		std::vector<std::thread> workers;
+		for (int i = 0; i < numWorkers; i++)
+			workers.emplace_back(worker);
+		for (auto& w : workers)
+			w.join();
 	}
 
 	m_filename = filename;
