@@ -1148,6 +1148,7 @@ bool Editor_TempObstacles::handleBuild()
 	if (m_tool)
 		m_tool->init(this);
 	initToolStates(this);
+	invalidateNavMeshCache();
 
 	return true;
 }

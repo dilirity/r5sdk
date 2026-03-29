@@ -610,7 +610,10 @@ void Editor::handleCommonSettings()
 	ImGui::SliderFloat("Max Align", &m_traversePortalMaxAlign, 0.0f, 0.5f, "%g", ImGuiSliderFlags_AlwaysClamp);
 
 	if (ImGui::Button("Rebuild Static Pathing Data"))
+	{
 		createStaticPathingData();
+		invalidateNavMeshCache();
+	}
 
 	ImGui::Separator();
 }
@@ -1964,6 +1967,7 @@ bool Editor::loadNavMesh(const char* path, const bool fullPath)
 
 	resetToolStates();
 	initToolStates(this);
+	invalidateNavMeshCache();
 
 	return result;
 }

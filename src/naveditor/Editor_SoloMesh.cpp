@@ -554,6 +554,7 @@ bool Editor_SoloMesh::handleBuild()
 	if (m_tool)
 		m_tool->init(this);
 	initToolStates(this);
+	invalidateNavMeshCache();
 
 	return true;
 }
