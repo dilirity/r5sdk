@@ -387,124 +387,136 @@ void CBSPCollisionDebug::DrawLeafTriangles(const CollisionModelContext_t* ctx, u
 	const int renderMode = bsp_collision_debug_mode.GetInt();
 	const int alpha = bsp_collision_debug_alpha.GetInt();
 
-	//if (childType == 5)
-	//{
-	//	// Poly3 - packed int16 triangle
-	//	// childIdx is the offset into leafDataStream (in uint32_t units)
-	//	const uint32_t* leafData = &ctx->leafDataStream[childIdx];
-	//	const int16_t* packedVerts = reinterpret_cast<const int16_t*>(ctx->verts);
-	//	
-	//	// Header format: bits 0-11 = surfPropIdx, bits 12-15 = numPolys-1, bits 16-31 = baseVertex
-	//	const uint32_t header = leafData[0];
-	//	const int numPolys = ((header >> 12) & 0xF) + 1;
-	//	const int baseVertex = (header >> 16) & 0xFFFF;
-	//	
-	//	int runningBase = baseVertex << 10;  // Vertex base index
-	//	
-	//	for (int i = 0; i < numPolys && i < 16; i++)
-	//	{
-	//		// Per-triangle data: bits 0-10 = v0_offset, bits 11-19 = v1_delta, bits 20-28 = v2_delta
-	//		const uint32_t triData = leafData[1 + i];
-	//		const int v0_offset = triData & 0x7FF;         // 11 bits
-	//		const int v1_delta = (triData >> 11) & 0x1FF;  // 9 bits
-	//		const int v2_delta = (triData >> 20) & 0x1FF;  // 9 bits
-	//		
-	//		// Calculate absolute vertex indices
-	//		const int idx0 = runningBase + v0_offset;
-	//		const int idx1 = idx0 + 1 + v1_delta;
-	//		const int idx2 = idx0 + 1 + v2_delta;
-	//		
-	//		// Update running base for next triangle
-	//		runningBase = idx0;
-	//		
-	//		// Decode vertices and draw triangle
-	//		const Vector3D v0 = DecodePackedVertex(packedVerts, idx0, origin, quantScale);
-	//		const Vector3D v1 = DecodePackedVertex(packedVerts, idx1, origin, quantScale);
-	//		const Vector3D v2 = DecodePackedVertex(packedVerts, idx2, origin, quantScale);
-	//		
-	//		// Per-triangle color for variety
-	//		const Color triColor = GetTriangleColor(childIdx, i, alpha);
-	//		DrawTriangle(v0, v1, v2, triColor, renderMode);
-	//	}
-	//}
-	//else if (childType == 6)
-	//{
-	//	// Poly4 - packed int16 quad (draw as 2 triangles)
-	//	const uint32_t* leafData = &ctx->leafDataStream[childIdx];
-	//	const int16_t* packedVerts = reinterpret_cast<const int16_t*>(ctx->verts);
-	//	
-	//	const uint32_t header = leafData[0];
-	//	const int numPolys = ((header >> 12) & 0xF) + 1;
-	//	const int baseVertex = (header >> 16) & 0xFFFF;
-	//	
-	//	int runningBase = baseVertex << 10;
-	//	
-	//	for (int i = 0; i < numPolys && i < 16; i++)
-	//	{
-	//		// For quads, we need 4 vertex references
-	//		const uint32_t triData = leafData[1 + i];
-	//		const int v0_offset = triData & 0x7FF;
-	//		const int v1_delta = (triData >> 11) & 0x1FF;
-	//		const int v2_delta = (triData >> 20) & 0x1FF;
-	//		
-	//		const int idx0 = runningBase + v0_offset;
-	//		const int idx1 = idx0 + 1 + v1_delta;
-	//		const int idx2 = idx0 + 1 + v2_delta;
-	//		const int idx3 = idx2 + 1;  // Assume v3 follows v2
-	//		
-	//		runningBase = idx0;
-	//		
-	//		const Vector3D v0 = DecodePackedVertex(packedVerts, idx0, origin, quantScale);
-	//		const Vector3D v1 = DecodePackedVertex(packedVerts, idx1, origin, quantScale);
-	//		const Vector3D v2 = DecodePackedVertex(packedVerts, idx2, origin, quantScale);
-	//		const Vector3D v3 = DecodePackedVertex(packedVerts, idx3, origin, quantScale);
-	//		
-	//		// Per-triangle color for variety
-	//		const Color triColor = GetTriangleColor(childIdx, i * 2, alpha);
-	//		const Color triColor2 = GetTriangleColor(childIdx, i * 2 + 1, alpha);
-	//		
-	//		// Draw as two triangles
-	//		DrawTriangle(v0, v1, v2, triColor, renderMode);
-	//		DrawTriangle(v0, v2, v3, triColor2, renderMode);
-	//	}
-	//}
-	//else if (childType == 7)
-	//{
-	//	// Poly5+ - packed int16 polygon with 5+ vertices
-	//	const uint32_t* leafData = &ctx->leafDataStream[childIdx];
-	//	const int16_t* packedVerts = reinterpret_cast<const int16_t*>(ctx->verts);
-	//	
-	//	const uint32_t header = leafData[0];
-	//	const int numPolys = ((header >> 12) & 0xF) + 1;
-	//	const int baseVertex = (header >> 16) & 0xFFFF;
-	//	
-	//	int runningBase = baseVertex << 10;
-	//	
-	//	for (int i = 0; i < numPolys && i < 16; i++)
-	//	{
-	//		// Similar to Poly3/4 but with more vertices per polygon
-	//		const uint32_t triData = leafData[1 + i];
-	//		const int v0_offset = triData & 0x7FF;
-	//		const int v1_delta = (triData >> 11) & 0x1FF;
-	//		const int v2_delta = (triData >> 20) & 0x1FF;
-	//		
-	//		const int idx0 = runningBase + v0_offset;
-	//		const int idx1 = idx0 + 1 + v1_delta;
-	//		const int idx2 = idx0 + 1 + v2_delta;
-	//		
-	//		runningBase = idx0;
-	//		
-	//		// For Poly5+, draw what we can as triangles
-	//		const Vector3D v0 = DecodePackedVertex(packedVerts, idx0, origin, quantScale);
-	//		const Vector3D v1 = DecodePackedVertex(packedVerts, idx1, origin, quantScale);
-	//		const Vector3D v2 = DecodePackedVertex(packedVerts, idx2, origin, quantScale);
-	//		
-	//		// Per-triangle color for variety
-	//		const Color triColor = GetTriangleColor(childIdx, i, alpha);
-	//		DrawTriangle(v0, v1, v2, triColor, renderMode);
-	//	}
-	//}
-	if (childType == 4)
+	// Leaf data format (verified via IDA reverse engineering of sub_1402DD4A0 / sub_1402DDC50):
+	//
+	// Header (uint32, read as two uint16):
+	//   a3[0] bits 0-11  = surfPropIdx (12 bits)
+	//   a3[0] bits 12-15 = numPolys - 1 (4 bits)
+	//   a3[1]            = baseVertex (16 bits)
+	//   runningBase = baseVertex << 10
+	//
+	// Per-polygon (uint32):
+	//   Type 4/5 (triangles): 11-bit v0_offset | 9-bit v1_delta | 9-bit v2_delta | 3-bit flags
+	//   Type 6/7 (quads):     10-bit v0_offset | 9-bit v1_delta | 9-bit v2_delta | 4-bit flags
+	//
+	// Vertex indexing (same for all types):
+	//   runningBase += v0_offset
+	//   idx0 = runningBase
+	//   idx1 = idx0 + v1_delta + 1
+	//   idx2 = idx0 + v2_delta + 1
+	//   (runningBase carries forward to next polygon)
+	//
+	// Type 4: float vertices, absolute world coordinates. One triangle per polygon.
+	// Type 5: packed int16 vertices, origin-relative. One triangle per polygon.
+	// Type 6: float vertices, absolute world coordinates. Quad as parallelogram:
+	//         v3 = v1 + v2 - v0, draws two triangles: (v0,v1,v2) and (v2,v1,v3)
+	// Type 7: packed int16 vertices, origin-relative. Same quad format as type 6.
+
+	if (childType == 5)
+	{
+		// Type 5 - packed int16 triangles (11/9/9/3 bit layout)
+		const uint32_t* leafData = &ctx->leafDataStream[childIdx];
+		const int16_t* packedVerts = reinterpret_cast<const int16_t*>(ctx->verts);
+
+		const uint32_t header = leafData[0];
+		const int numPolys = ((header >> 12) & 0xF) + 1;
+		const int baseVertex = (header >> 16) & 0xFFFF;
+
+		int runningBase = baseVertex << 10;
+
+		for (int i = 0; i < numPolys && i < 16; i++)
+		{
+			const uint32_t triData = leafData[1 + i];
+			const int v0_offset = triData & 0x7FF;         // 11 bits
+			const int v1_delta = (triData >> 11) & 0x1FF;  // 9 bits
+			const int v2_delta = (triData >> 20) & 0x1FF;  // 9 bits
+
+			runningBase += v0_offset;
+			const int idx0 = runningBase;
+			const int idx1 = idx0 + v1_delta + 1;
+			const int idx2 = idx0 + v2_delta + 1;
+
+			const Vector3D v0 = DecodePackedVertex(packedVerts, idx0, origin, quantScale);
+			const Vector3D v1 = DecodePackedVertex(packedVerts, idx1, origin, quantScale);
+			const Vector3D v2 = DecodePackedVertex(packedVerts, idx2, origin, quantScale);
+
+			const Color triColor = GetTriangleColor(childIdx, i, alpha);
+			DrawTriangle(v0, v1, v2, triColor, renderMode);
+		}
+	}
+	else if (childType == 6)
+	{
+		// Type 6 - float quads (10/9/9/4 bit layout, parallelogram construction)
+		const uint32_t* leafData = &ctx->leafDataStream[childIdx];
+		const float* floatVerts = reinterpret_cast<const float*>(ctx->verts);
+
+		const uint32_t header = leafData[0];
+		const int numPolys = ((header >> 12) & 0xF) + 1;
+		const int baseVertex = (header >> 16) & 0xFFFF;
+
+		int runningBase = baseVertex << 10;
+
+		for (int i = 0; i < numPolys && i < 16; i++)
+		{
+			const uint32_t triData = leafData[1 + i];
+			const int v0_offset = triData & 0x3FF;         // 10 bits
+			const int v1_delta = (triData >> 10) & 0x1FF;  // 9 bits
+			const int v2_delta = (triData >> 19) & 0x1FF;  // 9 bits
+
+			runningBase += v0_offset;
+			const int idx0 = runningBase;
+			const int idx1 = idx0 + v1_delta + 1;
+			const int idx2 = idx0 + v2_delta + 1;
+
+			const Vector3D v0 = DecodeFloatVertex(floatVerts, idx0, origin);
+			const Vector3D v1 = DecodeFloatVertex(floatVerts, idx1, origin);
+			const Vector3D v2 = DecodeFloatVertex(floatVerts, idx2, origin);
+			// 4th vertex: parallelogram v3 = v1 + v2 - v0
+			const Vector3D v3(v1.x + v2.x - v0.x, v1.y + v2.y - v0.y, v1.z + v2.z - v0.z);
+
+			const Color triColor = GetTriangleColor(childIdx, i * 2, alpha);
+			const Color triColor2 = GetTriangleColor(childIdx, i * 2 + 1, alpha);
+			DrawTriangle(v0, v1, v2, triColor, renderMode);
+			DrawTriangle(v2, v1, v3, triColor2, renderMode);
+		}
+	}
+	else if (childType == 7)
+	{
+		// Type 7 - packed int16 quads (10/9/9/4 bit layout, parallelogram construction)
+		const uint32_t* leafData = &ctx->leafDataStream[childIdx];
+		const int16_t* packedVerts = reinterpret_cast<const int16_t*>(ctx->verts);
+
+		const uint32_t header = leafData[0];
+		const int numPolys = ((header >> 12) & 0xF) + 1;
+		const int baseVertex = (header >> 16) & 0xFFFF;
+
+		int runningBase = baseVertex << 10;
+
+		for (int i = 0; i < numPolys && i < 16; i++)
+		{
+			const uint32_t triData = leafData[1 + i];
+			const int v0_offset = triData & 0x3FF;         // 10 bits
+			const int v1_delta = (triData >> 10) & 0x1FF;  // 9 bits
+			const int v2_delta = (triData >> 19) & 0x1FF;  // 9 bits
+
+			runningBase += v0_offset;
+			const int idx0 = runningBase;
+			const int idx1 = idx0 + v1_delta + 1;
+			const int idx2 = idx0 + v2_delta + 1;
+
+			const Vector3D v0 = DecodePackedVertex(packedVerts, idx0, origin, quantScale);
+			const Vector3D v1 = DecodePackedVertex(packedVerts, idx1, origin, quantScale);
+			const Vector3D v2 = DecodePackedVertex(packedVerts, idx2, origin, quantScale);
+			// 4th vertex: parallelogram v3 = v1 + v2 - v0
+			const Vector3D v3(v1.x + v2.x - v0.x, v1.y + v2.y - v0.y, v1.z + v2.z - v0.z);
+
+			const Color triColor = GetTriangleColor(childIdx, i * 2, alpha);
+			const Color triColor2 = GetTriangleColor(childIdx, i * 2 + 1, alpha);
+			DrawTriangle(v0, v1, v2, triColor, renderMode);
+			DrawTriangle(v2, v1, v3, triColor2, renderMode);
+		}
+	}
+	else if (childType == 4)
 	{
 		// Type 4 - float vertices (triangle format, not strip)
 		// Uses same leaf data format as Type 5 but with float vertices
@@ -525,11 +537,10 @@ void CBSPCollisionDebug::DrawLeafTriangles(const CollisionModelContext_t* ctx, u
 			const int v1_delta = (triData >> 11) & 0x1FF;
 			const int v2_delta = (triData >> 20) & 0x1FF;
 			
-			const int idx0 = runningBase + v0_offset;
-			const int idx1 = idx0 + 1 + v1_delta;
-			const int idx2 = idx0 + 1 + v2_delta;
-			
-			runningBase = idx0;
+			runningBase += v0_offset;
+			const int idx0 = runningBase;
+			const int idx1 = idx0 + v1_delta + 1;
+			const int idx2 = idx0 + v2_delta + 1;
 			
 			const Vector3D v0 = DecodeFloatVertex(floatVerts, idx0, origin);
 			const Vector3D v1 = DecodeFloatVertex(floatVerts, idx1, origin);
