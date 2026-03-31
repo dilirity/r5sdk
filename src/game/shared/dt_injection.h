@@ -21,6 +21,12 @@ int DTInject_GetPlayerServerOffset(const char* name);
 int DTInject_GetWeaponClientOffset(const char* name);
 int DTInject_GetWeaponServerOffset(const char* name);
 
+// Context-aware offset helpers — defined in dt_injection.cpp since they
+// need SQVM which isn't available in all translation units that include this header.
+struct SQVM;
+int DTInject_GetPlayerOffset(SQVM* v, const char* name);
+int DTInject_GetWeaponOffset(SQVM* v, const char* name);
+
 // Edict dirty-marking global, resolved at init.
 inline uintptr_t g_nServerStateAddr = 0;
 

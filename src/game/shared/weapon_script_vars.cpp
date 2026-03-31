@@ -723,7 +723,7 @@ static SQRESULT Script_GetPhaseShiftType(HSQUIRRELVM v)
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pEntity)) || !pEntity)
 		return SQ_ERROR;
 
-	const int offset = DTInject_GetPlayerClientOffset("m_phaseShiftType");
+	const int offset = DTInject_GetPlayerOffset(v, "m_phaseShiftType");
 	sq_pushinteger(v, DTInject_ReadInt(pEntity, offset));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -748,7 +748,7 @@ static SQRESULT Script_PhaseShiftBegin_Override(HSQUIRRELVM v)
 	if (phaseType < 0 || phaseType > 1023)
 		phaseType = 0;
 
-	const int offset = DTInject_GetPlayerClientOffset("m_phaseShiftType");
+	const int offset = DTInject_GetPlayerOffset(v, "m_phaseShiftType");
 	DTInject_WriteInt(pEntity, offset, static_cast<int>(phaseType));
 	if (v_PhaseShiftBegin_Native)
 		v_PhaseShiftBegin_Native(pEntity, static_cast<float>(warmup), static_cast<float>(duration));
@@ -783,7 +783,7 @@ static SQRESULT Script_GetWeaponLockedSet(HSQUIRRELVM v)
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pWeapon)) || !pWeapon)
 		return SQ_ERROR;
 
-	const int offset = DTInject_GetWeaponClientOffset("m_weaponLockedSet");
+	const int offset = DTInject_GetWeaponOffset(v, "m_weaponLockedSet");
 	sq_pushinteger(v, DTInject_ReadInt(pWeapon, offset));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -800,7 +800,7 @@ static SQRESULT Script_SetWeaponLockedSet(HSQUIRRELVM v)
 	if (lockedSet < 0 || lockedSet > 1023)
 		lockedSet = (lockedSet < 0) ? 0 : 1023;
 
-	const int offset = DTInject_GetWeaponClientOffset("m_weaponLockedSet");
+	const int offset = DTInject_GetWeaponOffset(v, "m_weaponLockedSet");
 	DTInject_WriteInt(pWeapon, offset, static_cast<int>(lockedSet));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -833,7 +833,7 @@ static SQRESULT Script_GetInfiniteAmmoState(HSQUIRRELVM v)
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pWeapon)))
 		return SQ_ERROR;
 
-	const int offset = DTInject_GetWeaponClientOffset("m_infiniteAmmoState");
+	const int offset = DTInject_GetWeaponOffset(v, "m_infiniteAmmoState");
 	sq_pushinteger(v, DTInject_ReadInt(pWeapon, offset));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -850,7 +850,7 @@ static SQRESULT Script_SetInfiniteAmmoState(HSQUIRRELVM v)
 	if (state < INFINITEAMMO_NONE || state > INFINITEAMMO_CLIPS)
 		state = INFINITEAMMO_NONE;
 
-	const int offset = DTInject_GetWeaponClientOffset("m_infiniteAmmoState");
+	const int offset = DTInject_GetWeaponOffset(v, "m_infiniteAmmoState");
 	DTInject_WriteInt(pWeapon, offset, static_cast<int>(state));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }

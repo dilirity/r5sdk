@@ -10,6 +10,7 @@
 //=============================================================================//
 
 #include "core/stdafx.h"
+#include "vscript/languages/squirrel_re/include/sqvm.h"
 #include "dt_injection.h"
 
 #include <vector>
@@ -54,6 +55,20 @@ int DTInject_GetPlayerClientOffset(const char* name) { return FindFieldOffset(s_
 int DTInject_GetPlayerServerOffset(const char* name) { return FindFieldOffset(s_playerFields, name, true); }
 int DTInject_GetWeaponClientOffset(const char* name) { return FindFieldOffset(s_weaponFields, name, false); }
 int DTInject_GetWeaponServerOffset(const char* name) { return FindFieldOffset(s_weaponFields, name, true); }
+
+int DTInject_GetPlayerOffset(SQVM* v, const char* name)
+{
+	return (v->GetContext() == SQCONTEXT::SERVER)
+		? DTInject_GetPlayerServerOffset(name)
+		: DTInject_GetPlayerClientOffset(name);
+}
+
+int DTInject_GetWeaponOffset(SQVM* v, const char* name)
+{
+	return (v->GetContext() == SQCONTEXT::SERVER)
+		? DTInject_GetWeaponServerOffset(name)
+		: DTInject_GetWeaponClientOffset(name);
+}
 
 //-----------------------------------------------------------------------------
 // CLIENT RecvProp injection (0x68-byte CRecvProp structs, pointer array)
@@ -223,7 +238,8 @@ static bool PatchServerEntityFactory(int originalSize, int newSize)
 	const char mask[] = "xxxxxxxxxxxxxxxxxxxxxxx";
 
 	CMemory match = g_GameDll.FindPatternSIMD_Impl(pattern, mask, sizeof(pattern));
-	if (!match) return false;
+	if (!match)
+		return false;
 
 	uint8_t* p = reinterpret_cast<uint8_t*>(match.GetPtr());
 
@@ -316,31 +332,18 @@ void VDTInjection::Detour(const bool bAttach) const
 	{
 		const int clientSize = g_pClientWeaponSize ? *g_pClientWeaponSize : 0;
 		const int serverSize = g_pServerWeaponSize ? *g_pServerWeaponSize : 0;
-		const int base = (clientSize > serverSize) ? clientSize : serverSize;
 		const int fieldBytes = static_cast<int>(s_weaponFields.size()) * 4;
 
-		if (base > 0)
+		if (clientSize > 0 && g_pClientWeaponRecvTable && g_pClientWeaponSize)
 		{
-			if (serverSize > 0 && serverSize < base + fieldBytes)
-				PatchServerEntityFactory(serverSize, base + fieldBytes);
+			PatchServerEntityFactory(clientSize, clientSize + fieldBytes);
+			InjectClientProps(g_pClientWeaponRecvTable, s_weaponFields, g_pClientWeaponSize);
+		}
 
-			if (g_pClientWeaponSize)
-				*g_pClientWeaponSize = base;
-			if (g_pClientWeaponRecvTable && g_pClientWeaponSize)
-				InjectClientProps(g_pClientWeaponRecvTable, s_weaponFields, g_pClientWeaponSize);
-			if (g_pServerWeaponSendTable && g_pServerWeaponSize)
-			{
-				*g_pServerWeaponSize = base;
-				InjectServerProps(g_pServerWeaponSendTable, s_weaponFields, g_pServerWeaponSize);
-			}
-
-			// Force cache coherency for DT system visibility
-			if (g_pServerWeaponSendTable)
-			{
-				volatile int v = *reinterpret_cast<int*>(
-					reinterpret_cast<uintptr_t>(g_pServerWeaponSendTable) + 0x08);
-				(void)v;
-			}
+		if (serverSize > 0 && g_pServerWeaponSendTable && g_pServerWeaponSize)
+		{
+			PatchServerEntityFactory(serverSize, serverSize + fieldBytes);
+			InjectServerProps(g_pServerWeaponSendTable, s_weaponFields, g_pServerWeaponSize);
 		}
 	}
 
@@ -349,30 +352,18 @@ void VDTInjection::Detour(const bool bAttach) const
 	{
 		const int clientSize = g_pClientPlayerSize ? *g_pClientPlayerSize : 0;
 		const int serverSize = g_pServerPlayerSize ? *g_pServerPlayerSize : 0;
-		const int base = (clientSize > serverSize) ? clientSize : serverSize;
 		const int fieldBytes = static_cast<int>(s_playerFields.size()) * 4;
 
-		if (base > 0)
+		if (clientSize > 0 && g_pClientPlayerRecvTable && g_pClientPlayerSize)
 		{
-			if (serverSize > 0 && serverSize < base + fieldBytes)
-				PatchServerEntityFactory(serverSize, base + fieldBytes);
+			PatchServerEntityFactory(clientSize, clientSize + fieldBytes);
+			InjectClientProps(g_pClientPlayerRecvTable, s_playerFields, g_pClientPlayerSize);
+		}
 
-			if (g_pClientPlayerSize)
-				*g_pClientPlayerSize = base;
-			if (g_pClientPlayerRecvTable && g_pClientPlayerSize)
-				InjectClientProps(g_pClientPlayerRecvTable, s_playerFields, g_pClientPlayerSize);
-			if (g_pServerPlayerSendTable && g_pServerPlayerSize)
-			{
-				*g_pServerPlayerSize = base;
-				InjectServerProps(g_pServerPlayerSendTable, s_playerFields, g_pServerPlayerSize);
-			}
-
-			if (g_pServerPlayerSendTable)
-			{
-				volatile int v = *reinterpret_cast<int*>(
-					reinterpret_cast<uintptr_t>(g_pServerPlayerSendTable) + 0x08);
-				(void)v;
-			}
+		if (serverSize > 0 && g_pServerPlayerSendTable && g_pServerPlayerSize)
+		{
+			PatchServerEntityFactory(serverSize, serverSize + fieldBytes);
+			InjectServerProps(g_pServerPlayerSendTable, s_playerFields, g_pServerPlayerSize);
 		}
 	}
 

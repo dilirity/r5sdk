@@ -218,7 +218,7 @@ static SQRESULT Script_GetExtraShieldHealth(HSQUIRRELVM v)
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
 		return SQ_ERROR;
 
-	const int offset = DTInject_GetPlayerClientOffset("m_extraShieldHealth");
+	const int offset = DTInject_GetPlayerOffset(v, "m_extraShieldHealth");
 	sq_pushinteger(v, DTInject_ReadInt(pPlayer, offset));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -229,7 +229,7 @@ static SQRESULT Script_GetExtraShieldTier(HSQUIRRELVM v)
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
 		return SQ_ERROR;
 
-	const int offset = DTInject_GetPlayerClientOffset("m_extraShieldTier");
+	const int offset = DTInject_GetPlayerOffset(v, "m_extraShieldTier");
 	sq_pushinteger(v, DTInject_ReadInt(pPlayer, offset));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -245,7 +245,7 @@ static SQRESULT Script_SetExtraShieldHealth(HSQUIRRELVM v)
 
 	if (val < 0) val = 0;
 
-	const int offset = DTInject_GetPlayerClientOffset("m_extraShieldHealth");
+	const int offset = DTInject_GetPlayerOffset(v, "m_extraShieldHealth");
 	DTInject_WriteInt(pPlayer, offset, static_cast<int>(val));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -262,7 +262,7 @@ static SQRESULT Script_SetExtraShieldTier(HSQUIRRELVM v)
 	if (val < 0 || val > 1023)
 		val = (val < 0) ? 0 : 1023;
 
-	const int offset = DTInject_GetPlayerClientOffset("m_extraShieldTier");
+	const int offset = DTInject_GetPlayerOffset(v, "m_extraShieldTier");
 	DTInject_WriteInt(pPlayer, offset, static_cast<int>(val));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }

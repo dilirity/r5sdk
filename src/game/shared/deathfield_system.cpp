@@ -135,7 +135,7 @@ SQRESULT Script_DeathFieldIndex(HSQUIRRELVM v)
 	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pPlayer)))
 		return SQ_ERROR;
 
-	const int offset = DTInject_GetPlayerClientOffset("m_deathFieldIndex");
+	const int offset = DTInject_GetPlayerOffset(v, "m_deathFieldIndex");
 	sq_pushinteger(v, DTInject_ReadInt(pPlayer, offset));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
@@ -156,7 +156,7 @@ SQRESULT Script_SetDeathFieldIndex(HSQUIRRELVM v)
 		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 	}
 
-	const int offset = DTInject_GetPlayerClientOffset("m_deathFieldIndex");
+	const int offset = DTInject_GetPlayerOffset(v, "m_deathFieldIndex");
 	DTInject_WriteInt(pPlayer, offset, static_cast<int>(index));
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
