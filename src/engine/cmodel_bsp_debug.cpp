@@ -595,14 +595,19 @@ void VBSPCollisionDebug::GetVar(void) const
 		g_ppCollisionModelContexts = result.Offset(0x6).ResolveRelativeAddressSelf(0x3, 0x7).RCast<CollisionModelContext_t**>();
 	}
 
-	// Debug output
-	if (g_ppCollisionModelContexts)
+	// g_pNumBrushModels (dword_1634F14E8) - referenced in CM_ParseStarCollFromEntities
+	// as the bounds check for brush model index: "if (modelIndex >= *g_pNumBrushModels)"
+	// Resolve from CM_ParseStarCollFromEntities if available
+	if (CM_ParseStarCollFromEntities)
 	{
-		//DevMsg(eDLL_T::ENGINE, "BSP Collision Debug: g_ppCollisionModelContexts = 0x%p\n", g_ppCollisionModelContexts);
-	}
-	else
-	{
-		//Warning(eDLL_T::ENGINE, "BSP Collision Debug: Failed to find g_ppCollisionModelContexts - debug rendering disabled\n");
+		// In sub_14020FBE0, the pattern: cmp reg, cs:dword_1634F14E8
+		// Look for "3B ?? ?? ?? ?? ??" (cmp r32, [rip+disp32]) near the model index check
+		CMemory fnMem(CM_ParseStarCollFromEntities);
+		CMemory numBrushModelsRef = fnMem.FindPattern("3B 05", CMemory::Direction::DOWN, 512);
+		if (numBrushModelsRef)
+		{
+			g_pNumBrushModels = numBrushModelsRef.ResolveRelativeAddressSelf(0x2, 0x6).RCast<int32_t*>();
+		}
 	}
 #endif // !DEDICATED
 }

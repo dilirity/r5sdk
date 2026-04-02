@@ -136,6 +136,49 @@ struct CollisionModelContext_t
 static_assert(sizeof(CollisionModelContext_t) == 72);
 
 //-----------------------------------------------------------------------------
+// StarCollHeader_t - On-disk collision data header for brush entities
+//
+// Stored in entity *coll0..*collN keys as base64-encoded binary data.
+// Parsed by sub_14020FBE0 which base64-decodes the concatenated keys,
+// then interprets the first 48 bytes as offsets into the data blob:
+//
+//   int32[0]  = contentMasksOffset    → CollisionModelContext_t.contentMasks
+//   int32[1]  = surfPropsOffset       → CollisionModelContext_t.surfProps
+//   int32[2]  = surfPropNameBufOffset → CollisionModelContext_t.unk3
+//   int32[3]  = (unused / reserved)
+//   int32[4]  = flags                 → CollisionModelContext_t.unk4
+//   int32[5]  = bvhNodesOffset        → CollisionModelContext_t.bvhNodes
+//   int32[6]  = vertsOffset           → CollisionModelContext_t.verts
+//   int32[7]  = leafDataStreamOffset  → CollisionModelContext_t.leafDataStream
+//   float[8]  = scaleOriginX          → CollisionModelContext_t.scaleOriginX
+//   float[9]  = scaleOriginY          → CollisionModelContext_t.scaleOriginY
+//   int32[10] = scaleOriginZ          → CollisionModelContext_t.scaleOriginZ
+//   int32[11] = quantScale            → CollisionModelContext_t.quantScale
+//
+// All offsets are relative to the start of the header itself.
+// After the header: material string (null-terminated, padded to 4-byte alignment),
+// then BVH nodes, vertices, leaf data, content masks, etc.
+//
+// The BVH data uses the same CollBvh4Node_t format as worldspawn collision.
+//-----------------------------------------------------------------------------
+struct StarCollHeader_t
+{
+	int32_t contentMasksOffset;      // [0]  offset to content mask array
+	int32_t surfPropsOffset;         // [1]  offset to surface properties
+	int32_t surfPropNameBufOffset;   // [2]  offset to surface property name buffer
+	int32_t _reserved;               // [3]  unused
+	int32_t flags;                   // [4]  collision flags
+	int32_t bvhNodesOffset;          // [5]  offset to CollBvh4Node_t array
+	int32_t vertsOffset;             // [6]  offset to vertices (float3 or packed int16)
+	int32_t leafDataStreamOffset;    // [7]  offset to BVH leaf data
+	float   scaleOriginX;            // [8]  BVH decode origin X
+	float   scaleOriginY;            // [9]  BVH decode origin Y
+	float   scaleOriginZ;            // [10] BVH decode origin Z
+	float   quantScale;              // [11] BVH quantization scale
+};
+static_assert(sizeof(StarCollHeader_t) == 48);
+
+//-----------------------------------------------------------------------------
 // Full collision BSP data structure
 // Loaded by sub_14020F2F0 from the BSP file
 //-----------------------------------------------------------------------------
@@ -220,6 +263,31 @@ private:
 // Accessed via: g_ppCollisionModelContexts + 72 * modelIndex
 inline CollisionModelContext_t** g_ppCollisionModelContexts = nullptr;
 
+// Number of brush models (trigger volumes, func_brush, etc.)
+// Referenced as dword_1634F14E8 in sub_14020FBE0
+inline int32_t* g_pNumBrushModels = nullptr;
+
+//-----------------------------------------------------------------------------
+// CM_ParseStarCollFromEntities - sub_14020FBE0
+//
+// Parses entity lump text, extracts base64-encoded *coll keys (StarColl data),
+// and populates the CollisionModelContext_t array for brush model collision.
+//
+// Parameters:
+//   a1 - pointer to entity lump text buffer
+//   a2 - length of entity lump text
+//
+// Returns: new length of entity lump text (with *coll keys stripped out)
+//
+// For each entity with *coll keys:
+//   1. Base64-decodes concatenated *coll0..*collN values
+//   2. Reads the model key (*N) to get brush model index
+//   3. Interprets decoded data as StarCollHeader_t (48 bytes of offsets)
+//   4. Populates CollisionModelContext_t at g_ppCollisionModelContexts[modelIndex]
+//      by adding each header offset to the base data pointer
+//-----------------------------------------------------------------------------
+inline int64_t(*CM_ParseStarCollFromEntities)(char* entityLumpText, int entityLumpLength);
+
 #endif // !DEDICATED
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -232,9 +300,18 @@ class VBSPCollisionDebug : public IDetour
 	{
 #ifndef DEDICATED
 		LogVarAdr("g_ppCollisionModelContexts", g_ppCollisionModelContexts);
+		LogVarAdr("g_pNumBrushModels", g_pNumBrushModels);
+		LogFunAdr("CM_ParseStarCollFromEntities", CM_ParseStarCollFromEntities);
 #endif
 	}
-	virtual void GetFun(void) const { }
+	virtual void GetFun(void) const
+	{
+#ifndef DEDICATED
+		// sub_14020FBE0 - parses *coll keys from entity lump text,
+		// base64-decodes StarColl data, and populates CollisionModelContext_t
+		Module_FindPattern(g_GameDll, "48 89 4C 24 08 53 55 57 41 56 48 83 EC 58").GetPtr(CM_ParseStarCollFromEntities);
+#endif
+	}
 	virtual void GetVar(void) const;
 	virtual void GetCon(void) const { }
 	virtual void Detour(const bool bAttach) const { }
