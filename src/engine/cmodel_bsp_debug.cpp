@@ -34,6 +34,12 @@ ConVar bsp_collision_debug_radius("bsp_collision_debug_radius", "2048", FCVAR_DE
 ConVar bsp_collision_debug_alpha("bsp_collision_debug_alpha", "32", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
 	"Alpha value for solid debug rendering", true, 0.f, true, 255.f);
 
+ConVar bsp_trigger_debug("bsp_trigger_debug", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
+	"Draw trigger collision volumes: 0=off, 1=OOB, 2=slip, 3=hurt, 4=soundscape, 5=no_zipline, 6=no_grapple, 7=warp_gate, 8=skydive, 9=multiple_other, 10=other, 11=non-trigger, -1=all");
+
+ConVar bsp_trigger_debug_radius("bsp_trigger_debug_radius", "8192", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
+	"Radius around player to render trigger volumes", true, 64.f, true, 65536.f);
+
 #ifndef DEDICATED
 //-----------------------------------------------------------------------------
 // Triangle colors for per-triangle visualization (more vibrant)
@@ -56,6 +62,202 @@ static const Color s_TriangleColors[] = {
 	Color(150, 200, 255, 255),  // Light blue
 	Color(255, 180, 100, 255),  // Peach
 };
+
+//-----------------------------------------------------------------------------
+// Trigger volume colors
+//-----------------------------------------------------------------------------
+// Current entity origin and color for type 8 leaf decoding (set by DrawBrushModelBVH)
+static Vector3D s_currentEntityOrigin(0, 0, 0);
+static Color s_currentTriggerColor(255, 255, 255, 255);
+
+static Color GetTriggerColor(TriggerType_e type, int alpha)
+{
+	switch (type)
+	{
+	case TriggerType_e::OUT_OF_BOUNDS:  return Color(255, 50, 50, alpha);    // Red — you'll die if you stay
+	case TriggerType_e::SLIP:           return Color(255, 220, 50, alpha);   // Yellow — slide surface
+	case TriggerType_e::HURT:           return Color(200, 0, 100, alpha);    // Dark magenta — instant kill
+	case TriggerType_e::SOUNDSCAPE:     return Color(100, 180, 255, alpha);  // Light blue — just audio
+	case TriggerType_e::NO_ZIPLINE:     return Color(255, 150, 50, alpha);   // Orange — can't zipline
+	case TriggerType_e::NO_GRAPPLE:     return Color(200, 100, 30, alpha);   // Dark orange — can't grapple
+	case TriggerType_e::WARP_GATE:      return Color(160, 50, 220, alpha);   // Purple — phase runner teleporter
+	case TriggerType_e::SKYDIVE:        return Color(50, 220, 160, alpha);   // Teal — skydive/rift exit
+	case TriggerType_e::MULTIPLE_OTHER: return Color(180, 100, 220, alpha);  // Light purple — other trigger_multiple
+	case TriggerType_e::OTHER_TRIGGER:  return Color(128, 128, 128, alpha);  // Grey — unknown
+	case TriggerType_e::NON_TRIGGER:    return Color(220, 220, 220, alpha);  // White — structural
+	default:                           return Color(255, 255, 255, alpha);  // White
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Parse entity lump text to build trigger model index map
+// Called from our CM_ParseStarCollFromEntities detour before the original
+//-----------------------------------------------------------------------------
+static void ParseTriggerMappings(const char* entityText, int length)
+{
+	// Accumulate across multiple entity lump calls during map load
+	// g_triggerVolumes is zero-initialized at startup, and reset in RenderTriggerVolumes on map change
+
+	// Simple parser: scan for { } entity blocks, extract classname and model
+	const char* p = entityText;
+	const char* end = entityText + length;
+
+	while (p < end)
+	{
+		// Find next '{'
+		while (p < end && *p != '{') p++;
+		if (p >= end) break;
+		p++; // skip '{'
+
+		// Parse key-value pairs until '}'
+		char classname[128] = {};
+		char editorclass[128] = {};
+		int modelIndex = -1;
+		float entOrigin[3] = {0, 0, 0};
+		bool hasColl = false;
+
+		while (p < end && *p != '}')
+		{
+			// Skip whitespace
+			while (p < end && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) p++;
+			if (p >= end || *p == '}') break;
+
+			// Expect quoted key
+			if (*p != '"') { p++; continue; }
+			p++; // skip opening quote
+
+			const char* keyStart = p;
+			while (p < end && *p != '"') p++;
+			int keyLen = (int)(p - keyStart);
+			if (p < end) p++; // skip closing quote
+
+			// Skip whitespace between key and value
+			while (p < end && (*p == ' ' || *p == '\t')) p++;
+
+			// Expect quoted value
+			if (p >= end || *p != '"') continue;
+			p++; // skip opening quote
+
+			const char* valStart = p;
+			while (p < end && *p != '"') p++;
+			int valLen = (int)(p - valStart);
+			if (p < end) p++; // skip closing quote
+
+			// Check key
+			if (keyLen >= 5 && memcmp(keyStart, "*coll", 5) == 0)
+			{
+				hasColl = true;
+			}
+			else if (keyLen == 9 && memcmp(keyStart, "classname", 9) == 0)
+			{
+				int copyLen = (valLen < 127) ? valLen : 127;
+				memcpy(classname, valStart, copyLen);
+				classname[copyLen] = '\0';
+			}
+			else if (keyLen == 5 && memcmp(keyStart, "model", 5) == 0)
+			{
+				if (valLen > 1 && valStart[0] == '*')
+				{
+					// Parse integer after '*'
+					modelIndex = 0;
+					for (int i = 1; i < valLen; i++)
+					{
+						if (valStart[i] >= '0' && valStart[i] <= '9')
+							modelIndex = modelIndex * 10 + (valStart[i] - '0');
+					}
+				}
+			}
+			else if (keyLen == 11 && memcmp(keyStart, "editorclass", 11) == 0)
+			{
+				int copyLen = (valLen < 127) ? valLen : 127;
+				memcpy(editorclass, valStart, copyLen);
+				editorclass[copyLen] = '\0';
+			}
+			else if (keyLen == 6 && memcmp(keyStart, "origin", 6) == 0)
+			{
+				// Parse "x y z" origin string
+				char originBuf[128] = {};
+				int copyLen = (valLen < 127) ? valLen : 127;
+				memcpy(originBuf, valStart, copyLen);
+				originBuf[copyLen] = '\0';
+				// Simple float parse for 3 values
+				char* cursor = originBuf;
+				for (int oi = 0; oi < 3; oi++)
+				{
+					while (*cursor == ' ') cursor++;
+					entOrigin[oi] = (float)atof(cursor);
+					while (*cursor && *cursor != ' ') cursor++;
+				}
+			}
+		}
+
+		if (p < end) p++; // skip '}'
+
+		// Record trigger mapping
+		if (modelIndex > 0 && modelIndex < MAX_TRIGGER_VOLUMES && classname[0] && hasColl)
+		{
+			TriggerType_e type = TriggerType_e::NON_TRIGGER;
+
+			if (strstr(classname, "trigger_out_of_bounds"))
+				type = TriggerType_e::OUT_OF_BOUNDS;
+			else if (strstr(classname, "trigger_slip"))
+				type = TriggerType_e::SLIP;
+			else if (strstr(classname, "trigger_hurt"))
+				type = TriggerType_e::HURT;
+			else if (strstr(classname, "trigger_soundscape"))
+				type = TriggerType_e::SOUNDSCAPE;
+			else if (strstr(classname, "trigger_no_zipline"))
+				type = TriggerType_e::NO_ZIPLINE;
+			else if (strstr(classname, "trigger_no_grapple"))
+				type = TriggerType_e::NO_GRAPPLE;
+			else if (strstr(classname, "trigger_multiple"))
+			{
+				if (strstr(editorclass, "trigger_warp_gate"))
+					type = TriggerType_e::WARP_GATE;
+				else if (strstr(editorclass, "trigger_skydive"))
+					type = TriggerType_e::SKYDIVE;
+				else
+					type = TriggerType_e::MULTIPLE_OTHER;
+			}
+			else if (strncmp(classname, "trigger_", 8) == 0)
+				type = TriggerType_e::OTHER_TRIGGER;
+
+			g_triggerVolumes[modelIndex].type = type;
+			g_triggerVolumes[modelIndex].originX = entOrigin[0];
+			g_triggerVolumes[modelIndex].originY = entOrigin[1];
+			g_triggerVolumes[modelIndex].originZ = entOrigin[2];
+
+			if (modelIndex >= g_numTriggerVolumes)
+				g_numTriggerVolumes = modelIndex + 1;
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Detour for CM_ParseStarCollFromEntities
+// Parses trigger mappings before calling the original function
+//-----------------------------------------------------------------------------
+static bool s_collisionMarked = false;
+
+static int64_t CM_ParseStarCollFromEntities_Detour(char* entityLumpText, int entityLumpLength)
+{
+	// Reset trigger data on first entity lump of a new map load
+	// The detour fires multiple times (once per entity lump), but s_collisionMarked
+	// being true means we rendered a previous map — time to reset
+	if (s_collisionMarked)
+	{
+		s_collisionMarked = false;
+		memset(g_triggerVolumes, 0, sizeof(g_triggerVolumes));
+		g_numTriggerVolumes = 0;
+	}
+
+	// Parse entity text to build trigger type mappings before the original
+	// strips out *coll keys
+	ParseTriggerMappings(entityLumpText, entityLumpLength);
+
+	// Call original — this populates CollisionModelContext_t for each brush model
+	return CM_ParseStarCollFromEntities(entityLumpText, entityLumpLength);
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Get a unique color for a triangle based on hash
@@ -168,7 +370,12 @@ void CBSPCollisionDebug::DrawTriangle(const Vector3D& v0, const Vector3D& v1, co
 void CBSPCollisionDebug::DrawLeafTriangles(const CollisionModelContext_t* ctx, uint32_t childIdx,
 	int childType, const Vector3D& origin, float quantScale, int depth)
 {
-	if (!ctx || childIdx == 0 || !ctx->verts || !ctx->leafDataStream)
+	if (!ctx || !ctx->leafDataStream)
+	{
+		return;
+	}
+	// Type 8 has its own embedded vertices, other types need ctx->verts
+	if (childType != 8 && (!ctx->verts || childIdx == 0))
 	{
 		return;
 	}
@@ -333,6 +540,133 @@ void CBSPCollisionDebug::DrawLeafTriangles(const CollisionModelContext_t* ctx, u
 			DrawTriangle(v0, v1, v2, triColor, renderMode);
 		}
 	}
+	else if (childType == 8)
+	{
+		// Type 8 - ConvexHull
+		// Leaf data layout:
+		//   byte[0] = vertexCount
+		//   byte[1] = edge/face count 1
+		//   byte[2] = face data offset 1
+		//   byte[3] = face data offset 2
+		//   bytes[4..19] = per-hull origin/scale as 4 floats (x, y, z, scale)
+		//   bytes[20..] = packed int16 vertices (6 bytes each: x, y, z)
+		//   After vertices: triangle strip data using type-4 format
+
+		const uint8_t* leafBytes = reinterpret_cast<const uint8_t*>(&ctx->leafDataStream[childIdx]);
+		const int vertCount = leafBytes[0];
+
+		if (vertCount == 0 || (leafBytes[2] == 0 && leafBytes[3] == 0))
+			return;
+
+		// Per-hull origin and scale at offset 4 (16 bytes = 4 floats)
+		const float* hullParams = reinterpret_cast<const float*>(leafBytes + 4);
+		const float hullScale = hullParams[3]; // w component = scale broadcast
+
+		// Decode packed int16 vertices to world space
+		// Engine formula: world = int16_unpack_to_high16 * scale + origin_vec
+		// Which is: world = int16 * 65536.0 * scale + origin (for each component)
+		// But from the decompiled code (line 82): mul by v8 (scale broadcast) + v4 (origin vec)
+		// v8 = shuffle(v4, 0xFF) = broadcast v4.w = scale
+		// So: world = int16_as_high16 * v4.w + v4.xyz
+		// int16_as_high16 = int16 << 16 as float = int16 * 65536.0
+		const float effectiveScale = hullScale * 65536.0f;
+
+		Vector3D decodedVerts[256]; // max 256 vertices
+		const int16_t* packedVerts = reinterpret_cast<const int16_t*>(leafBytes + 20);
+		const int maxVerts = (vertCount < 256) ? vertCount : 256;
+
+		for (int vi = 0; vi < maxVerts; vi++)
+		{
+			decodedVerts[vi].x = s_currentEntityOrigin.x + hullParams[0] + (float)packedVerts[vi * 3 + 0] * effectiveScale;
+			decodedVerts[vi].y = s_currentEntityOrigin.y + hullParams[1] + (float)packedVerts[vi * 3 + 1] * effectiveScale;
+			decodedVerts[vi].z = s_currentEntityOrigin.z + hullParams[2] + (float)packedVerts[vi * 3 + 2] * effectiveScale;
+		}
+
+		// Triangle data offset calculation from engine (sub_1402DBB20):
+		//   v32 = byte[1] + 2 * vertCount
+		//   rawOff = v32 + 2 * (v32 + 10)
+		//   triDataOffset = rawOff + ((-rawOff) & 3)  // align up to multiple of 4
+		const int byte1 = leafBytes[1];
+		const int v32 = byte1 + 2 * vertCount;
+		const int rawOff = v32 + 2 * (v32 + 10);
+		const int triDataOffset = rawOff + ((-rawOff) & 3);
+
+		// Two passes over triangle data:
+		// Pass 1 (leafBytes[2] groups): triangles — same bit layout as BVH type 4
+		//   v0_offset = data & 0x7FF (11 bits), v1_delta = (data>>11) & 0x1FF, v2_delta = (data>>20) & 0x1FF
+		// Pass 2 (leafBytes[3] groups): quads — same bit layout as BVH type 6
+		//   v0_offset = data & 0x3FF (10 bits), v1_delta = (data>>10) & 0x1FF, v2_delta = (data>>19) & 0x1FF
+		//   4th vertex = v2 + v1 - v0 (parallelogram), drawn as 2 triangles
+
+		const int pass1TriGroups = leafBytes[2];
+		const int pass2QuadGroups = leafBytes[3];
+		int dataPos = triDataOffset;
+
+		// Pass 1: triangles
+		for (int g = 0; g < pass1TriGroups; g++)
+		{
+			if (dataPos + 4 > 4096) break;
+
+			const uint16_t* groupHeader = reinterpret_cast<const uint16_t*>(leafBytes + dataPos);
+			const int numPolys = (groupHeader[0] >> 12) + 1;
+			int runningBase = (int)groupHeader[1] << 10;
+
+			for (int i = 0; i < numPolys && i < 16; i++)
+			{
+				const uint32_t triData = *reinterpret_cast<const uint32_t*>(leafBytes + dataPos + 4 + i * 4);
+				const int v0_offset = triData & 0x7FF;
+				const int v1_delta = (triData >> 11) & 0x1FF;
+				const int v2_delta = (triData >> 20) & 0x1FF;
+
+				const int idx0 = runningBase + v0_offset;
+				const int idx1 = idx0 + 1 + v1_delta;
+				const int idx2 = idx0 + 1 + v2_delta;
+				runningBase = idx0;
+
+				if (idx0 >= 0 && idx0 < maxVerts && idx1 >= 0 && idx1 < maxVerts && idx2 >= 0 && idx2 < maxVerts)
+				{
+					DrawTriangle(decodedVerts[idx0], decodedVerts[idx1], decodedVerts[idx2], s_currentTriggerColor, renderMode);
+				}
+			}
+			dataPos += 4 + numPolys * 4;
+		}
+
+		// Pass 2: quads (parallelogram — 4th vertex computed)
+		for (int g = 0; g < pass2QuadGroups; g++)
+		{
+			if (dataPos + 4 > 4096) break;
+
+			const uint16_t* groupHeader = reinterpret_cast<const uint16_t*>(leafBytes + dataPos);
+			const int numPolys = (groupHeader[0] >> 12) + 1;
+			int runningBase = (int)groupHeader[1] << 10;
+
+			for (int i = 0; i < numPolys && i < 16; i++)
+			{
+				const uint32_t quadData = *reinterpret_cast<const uint32_t*>(leafBytes + dataPos + 4 + i * 4);
+				const int v0_offset = quadData & 0x3FF;        // 10 bits
+				const int v1_delta = (quadData >> 10) & 0x1FF; // 9 bits
+				const int v2_delta = (quadData >> 19) & 0x1FF; // 9 bits
+
+				const int idx0 = runningBase + v0_offset;
+				const int idx1 = idx0 + 1 + v1_delta;
+				const int idx2 = idx0 + 1 + v2_delta;
+				runningBase = idx0;
+
+				if (idx0 >= 0 && idx0 < maxVerts && idx1 >= 0 && idx1 < maxVerts && idx2 >= 0 && idx2 < maxVerts)
+				{
+					// Parallelogram: v3 = v1 + v2 - v0
+					Vector3D v3;
+					v3.x = decodedVerts[idx1].x + decodedVerts[idx2].x - decodedVerts[idx0].x;
+					v3.y = decodedVerts[idx1].y + decodedVerts[idx2].y - decodedVerts[idx0].y;
+					v3.z = decodedVerts[idx1].z + decodedVerts[idx2].z - decodedVerts[idx0].z;
+
+					DrawTriangle(decodedVerts[idx0], decodedVerts[idx1], decodedVerts[idx2], s_currentTriggerColor, renderMode);
+					DrawTriangle(decodedVerts[idx2], decodedVerts[idx1], v3, s_currentTriggerColor, renderMode);
+				}
+			}
+			dataPos += 4 + numPolys * 4;
+		}
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -443,12 +777,13 @@ void CBSPCollisionDebug::DrawNodeRecursive(const CollBvh4Node_t* nodes, int node
 			continue;
 
 		// For leaves, draw the actual collision triangles
-		if (isLeaf && childIdx > 0)
+		// childIdx == 0 is valid for type 8 (convex hull) - data starts at stream offset 0
+		if (isLeaf)
 		{
 			const CollisionModelContext_t* ctx = *g_ppCollisionModelContexts;
 			
-			// Only draw types 4-7 which have triangle data
-			if (childType >= 4 && childType <= 7)
+			// Draw types 4-8 (4-7 = triangle/quad types, 8 = convex hull)
+			if (childType >= 4 && childType <= 8)
 			{
 				DrawLeafTriangles(ctx, childIdx, childType, origin, scale, depth);
 			}
@@ -489,6 +824,125 @@ void CBSPCollisionDebug::DrawBVHNodesAroundPoint(const Vector3D& pos, float radi
 
 	// Start from root node (index 0)
 	DrawNodeRecursive(ctx->bvhNodes, 0, origin, scale, 0, maxDepth, filterMins, filterMaxs);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Draw BVH for a specific brush model index with a given color
+//-----------------------------------------------------------------------------
+void CBSPCollisionDebug::DrawBrushModelBVH(int modelIndex, const Color& color, const Vector3D& entityOrigin)
+{
+	s_currentEntityOrigin = entityOrigin;
+	s_currentTriggerColor = color;
+	if (!g_ppCollisionModelContexts || !*g_ppCollisionModelContexts)
+		return;
+
+	const CollisionModelContext_t* ctx = reinterpret_cast<const CollisionModelContext_t*>(
+		reinterpret_cast<const char*>(*g_ppCollisionModelContexts) + 72 * modelIndex);
+
+	// Bounds check against engine's brush model count
+	if (g_pNumBrushModels && modelIndex >= *g_pNumBrushModels)
+		return;
+
+	if (!ctx->bvhNodes || !ctx->leafDataStream)
+		return;
+
+	const Vector3D origin(ctx->scaleOriginX, ctx->scaleOriginY, ctx->scaleOriginZ);
+	float scale = ctx->quantScale;
+	if (scale <= 0.0f)
+		scale = 1.0f;
+
+	// Get player position for distance filter
+	Vector3D playerPos(0, 0, 0);
+	if (g_pEngineClient && g_pClientEntityList)
+	{
+		const int localPlayerIndex = g_pEngineClient->GetLocalPlayer();
+		if (localPlayerIndex > 0)
+		{
+			const IClientEntity* pLocalPlayer = g_pClientEntityList->GetClientEntity(localPlayerIndex);
+			if (pLocalPlayer)
+				playerPos = pLocalPlayer->GetAbsOrigin();
+		}
+	}
+
+	// Use huge filter bounds — trigger BVHs are small (often 1 node) and
+	// the context origin/scale doesn't match world coords for node bounds.
+	// Distance filtering is done at the model level, not per-node.
+	const Vector3D filterMins(-1e9f, -1e9f, -1e9f);
+	const Vector3D filterMaxs(1e9f, 1e9f, 1e9f);
+
+	// Temporarily set the context pointer so DrawNodeRecursive can read it
+	const CollisionModelContext_t* originalCtx = *g_ppCollisionModelContexts;
+	*g_ppCollisionModelContexts = const_cast<CollisionModelContext_t*>(ctx);
+
+	DrawNodeRecursive(ctx->bvhNodes, 0, origin, scale, 0, -1, filterMins, filterMaxs);
+
+	*g_ppCollisionModelContexts = const_cast<CollisionModelContext_t*>(originalCtx);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Render trigger volumes colored by type
+//-----------------------------------------------------------------------------
+void CBSPCollisionDebug::RenderTriggerVolumes()
+{
+	const int mode = bsp_trigger_debug.GetInt();
+	if (mode <= 0)
+		return;
+
+	if (!g_ppCollisionModelContexts || !*g_ppCollisionModelContexts)
+		return;
+
+	// Mark collision data on first render after map load
+	if (g_numTriggerVolumes > 0 && !s_collisionMarked)
+	{
+		s_collisionMarked = true;
+		int collisionCount = 0;
+		const int maxIdx = (g_pNumBrushModels && *g_pNumBrushModels < g_numTriggerVolumes)
+			? *g_pNumBrushModels : g_numTriggerVolumes;
+		for (int i = 1; i < maxIdx; i++)
+		{
+			if (g_triggerVolumes[i].type == TriggerType_e::NONE)
+				continue;
+			const CollisionModelContext_t* ctx = reinterpret_cast<const CollisionModelContext_t*>(
+				reinterpret_cast<const char*>(*g_ppCollisionModelContexts) + 72 * i);
+			if (ctx->bvhNodes)
+			{
+				g_triggerVolumes[i].hasCollision = true;
+				collisionCount++;
+			}
+		}
+		DevMsg(eDLL_T::ENGINE, "TriggerDebug: %d volumes mapped, %d with collision data\n",
+			g_numTriggerVolumes, collisionCount);
+	}
+
+	if (!g_pClientState || !g_pClientState->IsActive())
+		return;
+
+	const int alpha = bsp_collision_debug_alpha.GetInt();
+
+	for (int i = 1; i < g_numTriggerVolumes; i++)
+	{
+		const TriggerVolumeInfo_t& info = g_triggerVolumes[i];
+		if (!info.hasCollision)
+			continue;
+
+		// Filter by mode (-1 = all, 1-9 = specific type)
+		bool draw = false;
+		if (mode == -1)
+		{
+			draw = (info.type != TriggerType_e::NONE);
+		}
+		else
+		{
+			draw = ((int)info.type == mode);
+		}
+
+		if (!draw)
+			continue;
+
+		const Color color = GetTriggerColor(info.type, alpha);
+		const Vector3D entOrigin(info.originX, info.originY, info.originZ);
+		DrawBrushModelBVH(i, color, entOrigin);
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -596,20 +1050,33 @@ void VBSPCollisionDebug::GetVar(void) const
 	}
 
 	// g_pNumBrushModels (dword_1634F14E8) - referenced in CM_ParseStarCollFromEntities
-	// as the bounds check for brush model index: "if (modelIndex >= *g_pNumBrushModels)"
-	// Resolve from CM_ParseStarCollFromEntities if available
+	// at loc_14020FE25: 44 8B 05 XX XX XX XX  mov r8d, cs:dword_1634F14E8
+	// Scan from resolved function pointer (offset 0x245 into function, scan range 1024)
 	if (CM_ParseStarCollFromEntities)
 	{
-		// In sub_14020FBE0, the pattern: cmp reg, cs:dword_1634F14E8
-		// Look for "3B ?? ?? ?? ?? ??" (cmp r32, [rip+disp32]) near the model index check
 		CMemory fnMem(CM_ParseStarCollFromEntities);
-		CMemory numBrushModelsRef = fnMem.FindPattern("3B 05", CMemory::Direction::DOWN, 512);
-		if (numBrushModelsRef)
+		// Search for: mov r8d, cs:[rip+disp32] followed by cmp r13d, r8d; jb
+		// 44 8B 05 ?? ?? ?? ?? 45 3B E8 72
+		CMemory brushModelRef = fnMem.FindPattern("44 8B 05 ?? ?? ?? ?? 45 3B E8 72", CMemory::Direction::DOWN, 1024);
+		if (brushModelRef)
 		{
-			g_pNumBrushModels = numBrushModelsRef.ResolveRelativeAddressSelf(0x2, 0x6).RCast<int32_t*>();
+			g_pNumBrushModels = brushModelRef.ResolveRelativeAddressSelf(0x3, 0x7).RCast<int32_t*>();
 		}
 	}
 #endif // !DEDICATED
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Attach/detach the StarColl parsing detour
+//-----------------------------------------------------------------------------
+void VBSPCollisionDebug::Detour(const bool bAttach) const
+{
+#ifndef DEDICATED
+	if (CM_ParseStarCollFromEntities)
+	{
+		DetourSetup(&CM_ParseStarCollFromEntities, &CM_ParseStarCollFromEntities_Detour, bAttach);
+	}
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
