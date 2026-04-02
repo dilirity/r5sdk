@@ -75,6 +75,8 @@ add_sources( SOURCE_GROUP "Weapon"
     "shared/highlight_context.h"
     "shared/dt_injection.cpp"
     "shared/dt_injection.h"
+    "shared/scriptnetdata_ext.cpp"
+    "shared/scriptnetdata_ext.h"
 )
 
 add_sources( SOURCE_GROUP "Network"

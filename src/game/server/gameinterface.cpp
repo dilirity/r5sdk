@@ -25,6 +25,7 @@
 #include "game/shared/weapon_script_vars.h"
 #include "game/shared/weapon_heat.h"
 #include "game/shared/globalnonrewind_vars.h"
+#include "game/shared/scriptnetdata_ext.h"
 #include "game/shared/deathfield_system.h"
 #include "game/shared/highlight_context.h"
 #ifndef DEDICATED
@@ -103,6 +104,7 @@ void CServerGameDLL::LevelShutdown(void)
 	WeaponScriptVars_InfiniteAmmo_LevelShutdown();
 	WeaponHeat_LevelShutdown();
 	GlobalNonRewind_LevelShutdown();
+	ScriptNetDataExt_LevelShutdown();
 	DeathField_LevelShutdown();
 	HighlightContext_LevelShutdown();
 #ifndef DEDICATED

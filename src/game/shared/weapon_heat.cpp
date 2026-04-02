@@ -468,7 +468,7 @@ SQRESULT Script_Global_Weapon_GetBaseClassName(HSQUIRRELVM v)
 	else
 		sq_pushstring(v, weaponName, -1);
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 SQRESULT Script_Global_Weapon_GetBaseClassNameOrEmpty(HSQUIRRELVM v)
@@ -484,7 +484,7 @@ SQRESULT Script_Global_Weapon_GetBaseClassNameOrEmpty(HSQUIRRELVM v)
 	else
 		sq_pushstring(v, "", -1);
 
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------
@@ -618,7 +618,7 @@ static SQRESULT Script_PlayWeaponEffectNoCullReturnViewEffectHandle(HSQUIRRELVM 
 	// Engine native pushes no return value (void).
 	// We push -1 as handle (EffectSetControlPointVector with -1 is a no-op).
 	sq_pushinteger(v, -1);
-	return SQ_OK;
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
 //-----------------------------------------------------------------------------

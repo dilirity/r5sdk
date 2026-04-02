@@ -9,17 +9,17 @@
 #include "vscript/vscript.h"
 
 // SNDC - Script Net Data Category
+// Engine has 5 categories (0-4). SDK adds GLOBAL_NON_REWIND as category 5.
 enum ScriptNetDataCategory_e
 {
 	SNDC_GLOBAL = 0,
-	SNDC_GLOBAL_NON_REWIND = 1,  // S10+ addition
-	SNDC_PLAYER_GLOBAL = 2,
-	SNDC_PLAYER_EXCLUSIVE = 3,
-	// 4 = unused
-	SNDC_TITAN_SOUL = 5,
-	SNDC_DEATH_BOX = 6,
+	SNDC_PLAYER_GLOBAL = 1,
+	SNDC_PLAYER_EXCLUSIVE = 2,
+	SNDC_TITAN_SOUL = 3,
+	SNDC_DEATH_BOX = 4,
+	SNDC_GLOBAL_NON_REWIND = 5,  // SDK extension — appended to S3's 5 categories
 
-	SNDC_COUNT = 7
+	SNDC_COUNT = 6
 };
 
 // SNVT - Script Net Variable Type

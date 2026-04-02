@@ -930,6 +930,8 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
 
     Script_RegisterRemoteFunctionServerNatives(s);
 
+    s->RegisterConstant("SNDC_GLOBAL_NON_REWIND", 5);
+
     s->RegisterConstant("SHIELD_CHANGE_SOURCE_DIRECT", 0);
     s->RegisterConstant("SHIELD_CHANGE_SOURCE_REGEN", 1);
     s->RegisterConstant("FX_PATTACH_WEAPON_CHARGE_FRACTION_CURVED", 0x18);

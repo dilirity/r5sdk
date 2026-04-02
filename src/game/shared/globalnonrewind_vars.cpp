@@ -13,6 +13,9 @@
 #include "vscript/languages/squirrel_re/include/squirrel.h"
 #include "game/shared/vscript_gamedll_defs.h"
 #include "globalnonrewind_vars.h"
+#include "game/shared/scriptnetdata_ext.h"
+#include "game/shared/dt_injection.h"
+#include "game/client/scriptnetdata_client.h"
 
 #ifdef CLIENT_DLL
 #include "game/client/cliententitylist.h"
@@ -23,7 +26,94 @@
 #include <string>
 
 //-----------------------------------------------------------------------------
-// Storage
+// Entity data array offsets within CScriptNetDataGlobal (from DT RE)
+//-----------------------------------------------------------------------------
+static constexpr int ENT_OFFSET_BOOLS    = 0xC40;  // m_bools[16], 1 byte each
+static constexpr int ENT_OFFSET_RANGES   = 0xC50;  // m_ranges[32], 2 bytes each (uint16)
+static constexpr int ENT_OFFSET_INT32S   = 0xC90;  // m_int32s[8], 4 bytes each
+static constexpr int ENT_OFFSET_TIMES    = 0xCB0;  // m_times[24], 4 bytes each (float)
+static constexpr int ENT_OFFSET_ENTITIES = 0xD10;  // m_entities[16], 4 bytes each (ehandle)
+
+//-----------------------------------------------------------------------------
+// Entity-backed read/write helpers
+//
+// When the NonRewind entity exists, these operate directly on its memory.
+// The DT system replicates changes automatically when edict is marked dirty.
+//-----------------------------------------------------------------------------
+static bool EntitySetBool(const char* name, bool value)
+{
+	if (!g_pScriptNetDataNonRewindEnt) return false;
+	int slot = ScriptNetData_FindVarSlot(name, SNDC_GLOBAL_NON_REWIND);
+	if (slot < 0) return false;
+
+	*reinterpret_cast<uint8_t*>(
+		reinterpret_cast<uintptr_t>(g_pScriptNetDataNonRewindEnt) + ENT_OFFSET_BOOLS + slot) = value ? 1 : 0;
+	DTInject_MarkEntityDirty(g_pScriptNetDataNonRewindEnt);
+	return true;
+}
+
+static bool EntityGetBool(const char* name, bool& out)
+{
+	if (!g_pScriptNetDataNonRewindEnt) return false;
+	int slot = ScriptNetData_FindVarSlot(name, SNDC_GLOBAL_NON_REWIND);
+	if (slot < 0) return false;
+
+	out = *reinterpret_cast<uint8_t*>(
+		reinterpret_cast<uintptr_t>(g_pScriptNetDataNonRewindEnt) + ENT_OFFSET_BOOLS + slot) != 0;
+	return true;
+}
+
+static bool EntitySetInt(const char* name, int value)
+{
+	if (!g_pScriptNetDataNonRewindEnt) return false;
+	int slot = ScriptNetData_FindVarSlot(name, SNDC_GLOBAL_NON_REWIND);
+	if (slot < 0) return false;
+
+	// SNVT_INT: 10-bit signed in m_ranges (uint16), range -512..511
+	*reinterpret_cast<uint16_t*>(
+		reinterpret_cast<uintptr_t>(g_pScriptNetDataNonRewindEnt) + ENT_OFFSET_RANGES + slot * 2)
+		= static_cast<uint16_t>(value & 0x3FF);
+	DTInject_MarkEntityDirty(g_pScriptNetDataNonRewindEnt);
+	return true;
+}
+
+static bool EntityGetInt(const char* name, int& out)
+{
+	if (!g_pScriptNetDataNonRewindEnt) return false;
+	int slot = ScriptNetData_FindVarSlot(name, SNDC_GLOBAL_NON_REWIND);
+	if (slot < 0) return false;
+
+	uint16_t raw = *reinterpret_cast<uint16_t*>(
+		reinterpret_cast<uintptr_t>(g_pScriptNetDataNonRewindEnt) + ENT_OFFSET_RANGES + slot * 2);
+	out = (raw < 0x200) ? static_cast<int>(raw) : static_cast<int>(raw) - 1024;
+	return true;
+}
+
+static bool EntitySetFloat(const char* name, float value)
+{
+	if (!g_pScriptNetDataNonRewindEnt) return false;
+	int slot = ScriptNetData_FindVarSlot(name, SNDC_GLOBAL_NON_REWIND);
+	if (slot < 0) return false;
+
+	*reinterpret_cast<float*>(
+		reinterpret_cast<uintptr_t>(g_pScriptNetDataNonRewindEnt) + ENT_OFFSET_TIMES + slot * 4) = value;
+	DTInject_MarkEntityDirty(g_pScriptNetDataNonRewindEnt);
+	return true;
+}
+
+static bool EntityGetFloat(const char* name, float& out)
+{
+	if (!g_pScriptNetDataNonRewindEnt) return false;
+	int slot = ScriptNetData_FindVarSlot(name, SNDC_GLOBAL_NON_REWIND);
+	if (slot < 0) return false;
+
+	out = *reinterpret_cast<float*>(
+		reinterpret_cast<uintptr_t>(g_pScriptNetDataNonRewindEnt) + ENT_OFFSET_TIMES + slot * 4);
+	return true;
+}
+
+//-----------------------------------------------------------------------------
+// Fallback key-value storage (used when entity isn't available)
 //-----------------------------------------------------------------------------
 struct NonRewindVar_t
 {
@@ -72,11 +162,14 @@ SQRESULT Script_SetGlobalNonRewindNetBool(HSQUIRRELVM v)
 	if (SQ_FAILED(sq_getstring(v, 2, &name)) || !name)
 		return SQ_ERROR;
 
-	if (!EnsureVarSlot(name))
-		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-
 	SQBool value;
 	sq_getbool(v, 3, &value);
+
+	if (EntitySetBool(name, value != 0))
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+	if (!EnsureVarSlot(name))
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 
 	NonRewindVar_t& var = s_nonRewindVars[name];
 	var.type = NonRewindVar_t::BOOL;
@@ -90,11 +183,14 @@ SQRESULT Script_SetGlobalNonRewindNetInt(HSQUIRRELVM v)
 	if (SQ_FAILED(sq_getstring(v, 2, &name)) || !name)
 		return SQ_ERROR;
 
-	if (!EnsureVarSlot(name))
-		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-
 	SQInteger value;
 	sq_getinteger(v, 3, &value);
+
+	if (EntitySetInt(name, static_cast<int>(value)))
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+	if (!EnsureVarSlot(name))
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 
 	NonRewindVar_t& var = s_nonRewindVars[name];
 	var.type = NonRewindVar_t::INT;
@@ -108,11 +204,14 @@ SQRESULT Script_SetGlobalNonRewindNetFloat(HSQUIRRELVM v)
 	if (SQ_FAILED(sq_getstring(v, 2, &name)) || !name)
 		return SQ_ERROR;
 
-	if (!EnsureVarSlot(name))
-		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-
 	SQFloat value;
 	sq_getfloat(v, 3, &value);
+
+	if (EntitySetFloat(name, static_cast<float>(value)))
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+	if (!EnsureVarSlot(name))
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 
 	NonRewindVar_t& var = s_nonRewindVars[name];
 	var.type = NonRewindVar_t::FLOAT;
@@ -126,11 +225,14 @@ SQRESULT Script_SetGlobalNonRewindNetTime(HSQUIRRELVM v)
 	if (SQ_FAILED(sq_getstring(v, 2, &name)) || !name)
 		return SQ_ERROR;
 
-	if (!EnsureVarSlot(name))
-		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
-
 	SQFloat value;
 	sq_getfloat(v, 3, &value);
+
+	if (EntitySetFloat(name, static_cast<float>(value)))
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+	if (!EnsureVarSlot(name))
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 
 	NonRewindVar_t& var = s_nonRewindVars[name];
 	var.type = NonRewindVar_t::TIME;
@@ -147,6 +249,13 @@ SQRESULT Script_GetGlobalNonRewindNetBool(HSQUIRRELVM v)
 	if (SQ_FAILED(sq_getstring(v, 2, &name)) || !name)
 		return SQ_ERROR;
 
+	bool bVal = false;
+	if (EntityGetBool(name, bVal))
+	{
+		sq_pushbool(v, bVal);
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+	}
+
 	auto it = s_nonRewindVars.find(name);
 	if (it != s_nonRewindVars.end() && it->second.type == NonRewindVar_t::BOOL)
 		sq_pushbool(v, it->second.bVal);
@@ -161,6 +270,13 @@ SQRESULT Script_GetGlobalNonRewindNetInt(HSQUIRRELVM v)
 	const SQChar* name = nullptr;
 	if (SQ_FAILED(sq_getstring(v, 2, &name)) || !name)
 		return SQ_ERROR;
+
+	int iVal = 0;
+	if (EntityGetInt(name, iVal))
+	{
+		sq_pushinteger(v, iVal);
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+	}
 
 	auto it = s_nonRewindVars.find(name);
 	if (it != s_nonRewindVars.end() && it->second.type == NonRewindVar_t::INT)
@@ -177,6 +293,13 @@ SQRESULT Script_GetGlobalNonRewindNetFloat(HSQUIRRELVM v)
 	if (SQ_FAILED(sq_getstring(v, 2, &name)) || !name)
 		return SQ_ERROR;
 
+	float fVal = 0.0f;
+	if (EntityGetFloat(name, fVal))
+	{
+		sq_pushfloat(v, fVal);
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+	}
+
 	auto it = s_nonRewindVars.find(name);
 	if (it != s_nonRewindVars.end() && it->second.type == NonRewindVar_t::FLOAT)
 		sq_pushfloat(v, it->second.fVal);
@@ -191,6 +314,13 @@ SQRESULT Script_GetGlobalNonRewindNetTime(HSQUIRRELVM v)
 	const SQChar* name = nullptr;
 	if (SQ_FAILED(sq_getstring(v, 2, &name)) || !name)
 		return SQ_ERROR;
+
+	float fVal = 0.0f;
+	if (EntityGetFloat(name, fVal))
+	{
+		sq_pushfloat(v, fVal);
+		SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+	}
 
 	auto it = s_nonRewindVars.find(name);
 	if (it != s_nonRewindVars.end() && it->second.type == NonRewindVar_t::TIME)
