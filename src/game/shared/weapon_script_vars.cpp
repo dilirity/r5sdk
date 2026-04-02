@@ -479,6 +479,34 @@ static SQRESULT Script_HighlightDisableForTeam(HSQUIRRELVM v)
 	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+static SQRESULT Script_IsHighlightEnabledForTeam(HSQUIRRELVM v)
+{
+	void* pEntity = nullptr;
+	if (!v_sq_getentity(v, reinterpret_cast<SQEntity*>(&pEntity)))
+		return SQ_ERROR;
+
+	SQInteger contextId, team;
+	sq_getinteger(v, 2, &contextId);
+	sq_getinteger(v, 3, &team);
+
+	bool enabled = false;
+	auto it = s_entityHighlightTeams.find(reinterpret_cast<uintptr_t>(pEntity));
+	if (it != s_entityHighlightTeams.end() && contextId >= 0 && contextId <= 254 && team >= 0 && team <= 31)
+	{
+		for (int i = 0; i < HIGHLIGHT_TEAM_MAX_SLOTS; i++)
+		{
+			if (it->second.teamIndex[i] == static_cast<uint8_t>(contextId))
+			{
+				enabled = (it->second.teamBits[i] & (1u << static_cast<int>(team))) != 0;
+				break;
+			}
+		}
+	}
+
+	sq_pushbool(v, enabled);
+	SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //-----------------------------------------------------------------------------
 // Highlight_OverrideParam / Highlight_ClearOverrideParam
 //-----------------------------------------------------------------------------
@@ -931,6 +959,33 @@ void WeaponScriptVars_RegisterEntityFuncs(ScriptClassDescriptor_t* entityStruct)
 		"",
 		false,
 		Script_GetUsableValue);
+
+	entityStruct->AddFunction(
+		"HighlightEnableForTeam",
+		"Script_HighlightEnableForTeam",
+		"Enables highlight for a team by context ID",
+		"void",
+		"int contextId, int team",
+		false,
+		Script_HighlightEnableForTeam);
+
+	entityStruct->AddFunction(
+		"HighlightDisableForTeam",
+		"Script_HighlightDisableForTeam",
+		"Disables highlight for a team by context ID",
+		"void",
+		"int contextId, int team",
+		false,
+		Script_HighlightDisableForTeam);
+
+	entityStruct->AddFunction(
+		"IsHighlightEnabledForTeam",
+		"Script_IsHighlightEnabledForTeam",
+		"Checks if highlight is enabled for a team by context ID",
+		"bool",
+		"int contextId, int team",
+		false,
+		Script_IsHighlightEnabledForTeam);
 
 	entityStruct->AddFunction(
 		"Highlight_OverrideParam",
