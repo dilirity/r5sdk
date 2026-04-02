@@ -204,6 +204,43 @@ struct CollisionBSPData_t
 };
 
 //-----------------------------------------------------------------------------
+// Trigger volume types for debug rendering
+//-----------------------------------------------------------------------------
+enum class TriggerType_e
+{
+	NONE = 0,
+	OUT_OF_BOUNDS,     // 1
+	SLIP,              // 2
+	HURT,              // 3
+	SOUNDSCAPE,        // 4
+	NO_ZIPLINE,        // 5
+	NO_GRAPPLE,        // 6
+	WARP_GATE,         // 7 (phase runner teleporters)
+	SKYDIVE,           // 8 (rift exits)
+	MULTIPLE_OTHER,    // 9 (other trigger_multiple)
+	OTHER_TRIGGER,     // 10
+	NON_TRIGGER        // 11 (func_brush, etc.)
+};
+
+//-----------------------------------------------------------------------------
+// Per-brush-model trigger info, populated during entity lump parsing
+//-----------------------------------------------------------------------------
+struct TriggerVolumeInfo_t
+{
+	TriggerType_e type;
+	bool hasCollision;   // true if CollisionModelContext_t was populated for this model
+	float originX, originY, originZ;  // entity origin offset
+};
+
+// Max brush models we track (matches engine limit)
+constexpr int MAX_TRIGGER_VOLUMES = 4096;
+
+// Trigger volume info array, indexed by brush model index
+// Populated by our CM_ParseStarCollFromEntities detour
+inline TriggerVolumeInfo_t g_triggerVolumes[MAX_TRIGGER_VOLUMES] = {};
+inline int g_numTriggerVolumes = 0;
+
+//-----------------------------------------------------------------------------
 // Debug drawing modes
 //-----------------------------------------------------------------------------
 enum class BVHDebugMode_e
@@ -233,6 +270,10 @@ public:
 
 	// Console command
 	static void CC_DrawBSPCollision(const CCommand& args);
+
+	// Trigger volume rendering
+	static void RenderTriggerVolumes();
+	static void DrawBrushModelBVH(int modelIndex, const Color& color, const Vector3D& entityOrigin);
 
 private:
 	static void DrawNodeRecursive(const CollBvh4Node_t* nodes, int nodeIndex, 
@@ -309,10 +350,17 @@ class VBSPCollisionDebug : public IDetour
 #ifndef DEDICATED
 		// sub_14020FBE0 - parses *coll keys from entity lump text,
 		// base64-decodes StarColl data, and populates CollisionModelContext_t
-		Module_FindPattern(g_GameDll, "48 89 4C 24 08 53 55 57 41 56 48 83 EC 58").GetPtr(CM_ParseStarCollFromEntities);
+		// Pattern scan for sub_14020FBE0 (CM_ParseStarCollFromEntities)
+		// Anchor on unique sequence: movsxd rbx,edx; lea rsi,[rip+??]; mov rcx,rsi; mov [rsp+?],r13; mov edx,400h
+		// Then subtract 0x16 bytes to get to the function start
+		{
+			CMemory mid = Module_FindPattern(g_GameDll, "48 63 DA 48 8D 35 ?? ?? ?? ?? 48 8B CE 4C 89 6C 24 ?? BA 00 04 00 00");
+			if (mid)
+				CM_ParseStarCollFromEntities = mid.Offset(-0x16).RCast<decltype(CM_ParseStarCollFromEntities)>();
+		}
 #endif
 	}
 	virtual void GetVar(void) const;
 	virtual void GetCon(void) const { }
-	virtual void Detour(const bool bAttach) const { }
+	virtual void Detour(const bool bAttach) const;
 };

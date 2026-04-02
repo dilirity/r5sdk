@@ -508,6 +508,7 @@ static void DebugOverlay_DrawAllOverlays(const bool bDraw)
 #ifndef DEDICATED
     // BSP collision debug rendering
     CBSPCollisionDebug::Render();
+    CBSPCollisionDebug::RenderTriggerVolumes();
 #endif // !DEDICATED
 }
 
