@@ -126,7 +126,7 @@ end_header
 	m_tris.resize(m_triCount * 3);
 
 	// Read vertices — bulk memcpy since the binary layout matches rdVec3D (3 floats).
-	const ssize_t vertBytes = (ssize_t)m_vertCount * sizeof(float) * 3;
+	const ssize_t vertBytes = (ssize_t)m_vertCount * 3LL * sizeof(float);
 	if (p + vertBytes > end)
 	{
 		delete[] buf;
