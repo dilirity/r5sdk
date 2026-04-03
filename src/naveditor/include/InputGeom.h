@@ -139,7 +139,7 @@ class InputGeom
 
 	/// @name Convex Volumes.
 	///@{
-	static const int MAX_VOLUMES = 256;
+	static const int MAX_VOLUMES = 2048;
 	ShapeVolume m_volumes[MAX_VOLUMES];
 	int m_volumeCount;
 	///@}
