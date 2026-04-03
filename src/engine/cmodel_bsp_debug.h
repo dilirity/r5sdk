@@ -276,12 +276,12 @@ public:
 	static void DrawBrushModelBVH(int modelIndex, const Color& color, const Vector3D& entityOrigin);
 
 private:
-	static void DrawNodeRecursive(const CollBvh4Node_t* nodes, int nodeIndex, 
+	static void DrawNodeRecursive(const CollisionModelContext_t* ctx, const CollBvh4Node_t* nodes, int nodeIndex,
 		const Vector3D& origin, float scale, int depth, int maxDepth,
 		const Vector3D& filterMins, const Vector3D& filterMaxs);
 
 	static bool NodeIntersectsAABB(const CollBvh4Node_t* node, int childIndex, float scale,
-		const Vector3D& filterMins, const Vector3D& filterMaxs);
+		const Vector3D& origin, const Vector3D& filterMins, const Vector3D& filterMaxs);
 
 	static void GetNodeBounds(const CollBvh4Node_t* node, int childIndex, float scale,
 		const Vector3D& origin, Vector3D& outMins, Vector3D& outMaxs);

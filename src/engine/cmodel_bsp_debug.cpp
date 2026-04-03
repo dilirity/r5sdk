@@ -701,18 +701,8 @@ void CBSPCollisionDebug::GetNodeBounds(const CollBvh4Node_t* node, int childInde
 // Purpose: Check if a node child intersects with an AABB
 //-----------------------------------------------------------------------------
 bool CBSPCollisionDebug::NodeIntersectsAABB(const CollBvh4Node_t* node, int childIndex, float scale,
-	const Vector3D& filterMins, const Vector3D& filterMaxs)
+	const Vector3D& origin, const Vector3D& filterMins, const Vector3D& filterMaxs)
 {
-	// Get origin from the current collision context being rendered
-	Vector3D origin(0, 0, 0);
-	if (g_ppCollisionModelContexts && *g_ppCollisionModelContexts)
-	{
-		const CollisionModelContext_t* ctx = *g_ppCollisionModelContexts;
-		origin.x = ctx->scaleOriginX;
-		origin.y = ctx->scaleOriginY;
-		origin.z = ctx->scaleOriginZ;
-	}
-
 	Vector3D nodeMins, nodeMaxs;
 	GetNodeBounds(node, childIndex, scale, origin, nodeMins, nodeMaxs);
 
@@ -731,7 +721,7 @@ bool CBSPCollisionDebug::NodeIntersectsAABB(const CollBvh4Node_t* node, int chil
 // Purpose: Recursively draw BVH nodes
 // Based on CollBvh_VisitNodes_r from engine decompilation
 //-----------------------------------------------------------------------------
-void CBSPCollisionDebug::DrawNodeRecursive(const CollBvh4Node_t* nodes, int nodeIndex,
+void CBSPCollisionDebug::DrawNodeRecursive(const CollisionModelContext_t* ctx, const CollBvh4Node_t* nodes, int nodeIndex,
 	const Vector3D& origin, float scale, int depth, int maxDepth,
 	const Vector3D& filterMins, const Vector3D& filterMaxs)
 {
@@ -773,15 +763,13 @@ void CBSPCollisionDebug::DrawNodeRecursive(const CollBvh4Node_t* nodes, int node
 			continue;
 
 		// Check if this child intersects our filter AABB
-		if (!NodeIntersectsAABB(node, i, scale, filterMins, filterMaxs))
+		if (!NodeIntersectsAABB(node, i, scale, origin, filterMins, filterMaxs))
 			continue;
 
 		// For leaves, draw the actual collision triangles
 		// childIdx == 0 is valid for type 8 (convex hull) - data starts at stream offset 0
 		if (isLeaf)
 		{
-			const CollisionModelContext_t* ctx = *g_ppCollisionModelContexts;
-			
 			// Draw types 4-8 (4-7 = triangle/quad types, 8 = convex hull)
 			if (childType >= 4 && childType <= 8)
 			{
@@ -793,7 +781,7 @@ void CBSPCollisionDebug::DrawNodeRecursive(const CollBvh4Node_t* nodes, int node
 			// Recurse into internal nodes
 			if (childIdx > 0)
 			{
-				DrawNodeRecursive(nodes, childIdx, origin, scale, depth + 1, maxDepth, filterMins, filterMaxs);
+				DrawNodeRecursive(ctx, nodes, childIdx, origin, scale, depth + 1, maxDepth, filterMins, filterMaxs);
 			}
 		}
 	}
@@ -823,7 +811,7 @@ void CBSPCollisionDebug::DrawBVHNodesAroundPoint(const Vector3D& pos, float radi
 	const Vector3D filterMaxs = pos + Vector3D(radius, radius, radius);
 
 	// Start from root node (index 0)
-	DrawNodeRecursive(ctx->bvhNodes, 0, origin, scale, 0, maxDepth, filterMins, filterMaxs);
+	DrawNodeRecursive(ctx, ctx->bvhNodes, 0, origin, scale, 0, maxDepth, filterMins, filterMaxs);
 }
 
 //-----------------------------------------------------------------------------
@@ -870,13 +858,7 @@ void CBSPCollisionDebug::DrawBrushModelBVH(int modelIndex, const Color& color, c
 	const Vector3D filterMins(-1e9f, -1e9f, -1e9f);
 	const Vector3D filterMaxs(1e9f, 1e9f, 1e9f);
 
-	// Temporarily set the context pointer so DrawNodeRecursive can read it
-	const CollisionModelContext_t* originalCtx = *g_ppCollisionModelContexts;
-	*g_ppCollisionModelContexts = const_cast<CollisionModelContext_t*>(ctx);
-
-	DrawNodeRecursive(ctx->bvhNodes, 0, origin, scale, 0, -1, filterMins, filterMaxs);
-
-	*g_ppCollisionModelContexts = const_cast<CollisionModelContext_t*>(originalCtx);
+	DrawNodeRecursive(ctx, ctx->bvhNodes, 0, origin, scale, 0, -1, filterMins, filterMaxs);
 }
 
 //-----------------------------------------------------------------------------
