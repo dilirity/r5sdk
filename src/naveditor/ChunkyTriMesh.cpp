@@ -151,10 +151,13 @@ static void subdivide(BoundsItem* items, int nitems, int imin, int imax, int tri
 
 		// For large subtrees near the top of the tree, recurse in parallel.
 		// Pre-compute node/tri counts so each side writes to non-overlapping ranges.
-		if (leftCount >= PARALLEL_THRESHOLD && depth < 4)
-		{
-			const int leftNodeCount = countSubtreeNodes(leftCount, trisPerChunk);
+		const int leftNodeCount = (leftCount >= PARALLEL_THRESHOLD && depth < 4)
+			? countSubtreeNodes(leftCount, trisPerChunk) : 0;
+		const int rightNodeCount = (leftNodeCount > 0)
+			? countSubtreeNodes(rightCount, trisPerChunk) : 0;
 
+		if (leftNodeCount > 0 && curNode + leftNodeCount + rightNodeCount <= maxNodes)
+		{
 			// Left subtree gets: nodes [curNode .. curNode+leftNodeCount), tris [curTri .. curTri+leftCount)
 			int leftNodeStart = curNode;
 			int leftTriStart = curTri;
@@ -164,7 +167,6 @@ static void subdivide(BoundsItem* items, int nitems, int imin, int imax, int tri
 			int rightTriStart = curTri + leftCount;
 
 			// Reserve space — advance counters past both subtrees.
-			const int rightNodeCount = countSubtreeNodes(rightCount, trisPerChunk);
 			curNode += leftNodeCount + rightNodeCount;
 			curTri += leftCount + rightCount;
 

@@ -314,7 +314,12 @@ bool sdl_init(SDL_Window*& window, SDL_Renderer*& renderer, int &width, int &hei
 		return false;
 	}
 
-	initGLExtensions();
+	if (!initGLExtensions())
+	{
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to load required GL extensions (VBO support).\n");
+		SDL_Quit();
+		return false;
+	}
 
 	return true;
 }
