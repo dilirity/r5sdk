@@ -49,8 +49,8 @@ end_header
 		fclose(fp);
 		return false;
 	}
-	const ssize_t fileSize = ftell64(fp);
-	if (fileSize < 0)
+	const long long fileSize = ftell64(fp);
+	if (fileSize <= 0)
 	{
 		fclose(fp);
 		return false;
@@ -111,22 +111,47 @@ end_header
 			break;
 
 		if (line.compare(0, 15, "element vertex ") == 0)
-			m_vertCount = atoi(line.c_str() + 15);
+		{
+			char* endptr;
+			const long long val = strtoll(line.c_str() + 15, &endptr, 10);
+			if (endptr == line.c_str() + 15 || val <= 0 || val > INT_MAX)
+			{
+				delete[] buf;
+				return false;
+			}
+			m_vertCount = (int)val;
+		}
 		else if (line.compare(0, 13, "element face ") == 0)
-			m_triCount = atoi(line.c_str() + 13);
+		{
+			char* endptr;
+			const long long val = strtoll(line.c_str() + 13, &endptr, 10);
+			if (endptr == line.c_str() + 13 || val <= 0 || val > INT_MAX)
+			{
+				delete[] buf;
+				return false;
+			}
+			m_triCount = (int)val;
+		}
 	}
 
-	if (m_vertCount <= 0 || m_triCount <= 0)
+	if (m_vertCount <= 0 || m_triCount <= 0 || m_triCount > INT_MAX / 3)
+	{
+		delete[] buf;
+		return false;
+	}
+
+	// Validate claimed sizes fit in remaining buffer before allocating.
+	const long long vertBytes = (long long)m_vertCount * 3LL * sizeof(float);
+	const long long faceBytes = (long long)m_triCount * (1LL + 3LL * sizeof(int));
+	if (vertBytes + faceBytes > end - p)
 	{
 		delete[] buf;
 		return false;
 	}
 
 	m_verts.resize(m_vertCount);
-	m_tris.resize(m_triCount * 3);
+	m_tris.resize((size_t)m_triCount * 3);
 
-	// Read vertices — bulk memcpy since the binary layout matches rdVec3D (3 floats).
-	const ssize_t vertBytes = (ssize_t)m_vertCount * 3LL * sizeof(float);
 	if (p + vertBytes > end)
 	{
 		delete[] buf;
