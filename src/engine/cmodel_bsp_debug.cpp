@@ -152,10 +152,10 @@ void CBSPCollisionDebug::DrawTriangle(const Vector3D& v0, const Vector3D& v1, co
 //   1 = None/empty
 //   2 = Empty leaf
 //   3 = Bundle (references other nodes)
-//   4 = TriStrip (float vertices)
+//   4 = Poly3f (float, triangle)
 //   5 = Poly3 (packed int16, triangle)
-//   6 = Poly4 (packed int16, quad - 2 triangles)
-//   7 = Poly5+ (packed int16, 5+ vertices)
+//   6 = Poly4f (float, quad - parallelogram)
+//   7 = Poly4 (packed int16, quad - parallelogram)
 //   8 = ConvexHull
 //   9 = StaticProp
 //   10 = Heightfield
@@ -174,8 +174,8 @@ void CBSPCollisionDebug::DrawLeafTriangles(const CollisionModelContext_t* ctx, u
 	}
 
 	// Cast verts pointer appropriately based on type
-	// Type 4 uses float vertices (12 bytes per vertex)
-	// Type 5/6/7 use packed int16 vertices (6 bytes per vertex)
+	// Type 4/6 use float vertices (12 bytes per vertex)
+	// Type 5/7 use packed int16 vertices (6 bytes per vertex)
 
 	const int renderMode = bsp_collision_debug_mode.GetInt();
 	const int alpha = bsp_collision_debug_alpha.GetInt();
@@ -347,6 +347,184 @@ void CBSPCollisionDebug::DrawLeafTriangles(const CollisionModelContext_t* ctx, u
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: Draw a ConvexHull leaf (type 8)
+// Self-contained blob with embedded vertices, origin, and scale.
+// Verified via IDA reverse engineering of sub_1402DBB20, sub_1402DCEF0, sub_1402DD190.
+//
+// Hull data format:
+//   Byte 0:    numVertices
+//   Byte 1:    extra (used in offset calculation)
+//   Byte 2:    numTriSections
+//   Byte 3:    numQuadSections
+//   Bytes 4-19:  origin(xyz) + quantScale (4 floats, hull-local)
+//   Bytes 20+:   packed int16 vertices (6 bytes each)
+//   Aligned:     triangle sections (11/9/9 bit layout, same as type 4/5)
+//   After tri:   quad sections (10/9/9 bit layout, parallelogram, same as type 6/7)
+//-----------------------------------------------------------------------------
+void CBSPCollisionDebug::DrawConvexHull(const CollisionModelContext_t* ctx, uint32_t childIdx, int depth)
+{
+	if (!ctx || childIdx == 0 || !ctx->leafDataStream)
+		return;
+
+	const int renderMode = bsp_collision_debug_mode.GetInt();
+	const int alpha = bsp_collision_debug_alpha.GetInt();
+
+	const uint8_t* hullData = reinterpret_cast<const uint8_t*>(&ctx->leafDataStream[childIdx]);
+
+	const int numVertices = hullData[0];
+	const int extraField = hullData[1];
+	const int numTriSections = hullData[2];
+	const int numQuadSections = hullData[3];
+
+	if (numVertices == 0)
+		return;
+
+	// Hull has its own origin and quantization scale at offset 4
+	const float* originScale = reinterpret_cast<const float*>(hullData + 4);
+	const Vector3D hullOrigin(originScale[0], originScale[1], originScale[2]);
+	const float hullScale = originScale[3];
+
+	// Pre-decode all packed int16 vertices from offset 20
+	const int16_t* packedVerts = reinterpret_cast<const int16_t*>(hullData + 20);
+	const int maxVerts = (numVertices < 255) ? numVertices : 255;
+	Vector3D decodedVerts[256];
+
+	for (int v = 0; v < maxVerts; v++)
+		decodedVerts[v] = DecodePackedVertex(packedVerts, v, hullOrigin, hullScale);
+
+	// Compute offset to section data (matches engine formula from sub_1402DBB20)
+	// v32 = extra + 2 * numVerts; offset = 3*v32 + 20, aligned up to 4 bytes
+	const int v32 = extraField + 2 * numVertices;
+	const int x = 3 * v32 + 20;
+	int offset = x + ((-x) & 3);
+
+	// Process triangle sections (11/9/9 bit layout, same as type 4/5)
+	for (int s = 0; s < numTriSections; s++)
+	{
+		const uint16_t* sectionHdr = reinterpret_cast<const uint16_t*>(hullData + offset);
+		const int numPolys = ((sectionHdr[0] >> 12) & 0xF) + 1;
+		const int baseVertex = sectionHdr[1];
+		int runningBase = baseVertex << 10;
+
+		const uint32_t* polyData = reinterpret_cast<const uint32_t*>(sectionHdr + 2);
+
+		for (int i = 0; i < numPolys && i < 16; i++)
+		{
+			const uint32_t triData = polyData[i];
+			const int v0_offset = triData & 0x7FF;
+			const int v1_delta = (triData >> 11) & 0x1FF;
+			const int v2_delta = (triData >> 20) & 0x1FF;
+
+			runningBase += v0_offset;
+			const int idx0 = runningBase;
+			const int idx1 = idx0 + v1_delta + 1;
+			const int idx2 = idx0 + v2_delta + 1;
+
+			if (idx0 >= maxVerts || idx1 >= maxVerts || idx2 >= maxVerts)
+				continue;
+
+			const Color triColor = GetTriangleColor(childIdx, s * 16 + i, alpha);
+			DrawTriangle(decodedVerts[idx0], decodedVerts[idx1], decodedVerts[idx2], triColor, renderMode);
+		}
+
+		offset += 4 + 4 * numPolys;
+	}
+
+	// Process quad sections (10/9/9 bit layout, parallelogram, same as type 6/7)
+	for (int s = 0; s < numQuadSections; s++)
+	{
+		const uint16_t* sectionHdr = reinterpret_cast<const uint16_t*>(hullData + offset);
+		const int numPolys = ((sectionHdr[0] >> 12) & 0xF) + 1;
+		const int baseVertex = sectionHdr[1];
+		int runningBase = baseVertex << 10;
+
+		const uint32_t* polyData = reinterpret_cast<const uint32_t*>(sectionHdr + 2);
+
+		for (int i = 0; i < numPolys && i < 16; i++)
+		{
+			const uint32_t triData = polyData[i];
+			const int v0_offset = triData & 0x3FF;
+			const int v1_delta = (triData >> 10) & 0x1FF;
+			const int v2_delta = (triData >> 19) & 0x1FF;
+
+			runningBase += v0_offset;
+			const int idx0 = runningBase;
+			const int idx1 = idx0 + v1_delta + 1;
+			const int idx2 = idx0 + v2_delta + 1;
+
+			if (idx0 >= maxVerts || idx1 >= maxVerts || idx2 >= maxVerts)
+				continue;
+
+			const Vector3D& v0 = decodedVerts[idx0];
+			const Vector3D& v1 = decodedVerts[idx1];
+			const Vector3D& v2 = decodedVerts[idx2];
+			const Vector3D v3(v1.x + v2.x - v0.x, v1.y + v2.y - v0.y, v1.z + v2.z - v0.z);
+
+			const Color triColor = GetTriangleColor(childIdx, (numTriSections + s) * 16 + i * 2, alpha);
+			const Color triColor2 = GetTriangleColor(childIdx, (numTriSections + s) * 16 + i * 2 + 1, alpha);
+			DrawTriangle(v0, v1, v2, triColor, renderMode);
+			DrawTriangle(v2, v1, v3, triColor2, renderMode);
+		}
+
+		offset += 4 + 4 * numPolys;
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Draw a Bundle leaf (type 3)
+// A container that holds sub-entries of various types and dispatches to them.
+// Verified via IDA reverse engineering of sub_1402DBD40.
+//
+// Bundle data format (in uint32_t units from leafDataStream):
+//   dword 0:          count of sub-entries
+//   dwords 1..count:  per-entry metadata packed as:
+//     bits 0-7:   content mask index
+//     bits 8-15:  child type (3=bundle, 4-7=poly, 8=convexhull, 9=staticprop)
+//     bits 16-31: data size (uint16, in dwords)
+//   After metadata:   sub-entry data blobs (back to back)
+//-----------------------------------------------------------------------------
+void CBSPCollisionDebug::DrawBundleLeaf(const CollisionModelContext_t* ctx, uint32_t childIdx,
+	const Vector3D& origin, float quantScale, int depth)
+{
+	if (!ctx || childIdx == 0 || !ctx->leafDataStream)
+		return;
+
+	const uint32_t* bundleData = &ctx->leafDataStream[childIdx];
+	const uint32_t count = bundleData[0];
+
+	if (count == 0 || count > 256)
+		return;
+
+	// Data starts after the header: 1 dword count + count dwords metadata
+	uint32_t dataOffset = count + 1; // in dwords from bundleData start
+
+	for (uint32_t i = 0; i < count; i++)
+	{
+		const uint32_t meta = bundleData[1 + i];
+		const int subType = (meta >> 8) & 0xFF;
+		const uint32_t dataSize = (meta >> 16) & 0xFFFF; // in dwords
+
+		// Compute the absolute index into leafDataStream for this sub-entry
+		const uint32_t subChildIdx = childIdx + dataOffset;
+
+		if (subType == 3)
+		{
+			DrawBundleLeaf(ctx, subChildIdx, origin, quantScale, depth);
+		}
+		else if (subType >= 4 && subType <= 7)
+		{
+			DrawLeafTriangles(ctx, subChildIdx, subType, origin, quantScale, depth);
+		}
+		else if (subType == 8)
+		{
+			DrawConvexHull(ctx, subChildIdx, depth);
+		}
+
+		dataOffset += dataSize;
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: Get the bounds of a BVH node child
 // The bounds in BVH nodes are stored as int16 quantized values
 // The engine uses SIMD unpacking that shifts int16 to high 16 bits of int32,
@@ -457,11 +635,18 @@ void CBSPCollisionDebug::DrawNodeRecursive(const CollBvh4Node_t* nodes, int node
 		if (isLeaf && childIdx > 0)
 		{
 			const CollisionModelContext_t* ctx = *g_ppCollisionModelContexts;
-			
-			// Only draw types 4-7 which have triangle data
-			if (childType >= 4 && childType <= 7)
+
+			if (childType == 3)
+			{
+				DrawBundleLeaf(ctx, childIdx, origin, scale, depth);
+			}
+			else if (childType >= 4 && childType <= 7)
 			{
 				DrawLeafTriangles(ctx, childIdx, childType, origin, scale, depth);
+			}
+			else if (childType == 8)
+			{
+				DrawConvexHull(ctx, childIdx, depth);
 			}
 		}
 		else if (isInternalNode)

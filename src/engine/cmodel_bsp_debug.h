@@ -210,6 +210,13 @@ private:
 	static void DrawTriangle(const Vector3D& v0, const Vector3D& v1, const Vector3D& v2, const Color& color, int renderMode = 1);
 	static void DrawLeafTriangles(const CollisionModelContext_t* ctx, uint32_t childIdx,
 		int childType, const Vector3D& origin, float quantScale, int depth);
+
+	// Type 8 - ConvexHull: self-contained blob with embedded vertices and origin/scale
+	static void DrawConvexHull(const CollisionModelContext_t* ctx, uint32_t childIdx, int depth);
+
+	// Type 3 - Bundle: container that dispatches to sub-entries of various types
+	static void DrawBundleLeaf(const CollisionModelContext_t* ctx, uint32_t childIdx,
+		const Vector3D& origin, float quantScale, int depth);
 };
 
 //-----------------------------------------------------------------------------
