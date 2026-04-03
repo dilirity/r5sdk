@@ -41,8 +41,11 @@ extern PFNGLBUFFERDATAPROC glBufferData;
 #ifndef GL_STATIC_DRAW
 #define GL_STATIC_DRAW 0x88E4
 #endif
+#ifndef GL_DYNAMIC_DRAW
+#define GL_DYNAMIC_DRAW 0x88E8
+#endif
 
-void initGLExtensions();
+bool initGLExtensions();
 
 // These are example implementations of various interfaces used in Recast and Detour.
 

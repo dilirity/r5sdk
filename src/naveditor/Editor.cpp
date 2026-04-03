@@ -354,13 +354,13 @@ void Editor::drawDisplayListFast(DisplayListCache& cache, duDebugDraw* dd)
 		}
 
 		glBindBuffer(GL_ARRAY_BUFFER, cache.vboPos);
-		glBufferData(GL_ARRAY_BUFFER, dl.size() * sizeof(rdVec3D), dl.getPositions(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, dl.size() * sizeof(rdVec3D), dl.getPositions(), GL_DYNAMIC_DRAW);
 
 		glBindBuffer(GL_ARRAY_BUFFER, cache.vboColor);
-		glBufferData(GL_ARRAY_BUFFER, dl.size() * sizeof(unsigned int), dl.getColors(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, dl.size() * sizeof(unsigned int), dl.getColors(), GL_DYNAMIC_DRAW);
 
 		glBindBuffer(GL_ARRAY_BUFFER, cache.vboUV);
-		glBufferData(GL_ARRAY_BUFFER, dl.size() * sizeof(rdVec2D), dl.getUVs(), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, dl.size() * sizeof(rdVec2D), dl.getUVs(), GL_DYNAMIC_DRAW);
 
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		cache.vboDirty = false;

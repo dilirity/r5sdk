@@ -12,12 +12,14 @@ PFNGLDELETEBUFFERSPROC glDeleteBuffers = nullptr;
 PFNGLBINDBUFFERPROC glBindBuffer = nullptr;
 PFNGLBUFFERDATAPROC glBufferData = nullptr;
 
-void initGLExtensions()
+bool initGLExtensions()
 {
 	glGenBuffers = (PFNGLGENBUFFERSPROC)SDL_GL_GetProcAddress("glGenBuffers");
 	glDeleteBuffers = (PFNGLDELETEBUFFERSPROC)SDL_GL_GetProcAddress("glDeleteBuffers");
 	glBindBuffer = (PFNGLBINDBUFFERPROC)SDL_GL_GetProcAddress("glBindBuffer");
 	glBufferData = (PFNGLBUFFERDATAPROC)SDL_GL_GetProcAddress("glBufferData");
+
+	return glGenBuffers && glDeleteBuffers && glBindBuffer && glBufferData;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
