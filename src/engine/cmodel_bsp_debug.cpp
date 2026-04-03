@@ -702,6 +702,7 @@ void CBSPCollisionDebug::DrawConvexHull(const CollisionModelContext_t* ctx, uint
 
 	const int renderMode = bsp_collision_debug_mode.GetInt();
 	const int alpha = bsp_collision_debug_alpha.GetInt();
+	const bool isTriggerMode = (bsp_trigger_debug.GetInt() != 0);
 
 	const uint8_t* hullData = reinterpret_cast<const uint8_t*>(&ctx->leafDataStream[childIdx]);
 
@@ -723,8 +724,15 @@ void CBSPCollisionDebug::DrawConvexHull(const CollisionModelContext_t* ctx, uint
 	const int maxVerts = (numVertices < 255) ? numVertices : 255;
 	Vector3D decodedVerts[256];
 
+	// For trigger volumes, entity origin must be added (brush models are in local space).
+	// For worldspawn, s_currentEntityOrigin is (0,0,0) so this is a no-op.
+	const Vector3D decodeOrigin(
+		s_currentEntityOrigin.x + hullOrigin.x,
+		s_currentEntityOrigin.y + hullOrigin.y,
+		s_currentEntityOrigin.z + hullOrigin.z);
+
 	for (int v = 0; v < maxVerts; v++)
-		decodedVerts[v] = DecodePackedVertex(packedVerts, v, hullOrigin, hullScale);
+		decodedVerts[v] = DecodePackedVertex(packedVerts, v, decodeOrigin, hullScale);
 
 	// Compute offset to section data (matches engine formula from sub_1402DBB20)
 	// v32 = extra + 2 * numVerts; offset = 3*v32 + 20, aligned up to 4 bytes
@@ -757,7 +765,7 @@ void CBSPCollisionDebug::DrawConvexHull(const CollisionModelContext_t* ctx, uint
 			if (idx0 >= maxVerts || idx1 >= maxVerts || idx2 >= maxVerts)
 				continue;
 
-			const Color triColor = GetTriangleColor(childIdx, s * 16 + i, alpha);
+			const Color triColor = isTriggerMode ? s_currentTriggerColor : GetTriangleColor(childIdx, s * 16 + i, alpha);
 			DrawTriangle(decodedVerts[idx0], decodedVerts[idx1], decodedVerts[idx2], triColor, renderMode);
 		}
 
@@ -794,8 +802,8 @@ void CBSPCollisionDebug::DrawConvexHull(const CollisionModelContext_t* ctx, uint
 			const Vector3D& v2 = decodedVerts[idx2];
 			const Vector3D v3(v1.x + v2.x - v0.x, v1.y + v2.y - v0.y, v1.z + v2.z - v0.z);
 
-			const Color triColor = GetTriangleColor(childIdx, (numTriSections + s) * 16 + i * 2, alpha);
-			const Color triColor2 = GetTriangleColor(childIdx, (numTriSections + s) * 16 + i * 2 + 1, alpha);
+			const Color triColor = isTriggerMode ? s_currentTriggerColor : GetTriangleColor(childIdx, (numTriSections + s) * 16 + i * 2, alpha);
+			const Color triColor2 = isTriggerMode ? s_currentTriggerColor : GetTriangleColor(childIdx, (numTriSections + s) * 16 + i * 2 + 1, alpha);
 			DrawTriangle(v0, v1, v2, triColor, renderMode);
 			DrawTriangle(v2, v1, v3, triColor2, renderMode);
 		}
@@ -1081,7 +1089,7 @@ void CBSPCollisionDebug::DrawBrushModelBVH(int modelIndex, const Color& color, c
 void CBSPCollisionDebug::RenderTriggerVolumes()
 {
 	const int mode = bsp_trigger_debug.GetInt();
-	if (mode <= 0)
+	if (mode == 0)
 		return;
 
 	if (!g_ppCollisionModelContexts || !*g_ppCollisionModelContexts)
