@@ -885,7 +885,7 @@ void CBSPCollisionDebug::DrawBrushModelBVH(int modelIndex, const Color& color, c
 void CBSPCollisionDebug::RenderTriggerVolumes()
 {
 	const int mode = bsp_trigger_debug.GetInt();
-	if (mode <= 0)
+	if (mode == 0)
 		return;
 
 	if (!g_ppCollisionModelContexts || !*g_ppCollisionModelContexts)
