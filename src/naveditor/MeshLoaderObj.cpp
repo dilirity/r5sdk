@@ -107,8 +107,8 @@ static inline bool isFaceLine(const char* p, const char* end)
 	return p + 1 < end && p[0] == 'f' && (p[1] == ' ' || p[1] == '\t');
 }
 
-// Minimal float parser for OBJ data. Handles [-]digits[.digits] only.
-// No scientific notation, no NaN/Inf — OBJ files don't use them.
+// Fast float parser for OBJ data. Handles [-]digits[.digits][e[-]digits].
+// No NaN/Inf — OBJ files don't use them.
 static inline float fastParseFloat(const char*& p, const char* end)
 {
 	while (p < end && (*p == ' ' || *p == '\t'))
@@ -144,6 +144,36 @@ static inline float fastParseFloat(const char*& p, const char* end)
 			p++;
 		}
 		val += frac / div;
+	}
+
+	if (p < end && (*p == 'e' || *p == 'E'))
+	{
+		p++;
+		int expSign = 1;
+		if (p < end && *p == '-')
+		{
+			expSign = -1;
+			p++;
+		}
+		else if (p < end && *p == '+')
+		{
+			p++;
+		}
+
+		int exp = 0;
+		while (p < end && *p >= '0' && *p <= '9')
+		{
+			exp = exp * 10 + (*p - '0');
+			p++;
+		}
+
+		// Apply exponent via repeated multiply/divide (exponents in OBJ
+		// are small, typically < 10, so this is faster than powf).
+		float scale = 1.0f;
+		for (int i = 0; i < exp; i++)
+			scale *= 10.0f;
+
+		val = (expSign > 0) ? val * scale : val / scale;
 	}
 
 	return sign * val;
