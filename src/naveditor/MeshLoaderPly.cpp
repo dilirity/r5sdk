@@ -153,6 +153,14 @@ end_header
 
 		memcpy(&m_tris[i * 3], p, 3 * sizeof(int));
 		p += 3 * sizeof(int);
+
+		if (m_tris[i * 3] < 0 || m_tris[i * 3] >= m_vertCount ||
+			m_tris[i * 3 + 1] < 0 || m_tris[i * 3 + 1] >= m_vertCount ||
+			m_tris[i * 3 + 2] < 0 || m_tris[i * 3 + 2] >= m_vertCount)
+		{
+			delete[] buf;
+			return false;
+		}
 	}
 
 	delete[] buf;
