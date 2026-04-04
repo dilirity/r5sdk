@@ -856,13 +856,12 @@ int not_main(int argc, char** argv)
 			simIter++;
 		}
 
-		// Clamp the framerate so that we do not hog all the CPU.
-		const float MIN_FRAME_TIME = 1.0f / 40.0f;
+		// Clamp the framerate to 60 FPS to reduce GPU load.
+		const float MIN_FRAME_TIME = 1.0f / 60.0f;
 		if (dt < MIN_FRAME_TIME)
 		{
 			int ms = (int)((MIN_FRAME_TIME - dt) * 1000.0f);
-			if (ms > 10) ms = 10;
-			if (ms >= 0) SDL_Delay(ms);
+			if (ms > 0) SDL_Delay(ms);
 		}
 		
 		// Set the viewport.

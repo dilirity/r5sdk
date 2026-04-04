@@ -309,7 +309,25 @@ protected:
 		DisplayListCache() : vboPos(0), vboColor(0), vboUV(0), vboDirty(true) {}
 	};
 
+	// Indexed mesh VBOs for large input meshes — uses glDrawElements with
+	// shared vertices instead of unrolling to 3x non-indexed vertex soup.
+	struct IndexedMeshCache
+	{
+		unsigned int vboPos;
+		unsigned int vboColor;
+		unsigned int vboUV;
+		unsigned int ibo;
+		int vertCount;
+		int indexCount;
+		bool dirty;
+
+		IndexedMeshCache() : vboPos(0), vboColor(0), vboUV(0), ibo(0), vertCount(0), indexCount(0), dirty(true) {}
+	};
+
+	static const int INDEXED_MESH_THRESHOLD = 1000000;
+
 	DisplayListCache m_inputMeshCache;
+	IndexedMeshCache m_inputMeshIndexed;
 	DisplayListCache m_navMeshCache;
 	bool m_inputMeshCacheDirty;
 	bool m_navMeshCacheDirty;
@@ -399,6 +417,7 @@ public:
 
 	void updateTraverseLinkRenderParams();
 	void drawInputMeshCached(float maxSlope, float texScale);
+	void drawInputMeshIndexed(float maxSlope, float texScale);
 	void drawNavMeshCached(unsigned int flags);
 	void invalidateNavMeshCache() { m_navMeshCacheDirty = true; }
 

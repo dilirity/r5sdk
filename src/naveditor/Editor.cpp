@@ -189,6 +189,10 @@ Editor::~Editor()
 	if (m_inputMeshCache.vboPos) glDeleteBuffers(1, &m_inputMeshCache.vboPos);
 	if (m_inputMeshCache.vboColor) glDeleteBuffers(1, &m_inputMeshCache.vboColor);
 	if (m_inputMeshCache.vboUV) glDeleteBuffers(1, &m_inputMeshCache.vboUV);
+	if (m_inputMeshIndexed.vboPos) glDeleteBuffers(1, &m_inputMeshIndexed.vboPos);
+	if (m_inputMeshIndexed.vboColor) glDeleteBuffers(1, &m_inputMeshIndexed.vboColor);
+	if (m_inputMeshIndexed.vboUV) glDeleteBuffers(1, &m_inputMeshIndexed.vboUV);
+	if (m_inputMeshIndexed.ibo) glDeleteBuffers(1, &m_inputMeshIndexed.ibo);
 	if (m_navMeshCache.vboPos) glDeleteBuffers(1, &m_navMeshCache.vboPos);
 	if (m_navMeshCache.vboColor) glDeleteBuffers(1, &m_navMeshCache.vboColor);
 	if (m_navMeshCache.vboUV) glDeleteBuffers(1, &m_navMeshCache.vboUV);
@@ -432,6 +436,145 @@ void Editor::drawInputMeshCached(float maxSlope, float texScale)
 	}
 
 	drawDisplayListFast(m_inputMeshCache, &m_dd);
+}
+
+void Editor::drawInputMeshIndexed(float maxSlope, float texScale)
+{
+	if (!m_geom || !m_geom->getMesh())
+		return;
+
+	IndexedMeshCache& cache = m_inputMeshIndexed;
+
+	if (m_inputMeshCacheDirty || cache.dirty)
+	{
+		const IMeshLoader* mesh = m_geom->getMesh();
+		const rdVec3D* verts = mesh->getVerts();
+		const rdVec3D* normals = mesh->getNormals();
+		const int* tris = mesh->getTris();
+		const int vertCount = mesh->getVertCount();
+		const int triCount = mesh->getTriCount();
+
+		cache.vertCount = vertCount;
+		cache.indexCount = triCount * 3;
+
+		const float walkableThr = rdMathCosf(maxSlope / 180.0f * RD_PI);
+		const unsigned int unwalkable = duRGBA(192, 128, 0, 255);
+
+		unsigned int* colors = new unsigned int[vertCount];
+		rdVec2D* uvs = new rdVec2D[vertCount];
+
+		{
+			const int numWorkers = rdMax(1, (int)std::thread::hardware_concurrency() - 1);
+			std::atomic<int> nextChunk(0);
+			const int chunkSize = 8192;
+
+			auto worker = [&]()
+			{
+				for (;;)
+				{
+					const int start = nextChunk.fetch_add(chunkSize);
+					if (start >= triCount)
+						break;
+					const int end = rdMin(start + chunkSize, triCount);
+					for (int i = start; i < end; i++)
+					{
+						const rdVec3D* norm = &normals[i];
+						unsigned char a = (unsigned char)(220 * (2 + norm->x + norm->y) / 4);
+						unsigned int color;
+						if (norm->z < walkableThr)
+							color = duLerpCol(duRGBA(a, a, a, 255), unwalkable, 64);
+						else
+							color = duRGBA(a, a, a, 255);
+
+						// Pick UV projection axis from face normal, same as duDebugDrawTriMeshSlope.
+						int ax = 2;
+						float absNorm = rdAbs((*norm)[ax]);
+						if (rdAbs(norm->x) > absNorm) { ax = 0; absNorm = rdAbs(norm->x); }
+						if (rdAbs(norm->y) > absNorm) { ax = 1; }
+						ax = (1 << ax) & 3;
+						const int ay = (1 << ax) & 3;
+
+						const int i0 = tris[i * 3 + 0];
+						const int i1 = tris[i * 3 + 1];
+						const int i2 = tris[i * 3 + 2];
+
+						colors[i0] = color;
+						colors[i1] = color;
+						colors[i2] = color;
+
+						uvs[i0] = { verts[i0][ax] * texScale, verts[i0][ay] * texScale };
+						uvs[i1] = { verts[i1][ax] * texScale, verts[i1][ay] * texScale };
+						uvs[i2] = { verts[i2][ax] * texScale, verts[i2][ay] * texScale };
+					}
+				}
+			};
+
+			std::vector<std::thread> workers;
+			for (int i = 0; i < numWorkers; i++)
+				workers.emplace_back(worker);
+			for (auto& w : workers)
+				w.join();
+		}
+
+		if (!cache.vboPos)
+		{
+			glGenBuffers(1, &cache.vboPos);
+			glGenBuffers(1, &cache.vboColor);
+			glGenBuffers(1, &cache.vboUV);
+			glGenBuffers(1, &cache.ibo);
+		}
+
+		glBindBuffer(GL_ARRAY_BUFFER, cache.vboPos);
+		glBufferData(GL_ARRAY_BUFFER, vertCount * sizeof(rdVec3D), verts, GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, cache.vboColor);
+		glBufferData(GL_ARRAY_BUFFER, vertCount * sizeof(unsigned int), colors, GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, cache.vboUV);
+		glBufferData(GL_ARRAY_BUFFER, vertCount * sizeof(rdVec2D), uvs, GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cache.ibo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, cache.indexCount * sizeof(int), tris, GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		delete[] colors;
+		delete[] uvs;
+
+		cache.dirty = false;
+		m_inputMeshCacheDirty = false;
+	}
+
+	// Flat shading so each triangle gets a uniform color from its provoking vertex.
+	glShadeModel(GL_FLAT);
+
+	m_dd.texture(true);
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_COLOR_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+	glBindBuffer(GL_ARRAY_BUFFER, cache.vboPos);
+	glVertexPointer(3, GL_FLOAT, sizeof(rdVec3D), 0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, cache.vboColor);
+	glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(unsigned int), 0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, cache.vboUV);
+	glTexCoordPointer(2, GL_FLOAT, sizeof(rdVec2D), 0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cache.ibo);
+	glDrawElements(GL_TRIANGLES, cache.indexCount, GL_UNSIGNED_INT, 0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_COLOR_ARRAY);
+
+	m_dd.texture(false);
+	glShadeModel(GL_SMOOTH);
 }
 
 void Editor::drawNavMeshCached(unsigned int flags)
