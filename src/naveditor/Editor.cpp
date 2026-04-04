@@ -423,19 +423,28 @@ void Editor::drawInputMeshCached(float maxSlope, float texScale)
 	if (!m_geom || !m_geom->getMesh())
 		return;
 
-	if (m_inputMeshCacheDirty)
-	{
-		m_inputMeshCache.list.clear();
-		duDebugDrawTriMeshSlope(&m_inputMeshCache.list,
-			m_geom->getMesh()->getVerts(), m_geom->getMesh()->getVertCount(),
-			m_geom->getMesh()->getTris(), m_geom->getMesh()->getNormals(),
-			m_geom->getMesh()->getTriCount(),
-			maxSlope, texScale, nullptr);
-		m_inputMeshCacheDirty = false;
-		m_inputMeshCache.vboDirty = true;
-	}
+	const int triCount = m_geom->getMesh()->getTriCount();
 
-	drawDisplayListFast(m_inputMeshCache, &m_dd);
+	if (triCount >= INDEXED_MESH_THRESHOLD)
+	{
+		drawInputMeshIndexed(maxSlope, texScale);
+	}
+	else
+	{
+		if (m_inputMeshCacheDirty)
+		{
+			m_inputMeshCache.list.clear();
+			duDebugDrawTriMeshSlope(&m_inputMeshCache.list,
+				m_geom->getMesh()->getVerts(), m_geom->getMesh()->getVertCount(),
+				m_geom->getMesh()->getTris(), m_geom->getMesh()->getNormals(),
+				m_geom->getMesh()->getTriCount(),
+				maxSlope, texScale, nullptr);
+			m_inputMeshCacheDirty = false;
+			m_inputMeshCache.vboDirty = true;
+		}
+
+		drawDisplayListFast(m_inputMeshCache, &m_dd);
+	}
 }
 
 void Editor::drawInputMeshIndexed(float maxSlope, float texScale)
