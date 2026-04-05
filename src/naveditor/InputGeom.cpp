@@ -820,6 +820,10 @@ void InputGeom::drawConvexVolumes(struct duDebugDraw* dd, const rdVec3D* offset,
 			dd->vertex(vb->x,vb->y,vol->hmax, col);
 			dd->vertex(vol->verts->x,vol->verts->y,vol->hmax, col);
 
+			dd->vertex(vb->x,vb->y,vol->hmin, duDarkenCol(col));
+			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
+			dd->vertex(vol->verts->x,vol->verts->y,vol->hmin, duDarkenCol(col));
+
 			dd->vertex(vb->x,vb->y,vol->hmax, col);
 			dd->vertex(va->x,va->y,vol->hmax, col);
 			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
