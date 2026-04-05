@@ -321,6 +321,10 @@ bool sdl_init(SDL_Window*& window, SDL_Renderer*& renderer, int &width, int &hei
 		return false;
 	}
 
+	// Enable VSync — ties frame rate to monitor refresh (typically 60Hz).
+	// More reliable than SDL_Delay for frame limiting, no jitter.
+	SDL_GL_SetSwapInterval(1);
+
 	return true;
 }
 
@@ -856,13 +860,7 @@ int not_main(int argc, char** argv)
 			simIter++;
 		}
 
-		// Clamp the framerate to 60 FPS to reduce GPU load.
-		const float MIN_FRAME_TIME = 1.0f / 60.0f;
-		if (dt < MIN_FRAME_TIME)
-		{
-			int ms = (int)((MIN_FRAME_TIME - dt) * 1000.0f);
-			if (ms > 0) SDL_Delay(ms);
-		}
+		// Frame pacing handled by VSync — no software limiter needed.
 		
 		// Set the viewport.
 		glViewport(0, 0, width, height);
