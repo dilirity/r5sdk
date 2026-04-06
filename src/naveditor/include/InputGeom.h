@@ -46,17 +46,16 @@ struct ShapeVolume
 		for (int i = 0; i < MAX_SHAPEVOL_PTS; i++)
 		{
 			verts[i].init(0.f,0.f,0.f);
+			tops[i] = 0.f;
 		}
-		hmin = 0.f;
-		hmax = 0.f;
 		nverts = 0;
 		flags = 0;
 		area = 0;
 		type = VOLUME_INVALID;
 	}
 
-	rdVec3D verts[MAX_SHAPEVOL_PTS];
-	float hmin, hmax;
+	rdVec3D verts[MAX_SHAPEVOL_PTS]; // verts[i].z = bottom Z
+	float tops[MAX_SHAPEVOL_PTS];    // tops[i] = top Z
 	int nverts;
 	unsigned short flags;
 	unsigned char area;
@@ -200,8 +199,8 @@ public:
 						 unsigned short flags, unsigned char area);
 	int addCylinderVolume(const rdVec3D* pos, const float radius,
 						 const float height, unsigned short flags, unsigned char area);
-	int addConvexVolume(const rdVec3D* verts, const int nverts,
-						 const float minh, const float maxh, unsigned short flags, unsigned char area);
+	int addConvexVolume(const rdVec3D* verts, const float* tops, const int nverts,
+						 unsigned short flags, unsigned char area);
 	void deleteShapeVolume(int i);
 	void drawBoxVolumes(struct duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx = -1);
 	void drawCylinderVolumes(struct duDebugDraw* dd, const rdVec3D* offset, const int hilightIdx = -1);

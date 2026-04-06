@@ -251,8 +251,6 @@ bool InputGeom::loadGeomSet(rcContext* ctx, const std::string& filepath)
 					&vol->verts[0].x, &vol->verts[0].y, &vol->verts[0].z,
 					&vol->verts[1].x, &vol->verts[1].y, &vol->verts[1].z);
 
-				vol->hmin = 0.0f;
-				vol->hmax = 0.0f;
 				vol->nverts = 6;
 				vol->type = VOLUME_BOX;
 			}
@@ -268,24 +266,46 @@ bool InputGeom::loadGeomSet(rcContext* ctx, const std::string& filepath)
 					&vol->verts[0].x, &vol->verts[0].y, &vol->verts[0].z,
 					&vol->verts[1].x, &vol->verts[1].y);
 
-				vol->hmin = 0.0f;
-				vol->hmax = 0.0f;
 				vol->nverts = 5;
 				vol->type = VOLUME_CYLINDER;
 			}
 		}
 		else if (row[0] == 'p')
 		{
-			// Convex polygon volumes
+			// Legacy convex polygon volumes (flat hmin/hmax)
 			if (m_volumeCount < MAX_VOLUMES)
 			{
 				ShapeVolume* vol = &m_volumes[m_volumeCount++];
-				sscanf(row+1, "%d %hu %hhu %f %f", &vol->nverts, &vol->flags, &vol->area, &vol->hmin, &vol->hmax);
+				float hmin, hmax;
+				sscanf(row+1, "%d %hu %hhu %f %f", &vol->nverts, &vol->flags, &vol->area, &hmin, &hmax);
 				for (int i = 0; i < vol->nverts; ++i)
 				{
 					row[0] = '\0';
 					src = parseRow(src, srcEnd, row, sizeof(row)/sizeof(char));
 					sscanf(row, "%f %f %f", &vol->verts[i].x, &vol->verts[i].y, &vol->verts[i].z);
+				}
+
+				// Convert legacy flat hmin/hmax to per-vertex tops.
+				for (int i = 0; i < vol->nverts; ++i)
+				{
+					vol->verts[i].z = hmin;
+					vol->tops[i] = hmax;
+				}
+				vol->type = VOLUME_CONVEX;
+			}
+		}
+		else if (row[0] == 'P')
+		{
+			// Convex polygon volumes (per-vertex bottom and top Z)
+			if (m_volumeCount < MAX_VOLUMES)
+			{
+				ShapeVolume* vol = &m_volumes[m_volumeCount++];
+				sscanf(row+1, "%d %hu %hhu", &vol->nverts, &vol->flags, &vol->area);
+				for (int i = 0; i < vol->nverts; ++i)
+				{
+					row[0] = '\0';
+					src = parseRow(src, srcEnd, row, sizeof(row)/sizeof(char));
+					sscanf(row, "%f %f %f %f", &vol->verts[i].x, &vol->verts[i].y, &vol->verts[i].z, &vol->tops[i]);
 				}
 
 				vol->type = VOLUME_CONVEX;
@@ -437,9 +457,9 @@ bool InputGeom::saveGeomSet(const BuildSettings* settings)
 				vol->verts[1].x, vol->verts[1].y);
 			break;
 		case VOLUME_CONVEX:
-			fprintf(fp, "p %d %hu %hhu %f %f\n", vol->nverts, vol->flags, vol->area, vol->hmin, vol->hmax);
+			fprintf(fp, "P %d %hu %hhu\n", vol->nverts, vol->flags, vol->area);
 			for (int j = 0; j < vol->nverts; ++j)
-				fprintf(fp, "%f %f %f\n", vol->verts[j].x, vol->verts[j].y, vol->verts[j].z);
+				fprintf(fp, "%f %f %f %f\n", vol->verts[j].x, vol->verts[j].y, vol->verts[j].z, vol->tops[j]);
 		}
 	}
 	
@@ -494,7 +514,13 @@ bool InputGeom::raycastMesh(const rdVec3D* src, const rdVec3D* dst, const unsign
 		}
 		else if (vol.type == VOLUME_CONVEX)
 		{
-			if (rdIntersectSegmentConvexHull(src, dst, vol.verts, vol.nverts, vol.hmin, vol.hmax, tsmin, tsmax))
+			float volHmin = FLT_MAX, volHmax = -FLT_MAX;
+			for (int v = 0; v < vol.nverts; v++)
+			{
+				volHmin = rdMin(volHmin, vol.verts[v].z);
+				volHmax = rdMax(volHmax, vol.tops[v]);
+			}
+			if (rdIntersectSegmentConvexHull(src, dst, vol.verts, vol.nverts, volHmin, volHmax, tsmin, tsmax))
 				isect = true;
 		}
 
@@ -674,8 +700,6 @@ int InputGeom::addBoxVolume(const rdVec3D* bmin, const rdVec3D* bmax,
 	ShapeVolume* vol = &m_volumes[m_volumeCount++];
 	rdVcopy(&vol->verts[0], bmin);
 	rdVcopy(&vol->verts[1], bmax);
-	vol->hmin = 0.0f;
-	vol->hmax = 0.0f;
 	vol->nverts = 6;
 	vol->flags = flags;
 	vol->area = area;
@@ -692,8 +716,6 @@ int InputGeom::addCylinderVolume(const rdVec3D* pos, const float radius,
 	rdVcopy(vol->verts, pos);
 	vol->verts[1].x = radius;
 	vol->verts[1].y = height;
-	vol->hmin = 0.0f;
-	vol->hmax = 0.0f;
 	vol->nverts = 5;
 	vol->flags = flags;
 	vol->area = area;
@@ -702,14 +724,13 @@ int InputGeom::addCylinderVolume(const rdVec3D* pos, const float radius,
 	return m_volumeCount-1;
 }
 
-int InputGeom::addConvexVolume(const rdVec3D* verts, const int nverts,
-								const float minh, const float maxh, unsigned short flags, unsigned char area)
+int InputGeom::addConvexVolume(const rdVec3D* verts, const float* tops, const int nverts,
+								unsigned short flags, unsigned char area)
 {
 	if (m_volumeCount >= MAX_VOLUMES) return -1;
 	ShapeVolume* vol = &m_volumes[m_volumeCount++];
 	memcpy(vol->verts, verts, sizeof(rdVec3D)*nverts);
-	vol->hmin = minh;
-	vol->hmax = maxh;
+	memcpy(vol->tops, tops, sizeof(float)*nverts);
 	vol->nverts = nverts;
 	vol->flags = flags;
 	vol->area = area;
@@ -815,22 +836,30 @@ void InputGeom::drawConvexVolumes(struct duDebugDraw* dd, const rdVec3D* offset,
 		{
 			const rdVec3D* va = &vol->verts[k];
 			const rdVec3D* vb = &vol->verts[j];
+			const rdVec3D* v0 = &vol->verts[0];
 
-			dd->vertex(va->x,va->y,vol->hmax, col);
-			dd->vertex(vb->x,vb->y,vol->hmax, col);
-			dd->vertex(vol->verts->x,vol->verts->y,vol->hmax, col);
+			const float va_top = vol->tops[k];
+			const float vb_top = vol->tops[j];
+			const float v0_top = vol->tops[0];
 
-			dd->vertex(vb->x,vb->y,vol->hmin, duDarkenCol(col));
-			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
-			dd->vertex(vol->verts->x,vol->verts->y,vol->hmin, duDarkenCol(col));
+			// Top face
+			dd->vertex(va->x,va->y,va_top, col);
+			dd->vertex(vb->x,vb->y,vb_top, col);
+			dd->vertex(v0->x,v0->y,v0_top, col);
 
-			dd->vertex(vb->x,vb->y,vol->hmax, col);
-			dd->vertex(va->x,va->y,vol->hmax, col);
-			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
+			// Bottom face
+			dd->vertex(vb->x,vb->y,vb->z, duDarkenCol(col));
+			dd->vertex(va->x,va->y,va->z, duDarkenCol(col));
+			dd->vertex(v0->x,v0->y,v0->z, duDarkenCol(col));
 
-			dd->vertex(vb->x,vb->y,vol->hmin, duDarkenCol(col));
-			dd->vertex(vb->x,vb->y,vol->hmax, col);
-			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
+			// Side faces
+			dd->vertex(vb->x,vb->y,vb_top, col);
+			dd->vertex(va->x,va->y,va_top, col);
+			dd->vertex(va->x,va->y,va->z, duDarkenCol(col));
+
+			dd->vertex(vb->x,vb->y,vb->z, duDarkenCol(col));
+			dd->vertex(vb->x,vb->y,vb_top, col);
+			dd->vertex(va->x,va->y,va->z, duDarkenCol(col));
 		}
 	}
 	
@@ -855,12 +884,12 @@ void InputGeom::drawConvexVolumes(struct duDebugDraw* dd, const rdVec3D* offset,
 		{
 			const rdVec3D* va = &vol->verts[k];
 			const rdVec3D* vb = &vol->verts[j];
-			dd->vertex(vb->x,vb->y,vol->hmin, duDarkenCol(col));
-			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
-			dd->vertex(vb->x,vb->y,vol->hmax, col);
-			dd->vertex(va->x,va->y,vol->hmax, col);
-			dd->vertex(va->x,va->y,vol->hmax, col);
-			dd->vertex(va->x,va->y,vol->hmin, duDarkenCol(col));
+			dd->vertex(vb->x,vb->y,vb->z, duDarkenCol(col));
+			dd->vertex(va->x,va->y,va->z, duDarkenCol(col));
+			dd->vertex(vb->x,vb->y,vol->tops[j], col);
+			dd->vertex(va->x,va->y,vol->tops[k], col);
+			dd->vertex(va->x,va->y,vol->tops[k], col);
+			dd->vertex(va->x,va->y,va->z, duDarkenCol(col));
 		}
 	}
 	dd->end();
@@ -882,8 +911,8 @@ void InputGeom::drawConvexVolumes(struct duDebugDraw* dd, const rdVec3D* offset,
 
 		for (int j = 0; j < vol->nverts; ++j)
 		{
-			dd->vertex(vol->verts[j].x,vol->verts[j].y,vol->hmax, col);
-			dd->vertex(vol->verts[j].x,vol->verts[j].y,vol->hmin, col);
+			dd->vertex(vol->verts[j].x,vol->verts[j].y,vol->tops[j], col);
+			dd->vertex(vol->verts[j].x,vol->verts[j].y,vol->verts[j].z, col);
 			dd->vertex(vol->verts[j].x,vol->verts[j].y+0.1f,vol->verts[j].z, col);
 		}
 	}

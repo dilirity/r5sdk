@@ -966,18 +966,17 @@ void rcMarkBoxArea(rcContext* ctx, const rdVec3D* bmin, const rdVec3D* bmax,
 				   unsigned short flags, unsigned char areaId,
 				   rcCompactHeightfield& chf);
 
-/// Applies the area id to the all spans within the specified convex polygon. 
+/// Applies the area id to the all spans within the specified convex polygon.
+/// Height bounds are per-vertex: bottom = verts[i].z, top = tops[i].
 /// @ingroup recast
 /// @param[in,out]	ctx		The build context to use during the operation.
-/// @param[in]		verts	The vertices of the polygon [Form: (x, y, z) * @p nverts]
+/// @param[in]		verts	The vertices of the polygon [Form: (x, y, z) * @p nverts]. z = bottom height.
+/// @param[in]		tops	The per-vertex top heights. [Size: @p nverts]
 /// @param[in]		nverts	The number of vertices in the polygon.
-/// @param[in]		hmin	The height of the base of the polygon.
-/// @param[in]		hmax	The height of the top of the polygon.
 /// @param[in]		flags	The flags to apply.
 /// @param[in]		areaId	The area id to apply. [Limit: <= #RC_WALKABLE_AREA]
 /// @param[in,out]	chf		A populated compact heightfield.
-void rcMarkConvexPolyArea(rcContext* ctx, const rdVec3D* verts, const int nverts,
-						  const float hmin, const float hmax, 
+void rcMarkConvexPolyArea(rcContext* ctx, const rdVec3D* verts, const float* tops, const int nverts,
 						  unsigned short flags, unsigned char areaId,
 						  rcCompactHeightfield& chf);
 

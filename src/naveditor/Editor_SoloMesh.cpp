@@ -302,7 +302,7 @@ bool Editor_SoloMesh::handleBuild()
 	// (Optional) Mark areas.
 	const ShapeVolume* vols = m_geom->getShapeVolumes();
 	for (int i  = 0; i < m_geom->getShapeVolumeCount(); ++i)
-		rcMarkConvexPolyArea(m_ctx, vols[i].verts, vols[i].nverts, vols[i].hmin, vols[i].hmax, (unsigned short)vols[i].flags, (unsigned char)vols[i].area, *m_chf);
+		rcMarkConvexPolyArea(m_ctx, vols[i].verts, vols[i].tops, vols[i].nverts, (unsigned short)vols[i].flags, (unsigned char)vols[i].area, *m_chf);
 
 	
 	// Partition the heightfield so that we can use simple algorithm later to triangulate the walkable areas.

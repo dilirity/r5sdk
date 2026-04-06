@@ -41,7 +41,7 @@ class ShapeVolumeTool : public EditorTool
 	float m_cylinderHeight;
 
 	float m_convexOffset;
-	float m_convexHeight;
+	float m_convexAscent;
 	float m_convexDescent;
 	
 	rdVec3D m_pts[MAX_SHAPEVOL_PTS];

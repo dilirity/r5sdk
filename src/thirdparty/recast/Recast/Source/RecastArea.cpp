@@ -433,29 +433,29 @@ void rcMarkBoxArea(rcContext* ctx, const rdVec3D* bmin, const rdVec3D* bmax,
 /// @par
 ///
 /// The value of spacial parameters are in world units.
-/// 
-/// The z-values of the polygon vertices are ignored. So the polygon is effectively 
-/// projected onto the xy-plane at @p hmin, then extruded to @p hmax.
-/// 
+///
+/// Height bounds are per-vertex: bottom = verts[i].z, top = tops[i].
+/// Both surfaces are interpolated across the polygon using barycentric coordinates.
+///
 /// @see rcCompactHeightfield, rcMedianFilterWalkableArea
-void rcMarkConvexPolyArea(rcContext* ctx, const rdVec3D* verts, const int nverts,
-						  const float hmin, const float hmax,
+void rcMarkConvexPolyArea(rcContext* ctx, const rdVec3D* verts, const float* tops, const int nverts,
 						  unsigned short flags, unsigned char areaId,
 						  rcCompactHeightfield& chf)
 {
 	rdAssert(ctx);
-	
+
 	rcScopedTimer timer(ctx, RC_TIMER_MARK_CONVEXPOLY_AREA);
 
 	rdVec3D bmin(verts);
 	rdVec3D bmax(verts);
+	float topMax = tops[0];
 	for (int i = 1; i < nverts; ++i)
 	{
 		rdVmin(&bmin, &verts[i]);
 		rdVmax(&bmax, &verts[i]);
+		if (tops[i] > topMax) topMax = tops[i];
 	}
-	bmin.z = hmin;
-	bmax.z = hmax;
+	bmax.z = topMax;
 
 	int minx = (int)((bmin.x-chf.bmin.x)/chf.cs);
 	int miny = (int)((bmin.y-chf.bmin.y)/chf.cs);
@@ -463,19 +463,17 @@ void rcMarkConvexPolyArea(rcContext* ctx, const rdVec3D* verts, const int nverts
 	int maxx = (int)((bmax.x-chf.bmin.x)/chf.cs);
 	int maxy = (int)((bmax.y-chf.bmin.y)/chf.cs);
 	int maxz = (int)((bmax.z-chf.bmin.z)/chf.ch);
-	
+
 	if (maxx < 0) return;
 	if (minx >= chf.width) return;
 	if (maxy < 0) return;
 	if (miny >= chf.height) return;
-	
+
 	if (minx < 0) minx = 0;
 	if (maxx >= chf.width) maxx = chf.width-1;
 	if (miny < 0) miny = 0;
 	if (maxy >= chf.height) maxy = chf.height-1;
-	
-	
-	// TODO: Optimize.
+
 	for (int y = miny; y <= maxy; ++y)
 	{
 		for (int x = minx; x <= maxx; ++x)
@@ -488,15 +486,52 @@ void rcMarkConvexPolyArea(rcContext* ctx, const rdVec3D* verts, const int nverts
 					continue;
 				if ((int)s.z >= minz && (int)s.z <= maxz)
 				{
-					rdVec3D p;
-					p.x = chf.bmin.x + (x+0.5f)*chf.cs;
-					p.y = chf.bmin.y + (y+0.5f)*chf.cs;
-					p.z = 0; 
+					const float px = chf.bmin.x + (x+0.5f)*chf.cs;
+					const float py = chf.bmin.y + (y+0.5f)*chf.cs;
 
-					if (rdPointInPolygon(&p, verts, nverts))
+					// Test containment and interpolate bottom/top Z using
+					// triangle fan from verts[0] with barycentric coords.
+					bool inside = false;
+					for (int t = 1; t < nverts - 1; ++t)
 					{
-						chf.flags[i] = flags;
-						chf.areas[i] = areaId;
+						const int ai = 0, bi = t, ci = t+1;
+						const rdVec3D* a = &verts[ai];
+						const rdVec3D* b = &verts[bi];
+						const rdVec3D* cv = &verts[ci];
+
+						const float v0x = cv->x - a->x, v0y = cv->y - a->y;
+						const float v1x = b->x - a->x,  v1y = b->y - a->y;
+						const float v2x = px - a->x,     v2y = py - a->y;
+
+						const float dot00 = v0x*v0x + v0y*v0y;
+						const float dot01 = v0x*v1x + v0y*v1y;
+						const float dot02 = v0x*v2x + v0y*v2y;
+						const float dot11 = v1x*v1x + v1y*v1y;
+						const float dot12 = v1x*v2x + v1y*v2y;
+
+						const float inv = dot00*dot11 - dot01*dot01;
+						if (rdMathFabsf(inv) < RD_EPS)
+							continue;
+
+						const float rcpInv = 1.0f / inv;
+						const float u = (dot11*dot02 - dot01*dot12) * rcpInv;
+						const float v = (dot00*dot12 - dot01*dot02) * rcpInv;
+						const float w = 1.0f - u - v;
+
+						if (w >= -RD_EPS && u >= -RD_EPS && v >= -RD_EPS)
+						{
+							const float botZ = w * a->z + v * b->z + u * cv->z;
+							const float topZ = w * tops[ai] + v * tops[bi] + u * tops[ci];
+							const int localMinZ = (int)((botZ - chf.bmin.z) / chf.ch);
+							const int localMaxZ = (int)((topZ - chf.bmin.z) / chf.ch);
+							if ((int)s.z >= localMinZ && (int)s.z <= localMaxZ)
+							{
+								chf.flags[i] = flags;
+								chf.areas[i] = areaId;
+							}
+							inside = true;
+							break;
+						}
 					}
 				}
 			}

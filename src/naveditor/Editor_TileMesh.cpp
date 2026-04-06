@@ -1000,7 +1000,7 @@ static unsigned char* buildTileMeshStandalone(const TileBuildParams& params, rcC
 			rcMarkCylinderArea(ctx, &vol.verts[0], vol.verts[1].x, vol.verts[1].y, vol.flags, vol.area, *chf);
 			break;
 		case VOLUME_CONVEX:
-			rcMarkConvexPolyArea(ctx, vol.verts, vol.nverts, vol.hmin, vol.hmax, vol.flags, vol.area, *chf);
+			rcMarkConvexPolyArea(ctx, vol.verts, vol.tops, vol.nverts, vol.flags, vol.area, *chf);
 			break;
 		}
 	}
@@ -1571,7 +1571,7 @@ unsigned char* Editor_TileMesh::buildTileMesh(const int tx, const int ty, const 
 			rcMarkCylinderArea(m_ctx, &vol.verts[0], vol.verts[1].x, vol.verts[1].y, vol.flags, vol.area, *m_chf);
 			break;
 		case VOLUME_CONVEX:
-			rcMarkConvexPolyArea(m_ctx, vol.verts, vol.nverts, vol.hmin, vol.hmax, vol.flags, vol.area, *m_chf);
+			rcMarkConvexPolyArea(m_ctx, vol.verts, vol.tops, vol.nverts, vol.flags, vol.area, *m_chf);
 			break;
 		}
 	}

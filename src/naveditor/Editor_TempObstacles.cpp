@@ -363,8 +363,7 @@ int Editor_TempObstacles::rasterizeTileLayers(
 	const ShapeVolume* vols = m_geom->getShapeVolumes();
 	for (int i  = 0; i < m_geom->getShapeVolumeCount(); ++i)
 	{
-		rcMarkConvexPolyArea(m_ctx, vols[i].verts, vols[i].nverts,
-							 vols[i].hmin, vols[i].hmax,
+		rcMarkConvexPolyArea(m_ctx, vols[i].verts, vols[i].tops, vols[i].nverts,
 							 (unsigned short)vols[i].flags,
 							 (unsigned char)vols[i].area, *rc.chf);
 	}

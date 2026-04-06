@@ -148,7 +148,7 @@ ShapeVolumeTool::ShapeVolumeTool() :
 	m_cylinderRadius(64),
 	m_cylinderHeight(128),
 	m_convexOffset(0.0f),
-	m_convexHeight(650.0f),
+	m_convexAscent(650.0f),
 	m_convexDescent(150.0f),
 	m_npts(0),
 	m_nhull(0),
@@ -206,7 +206,7 @@ void ShapeVolumeTool::handleMenu()
 		ImGui::SliderFloat("Height##ShapeVolumeCreate", &m_cylinderHeight, 0.1f, VALUE_ADJUST_WINDOW);
 		break;
 	case VOLUME_CONVEX:
-		ImGui::SliderFloat("Height##ShapeVolumeCreate", &m_convexHeight, 0.1f, VALUE_ADJUST_WINDOW);
+		ImGui::SliderFloat("Ascent##ShapeVolumeCreate", &m_convexAscent, 0.1f, VALUE_ADJUST_WINDOW);
 		ImGui::SliderFloat("Descent##ShapeVolumeCreate", &m_convexDescent, 0.1f, VALUE_ADJUST_WINDOW);
 		ImGui::SliderFloat("Offset##ShapeVolumeCreate", &m_convexOffset, 0.0f, VALUE_ADJUST_WINDOW/2);
 		break;
@@ -284,9 +284,7 @@ void ShapeVolumeTool::handleMenu()
 		ImGui::SliderFloat("Height##ShapeVolumeModify", &vol.verts[1].y, 0.1f, VALUE_ADJUST_WINDOW);
 		break;
 	case VOLUME_CONVEX:
-		ImGui::SliderFloat("Descent##ShapeVolumeModify", &vol.hmin, m_shapeCopy.hmin-(VALUE_ADJUST_WINDOW/2), m_shapeCopy.hmax);
-		ImGui::SliderFloat("Ascent##ShapeVolumeModify", &vol.hmax, m_shapeCopy.hmin, m_shapeCopy.hmax+(VALUE_ADJUST_WINDOW/2));
-
+	{
 		char sliderId[64];
 
 		for (int i = 0; i < vol.nverts; i++)
@@ -298,14 +296,17 @@ void ShapeVolumeTool::handleMenu()
 				break;
 			}
 
-			ImGui::PushItemWidth(60);
+			ImGui::PushItemWidth(55);
 			ImGui::SliderFloat(sliderId, &vol.verts[i].x, m_shapeCopy.verts[i].x-(VALUE_ADJUST_WINDOW/2), m_shapeCopy.verts[i].x+(VALUE_ADJUST_WINDOW/2));
 			ImGui::SameLine();
 			sliderId[len] = 'Y';
 			ImGui::SliderFloat(sliderId, &vol.verts[i].y, m_shapeCopy.verts[i].y-(VALUE_ADJUST_WINDOW/2), m_shapeCopy.verts[i].y+(VALUE_ADJUST_WINDOW/2));
 			ImGui::SameLine();
-			sliderId[len] = 'Z';
+			sliderId[len] = 'B';
 			ImGui::SliderFloat(sliderId, &vol.verts[i].z, m_shapeCopy.verts[i].z-(VALUE_ADJUST_WINDOW/2), m_shapeCopy.verts[i].z+(VALUE_ADJUST_WINDOW/2));
+			ImGui::SameLine();
+			sliderId[len] = 'T';
+			ImGui::SliderFloat(sliderId, &vol.tops[i], m_shapeCopy.tops[i]-(VALUE_ADJUST_WINDOW/2), m_shapeCopy.tops[i]+(VALUE_ADJUST_WINDOW/2));
 			ImGui::SameLine();
 
 			snprintf(sliderId, sizeof(sliderId), "Vert #%d", i);
@@ -314,6 +315,7 @@ void ShapeVolumeTool::handleMenu()
 			ImGui::PopItemWidth();
 		}
 		break;
+	}
 	}
 
 	if (vol.area == DT_POLYAREA_TRIGGER)
@@ -395,25 +397,30 @@ void ShapeVolumeTool::handleClick(const rdVec3D* /*s*/, const rdVec3D* p, const 
 				{
 					// Create shape.
 					rdVec3D verts[MAX_SHAPEVOL_PTS];
+					float tops[MAX_SHAPEVOL_PTS];
 					for (int i = 0; i < m_nhull; ++i)
+					{
 						rdVcopy(&verts[i], &m_pts[m_hull[i]]);
-						
-					float minh = FLT_MAX, maxh = 0;
-					for (int i = 0; i < m_nhull; ++i)
-						minh = rdMin(minh, verts[i].z);
-					minh -= m_convexDescent;
-					maxh = minh + m_convexHeight;
+						tops[i] = verts[i].z + m_convexAscent;
+						verts[i].z -= m_convexDescent;
+					}
 
 					if (m_convexOffset > 0.01f)
 					{
 						rdVec3D offset[MAX_SHAPEVOL_PTS*2];
+						float offsetTops[MAX_SHAPEVOL_PTS*2];
 						const int noffset = rcOffsetPoly(verts, m_nhull, m_convexOffset, offset, MAX_SHAPEVOL_PTS*2);
 						if (noffset > 0)
-							m_selectedVolumeIndex = geom->addConvexVolume(offset, noffset, minh, maxh, (unsigned short)m_polyFlags, (unsigned char)m_areaType);
+						{
+							// Offset poly preserves Z from source; compute tops for offset verts.
+							for (int i = 0; i < noffset; ++i)
+								offsetTops[i] = offset[i].z + m_convexDescent + m_convexAscent;
+							m_selectedVolumeIndex = geom->addConvexVolume(offset, offsetTops, noffset, (unsigned short)m_polyFlags, (unsigned char)m_areaType);
+						}
 					}
 					else
 					{
-						m_selectedVolumeIndex = geom->addConvexVolume(verts, m_nhull, minh, maxh, (unsigned short)m_polyFlags, (unsigned char)m_areaType);
+						m_selectedVolumeIndex = geom->addConvexVolume(verts, tops, m_nhull, (unsigned short)m_polyFlags, (unsigned char)m_areaType);
 					}
 				}
 				
@@ -459,13 +466,6 @@ void ShapeVolumeTool::handleRender()
 	duDebugDraw& dd = m_editor->getDebugDraw();
 	const rdVec3D* drawOffset = m_editor->getDetourDrawOffset();
 	
-	// Find height extent of the shape.
-	float minh = FLT_MAX, maxh = 0;
-	for (int i = 0; i < m_npts; ++i)
-		minh = rdMin(minh, m_pts[i].z);
-	minh -= m_convexDescent;
-	maxh = minh + m_convexHeight;
-
 	dd.begin(DU_DRAW_POINTS, 4.0f, drawOffset);
 	for (int i = 0; i < m_npts; ++i)
 	{
@@ -484,12 +484,16 @@ void ShapeVolumeTool::handleRender()
 		{
 			const rdVec3D* vi = &m_pts[m_hull[j]];
 			const rdVec3D* vj = &m_pts[m_hull[i]];
-			dd.vertex(vj->x,vj->y,minh, duRGBA(255,255,255,64));
-			dd.vertex(vi->x,vi->y,minh, duRGBA(255,255,255,64));
-			dd.vertex(vj->x,vj->y,maxh, duRGBA(255,255,255,64));
-			dd.vertex(vi->x,vi->y,maxh, duRGBA(255,255,255,64));
-			dd.vertex(vj->x,vj->y,minh, duRGBA(255,255,255,64));
-			dd.vertex(vj->x,vj->y,maxh, duRGBA(255,255,255,64));
+			const float vi_bot = vi->z - m_convexDescent;
+			const float vi_top = vi->z + m_convexAscent;
+			const float vj_bot = vj->z - m_convexDescent;
+			const float vj_top = vj->z + m_convexAscent;
+			dd.vertex(vj->x,vj->y,vj_bot, duRGBA(255,255,255,64));
+			dd.vertex(vi->x,vi->y,vi_bot, duRGBA(255,255,255,64));
+			dd.vertex(vj->x,vj->y,vj_top, duRGBA(255,255,255,64));
+			dd.vertex(vi->x,vi->y,vi_top, duRGBA(255,255,255,64));
+			dd.vertex(vj->x,vj->y,vj_bot, duRGBA(255,255,255,64));
+			dd.vertex(vj->x,vj->y,vj_top, duRGBA(255,255,255,64));
 		}
 		dd.end();
 	}
