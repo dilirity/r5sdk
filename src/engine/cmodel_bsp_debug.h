@@ -230,6 +230,7 @@ struct TriggerVolumeInfo_t
 	TriggerType_e type;
 	bool hasCollision;   // true if CollisionModelContext_t was populated for this model
 	float originX, originY, originZ;  // entity origin offset
+	float worldX, worldY, worldZ;     // cached world-space position (from hull data)
 };
 
 // Max brush models we track (matches engine limit)
