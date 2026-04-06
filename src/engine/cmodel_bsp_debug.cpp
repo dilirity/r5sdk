@@ -839,22 +839,10 @@ void CBSPCollisionDebug::DrawBrushModelBVH(int modelIndex, const Color& color, c
 	if (scale <= 0.0f)
 		scale = 1.0f;
 
-	// Get player position for distance filter
-	Vector3D playerPos(0, 0, 0);
-	if (g_pEngineClient && g_pClientEntityList)
-	{
-		const int localPlayerIndex = g_pEngineClient->GetLocalPlayer();
-		if (localPlayerIndex > 0)
-		{
-			const IClientEntity* pLocalPlayer = g_pClientEntityList->GetClientEntity(localPlayerIndex);
-			if (pLocalPlayer)
-				playerPos = pLocalPlayer->GetAbsOrigin();
-		}
-	}
-
-	// Use huge filter bounds — trigger BVHs are small (often 1 node) and
-	// the context origin/scale doesn't match world coords for node bounds.
-	// Distance filtering is done at the model level, not per-node.
+	// Trigger BVHs use type 8 convex hulls with their own embedded origin/scale,
+	// so the context's scaleOrigin/quantScale don't produce valid world-space
+	// node bounds.  Use huge filter bounds here; distance filtering is handled
+	// by RenderTriggerVolumes using cached world-space positions from hull data.
 	const Vector3D filterMins(-1e9f, -1e9f, -1e9f);
 	const Vector3D filterMaxs(1e9f, 1e9f, 1e9f);
 
@@ -886,10 +874,30 @@ void CBSPCollisionDebug::RenderTriggerVolumes()
 				continue;
 			const CollisionModelContext_t* ctx = reinterpret_cast<const CollisionModelContext_t*>(
 				reinterpret_cast<const char*>(*g_ppCollisionModelContexts) + 72 * i);
-			if (ctx->bvhNodes)
+			if (ctx->bvhNodes && ctx->leafDataStream)
 			{
 				g_triggerVolumes[i].hasCollision = true;
 				collisionCount++;
+
+				// Cache world-space position from the first type 8 (convex hull)
+				// leaf's embedded origin, since the context's scaleOrigin doesn't
+				// map to world coords for brush models.
+				const CollBvh4Node_t* rootNode = ctx->bvhNodes;
+				for (int c = 0; c < 4; c++)
+				{
+					if (rootNode->GetChildType(c) != 8)
+						continue;
+
+					const uint32_t childIdx = rootNode->GetChildIndex(c);
+					const uint8_t* hullData = reinterpret_cast<const uint8_t*>(
+						&ctx->leafDataStream[childIdx]);
+					const float* hullOrigin = reinterpret_cast<const float*>(hullData + 4);
+
+					g_triggerVolumes[i].worldX = g_triggerVolumes[i].originX + hullOrigin[0];
+					g_triggerVolumes[i].worldY = g_triggerVolumes[i].originY + hullOrigin[1];
+					g_triggerVolumes[i].worldZ = g_triggerVolumes[i].originZ + hullOrigin[2];
+					break;
+				}
 			}
 		}
 		DevMsg(eDLL_T::ENGINE, "TriggerDebug: %d volumes mapped, %d with collision data\n",
@@ -899,6 +907,19 @@ void CBSPCollisionDebug::RenderTriggerVolumes()
 	if (!g_pClientState || !g_pClientState->IsActive())
 		return;
 
+	Vector3D playerPos(0, 0, 0);
+	if (g_pEngineClient && g_pClientEntityList)
+	{
+		const int localPlayerIndex = g_pEngineClient->GetLocalPlayer();
+		if (localPlayerIndex > 0)
+		{
+			const IClientEntity* pLocalPlayer = g_pClientEntityList->GetClientEntity(localPlayerIndex);
+			if (pLocalPlayer)
+				playerPos = pLocalPlayer->GetAbsOrigin();
+		}
+	}
+
+	const float radiusSqr = bsp_trigger_debug_radius.GetFloat() * bsp_trigger_debug_radius.GetFloat();
 	const int alpha = bsp_collision_debug_alpha.GetInt();
 
 	for (int i = 1; i < g_numTriggerVolumes; i++)
@@ -919,6 +940,10 @@ void CBSPCollisionDebug::RenderTriggerVolumes()
 		}
 
 		if (!draw)
+			continue;
+
+		const Vector3D worldPos(info.worldX, info.worldY, info.worldZ);
+		if (playerPos.DistToSqr(worldPos) > radiusSqr)
 			continue;
 
 		const Color color = GetTriggerColor(info.type, alpha);
