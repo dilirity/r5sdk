@@ -120,6 +120,71 @@ static void removeLinksToPolyRef(dtNavMesh* nav, dtMeshTile* tile, dtPolyRef tar
 	}
 }
 
+void NavMeshPolyEditTool::selectGroup()
+{
+	if (!m_editor) return;
+	dtNavMesh* nav = m_editor->getNavMesh();
+	if (!nav) return;
+	if (m_selectedPolys.empty()) return;
+
+	// Collect unique group IDs from the current selection.
+	rdPermVector<unsigned short> groupIds;
+
+	for (int i = 0; i < (int)m_selectedPolys.size(); i++)
+	{
+		const dtMeshTile* tile;
+		const dtPoly* poly;
+		nav->getTileAndPolyByRefUnsafe(m_selectedPolys[i], &tile, &poly);
+
+		bool found = false;
+		for (int j = 0; j < (int)groupIds.size(); j++)
+		{
+			if (groupIds[j] == poly->groupId)
+			{
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+			groupIds.push_back(poly->groupId);
+	}
+
+	// Scan all tiles and select polygons matching any of the group IDs.
+	for (int i = 0; i < nav->getMaxTiles(); i++)
+	{
+		const dtMeshTile* tile = nav->getTile(i);
+		if (!tile->header) continue;
+
+		const dtPolyRef base = nav->getPolyRefBase(tile);
+
+		for (int j = 0; j < tile->header->polyCount; j++)
+		{
+			const dtPoly& poly = tile->polys[j];
+
+			if (poly.flags & DT_POLYFLAGS_DISABLED)
+				continue;
+
+			bool matches = false;
+			for (int g = 0; g < (int)groupIds.size(); g++)
+			{
+				if (poly.groupId == groupIds[g])
+				{
+					matches = true;
+					break;
+				}
+			}
+
+			if (!matches)
+				continue;
+
+			const dtPolyRef ref = base | (dtPolyRef)j;
+
+			if (!isSelected(ref))
+				m_selectedPolys.push_back(ref);
+		}
+	}
+}
+
 void NavMeshPolyEditTool::removeSelectedPolys()
 {
 	if (!m_editor) return;
@@ -269,6 +334,11 @@ void NavMeshPolyEditTool::handleMenu()
 
 	if (numSelected > 0)
 	{
+		if (ImGui::Button("Select Group"))
+		{
+			selectGroup();
+		}
+
 		if (ImGui::Button("Remove Selected"))
 		{
 			removeSelectedPolys();

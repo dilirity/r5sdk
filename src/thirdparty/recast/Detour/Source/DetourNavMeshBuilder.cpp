@@ -1324,6 +1324,7 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 	rdScopedDelete<unsigned short> oldVertIdMap((unsigned short*)rdAlloc(sizeof(unsigned short)*header->vertCount, RD_ALLOC_TEMP));
 	rdScopedDelete<unsigned short> newVertIdMap((unsigned short*)rdAlloc(sizeof(unsigned short)*header->vertCount, RD_ALLOC_TEMP));
 
+	memset(newPolyIdMap, 0xff, sizeof(unsigned short)*header->polyCount);
 	memset(newVertIdMap, 0xff, sizeof(unsigned short)*header->vertCount);
 
 	rdScopedDelete<int> oldOffMeshConnIdMap((int*)rdAlloc(sizeof(int)*header->offMeshConCount, RD_ALLOC_TEMP));

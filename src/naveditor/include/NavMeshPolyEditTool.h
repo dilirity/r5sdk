@@ -30,6 +30,7 @@ public:
 	virtual void handleRenderOverlay(double* model, double* proj, int* view);
 
 private:
+	void selectGroup();
 	void removeSelectedPolys();
 	bool isSelected(dtPolyRef ref) const;
 	void toggleSelection(dtPolyRef ref);
