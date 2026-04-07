@@ -1624,6 +1624,8 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 			// if this is a portal, leave these values unchanged
 			if (ip.neis[n] & DT_EXT_LINK || !ip.neis[n])
 				p.neis[n] = ip.neis[n];
+			else if (newPolyIdMap[ip.neis[n]-1] == 0xffff)
+				p.neis[n] = 0; // Neighbor was removed, this is now a boundary edge.
 			else
 				p.neis[n] = newPolyIdMap[ip.neis[n]-1]+1;
 		}
