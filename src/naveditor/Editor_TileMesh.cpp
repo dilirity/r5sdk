@@ -29,6 +29,7 @@
 #include "NavEditor/Include/OffMeshConnectionTool.h"
 #include "NavEditor/Include/ShapeVolumeTool.h"
 #include "NavEditor/Include/CrowdTool.h"
+#include "NavEditor/Include/NavMeshPolyEditTool.h"
 #include "NavEditor/Include/InputGeom.h"
 #include "NavEditor/Include/Editor.h"
 #include "NavEditor/Include/Editor_TileMesh.h"
@@ -527,6 +528,12 @@ void Editor_TileMesh::handleTools()
 	if (ImGui::Checkbox("Prune NavMesh", &isEnabled))
 	{
 		setTool(new NavMeshPruneTool);
+	}
+
+	isEnabled = type == TOOL_POLY_EDIT;
+	if (ImGui::Checkbox("Edit Polygons", &isEnabled))
+	{
+		setTool(new NavMeshPolyEditTool);
 	}
 
 	isEnabled = type == TOOL_TILE_EDIT;
