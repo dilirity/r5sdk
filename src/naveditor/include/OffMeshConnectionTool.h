@@ -64,6 +64,7 @@ public:
 
 	void renderTileOffMeshModifyMenu();
 	void applyTileOffMeshChanges();
+	void deleteTileOffMeshConnection();
 	static void disconnectTileOffMeshLinks(class dtNavMesh* nav, struct dtMeshTile* tile);
 	
 	virtual int type() { return TOOL_OFFMESH_CONNECTION; }

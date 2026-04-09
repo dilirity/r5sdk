@@ -90,6 +90,66 @@ void OffMeshConnectionTool::reset()
 
 #define VALUE_ADJUST_WINDOW 200
 
+static void unlinkFromChain(dtMeshTile* tile, dtPoly* poly, unsigned int linkIdx)
+{
+	unsigned int k = poly->firstLink;
+	unsigned int pk = DT_NULL_LINK;
+	while (k != DT_NULL_LINK)
+	{
+		if (k == linkIdx)
+		{
+			const unsigned int nk = tile->links[k].next;
+			if (pk == DT_NULL_LINK)
+				poly->firstLink = nk;
+			else
+				tile->links[pk].next = nk;
+			tile->freeLink(k);
+			return;
+		}
+		pk = k;
+		k = tile->links[k].next;
+	}
+}
+
+static void removeLinksToPolyRef(dtNavMesh* nav, dtMeshTile* tile, dtPolyRef targetRef)
+{
+	if (!tile->header) return;
+
+	const unsigned int targetTileIdx = nav->decodePolyIdTile(targetRef);
+	const unsigned int targetPolyIdx = nav->decodePolyIdPoly(targetRef);
+
+	for (int i = 0; i < tile->header->polyCount; i++)
+	{
+		dtPoly* poly = &tile->polys[i];
+		unsigned int j = poly->firstLink;
+		unsigned int pj = DT_NULL_LINK;
+		while (j != DT_NULL_LINK)
+		{
+			const dtLink& currLink = tile->links[j];
+			if (nav->decodePolyIdTile(currLink.ref) == targetTileIdx &&
+				nav->decodePolyIdPoly(currLink.ref) == targetPolyIdx)
+			{
+				const unsigned int nj = currLink.next;
+				if (pj == DT_NULL_LINK)
+					poly->firstLink = nj;
+				else
+					tile->links[pj].next = nj;
+
+				if (poly->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
+					poly->flags &= ~DT_POLYFLAGS_JUMP_LINKED;
+
+				tile->freeLink(j);
+				j = nj;
+			}
+			else
+			{
+				pj = j;
+				j = currLink.next;
+			}
+		}
+	}
+}
+
 void OffMeshConnectionTool::disconnectTileOffMeshLinks(dtNavMesh* nav, dtMeshTile* tile)
 {
 	if (!tile->header) return;
@@ -181,6 +241,98 @@ void OffMeshConnectionTool::applyTileOffMeshChanges()
 	m_editor->invalidateNavMeshCache();
 }
 
+void OffMeshConnectionTool::deleteTileOffMeshConnection()
+{
+	if (!m_editor) return;
+	dtNavMesh* nav = m_editor->getNavMesh();
+	if (!nav) return;
+	if (m_selectedTileOffMeshTile < 0 || m_selectedTileOffMeshIdx < 0) return;
+
+	const unsigned int selTileIdx = (unsigned int)m_selectedTileOffMeshTile;
+	dtMeshTile* selTile = nav->getTile(selTileIdx);
+	if (!selTile->header) return;
+
+	dtOffMeshConnection* con = &selTile->offMeshCons[m_selectedTileOffMeshIdx];
+	dtPoly* selPoly = &selTile->polys[con->poly];
+	const dtPolyRef selRef = nav->getPolyRefBase(selTile) | (dtPolyRef)(con->poly);
+
+	// Use the same disconnect pattern as NavMeshPolyEditTool::removeSelectedPolys.
+
+	// Step A: Walk outgoing links. For each target poly, remove any
+	// links pointing back to our off-mesh poly. This handles both
+	// traverse reverse links and off-mesh reverse links on any tile
+	// (not limited to 8-neighbors like Step B).
+	unsigned int j = selPoly->firstLink;
+	while (j != DT_NULL_LINK)
+	{
+		dtLink& link = selTile->links[j];
+		const unsigned int nextJ = link.next;
+
+		const unsigned int targetTileIdx = nav->decodePolyIdTile(link.ref);
+		const unsigned int targetPolyIdx = nav->decodePolyIdPoly(link.ref);
+		dtMeshTile* targetTile = nav->getTile(targetTileIdx);
+		dtPoly* targetPoly = &targetTile->polys[targetPolyIdx];
+
+		// Remove all reverse links from the target poly back to us.
+		unsigned int k = targetPoly->firstLink;
+		unsigned int pk = DT_NULL_LINK;
+		while (k != DT_NULL_LINK)
+		{
+			dtLink& targetLink = targetTile->links[k];
+			if (targetLink.ref == selRef)
+			{
+				const unsigned int nk = targetLink.next;
+				if (pk == DT_NULL_LINK)
+					targetPoly->firstLink = nk;
+				else
+					targetTile->links[pk].next = nk;
+				targetTile->freeLink(k);
+				k = nk;
+			}
+			else
+			{
+				pk = k;
+				k = targetLink.next;
+			}
+		}
+
+		selTile->freeLink(j);
+		j = nextJ;
+	}
+	selPoly->firstLink = DT_NULL_LINK;
+
+	// Step B: Remove any remaining links from same tile + neighbor tiles
+	// that reference this poly.
+	removeLinksToPolyRef(nav, selTile, selRef);
+
+	static const int MAX_NEIS = 32;
+	dtMeshTile* neis[MAX_NEIS];
+	for (int side = 0; side < 8; side++)
+	{
+		const int nneis = nav->getNeighbourTilesAt(
+			selTile->header->x, selTile->header->y, side, neis, MAX_NEIS);
+		for (int n = 0; n < nneis; n++)
+			removeLinksToPolyRef(nav, neis[n], selRef);
+	}
+
+	// Step C: Mark the polygon as disabled.
+	selPoly->groupId = DT_UNLINKED_POLY_GROUP;
+	selPoly->flags = DT_POLYFLAGS_DISABLED;
+
+	// Compact the tile to remove the disabled poly and its data.
+	selTile->header->userId = DT_SEMI_UNLINKED_TILE_USER_ID;
+	dtUpdateNavMeshData(nav, selTileIdx);
+
+	// Clear selection.
+	m_selectedTileOffMeshTile = -1;
+	m_selectedTileOffMeshIdx = -1;
+	m_copiedTileOffMeshTile = -1;
+	m_copiedTileOffMeshIdx = -1;
+
+	m_editor->createStaticPathingData();
+	m_editor->invalidateNavMeshCache();
+}
+
 void OffMeshConnectionTool::renderTileOffMeshModifyMenu()
 {
 	dtNavMesh* nav = m_editor->getNavMesh();
@@ -252,6 +404,12 @@ void OffMeshConnectionTool::renderTileOffMeshModifyMenu()
 		con->refYaw = dtCalcOffMeshRefYaw(&con->posa, &con->posb);
 		const rdVec3D refOffset(0.0f, 0.0f, con->rad);
 		dtCalcOffMeshRefPos(&con->posa, con->refYaw, &refOffset, &con->refPos);
+	}
+
+	if (ImGui::Button("Delete##TileOffMesh"))
+	{
+		deleteTileOffMeshConnection();
+		return;
 	}
 
 	if (ImGui::Button("Deselect##TileOffMesh"))

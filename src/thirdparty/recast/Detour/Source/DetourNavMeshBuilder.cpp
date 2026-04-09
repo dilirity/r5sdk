@@ -1333,6 +1333,8 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 	rdScopedDelete<unsigned int> oldLinkIdMap((unsigned int*)rdAlloc(sizeof(unsigned int)*header->maxLinkCount, RD_ALLOC_TEMP));
 	rdScopedDelete<unsigned int> newLinkIdMap((unsigned int*)rdAlloc(sizeof(unsigned int)*header->maxLinkCount, RD_ALLOC_TEMP));
 
+	memset(newLinkIdMap, 0xff, sizeof(unsigned int)*header->maxLinkCount);
+
 	int totPolyCount = 0, offMeshConCount = 0, detailTriCount = 0, portalCount = 0, detailVertCount = 0, vertCount = 0, maxLinkCount = 0;
 
 	// Iterate through this tile's polys, indexing them by their new poly ids
