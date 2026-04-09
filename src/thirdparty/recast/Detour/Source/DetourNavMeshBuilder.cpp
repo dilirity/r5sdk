@@ -2054,7 +2054,8 @@ bool dtAddOffMeshConnectionToTile(dtNavMesh* nav, const unsigned int tileIndex,
 	if (polyMapCount > 0 && tile->polyMap)
 		memcpy(newPolyMap, tile->polyMap, sizeof(unsigned int) * polyMapCount * header->polyCount);
 
-	// Links: skip — connectTile rebuilds them from scratch.
+	// Copy existing links and extend the free list with new slots.
+	memcpy(links, tile->links, sizeof(dtLink) * header->maxLinkCount);
 
 	// Copy detail meshes, verts, tris (off-mesh polys don't have detail meshes).
 	if (header->detailMeshCount > 0)
@@ -2093,52 +2094,16 @@ bool dtAddOffMeshConnectionToTile(dtNavMesh* nav, const unsigned int tileIndex,
 		memcpy(navCells, tile->cells, sizeof(dtCell) * header->maxCellCount);
 #endif
 
-	// Unconnect neighbor tiles' links pointing to this tile.
+	// Save values from old header before freeing.
+	const unsigned int oldFreeList = tile->linksFreeList;
+	const int oldMaxLinkCount = header->maxLinkCount;
 	const dtTileRef tileRef = nav->getTileRef(tile);
 
-	static const int MAX_NEIS = 32;
-	dtMeshTile* neis[MAX_NEIS];
-	int nneis;
 
-	// Disconnect from other layers in current tile.
-	nneis = nav->getTilesAt(header->x, header->y, neis, MAX_NEIS);
-	for (int j = 0; j < nneis; ++j)
-	{
-		if (neis[j] == tile) continue;
-		nav->unconnectLinks(neis[j], tile);
-	}
-
-	// Disconnect from neighbour tiles.
-	for (int i = 0; i < 8; ++i)
-	{
-		nneis = nav->getNeighbourTilesAt(header->x, header->y, i, neis, MAX_NEIS);
-		for (int j = 0; j < nneis; ++j)
-			nav->unconnectLinks(neis[j], tile);
-	}
-
-	// Disconnect off-mesh land tiles.
-	for (int i = 0; i < header->offMeshConCount; i++)
-	{
-		const dtOffMeshConnection* con = &tile->offMeshCons[i];
-		const dtPoly* poly = &tile->polys[con->poly];
-
-		for (unsigned int k = poly->firstLink; k != DT_NULL_LINK; k = tile->links[k].next)
-		{
-			const dtLink& link = tile->links[k];
-			const unsigned int landTileIdx = nav->decodePolyIdTile(link.ref);
-			dtMeshTile* landTile = nav->getTile(landTileIdx);
-
-			if (landTile == tile)
-				continue;
-
-			nav->unconnectLinks(landTile, tile);
-		}
-	}
 
 	// Free old data and replace tile pointers.
 	rdFree(tile->data);
 
-	tile->linksFreeList = DT_NULL_LINK;
 	tile->header = newHeader;
 	tile->verts = navVerts;
 	tile->polys = navPolys;
@@ -2155,9 +2120,104 @@ bool dtAddOffMeshConnectionToTile(dtNavMesh* nav, const unsigned int tileIndex,
 	tile->data = data;
 	tile->dataSize = dataSize;
 
-	// Rebuild all links from scratch.
-	nav->connectTile(tileRef);
-	nav->connectOffMeshLinks(tileRef);
+	// Chain the new link slots into the existing free list.
+	// Existing links (0 to oldMaxLinkCount-1) were copied as-is.
+	for (int i = oldMaxLinkCount; i < newMaxLinkCount - 1; i++)
+		tile->links[i].next = i + 1;
+	tile->links[newMaxLinkCount - 1].next = oldFreeList;
+	tile->linksFreeList = oldMaxLinkCount;
+
+	// Directly link the new off-mesh connection (the last one in the array).
+	{
+		dtOffMeshConnection* con = &tile->offMeshCons[newHeader->offMeshConCount - 1];
+		dtPoly* conPoly = &tile->polys[con->poly];
+		const dtPolyRef conPolyRef = nav->getPolyRefBase(tile) | (dtPolyRef)(con->poly);
+
+		const unsigned char conTraverseType = con->getTraverseType();
+		const bool invertVertLookup = con->getVertLookupOrder();
+
+		// Find and link the base ground poly (posa side, same tile).
+		const dtPolyRef basePolyRef = nav->clampOffMeshVertToPoly(con, tile, tile, true);
+		if (!basePolyRef)
+			return true; // No ground poly found — connection stays unlinked.
+
+		// conPoly → basePoly
+		unsigned int idx = tile->allocLink();
+		if (idx != DT_NULL_LINK)
+		{
+			dtLink* link = &tile->links[idx];
+			link->ref = basePolyRef;
+			link->edge = 0;
+			link->side = 0xff;
+			link->bmin = link->bmax = 0;
+			link->next = conPoly->firstLink;
+			conPoly->firstLink = idx;
+			link->traverseType = DT_NULL_TRAVERSE_TYPE;
+			link->traverseDist = 0;
+			link->reverseLink = DT_NULL_TRAVERSE_REVERSE_LINK;
+		}
+
+		// basePoly → conPoly
+		const unsigned int basePolyIdx = nav->decodePolyIdPoly(basePolyRef);
+		dtPoly* basePoly = &tile->polys[basePolyIdx];
+		idx = tile->allocLink();
+		if (idx != DT_NULL_LINK)
+		{
+			dtLink* link = &tile->links[idx];
+			link->ref = conPolyRef;
+			link->edge = 0xff;
+			link->side = 0xff;
+			link->bmin = link->bmax = 0;
+			link->next = basePoly->firstLink;
+			basePoly->firstLink = idx;
+			link->traverseType = conTraverseType | (invertVertLookup ? DT_OFFMESH_CON_TRAVERSE_ON_VERT : DT_OFFMESH_CON_TRAVERSE_ON_POLY);
+			link->traverseDist = 0;
+			link->reverseLink = DT_NULL_TRAVERSE_REVERSE_LINK;
+		}
+
+		// Find and link the land ground poly (posb side, may be a different tile).
+		int tx, ty;
+		nav->calcTileLoc(&con->posb, &tx, &ty);
+
+		static const int MAX_NEIS = 32;
+		dtMeshTile* neis[MAX_NEIS];
+		const int nneis = nav->getTilesAt(tx, ty, neis, MAX_NEIS);
+
+		const unsigned char side = rdClassifyPointOutsideBounds(&con->posb, &newHeader->bmin, &newHeader->bmax);
+		const unsigned char oppositeSide = (side == 0xff) ? 0xff : rdOppositeTile(side);
+
+		for (int j = 0; j < nneis; j++)
+		{
+			dtMeshTile* neiTile = neis[j];
+			const dtPolyRef landPolyRef = nav->clampOffMeshVertToPoly(con, tile, neiTile, false);
+			if (!landPolyRef)
+				continue;
+
+			// conPoly → landPoly
+			idx = tile->allocLink();
+			if (idx != DT_NULL_LINK)
+			{
+				dtLink* link = &tile->links[idx];
+				link->ref = landPolyRef;
+				link->edge = 1;
+				link->side = oppositeSide;
+				link->bmin = link->bmax = 0;
+				link->next = conPoly->firstLink;
+				conPoly->firstLink = idx;
+				link->traverseType = DT_NULL_TRAVERSE_TYPE;
+				link->traverseDist = 0;
+				link->reverseLink = DT_NULL_TRAVERSE_REVERSE_LINK;
+			}
+
+			// TODO: reverse land link (landPoly → conPoly) skipped for now.
+			// Adding a link to the neighbor tile's land poly causes a rendering
+			// hang that needs further investigation. The connection is functional
+			// one-directionally without this link.
+
+			conPoly->flags |= DT_POLYFLAGS_JUMP_LINKED;
+			break;
+		}
+	}
 
 	return true;
 }
