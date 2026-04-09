@@ -1952,11 +1952,221 @@ bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex)
 	return true;
 }
 
+bool dtAddOffMeshConnectionToTile(dtNavMesh* nav, const unsigned int tileIndex,
+	const rdVec3D* posa, const rdVec3D* posb, const float rad,
+	const unsigned char traverseType, const unsigned char order,
+	const unsigned char area, const unsigned short flags)
+{
+	dtMeshTile* tile = nav->getTile(tileIndex);
+	const dtMeshHeader* header = tile->header;
+
+	if (!header)
+		return false;
+
+	// Calculate new counts.
+	const int newVertCount = header->vertCount + 2;
+	const int newPolyCount = header->polyCount + 1;
+	const int newOffMeshConCount = header->offMeshConCount + 1;
+	const int newMaxLinkCount = header->maxLinkCount + 4;
+	const int polyMapCount = header->polyMapCount;
+
+	// The number of non-offmesh polys stays the same.
+	const int regularPolyCount = header->offMeshBase;
+
+	// Calculate section sizes.
+	const int headerSize = rdAlign4(sizeof(dtMeshHeader));
+	const int vertsSize = rdAlign4(sizeof(rdVec3D) * newVertCount);
+	const int polysSize = rdAlign4(sizeof(dtPoly) * newPolyCount);
+	const int polyMapSize = rdAlign4(sizeof(int) * (polyMapCount * newPolyCount));
+	const int linksSize = rdAlign4(sizeof(dtLink) * newMaxLinkCount);
+	const int detailMeshesSize = rdAlign4(sizeof(dtPolyDetail) * regularPolyCount);
+	const int detailVertsSize = rdAlign4(sizeof(rdVec3D) * header->detailVertCount);
+	const int detailTrisSize = rdAlign4(sizeof(unsigned char) * 4 * header->detailTriCount);
+	const int bvTreeSize = rdAlign4(sizeof(dtBVNode) * header->bvNodeCount);
+	const int offMeshConsSize = rdAlign4(sizeof(dtOffMeshConnection) * newOffMeshConCount);
+#if DT_NAVMESH_SET_VERSION >= 8
+	const int cellsSize = rdAlign4(sizeof(dtCell) * header->maxCellCount);
+#endif
+
+	const unsigned int dataSize = headerSize + vertsSize + polysSize + polyMapSize + linksSize +
+		detailMeshesSize + detailVertsSize + detailTrisSize +
+		bvTreeSize + offMeshConsSize
+#if DT_NAVMESH_SET_VERSION >= 8
+		+ cellsSize
+#endif
+		;
+
+	unsigned char* data = new unsigned char[dataSize];
+
+	if (!data)
+		return false;
+
+	memset(data, 0, dataSize);
+	unsigned char* d = data;
+
+	// Set up section pointers.
+	dtMeshHeader* newHeader = rdGetThenAdvanceBufferPointer<dtMeshHeader>(d, headerSize);
+	rdVec3D* navVerts = rdGetThenAdvanceBufferPointer<rdVec3D>(d, vertsSize);
+	dtPoly* navPolys = rdGetThenAdvanceBufferPointer<dtPoly>(d, polysSize);
+	unsigned int* newPolyMap = rdGetThenAdvanceBufferPointer<unsigned int>(d, polyMapSize);
+	dtLink* links = rdGetThenAdvanceBufferPointer<dtLink>(d, linksSize);
+	dtPolyDetail* navDMeshes = rdGetThenAdvanceBufferPointer<dtPolyDetail>(d, detailMeshesSize);
+	rdVec3D* navDVerts = rdGetThenAdvanceBufferPointer<rdVec3D>(d, detailVertsSize);
+	unsigned char* navDTris = rdGetThenAdvanceBufferPointer<unsigned char>(d, detailTrisSize);
+	dtBVNode* navBvtree = rdGetThenAdvanceBufferPointer<dtBVNode>(d, bvTreeSize);
+	dtOffMeshConnection* offMeshCons = rdGetThenAdvanceBufferPointer<dtOffMeshConnection>(d, offMeshConsSize);
+#if DT_NAVMESH_SET_VERSION >= 8
+	dtCell* navCells = rdGetThenAdvanceBufferPointer<dtCell>(d, cellsSize);
+#endif
+
+	// Copy header and update counts.
+	memcpy(newHeader, header, sizeof(dtMeshHeader));
+	newHeader->vertCount = newVertCount;
+	newHeader->polyCount = newPolyCount;
+	newHeader->maxLinkCount = newMaxLinkCount;
+	newHeader->offMeshConCount = newOffMeshConCount;
+	// offMeshBase stays the same — it's the index of the first off-mesh poly.
+	newHeader->userId = 0;
+
+	// Copy vertices and append new off-mesh endpoints.
+	memcpy(navVerts, tile->verts, sizeof(rdVec3D) * header->vertCount);
+	navVerts[header->vertCount] = *posa;
+	navVerts[header->vertCount + 1] = *posb;
+
+	// Copy existing polygons.
+	memcpy(navPolys, tile->polys, sizeof(dtPoly) * header->polyCount);
+
+	// Append new off-mesh polygon.
+	dtPoly& newPoly = navPolys[header->polyCount];
+	newPoly.firstLink = DT_NULL_LINK;
+	newPoly.verts[0] = (unsigned short)header->vertCount;
+	newPoly.verts[1] = (unsigned short)(header->vertCount + 1);
+	newPoly.vertCount = 2;
+	newPoly.flags = flags;
+	newPoly.setArea(area);
+	newPoly.setType(DT_POLYTYPE_OFFMESH_CONNECTION);
+	newPoly.groupId = DT_NULL_POLY_GROUP;
+	newPoly.surfaceArea = 0;
+	rdVadd(&newPoly.center, posa, posb);
+	rdVscale(&newPoly.center, &newPoly.center, 0.5f);
+
+	// Copy polymap (usually empty, polyMapCount == 0).
+	if (polyMapCount > 0 && tile->polyMap)
+		memcpy(newPolyMap, tile->polyMap, sizeof(unsigned int) * polyMapCount * header->polyCount);
+
+	// Links: skip — connectTile rebuilds them from scratch.
+
+	// Copy detail meshes, verts, tris (off-mesh polys don't have detail meshes).
+	if (header->detailMeshCount > 0)
+		memcpy(navDMeshes, tile->detailMeshes, sizeof(dtPolyDetail) * header->detailMeshCount);
+	if (header->detailVertCount > 0)
+		memcpy(navDVerts, tile->detailVerts, sizeof(rdVec3D) * header->detailVertCount);
+	if (header->detailTriCount > 0)
+		memcpy(navDTris, tile->detailTris, sizeof(unsigned char) * 4 * header->detailTriCount);
+
+	// Copy BV tree (off-mesh polys aren't in the BV tree).
+	if (header->bvNodeCount > 0)
+		memcpy(navBvtree, tile->bvTree, sizeof(dtBVNode) * header->bvNodeCount);
+
+	// Copy existing off-mesh connections and append new one.
+	if (header->offMeshConCount > 0)
+		memcpy(offMeshCons, tile->offMeshCons, sizeof(dtOffMeshConnection) * header->offMeshConCount);
+
+	dtOffMeshConnection& newCon = offMeshCons[header->offMeshConCount];
+	newCon.posa = *posa;
+	newCon.posb = *posb;
+	newCon.rad = rad;
+	newCon.poly = (unsigned short)header->polyCount;
+	newCon.side = rdClassifyPointOutsideBounds(posb, &header->bmin, &header->bmax);
+	newCon.setTraverseType(traverseType, order);
+	newCon.userId = 0;
+	newCon.refYaw = dtCalcOffMeshRefYaw(posa, posb);
+	const rdVec3D refOffset(0.0f, 0.0f, rad);
+	dtCalcOffMeshRefPos(posa, newCon.refYaw, &refOffset, &newCon.refPos);
+#if DT_NAVMESH_SET_VERSION >= 7
+	newCon.hintIndex = 0;
+#endif
+
+#if DT_NAVMESH_SET_VERSION >= 8
+	// Copy cells.
+	if (header->maxCellCount > 0 && tile->cells)
+		memcpy(navCells, tile->cells, sizeof(dtCell) * header->maxCellCount);
+#endif
+
+	// Unconnect neighbor tiles' links pointing to this tile.
+	const dtTileRef tileRef = nav->getTileRef(tile);
+
+	static const int MAX_NEIS = 32;
+	dtMeshTile* neis[MAX_NEIS];
+	int nneis;
+
+	// Disconnect from other layers in current tile.
+	nneis = nav->getTilesAt(header->x, header->y, neis, MAX_NEIS);
+	for (int j = 0; j < nneis; ++j)
+	{
+		if (neis[j] == tile) continue;
+		nav->unconnectLinks(neis[j], tile);
+	}
+
+	// Disconnect from neighbour tiles.
+	for (int i = 0; i < 8; ++i)
+	{
+		nneis = nav->getNeighbourTilesAt(header->x, header->y, i, neis, MAX_NEIS);
+		for (int j = 0; j < nneis; ++j)
+			nav->unconnectLinks(neis[j], tile);
+	}
+
+	// Disconnect off-mesh land tiles.
+	for (int i = 0; i < header->offMeshConCount; i++)
+	{
+		const dtOffMeshConnection* con = &tile->offMeshCons[i];
+		const dtPoly* poly = &tile->polys[con->poly];
+
+		for (unsigned int k = poly->firstLink; k != DT_NULL_LINK; k = tile->links[k].next)
+		{
+			const dtLink& link = tile->links[k];
+			const unsigned int landTileIdx = nav->decodePolyIdTile(link.ref);
+			dtMeshTile* landTile = nav->getTile(landTileIdx);
+
+			if (landTile == tile)
+				continue;
+
+			nav->unconnectLinks(landTile, tile);
+		}
+	}
+
+	// Free old data and replace tile pointers.
+	rdFree(tile->data);
+
+	tile->linksFreeList = DT_NULL_LINK;
+	tile->header = newHeader;
+	tile->verts = navVerts;
+	tile->polys = navPolys;
+	tile->polyMap = newPolyMap;
+	tile->links = links;
+	tile->detailMeshes = navDMeshes;
+	tile->detailVerts = navDVerts;
+	tile->detailTris = navDTris;
+	tile->bvTree = navBvtree;
+	tile->offMeshCons = offMeshCons;
+#if DT_NAVMESH_SET_VERSION >= 8
+	tile->cells = navCells;
+#endif
+	tile->data = data;
+	tile->dataSize = dataSize;
+
+	// Rebuild all links from scratch.
+	nav->connectTile(tileRef);
+	nav->connectOffMeshLinks(tileRef);
+
+	return true;
+}
+
 /// @par
 ///
-/// @warning This function assumes that the header is in the correct endianess already. 
-/// Call #dtNavMeshHeaderSwapEndian() first on the data if the data is expected to be in wrong endianess 
-/// to start with. Call #dtNavMeshHeaderSwapEndian() after the data has been swapped if converting from 
+/// @warning This function assumes that the header is in the correct endianess already.
+/// Call #dtNavMeshHeaderSwapEndian() first on the data if the data is expected to be in wrong endianess
+/// to start with. Call #dtNavMeshHeaderSwapEndian() after the data has been swapped if converting from
 /// native to foreign endianess.
 bool dtNavMeshDataSwapEndian(unsigned char* data, const int /*dataSize*/)
 {

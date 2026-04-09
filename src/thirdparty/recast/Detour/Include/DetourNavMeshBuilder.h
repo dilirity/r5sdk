@@ -247,6 +247,23 @@ bool dtCreateNavMeshData(dtNavMeshCreateParams* params, unsigned char** outData,
 class dtNavMesh;
 bool dtUpdateNavMeshData(dtNavMesh* nav, const unsigned int tileIndex);
 
+/// Adds a new off-mesh connection to an existing navmesh tile.
+/// @ingroup detour
+/// @param[in]		nav				The navmesh containing the tile.
+/// @param[in]		tileIndex		The index of the tile to expand.
+/// @param[in]		posa			The start endpoint position.
+/// @param[in]		posb			The end endpoint position.
+/// @param[in]		rad				The connection radius.
+/// @param[in]		traverseType	The traverse type (jump, climb, etc.)
+/// @param[in]		order			The vertex lookup order flag.
+/// @param[in]		area			The polygon area type.
+/// @param[in]		flags			The polygon flags.
+/// @return True if the connection was successfully added.
+bool dtAddOffMeshConnectionToTile(dtNavMesh* nav, const unsigned int tileIndex,
+	const rdVec3D* posa, const rdVec3D* posb, const float rad,
+	const unsigned char traverseType, const unsigned char order,
+	const unsigned char area, const unsigned short flags);
+
 /// Swaps the endianness of the tile data's header (#dtMeshHeader).
 ///  @param[in,out]	data		The tile data array.
 ///  @param[in]		dataSize	The size of the data array.

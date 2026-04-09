@@ -18,6 +18,7 @@
 
 #include "Recast/Include/Recast.h"
 #include "Detour/Include/DetourNavMesh.h"
+#include "Detour/Include/DetourNavMeshBuilder.h"
 #include "DebugUtils/Include/RecastDebugDraw.h"
 #include "DebugUtils/Include/DetourDebugDraw.h"
 #include "NavEditor/Include/OffMeshConnectionTool.h"
@@ -320,9 +321,9 @@ void OffMeshConnectionTool::handleClick(const rdVec3D* /*s*/, const rdVec3D* p, 
 	}
 	else
 	{
-		// Create
-		InputGeom* geom = m_editor->getInputGeom();
-		if (!geom) return;
+		// Create directly in tile data.
+		dtNavMesh* nav = m_editor->getNavMesh();
+		if (!nav) return;
 
 		if (!m_hitPosSet)
 		{
@@ -331,15 +332,27 @@ void OffMeshConnectionTool::handleClick(const rdVec3D* /*s*/, const rdVec3D* p, 
 		}
 		else
 		{
-			const unsigned char area = DT_POLYAREA_JUMP;
-			const unsigned short flags = DT_POLYFLAGS_WALK
+			// Find which tile posa belongs to.
+			int tx, ty;
+			nav->calcTileLoc(&m_hitPos, &tx, &ty);
+			const dtMeshTile* tile = nav->getTileAt(tx, ty, 0);
+
+			if (tile && tile->header)
+			{
+				const unsigned int tileIdx = nav->decodePolyIdTile(nav->getTileRef(tile));
+				const unsigned char area = DT_POLYAREA_JUMP;
+				const unsigned short flags = DT_POLYFLAGS_WALK
 #if DT_NAVMESH_SET_VERSION >= 7
-				| DT_POLYFLAGS_JUMP;
+					| DT_POLYFLAGS_JUMP;
 #else
-				;
+					;
 #endif;
-			geom->addOffMeshConnection(&m_hitPos, p, m_radius, m_bidir ? 1 : 0,
-				(unsigned char)m_traverseType, m_invertVertexLookupOrder ? 1 : 0, area, flags);
+				dtAddOffMeshConnectionToTile(nav, tileIdx, &m_hitPos, p, m_radius,
+					(unsigned char)m_traverseType, m_invertVertexLookupOrder ? 1 : 0, area, flags);
+
+				m_editor->invalidateNavMeshCache();
+			}
+
 			m_hitPosSet = false;
 		}
 	}

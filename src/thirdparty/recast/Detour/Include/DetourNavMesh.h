@@ -1119,8 +1119,10 @@ private:
 	/// Builds external polygon links for a tile.
 	dtStatus connectExtLinks(dtMeshTile* tile, dtMeshTile* target, const int side);
 
+public:
 	/// Removes external links at specified side.
 	void unconnectLinks(dtMeshTile* tile, dtMeshTile* target);
+private:
 
 
 	// TODO: These methods are duplicates from dtNavMeshQuery, but are needed for off-mesh connection finding.
