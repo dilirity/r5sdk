@@ -51,16 +51,20 @@ class OffMeshConnectionTool : public EditorTool
 	int m_traverseType;
 	unsigned int m_oldFlags;
 
-	int m_selectedOffMeshIndex;
-	int m_copiedOffMeshIndex;
+	// Tile-based off-mesh connection editing.
+	int m_selectedTileOffMeshTile;
+	int m_selectedTileOffMeshIdx;
+	int m_copiedTileOffMeshTile;
+	int m_copiedTileOffMeshIdx;
+	OffMeshConnection m_copyTileOffMeshInstance;
 
-	OffMeshConnection m_copyOffMeshInstance;
-	
 public:
 	OffMeshConnectionTool();
 	~OffMeshConnectionTool();
 
-	void renderModifyMenu();
+	void renderTileOffMeshModifyMenu();
+	void applyTileOffMeshChanges();
+	static void disconnectTileOffMeshLinks(class dtNavMesh* nav, struct dtMeshTile* tile);
 	
 	virtual int type() { return TOOL_OFFMESH_CONNECTION; }
 	virtual void init(Editor* editor);

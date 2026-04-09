@@ -17,6 +17,7 @@
 //
 
 #include "Recast/Include/Recast.h"
+#include "Detour/Include/DetourNavMesh.h"
 #include "DebugUtils/Include/RecastDebugDraw.h"
 #include "DebugUtils/Include/DetourDebugDraw.h"
 #include "NavEditor/Include/OffMeshConnectionTool.h"
@@ -37,12 +38,14 @@ OffMeshConnectionTool::OffMeshConnectionTool() :
 	m_invertVertexLookupOrder(false),
 	m_traverseType(0),
 	m_oldFlags(0),
-	m_selectedOffMeshIndex(-1),
-	m_copiedOffMeshIndex(-1)
+	m_selectedTileOffMeshTile(-1),
+	m_selectedTileOffMeshIdx(-1),
+	m_copiedTileOffMeshTile(-1),
+	m_copiedTileOffMeshIdx(-1)
 {
 	m_hitPos.init(0.0f,0.0f,0.0f);
 	m_refOffset.init(0.0f,0.0f,0.0f);
-	memset(&m_copyOffMeshInstance, 0, sizeof(OffMeshConnection));
+	memset(&m_copyTileOffMeshInstance, 0, sizeof(OffMeshConnection));
 }
 
 OffMeshConnectionTool::~OffMeshConnectionTool()
@@ -63,7 +66,6 @@ void OffMeshConnectionTool::init(Editor* editor)
 	{
 		m_editor = editor;
 		m_oldFlags = m_editor->getNavMeshDrawFlags();
-		m_editor->setNavMeshDrawFlags(m_oldFlags & ~DU_DRAW_DETOURMESH_OFFMESHCONS);
 
 		const float agentRadius = m_editor->getAgentRadius();
 		m_radius = agentRadius;
@@ -79,132 +81,182 @@ void OffMeshConnectionTool::reset()
 	m_radius = agentRadius;
 	m_lastSelectedAgentRadius = agentRadius;
 	m_hitPosSet = false;
+	m_selectedTileOffMeshTile = -1;
+	m_selectedTileOffMeshIdx = -1;
+	m_copiedTileOffMeshTile = -1;
+	m_copiedTileOffMeshIdx = -1;
 }
 
 #define VALUE_ADJUST_WINDOW 200
 
-void OffMeshConnectionTool::renderModifyMenu()
+void OffMeshConnectionTool::disconnectTileOffMeshLinks(dtNavMesh* nav, dtMeshTile* tile)
 {
-	InputGeom* geom = m_editor->getInputGeom();
-	if (!geom) return;
+	if (!tile->header) return;
+
+	const dtPolyRef base = nav->getPolyRefBase(tile);
+
+	for (int i = 0; i < tile->header->offMeshConCount; i++)
+	{
+		dtOffMeshConnection* con = &tile->offMeshCons[i];
+		dtPoly* conPoly = &tile->polys[con->poly];
+		const dtPolyRef conPolyRef = base | (dtPolyRef)(con->poly);
+
+		// Walk the off-mesh poly's link chain and remove reverse links
+		// from ground polys pointing back to this off-mesh poly.
+		unsigned int j = conPoly->firstLink;
+		while (j != DT_NULL_LINK)
+		{
+			dtLink& link = tile->links[j];
+			const unsigned int nextJ = link.next;
+
+			// Find the target tile and poly, remove their link back to us.
+			const unsigned int targetTileIdx = nav->decodePolyIdTile(link.ref);
+			const unsigned int targetPolyIdx = nav->decodePolyIdPoly(link.ref);
+			dtMeshTile* targetTile = nav->getTile(targetTileIdx);
+			dtPoly* targetPoly = &targetTile->polys[targetPolyIdx];
+
+			// Walk target poly's links, remove any pointing to our off-mesh poly.
+			unsigned int k = targetPoly->firstLink;
+			unsigned int pk = DT_NULL_LINK;
+			while (k != DT_NULL_LINK)
+			{
+				dtLink& targetLink = targetTile->links[k];
+				if (targetLink.ref == conPolyRef)
+				{
+					const unsigned int nk = targetLink.next;
+					if (pk == DT_NULL_LINK)
+						targetPoly->firstLink = nk;
+					else
+						targetTile->links[pk].next = nk;
+					targetTile->freeLink(k);
+					k = nk;
+				}
+				else
+				{
+					pk = k;
+					k = targetLink.next;
+				}
+			}
+
+			tile->freeLink(j);
+			j = nextJ;
+		}
+
+		conPoly->firstLink = DT_NULL_LINK;
+		conPoly->flags &= ~DT_POLYFLAGS_JUMP_LINKED;
+	}
+}
+
+void OffMeshConnectionTool::applyTileOffMeshChanges()
+{
+	if (!m_editor) return;
+	dtNavMesh* nav = m_editor->getNavMesh();
+	if (!nav) return;
+	if (m_selectedTileOffMeshTile < 0 || m_selectedTileOffMeshIdx < 0) return;
+
+	dtMeshTile* tile = nav->getTile(m_selectedTileOffMeshTile);
+	if (!tile->header) return;
+
+	dtOffMeshConnection* con = &tile->offMeshCons[m_selectedTileOffMeshIdx];
+	dtPoly* poly = &tile->polys[con->poly];
+	const dtTileRef tileRef = nav->getTileRef(tile);
+
+	// Disconnect all off-mesh connections in this tile before reconnecting.
+	disconnectTileOffMeshLinks(nav, tile);
+
+	// Update poly center from new endpoint positions.
+	rdVadd(&poly->center, &con->posa, &con->posb);
+	rdVscale(&poly->center, &poly->center, 0.5f);
+
+	// Reconnect all off-mesh connections in the tile.
+	nav->connectOffMeshLinks(tileRef);
+
+	// Read back clamped positions and update the backup for slider ranges.
+	m_copyTileOffMeshInstance.posa = con->posa;
+	m_copyTileOffMeshInstance.posb = con->posb;
+	m_copyTileOffMeshInstance.refPos = con->refPos;
+	m_copyTileOffMeshInstance.refYaw = con->refYaw;
+
+	m_editor->invalidateNavMeshCache();
+}
+
+void OffMeshConnectionTool::renderTileOffMeshModifyMenu()
+{
+	dtNavMesh* nav = m_editor->getNavMesh();
+	if (!nav) return;
+	if (m_selectedTileOffMeshTile < 0 || m_selectedTileOffMeshIdx < 0) return;
+
+	dtMeshTile* tile = nav->getTile(m_selectedTileOffMeshTile);
+	if (!tile->header) return;
+	if (m_selectedTileOffMeshIdx >= tile->header->offMeshConCount) return;
+
+	dtOffMeshConnection* con = &tile->offMeshCons[m_selectedTileOffMeshIdx];
+	dtPoly* poly = &tile->polys[con->poly];
+
+	// Backup original values on first access.
+	if (m_copiedTileOffMeshTile != m_selectedTileOffMeshTile ||
+		m_copiedTileOffMeshIdx != m_selectedTileOffMeshIdx)
+	{
+		m_copyTileOffMeshInstance.posa = con->posa;
+		m_copyTileOffMeshInstance.posb = con->posb;
+		m_copyTileOffMeshInstance.refPos = con->refPos;
+		m_copyTileOffMeshInstance.refYaw = con->refYaw;
+		m_copyTileOffMeshInstance.rad = con->rad;
+
+		m_copiedTileOffMeshTile = m_selectedTileOffMeshTile;
+		m_copiedTileOffMeshIdx = m_selectedTileOffMeshIdx;
+	}
 
 	ImGui::Separator();
-	ImGui::Text("Modify Off-Mesh Connection");
+	ImGui::Text("Modify Tile Off-Mesh Connection");
 
-	ImGui::SliderInt("Selected##OffMeshConnectionModify", &m_selectedOffMeshIndex, -1, geom->getOffMeshConnectionCount()-1);
-
-	if (m_selectedOffMeshIndex == -1)
-		return;
-
-	rdVec3D* verts = &geom->getOffMeshConnectionVerts()[m_selectedOffMeshIndex*2];
-	rdVec3D* refs = &geom->getOffMeshConnectionRefPos()[m_selectedOffMeshIndex];
-	float& rad = geom->getOffMeshConnectionRads()[m_selectedOffMeshIndex];
-	float& yaw = geom->getOffMeshConnectionRefYaws()[m_selectedOffMeshIndex];
-	unsigned char& dir = geom->getOffMeshConnectionDirs()[m_selectedOffMeshIndex];
-	unsigned char& jump = geom->getOffMeshConnectionJumps()[m_selectedOffMeshIndex];
-	unsigned char& order = geom->getOffMeshConnectionOrders()[m_selectedOffMeshIndex];
-	unsigned char& area = geom->getOffMeshConnectionAreas()[m_selectedOffMeshIndex];
-	unsigned short& flags = geom->getOffMeshConnectionFlags()[m_selectedOffMeshIndex];
-
-	if (m_copiedOffMeshIndex != m_selectedOffMeshIndex)
-	{
-		m_copyOffMeshInstance.posa = verts[0];
-		m_copyOffMeshInstance.posb = verts[1];
-		m_copyOffMeshInstance.refPos = *refs;
-
-		m_refOffset.init(0.f,0.f,rad);
-
-		m_copyOffMeshInstance.rad = rad;
-		m_copyOffMeshInstance.refYaw = yaw;
-		m_copyOffMeshInstance.dir = dir;
-		m_copyOffMeshInstance.jump = jump;
-		m_copyOffMeshInstance.order = order;
-		m_copyOffMeshInstance.area = area;
-		m_copyOffMeshInstance.flags = flags;
-
-		m_copiedOffMeshIndex = m_selectedOffMeshIndex;
-	}
+	const bool linked = (poly->flags & DT_POLYFLAGS_JUMP_LINKED) != 0;
+	ImGui::Text("Status: %s", linked ? "Linked" : "Unlinked");
 
 	ImGui::PushItemWidth(60);
 
-	ImGui::SliderFloat("##OffMeshConnectionModifyStartX", &verts[0].x, m_copyOffMeshInstance.posa.x - VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posa.x + VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##TileOffMeshStartX", &con->posa.x, m_copyTileOffMeshInstance.posa.x - VALUE_ADJUST_WINDOW, m_copyTileOffMeshInstance.posa.x + VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyStartY", &verts[0].y, m_copyOffMeshInstance.posa.y - VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posa.y + VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##TileOffMeshStartY", &con->posa.y, m_copyTileOffMeshInstance.posa.y - VALUE_ADJUST_WINDOW, m_copyTileOffMeshInstance.posa.y + VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyStartZ", &verts[0].z, m_copyOffMeshInstance.posa.z - VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posa.z + VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##TileOffMeshStartZ", &con->posa.z, m_copyTileOffMeshInstance.posa.z - VALUE_ADJUST_WINDOW, m_copyTileOffMeshInstance.posa.z + VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
 	ImGui::Text("Start");
 
-	ImGui::SliderFloat("##OffMeshConnectionModifyEndX", &verts[1].x, m_copyOffMeshInstance.posb.x-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posb.x+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##TileOffMeshEndX", &con->posb.x, m_copyTileOffMeshInstance.posb.x - VALUE_ADJUST_WINDOW, m_copyTileOffMeshInstance.posb.x + VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyEndY", &verts[1].y, m_copyOffMeshInstance.posb.y-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posb.y+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##TileOffMeshEndY", &con->posb.y, m_copyTileOffMeshInstance.posb.y - VALUE_ADJUST_WINDOW, m_copyTileOffMeshInstance.posb.y + VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyEndZ", &verts[1].z, m_copyOffMeshInstance.posb.z-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.posb.z+VALUE_ADJUST_WINDOW);
+	ImGui::SliderFloat("##TileOffMeshEndZ", &con->posb.z, m_copyTileOffMeshInstance.posb.z - VALUE_ADJUST_WINDOW, m_copyTileOffMeshInstance.posb.z + VALUE_ADJUST_WINDOW);
 	ImGui::SameLine();
 	ImGui::Text("End");
 
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefX", &refs->x, m_copyOffMeshInstance.refPos.x-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.refPos.x+VALUE_ADJUST_WINDOW);
-	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefY", &refs->y, m_copyOffMeshInstance.refPos.y-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.refPos.y+VALUE_ADJUST_WINDOW);
-	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefZ", &refs->z, m_copyOffMeshInstance.refPos.z-VALUE_ADJUST_WINDOW, m_copyOffMeshInstance.refPos.z+VALUE_ADJUST_WINDOW);
-	ImGui::SameLine();
-	ImGui::Text("Ref");
-
 	ImGui::PopItemWidth();
 
-	// On newer navmesh sets, off-mesh links are always bidirectional.
-#if DT_NAVMESH_SET_VERSION < 7
-	ImGui::Checkbox("Bidirectional##OffMeshConnectionModify", (bool*)&dir);
-#endif
-
-	ImGui::SliderFloat("Radius##OffMeshConnectionModify", &rad, 0, 512);
-	ImGui::SliderFloat("Yaw##OffMeshConnectionModify", &yaw, -180, 180);
-
-	int traverseType = jump;
-	ImGui::SliderInt("Jump##OffMeshConnectionModify", &traverseType, 0, DT_MAX_TRAVERSE_TYPES-1, "%d", ImGuiSliderFlags_NoInput);
-
-	if (traverseType != jump)
-		jump = (unsigned char)traverseType;
-
-	ImGui::PushItemWidth(60);
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefOffsetX", &m_refOffset.x, -VALUE_ADJUST_WINDOW, VALUE_ADJUST_WINDOW);
-	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefOffsetY", &m_refOffset.y, -VALUE_ADJUST_WINDOW, VALUE_ADJUST_WINDOW);
-	ImGui::SameLine();
-	ImGui::SliderFloat("##OffMeshConnectionModifyRefOffsetZ", &m_refOffset.z, -VALUE_ADJUST_WINDOW, VALUE_ADJUST_WINDOW);
-	ImGui::SameLine();
-	ImGui::Text("Ref Offset");
-	ImGui::PopItemWidth();
-
-	if (ImGui::Button("Recalculate Reference##OffMeshConnectionModify"))
+	if (ImGui::Button("Apply##TileOffMesh"))
 	{
-		yaw = dtCalcOffMeshRefYaw(&verts[0], &verts[1]);
-		dtCalcOffMeshRefPos(verts, yaw, &m_refOffset, refs);
+		applyTileOffMeshChanges();
 	}
 
-	if (ImGui::Button("Reset Connection##OffMeshConnectionModify"))
+	if (ImGui::Button("Reset##TileOffMesh"))
 	{
-		rdVcopy(&verts[0], &m_copyOffMeshInstance.posa);
-		rdVcopy(&verts[1], &m_copyOffMeshInstance.posb);
-		rdVcopy(refs, &m_copyOffMeshInstance.refPos);
-
-		rad = m_copyOffMeshInstance.rad;
-		yaw = m_copyOffMeshInstance.refYaw;
-		dir = m_copyOffMeshInstance.dir;
-		jump = m_copyOffMeshInstance.jump;
-		order = m_copyOffMeshInstance.order;
-		area = m_copyOffMeshInstance.area;
-		flags = m_copyOffMeshInstance.flags;
+		con->posa = m_copyTileOffMeshInstance.posa;
+		con->posb = m_copyTileOffMeshInstance.posb;
+		con->refPos = m_copyTileOffMeshInstance.refPos;
+		con->refYaw = m_copyTileOffMeshInstance.refYaw;
 	}
 
-	if (ImGui::Button("Delete Connection##OffMeshConnectionModify"))
+	if (ImGui::Button("Recalculate Reference##TileOffMesh"))
 	{
-		geom->deleteOffMeshConnection(m_selectedOffMeshIndex);
-		m_selectedOffMeshIndex = -1;
-		m_copiedOffMeshIndex = -1;
+		con->refYaw = dtCalcOffMeshRefYaw(&con->posa, &con->posb);
+		const rdVec3D refOffset(0.0f, 0.0f, con->rad);
+		dtCalcOffMeshRefPos(&con->posa, con->refYaw, &refOffset, &con->refPos);
+	}
 
-		return;
+	if (ImGui::Button("Deselect##TileOffMesh"))
+	{
+		m_selectedTileOffMeshTile = -1;
+		m_selectedTileOffMeshIdx = -1;
 	}
 }
 
@@ -223,42 +275,55 @@ void OffMeshConnectionTool::handleMenu()
 	ImGui::SliderFloat("Radius##OffMeshConnectionCreate", &m_radius, 0, 512);
 	ImGui::PopItemWidth();
 
-	renderModifyMenu();
+	renderTileOffMeshModifyMenu();
 }
 
 void OffMeshConnectionTool::handleClick(const rdVec3D* /*s*/, const rdVec3D* p, const int /*v*/, bool shift)
 {
 	if (!m_editor) return;
-	InputGeom* geom = m_editor->getInputGeom();
-	if (!geom) return;
 
 	if (shift)
 	{
-		// Select
-		// Find nearest link end-point
+		// Select nearest tile-based off-mesh connection endpoint.
 		float nearestDist = FLT_MAX;
-		int nearestIndex = -1;
-		const rdVec3D* verts = geom->getOffMeshConnectionVerts();
-		for (int i = 0; i < geom->getOffMeshConnectionCount()*2; ++i)
+		int nearestIdx = -1;
+		int nearestTile = -1;
+		dtNavMesh* nav = m_editor->getNavMesh();
+		if (nav)
 		{
-			const rdVec3D* v = &verts[i];
-			float d = rdVdist2DSqr(p, v);
-			if (d < nearestDist)
+			for (int i = 0; i < nav->getMaxTiles(); i++)
 			{
-				nearestDist = d;
-				nearestIndex = i/2; // Each link has two vertices.
+				const dtMeshTile* tile = nav->getTile(i);
+				if (!tile->header) continue;
+
+				for (int j = 0; j < tile->header->offMeshConCount; j++)
+				{
+					const dtOffMeshConnection* con = &tile->offMeshCons[j];
+					float da = rdVdist2DSqr(p, &con->posa);
+					float db = rdVdist2DSqr(p, &con->posb);
+					float d = rdMin(da, db);
+					if (d < nearestDist)
+					{
+						nearestDist = d;
+						nearestIdx = j;
+						nearestTile = i;
+					}
+				}
 			}
 		}
-		// If end point close enough, select it.
-		if (nearestIndex != -1 &&
-			rdMathSqrtf(nearestDist) < m_radius)
+
+		if (nearestIdx != -1 && rdMathSqrtf(nearestDist) < m_radius)
 		{
-			m_selectedOffMeshIndex = nearestIndex;
+			m_selectedTileOffMeshTile = nearestTile;
+			m_selectedTileOffMeshIdx = nearestIdx;
 		}
 	}
 	else
 	{
-		// Create	
+		// Create
+		InputGeom* geom = m_editor->getInputGeom();
+		if (!geom) return;
+
 		if (!m_hitPosSet)
 		{
 			m_hitPos = *p;
@@ -273,7 +338,7 @@ void OffMeshConnectionTool::handleClick(const rdVec3D* /*s*/, const rdVec3D* p, 
 #else
 				;
 #endif;
-			m_selectedOffMeshIndex = geom->addOffMeshConnection(&m_hitPos, p, m_radius, m_bidir ? 1 : 0,
+			geom->addOffMeshConnection(&m_hitPos, p, m_radius, m_bidir ? 1 : 0,
 				(unsigned char)m_traverseType, m_invertVertexLookupOrder ? 1 : 0, area, flags);
 			m_hitPosSet = false;
 		}
@@ -307,9 +372,31 @@ void OffMeshConnectionTool::handleRender()
 	if (m_hitPosSet)
 		duDebugDrawCross(&dd, m_hitPos[0],m_hitPos[1],m_hitPos[2]+0.1f, s, duRGBA(0,0,0,128), 2.0f, nullptr);
 
+	// Draw InputGeom off-mesh connections (newly created ones).
 	InputGeom* geom = m_editor->getInputGeom();
 	if (geom)
-		geom->drawOffMeshConnections(&dd, m_editor->getRecastDrawOffset(), m_selectedOffMeshIndex);
+		geom->drawOffMeshConnections(&dd, m_editor->getRecastDrawOffset(), -1);
+
+	// Highlight selected tile-based off-mesh connection.
+	if (m_selectedTileOffMeshTile >= 0 && m_selectedTileOffMeshIdx >= 0)
+	{
+		dtNavMesh* nav = m_editor->getNavMesh();
+		if (nav)
+		{
+			const dtMeshTile* tile = nav->getTile(m_selectedTileOffMeshTile);
+			if (tile->header && m_selectedTileOffMeshIdx < tile->header->offMeshConCount)
+			{
+				const dtOffMeshConnection* con = &tile->offMeshCons[m_selectedTileOffMeshIdx];
+				const unsigned int col = duRGBA(255, 200, 0, 220);
+				const rdVec3D* offset = m_editor->getDetourDrawOffset();
+
+				dd.begin(DU_DRAW_LINES, 4.0f, offset);
+				duAppendCircle(&dd, con->posa.x, con->posa.y, con->posa.z + 5.0f, con->rad, col);
+				duAppendCircle(&dd, con->posb.x, con->posb.y, con->posb.z + 5.0f, con->rad, col);
+				dd.end();
+			}
+		}
+	}
 }
 
 void OffMeshConnectionTool::handleRenderOverlay(double* model, double* proj, int* view)
