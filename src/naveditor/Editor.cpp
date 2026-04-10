@@ -463,67 +463,75 @@ void Editor::drawInputMeshIndexed(float maxSlope, float texScale)
 		const int vertCount = mesh->getVertCount();
 		const int triCount = mesh->getTriCount();
 
-		cache.vertCount = vertCount;
-		cache.indexCount = triCount * 3;
-
 		const float walkableThr = rdMathCosf(maxSlope / 180.0f * RD_PI);
 		const unsigned int unwalkable = duRGBA(192, 128, 0, 255);
 
-		unsigned int* colors = new unsigned int[vertCount];
-		rdVec2D* uvs = new rdVec2D[vertCount];
+		// Split shared vertices at UV projection seam boundaries.
+		//
+		// UV projection axis is per-face (derived from face normal), but indexed
+		// rendering requires per-vertex UVs. Vertices shared by faces with
+		// different projection axes need to be duplicated so each face gets the
+		// correct UVs. There are only 3 possible projection axes (X/Y/Z
+		// dominant normal), so each original vertex needs at most 3 copies.
+		// In practice only vertices at orientation transitions (e.g. floor/wall
+		// edges) get split, keeping the overhead minimal.
 
+		// For each original vertex, track up to 3 split copies (one per
+		// projection axis). -1 means no copy exists yet.
+		std::vector<int> vertSlots((size_t)vertCount * 3, -1);
+
+		std::vector<rdVec3D> splitVerts;
+		std::vector<unsigned int> splitColors;
+		std::vector<rdVec2D> splitUVs;
+		splitVerts.reserve(vertCount + vertCount / 5);
+		splitColors.reserve(vertCount + vertCount / 5);
+		splitUVs.reserve(vertCount + vertCount / 5);
+
+		std::vector<int> newTris(triCount * 3);
+
+		for (int i = 0; i < triCount; i++)
 		{
-			const int numWorkers = rdMax(1, (int)std::thread::hardware_concurrency() - 1);
-			std::atomic<int> nextChunk(0);
-			const int chunkSize = 8192;
+			const rdVec3D* norm = &normals[i];
 
-			auto worker = [&]()
+			// Dominant normal axis determines the UV projection plane.
+			int projAxis = 2;
+			float best = rdAbs(norm->z);
+			if (rdAbs(norm->x) > best) { projAxis = 0; best = rdAbs(norm->x); }
+			if (rdAbs(norm->y) > best) { projAxis = 1; }
+
+			const int ax = (1 << projAxis) & 3;
+			const int ay = (1 << ax) & 3;
+
+			unsigned char a = (unsigned char)(220 * (2 + norm->x + norm->y) / 4);
+			unsigned int color;
+			if (norm->z < walkableThr)
+				color = duLerpCol(duRGBA(a, a, a, 255), unwalkable, 64);
+			else
+				color = duRGBA(a, a, a, 255);
+
+			for (int j = 0; j < 3; j++)
 			{
-				for (;;)
+				const int origIdx = tris[i * 3 + j];
+				int& slot = vertSlots[origIdx * 3 + projAxis];
+
+				if (slot == -1)
 				{
-					const int start = nextChunk.fetch_add(chunkSize);
-					if (start >= triCount)
-						break;
-					const int end = rdMin(start + chunkSize, triCount);
-					for (int i = start; i < end; i++)
-					{
-						const rdVec3D* norm = &normals[i];
-						unsigned char a = (unsigned char)(220 * (2 + norm->x + norm->y) / 4);
-						unsigned int color;
-						if (norm->z < walkableThr)
-							color = duLerpCol(duRGBA(a, a, a, 255), unwalkable, 64);
-						else
-							color = duRGBA(a, a, a, 255);
-
-						// Pick UV projection axis from face normal, same as duDebugDrawTriMeshSlope.
-						int ax = 2;
-						float absNorm = rdAbs((*norm)[ax]);
-						if (rdAbs(norm->x) > absNorm) { ax = 0; absNorm = rdAbs(norm->x); }
-						if (rdAbs(norm->y) > absNorm) { ax = 1; }
-						ax = (1 << ax) & 3;
-						const int ay = (1 << ax) & 3;
-
-						const int i0 = tris[i * 3 + 0];
-						const int i1 = tris[i * 3 + 1];
-						const int i2 = tris[i * 3 + 2];
-
-						colors[i0] = color;
-						colors[i1] = color;
-						colors[i2] = color;
-
-						uvs[i0] = { verts[i0][ax] * texScale, verts[i0][ay] * texScale };
-						uvs[i1] = { verts[i1][ax] * texScale, verts[i1][ay] * texScale };
-						uvs[i2] = { verts[i2][ax] * texScale, verts[i2][ay] * texScale };
-					}
+					slot = (int)splitVerts.size();
+					splitVerts.push_back(verts[origIdx]);
+					splitColors.push_back(color);
+					splitUVs.push_back({ verts[origIdx][ax] * texScale, verts[origIdx][ay] * texScale });
 				}
-			};
+				else
+				{
+					splitColors[slot] = color;
+				}
 
-			std::vector<std::thread> workers;
-			for (int i = 0; i < numWorkers; i++)
-				workers.emplace_back(worker);
-			for (auto& w : workers)
-				w.join();
+				newTris[i * 3 + j] = slot;
+			}
 		}
+
+		cache.vertCount = (int)splitVerts.size();
+		cache.indexCount = triCount * 3;
 
 		if (!cache.vboPos)
 		{
@@ -534,22 +542,19 @@ void Editor::drawInputMeshIndexed(float maxSlope, float texScale)
 		}
 
 		glBindBuffer(GL_ARRAY_BUFFER, cache.vboPos);
-		glBufferData(GL_ARRAY_BUFFER, vertCount * sizeof(rdVec3D), verts, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, cache.vertCount * sizeof(rdVec3D), splitVerts.data(), GL_STATIC_DRAW);
 
 		glBindBuffer(GL_ARRAY_BUFFER, cache.vboColor);
-		glBufferData(GL_ARRAY_BUFFER, vertCount * sizeof(unsigned int), colors, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, cache.vertCount * sizeof(unsigned int), splitColors.data(), GL_STATIC_DRAW);
 
 		glBindBuffer(GL_ARRAY_BUFFER, cache.vboUV);
-		glBufferData(GL_ARRAY_BUFFER, vertCount * sizeof(rdVec2D), uvs, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, cache.vertCount * sizeof(rdVec2D), splitUVs.data(), GL_STATIC_DRAW);
 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cache.ibo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, cache.indexCount * sizeof(int), tris, GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, cache.indexCount * sizeof(int), newTris.data(), GL_STATIC_DRAW);
 
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		delete[] colors;
-		delete[] uvs;
 
 		cache.dirty = false;
 		m_inputMeshCacheDirty = false;
