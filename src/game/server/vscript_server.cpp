@@ -2070,6 +2070,186 @@ static SQRESULT ServerScript_NavMesh_UnbanTraverseLink(HSQUIRRELVM v)
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
 
+//-----------------------------------------------------------------------------
+// Purpose: returns navmesh polygon refs whose vertices lie within a horizontal
+//          radius of a point. Intended for spatial lookups that need to walk
+//          polygon geometry from script (e.g. border-edge cover queries).
+//
+//          Walks every polygon in the navmesh and filters by distance. Since
+//          polys are only stored per-tile, the loop visits each tile (via
+//          getMaxTiles() / getTile()) to reach its poly array — tiles are
+//          the container, polys are the unit of interest. Same iteration
+//          pattern the engine's own drawPolyMeshFaces() uses at
+//          DetourDebugDraw.cpp:62. Deliberately avoids
+//          dtNavMeshQuery::queryPolygons, which routes through a
+//          small/large-area dispatcher (DetourNavMeshQuery.cpp:1102) whose
+//          large-area spiral search bails early and drops polys near the
+//          outer edge of the query region.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_QueryPolysInRadius(HSQUIRRELVM v)
+{
+    const SQVector3D* centerVec = nullptr;
+    SQFloat radius;
+    SQInteger hullIdx;
+
+    sq_getvector(v, 2, &centerVec);
+    sq_getfloat(v, 3, &radius);
+    sq_getinteger(v, 4, &hullIdx);
+
+    dtQueryFilter unusedFilter;
+    rdVec3D unusedHalfExtents;
+
+    dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &unusedFilter, &unusedHalfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const rdVec3D center(centerVec->x, centerVec->y, centerVec->z);
+    const float radius2DSq = radius * radius;
+
+    sq_newarray(v, 0);
+
+    const int maxTiles = nav->getMaxTiles();
+    for (int t = 0; t < maxTiles; t++)
+    {
+        const dtMeshTile* tile = nav->getTile(t);
+        if (!tile || !tile->header)
+            continue;
+
+        const dtPolyRef base = nav->getPolyRefBase(tile);
+        const int polyCount = tile->header->polyCount;
+
+        for (int i = 0; i < polyCount; i++)
+        {
+            const dtPoly* p = &tile->polys[i];
+
+            if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
+                continue;
+
+            // Include the poly if any of its vertices is within the query
+            // radius (2D). Permissive by design: script does per-edge
+            // filtering afterward with GetPolyVerts / GetPolyEdgeNeighbors.
+            bool inRange = false;
+            for (int k = 0; k < p->vertCount; k++)
+            {
+                const rdVec3D* vert = &tile->verts[p->verts[k]];
+                const float dx = vert->x - center.x;
+                const float dy = vert->y - center.y;
+                if (dx * dx + dy * dy <= radius2DSq)
+                {
+                    inRange = true;
+                    break;
+                }
+            }
+
+            if (!inRange)
+                continue;
+
+            const dtPolyRef ref = base | (dtPolyRef)i;
+            sq_pushinteger(v, (SQInteger)ref);
+            sq_arrayappend(v, -2);
+        }
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: returns the world-space vertices of a navmesh polygon, in the
+//          polygon's native vertex order. Pair index i of this result with
+//          index i of NavMesh_GetPolyEdgeNeighbors to reason about edge i.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_GetPolyVerts(HSQUIRRELVM v)
+{
+    SQInteger polyRefInt;
+    SQInteger hullIdx;
+
+    sq_getinteger(v, 2, &polyRefInt);
+    sq_getinteger(v, 3, &hullIdx);
+
+    dtQueryFilter filter;
+    rdVec3D halfExtents;
+
+    dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &filter, &halfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const dtPolyRef polyRef = (dtPolyRef)polyRefInt;
+
+    sq_newarray(v, 0);
+
+    if (!polyRef)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+    const dtMeshTile* tile = nullptr;
+    const dtPoly* poly = nullptr;
+    nav->getTileAndPolyByRefUnsafe(polyRef, &tile, &poly);
+
+    if (!tile || !poly)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+    for (int i = 0; i < poly->vertCount; i++)
+    {
+        const unsigned short vertIdx = poly->verts[i];
+        const rdVec3D* vert = &tile->verts[vertIdx];
+        const SQVector3D sqVert(vert->x, vert->y, vert->z);
+        sq_pushvector(v, &sqVert);
+        sq_arrayappend(v, -2);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: returns a polygon's per-edge neighbor values (dtPoly::neis). A
+//          value of 0 means the edge is a border edge (no walkable neighbor
+//          in the same tile and not an external link) and therefore runs
+//          along real obstacle geometry. Any non-zero value means the edge
+//          is internal to the walkable surface and is not cover.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_GetPolyEdgeNeighbors(HSQUIRRELVM v)
+{
+    SQInteger polyRefInt;
+    SQInteger hullIdx;
+
+    sq_getinteger(v, 2, &polyRefInt);
+    sq_getinteger(v, 3, &hullIdx);
+
+    dtQueryFilter filter;
+    rdVec3D halfExtents;
+
+    dtNavMesh* const nav = Internal_ServerScript_NavMesh_GetNavMesh(
+        v, hullIdx, &filter, &halfExtents);
+
+    if (!nav)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const dtPolyRef polyRef = (dtPolyRef)polyRefInt;
+
+    sq_newarray(v, 0);
+
+    if (!polyRef)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+    const dtMeshTile* tile = nullptr;
+    const dtPoly* poly = nullptr;
+    nav->getTileAndPolyByRefUnsafe(polyRef, &tile, &poly);
+
+    if (!tile || !poly)
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+
+    for (int i = 0; i < poly->vertCount; i++)
+    {
+        sq_pushinteger(v, (SQInteger)poly->neis[i]);
+        sq_arrayappend(v, -2);
+    }
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
 //=============================================================================
 // Bot Control API
 //=============================================================================
@@ -2468,6 +2648,22 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "Restores a previously banned traverse link. Returns true on success",
         "bool",
         "int sourcePolyRef, int targetPolyRef, int hullType", false);
+
+    // NavMesh Polygon Geometry API (for cover queries and spatial walks)
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_QueryPolysInRadius,
+        "Returns polygon refs within a horizontal radius around a point. Z uses the hull's canonical height.",
+        "array",
+        "vector center, float radius, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetPolyVerts,
+        "Returns the world-space vertices of a polygon in vertex order. Pair with NavMesh_GetPolyEdgeNeighbors to walk edges.",
+        "array",
+        "int polyRef, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetPolyEdgeNeighbors,
+        "Returns per-edge neighbor values. A value of 0 means the edge is a border edge (runs along obstacle geometry).",
+        "array",
+        "int polyRef, int hullType", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, Bot_Create,
         "Creates a bot player, returns edict index (-1 on failure). Use GetEntByIndex() to get entity",
