@@ -25,6 +25,7 @@
 //=============================================================================//
 
 #include "core/stdafx.h"
+#include "tier0/platform.h"
 #include "rtech/playlists/playlists.h"
 #include "engine/client/cl_main.h"
 #include "engine/cmodel_bsp.h"
@@ -85,6 +86,17 @@ static SQRESULT SharedScript_GetAvailablePlaylists(HSQUIRRELVM v)
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: returns a high-resolution wall-clock timestamp in seconds. Unlike
+// Time(), which is quantized to server tick boundaries, this advances within
+// a single tick and is suitable for measuring per-phase script costs.
+//-----------------------------------------------------------------------------
+static SQRESULT SharedScript_PlatFloatTime(HSQUIRRELVM v)
+{
+    sq_pushfloat(v, (SQFloat)Plat_FloatTime());
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: forces a script error
 //-----------------------------------------------------------------------------
 static SQRESULT SharedScript_ScriptError(HSQUIRRELVM v)
@@ -109,6 +121,8 @@ void Script_RegisterCommonAbstractions(CSquirrelVM* s)
 
     DEFINE_SHARED_SCRIPTFUNC_NAMED(s, GetAvailableMaps, "Gets an array of all available maps", "array< string >", "", false);
     DEFINE_SHARED_SCRIPTFUNC_NAMED(s, GetAvailablePlaylists, "Gets an array of all available playlists", "array< string >", "", false);
+
+    DEFINE_SHARED_SCRIPTFUNC_NAMED(s, PlatFloatTime, "High-resolution wall-clock time in seconds. Advances within a single server tick (unlike Time()). Use for per-phase profiling.", "float", "", false);
 
     DEFINE_SHARED_SCRIPTFUNC_NAMED(s, ScriptError, "Throws a script error", "void", "string format, ...", true);
 
