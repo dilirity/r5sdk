@@ -209,17 +209,23 @@ struct CollisionBSPData_t
 enum class TriggerType_e
 {
 	NONE = 0,
-	OUT_OF_BOUNDS,     // 1
-	SLIP,              // 2
-	HURT,              // 3
-	SOUNDSCAPE,        // 4
-	NO_ZIPLINE,        // 5
-	NO_GRAPPLE,        // 6
-	WARP_GATE,         // 7 (phase runner teleporters)
-	SKYDIVE,           // 8 (rift exits)
-	MULTIPLE_OTHER,    // 9 (other trigger_multiple)
-	OTHER_TRIGGER,     // 10
-	NON_TRIGGER        // 11 (func_brush, etc.)
+	OUT_OF_BOUNDS,        // 1
+	SLIP,                 // 2
+	HURT,                 // 3
+	SOUNDSCAPE,           // 4
+	NO_ZIPLINE,           // 5
+	NO_GRAPPLE,           // 6
+	WARP_GATE,            // 7  (phase runner teleporters)
+	SKYDIVE,              // 8  (rift exits)
+	MULTIPLE_OTHER,       // 9  (other trigger_multiple, no recognized editor class)
+	OTHER_TRIGGER,        // 10
+	NON_TRIGGER,          // 11 (func_brush, etc.)
+	PVE_ZONE,             // 12 (trigger_multiple w/ editor class trigger_pve_zone — named POI volumes)
+	NETWORKED_OOB,        // 13 (trigger_networked_out_of_bounds)
+	NO_OBJECT_PLACEMENT,  // 14 (trigger_no_object_placement)
+	NETWORKED_NO_OP,      // 15 (trigger_networked_no_op)
+	BLOCK_ALL_OP,         // 16 (trigger_networked_block_all_op)
+	WATER                 // 17 (trigger_water)
 };
 
 //-----------------------------------------------------------------------------

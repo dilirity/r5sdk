@@ -35,7 +35,7 @@ ConVar bsp_collision_debug_alpha("bsp_collision_debug_alpha", "32", FCVAR_DEVELO
 	"Alpha value for solid debug rendering", true, 0.f, true, 255.f);
 
 ConVar bsp_trigger_debug("bsp_trigger_debug", "0", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
-	"Draw trigger collision volumes: 0=off, 1=OOB, 2=slip, 3=hurt, 4=soundscape, 5=no_zipline, 6=no_grapple, 7=warp_gate, 8=skydive, 9=multiple_other, 10=other, 11=non-trigger, -1=all");
+	"Draw trigger collision volumes: 0=off, 1=OOB, 2=slip, 3=hurt, 4=soundscape, 5=no_zipline, 6=no_grapple, 7=warp_gate, 8=skydive, 9=multiple_other, 10=other, 11=non-trigger, 12=pve_zone, 13=networked_oob, 14=no_object_placement, 15=networked_no_op, 16=block_all_op, 17=water, -1=all");
 
 ConVar bsp_trigger_debug_radius("bsp_trigger_debug_radius", "8192", FCVAR_DEVELOPMENTONLY | FCVAR_CHEAT,
 	"Radius around player to render trigger volumes", true, 64.f, true, 65536.f);
@@ -82,10 +82,16 @@ static Color GetTriggerColor(TriggerType_e type, int alpha)
 	case TriggerType_e::NO_GRAPPLE:     return Color(200, 100, 30, alpha);   // Dark orange — can't grapple
 	case TriggerType_e::WARP_GATE:      return Color(160, 50, 220, alpha);   // Purple — phase runner teleporter
 	case TriggerType_e::SKYDIVE:        return Color(50, 220, 160, alpha);   // Teal — skydive/rift exit
-	case TriggerType_e::MULTIPLE_OTHER: return Color(180, 100, 220, alpha);  // Light purple — other trigger_multiple
-	case TriggerType_e::OTHER_TRIGGER:  return Color(128, 128, 128, alpha);  // Grey — unknown
-	case TriggerType_e::NON_TRIGGER:    return Color(220, 220, 220, alpha);  // White — structural
-	default:                           return Color(255, 255, 255, alpha);  // White
+	case TriggerType_e::MULTIPLE_OTHER:      return Color(180, 100, 220, alpha);  // Light purple — other trigger_multiple
+	case TriggerType_e::OTHER_TRIGGER:       return Color(128, 128, 128, alpha);  // Grey — unknown
+	case TriggerType_e::NON_TRIGGER:         return Color(220, 220, 220, alpha);  // White — structural
+	case TriggerType_e::PVE_ZONE:            return Color(50, 255, 50, alpha);    // Bright green — named POI volume
+	case TriggerType_e::NETWORKED_OOB:       return Color(180, 30, 30, alpha);    // Dark red — networked out-of-bounds
+	case TriggerType_e::NO_OBJECT_PLACEMENT: return Color(140, 100, 60, alpha);   // Brown — placement gating
+	case TriggerType_e::NETWORKED_NO_OP:     return Color(120, 90, 50, alpha);    // Dark brown — networked no-op
+	case TriggerType_e::BLOCK_ALL_OP:        return Color(100, 70, 40, alpha);    // Darker brown — block-all-op
+	case TriggerType_e::WATER:               return Color(50, 180, 220, alpha);   // Cyan — water
+	default:                                 return Color(255, 255, 255, alpha);  // White
 	}
 }
 
@@ -198,12 +204,25 @@ static void ParseTriggerMappings(const char* entityText, int length)
 		{
 			TriggerType_e type = TriggerType_e::NON_TRIGGER;
 
-			if (strstr(classname, "trigger_out_of_bounds"))
+			// Order matters here: more specific names must be checked before
+			// substrings that would also match (e.g. trigger_networked_no_op
+			// before trigger_no_zipline since both contain "no").
+			if (strstr(classname, "trigger_networked_out_of_bounds"))
+				type = TriggerType_e::NETWORKED_OOB;
+			else if (strstr(classname, "trigger_networked_no_op"))
+				type = TriggerType_e::NETWORKED_NO_OP;
+			else if (strstr(classname, "trigger_networked_block_all_op"))
+				type = TriggerType_e::BLOCK_ALL_OP;
+			else if (strstr(classname, "trigger_no_object_placement"))
+				type = TriggerType_e::NO_OBJECT_PLACEMENT;
+			else if (strstr(classname, "trigger_out_of_bounds"))
 				type = TriggerType_e::OUT_OF_BOUNDS;
 			else if (strstr(classname, "trigger_slip"))
 				type = TriggerType_e::SLIP;
 			else if (strstr(classname, "trigger_hurt"))
 				type = TriggerType_e::HURT;
+			else if (strstr(classname, "trigger_water"))
+				type = TriggerType_e::WATER;
 			else if (strstr(classname, "trigger_soundscape"))
 				type = TriggerType_e::SOUNDSCAPE;
 			else if (strstr(classname, "trigger_no_zipline"))
@@ -216,6 +235,8 @@ static void ParseTriggerMappings(const char* entityText, int length)
 					type = TriggerType_e::WARP_GATE;
 				else if (strstr(editorclass, "trigger_skydive"))
 					type = TriggerType_e::SKYDIVE;
+				else if (strstr(editorclass, "trigger_pve_zone"))
+					type = TriggerType_e::PVE_ZONE;
 				else
 					type = TriggerType_e::MULTIPLE_OTHER;
 			}
