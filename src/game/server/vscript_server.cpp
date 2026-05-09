@@ -39,12 +39,20 @@
 
 #include "thirdparty/recast/DetourCrowd/Include/DetourPathCorridor.h"
 #include "public/game/server/ai_agent.h"  // g_traverseAnimDefaultCosts
+#include "public/game/server/ai_navmesh.h" // NavMesh_GetTraverseTableIndexForAnimType
 #include <unordered_map>
 #include <vector>
 
 //=============================================================================
 // Bot Navigation Corridor System
 //=============================================================================
+// Corridor poly buffer size - must match dtPathCorridor::init() arg below.
+static const int BOT_CORRIDOR_MAX_PATH = 256;
+
+// Lazy refill threshold: when corridor poly count drops to this, run the next
+// chained A* to extend the trip toward the goal.
+static const int BOT_CORRIDOR_REFILL_THRESHOLD = 32;
+
 struct BotCorridor
 {
     dtPathCorridor corridor;
@@ -53,7 +61,32 @@ struct BotCorridor
     Hull_e hullType;
     bool initialized;
 
-    BotCorridor() : hullType(HULL_HUMAN), initialized(false) {}
+    // Trip state - lets a long path be served by chained A* calls. SetPath does
+    // the first one; CorridorMove triggers further ones lazily as the bot walks
+    // and the corridor depletes. The bot script doesn't see any of this.
+    rdVec3D goalPos;             // original brain goal, snapped to navmesh
+    dtPolyRef goalRef;           // goal poly ref
+    dtPolyRef nextStartRef;      // partial endpoint poly to start the next A* from
+    rdVec3D nextStartPos;        // partial endpoint position (A* startPos arg)
+    bool tripActive;             // a trip is in flight (set by SetPath)
+    bool tripComplete;           // last A* returned non-partial - no more refills
+
+    // Pending poly stash - polys produced by the latest A* refill, waiting to be
+    // dripped into the corridor's tail as the front consumes. Boundary-deduped:
+    // the duplicate first poly (matches corridor's current last poly) is skipped.
+    dtPolyRef pendingPolys[BOT_CORRIDOR_MAX_PATH];
+    unsigned char pendingJumps[BOT_CORRIDOR_MAX_PATH];
+    int pendingCount;
+
+    BotCorridor()
+        : hullType(HULL_HUMAN)
+        , initialized(false)
+        , goalRef(0)
+        , nextStartRef(0)
+        , tripActive(false)
+        , tripComplete(false)
+        , pendingCount(0)
+    {}
 };
 
 static std::unordered_map<int, BotCorridor*> g_corridors;
@@ -1047,7 +1080,7 @@ static SQRESULT ServerScript_NavMesh_CreateCorridor(HSQUIRRELVM v)
     }
 
     // Initialize corridor path buffer
-    if (!pCorridor->corridor.init(256))
+    if (!pCorridor->corridor.init(BOT_CORRIDOR_MAX_PATH))
     {
         delete pCorridor;
         v_SQVM_ScriptError("NavMesh_CreateCorridor: failed to init corridor");
@@ -1199,6 +1232,12 @@ static SQRESULT ServerScript_NavMesh_CorridorSetPath(HSQUIRRELVM v)
         SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
     }
 
+    // Reset trip state at the top - if we fail somewhere below, the corridor
+    // ends up with no trip in flight, matching the "no path" scripts expect.
+    pCorridor->tripActive = false;
+    pCorridor->tripComplete = false;
+    pCorridor->pendingCount = 0;
+
     const rdVec3D startPos(startVec->x, startVec->y, startVec->z);
     const rdVec3D targetPos(targetVec->x, targetVec->y, targetVec->z);
 
@@ -1222,29 +1261,195 @@ static SQRESULT ServerScript_NavMesh_CorridorSetPath(HSQUIRRELVM v)
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
 
-    // Find path
-    dtPolyRef pathPolys[256];
-    unsigned char pathJumps[256];
-    int pathCount = 0;
-
-    dtStatus status = pCorridor->query.findPath(
-        startRef, targetRef,
-        &nearestStart, &nearestTarget, &pCorridor->filter,
-        pathPolys, pathJumps, &pathCount, 256);
-
-    // We don't need a partial path. We either can reach the target or there's no path to it.
-    if (dtStatusFailed(status) || pathCount == 0 || (status & DT_PARTIAL_RESULT))
+    // Static reachability check (precomputed traverse table). ANIMTYPE_PILOT
+    // mirrors the corridor filter (setTraverseFlags(0x8013F)). If the table
+    // says these polys aren't connected under PILOT's traverse-type set, no
+    // amount of A* will find a path - fail immediately.
+    const dtNavMesh* const nav = pCorridor->query.getAttachedNavMesh();
+    const int traverseTableIndex = NavMesh_GetTraverseTableIndexForAnimType(ANIMTYPE_PILOT);
+    if (!nav->isGoalPolyReachable(startRef, targetRef, false, traverseTableIndex))
     {
         sq_pushbool(v, false);
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
 
-    // Load path into corridor
-    pCorridor->corridor.setCorridor(&nearestTarget, pathPolys, pathJumps, pathCount);
+    // Find path
+    dtPolyRef pathPolys[BOT_CORRIDOR_MAX_PATH];
+    unsigned char pathJumps[BOT_CORRIDOR_MAX_PATH];
+    int pathCount = 0;
+
+    dtStatus status = pCorridor->query.findPath(
+        startRef, targetRef,
+        &nearestStart, &nearestTarget, &pCorridor->filter,
+        pathPolys, pathJumps, &pathCount, BOT_CORRIDOR_MAX_PATH);
+
+    if (dtStatusFailed(status) || pathCount == 0)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Buffer too small: getPathToNode truncates from the front, so the returned
+    // path doesn't start where the agent is - unusable.
+    if (status & DT_BUFFER_TOO_SMALL)
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Reachability above guarantees a full path exists. Partial here means A*
+    // exhausted its node pool (DT_OUT_OF_NODES) - the returned path is the best
+    // frontier toward the goal, treated as an intermediate destination. Partial
+    // WITHOUT DT_OUT_OF_NODES means the filter rejected something the table
+    // allowed (angle filtering, runtime poly flag changes) - fail loudly.
+    const bool isPartial = (status & DT_PARTIAL_RESULT) != 0;
+    if (isPartial && !(status & DT_OUT_OF_NODES))
+    {
+        sq_pushbool(v, false);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // For partial paths, snap the corridor's target to the path's last poly so
+    // findCorners has a real, on-corridor destination to steer toward (the
+    // original goal would be off the corridor and meaningless to findCorners).
+    rdVec3D corridorTarget = nearestTarget;
+    if (isPartial)
+    {
+        rdVec3D lastPolyPos;
+        float distUnused;
+        if (dtStatusSucceed(pCorridor->query.closestPointOnPolyBoundary(pathPolys[pathCount - 1], &nearestTarget, &lastPolyPos, &distUnused)))
+            corridorTarget = lastPolyPos;
+    }
+
+    pCorridor->corridor.setCorridor(&corridorTarget, pathPolys, pathJumps, pathCount);
     pCorridor->corridor.setPos(&nearestStart);
+
+    // Initialize trip state so CorridorMove can chain further A* calls if this
+    // first segment was partial. For complete paths, tripComplete=true short-
+    // circuits any future refill attempts.
+    pCorridor->tripActive = true;
+    pCorridor->goalPos = nearestTarget;
+    pCorridor->goalRef = targetRef;
+
+    if (isPartial)
+    {
+        pCorridor->tripComplete = false;
+        pCorridor->nextStartRef = pathPolys[pathCount - 1];
+        pCorridor->nextStartPos = corridorTarget;
+    }
+    else
+    {
+        pCorridor->tripComplete = true;
+    }
 
     sq_pushbool(v, true);
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
+// Trip extension helpers. Internal_Trip_Refill runs the next chained A* from
+// the latest partial endpoint toward the original brain goal, stashing the
+// result in pending. Internal_Trip_Drip moves polys from pending into the
+// corridor's tail as space appears. Both are no-ops when there's nothing to do.
+//-----------------------------------------------------------------------------
+static void Internal_Trip_Refill(BotCorridor* pCorridor)
+{
+    dtPolyRef pathPolys[BOT_CORRIDOR_MAX_PATH];
+    unsigned char pathJumps[BOT_CORRIDOR_MAX_PATH];
+    int pathCount = 0;
+
+    const dtStatus status = pCorridor->query.findPath(
+        pCorridor->nextStartRef, pCorridor->goalRef,
+        &pCorridor->nextStartPos, &pCorridor->goalPos, &pCorridor->filter,
+        pathPolys, pathJumps, &pathCount, BOT_CORRIDOR_MAX_PATH);
+
+    // Any failure mode means we can't extend the trip further. Mark complete so
+    // we stop trying; whatever's already in the corridor gets walked, then the
+    // bot's BT will request a new path from current position when it stalls.
+    if (dtStatusFailed(status) || pathCount == 0 || (status & DT_BUFFER_TOO_SMALL))
+    {
+        pCorridor->tripComplete = true;
+        return;
+    }
+
+    // Partial without DT_OUT_OF_NODES means the filter rejected something the
+    // reachability table allowed (angle filtering, runtime poly flag changes
+    // since SetPath). Bail loudly - the static-navmesh assumption is broken.
+    if ((status & DT_PARTIAL_RESULT) && !(status & DT_OUT_OF_NODES))
+    {
+        pCorridor->tripComplete = true;
+        return;
+    }
+
+    // Boundary dedup: pathPolys[0] is nextStartRef, which already lives in the
+    // corridor (or is being held there pending drip-in). Skip it.
+    const int toStash = pathCount - 1;
+    if (toStash <= 0)
+    {
+        // A* returned just the start poly (start == goal case). Nothing to add.
+        pCorridor->tripComplete = true;
+        return;
+    }
+
+    memcpy(pCorridor->pendingPolys, pathPolys + 1, sizeof(dtPolyRef) * toStash);
+    memcpy(pCorridor->pendingJumps, pathJumps + 1, sizeof(unsigned char) * toStash);
+    pCorridor->pendingCount = toStash;
+
+    // The new partial endpoint becomes the start of the next refill (if any).
+    pCorridor->nextStartRef = pathPolys[pathCount - 1];
+    rdVec3D newStartPos;
+    if (dtStatusSucceed(pCorridor->query.closestPointOnPolyBoundary(pCorridor->nextStartRef, &pCorridor->goalPos, &newStartPos, nullptr)))
+        pCorridor->nextStartPos = newStartPos;
+
+    // Complete path: this segment ends at the goal poly. Stop refilling.
+    if (!(status & DT_PARTIAL_RESULT))
+        pCorridor->tripComplete = true;
+}
+
+static void Internal_Trip_Drip(BotCorridor* pCorridor)
+{
+    if (pCorridor->pendingCount <= 0)
+        return;
+
+    const dtPolyRef* curPath = pCorridor->corridor.getPath();
+    const unsigned char* curJumps = pCorridor->corridor.getJump();
+    const int curCount = pCorridor->corridor.getPathCount();
+
+    const int freeSlots = BOT_CORRIDOR_MAX_PATH - curCount;
+    if (freeSlots <= 0)
+        return;
+
+    const int toAppend = (pCorridor->pendingCount < freeSlots) ? pCorridor->pendingCount : freeSlots;
+
+    dtPolyRef mergedPolys[BOT_CORRIDOR_MAX_PATH];
+    unsigned char mergedJumps[BOT_CORRIDOR_MAX_PATH];
+
+    memcpy(mergedPolys, curPath, sizeof(dtPolyRef) * curCount);
+    memcpy(mergedJumps, curJumps, sizeof(unsigned char) * curCount);
+    memcpy(mergedPolys + curCount, pCorridor->pendingPolys, sizeof(dtPolyRef) * toAppend);
+    memcpy(mergedJumps + curCount, pCorridor->pendingJumps, sizeof(unsigned char) * toAppend);
+
+    const int newCount = curCount + toAppend;
+    const dtPolyRef newLastPoly = mergedPolys[newCount - 1];
+
+    // Update target to the new last poly's projection toward the goal. For an
+    // intermediate partial-endpoint poly this is the snap to the boundary; for
+    // the goal poly itself the projection is the goal position (or close to).
+    rdVec3D newTarget = pCorridor->goalPos;
+    rdVec3D snapped;
+    if (dtStatusSucceed(pCorridor->query.closestPointOnPolyBoundary(newLastPoly, &pCorridor->goalPos, &snapped, nullptr)))
+        newTarget = snapped;
+
+    pCorridor->corridor.setCorridor(&newTarget, mergedPolys, mergedJumps, newCount);
+
+    // Shift remaining pending polys down.
+    const int remaining = pCorridor->pendingCount - toAppend;
+    if (remaining > 0)
+    {
+        memmove(pCorridor->pendingPolys, pCorridor->pendingPolys + toAppend, sizeof(dtPolyRef) * remaining);
+        memmove(pCorridor->pendingJumps, pCorridor->pendingJumps + toAppend, sizeof(unsigned char) * remaining);
+    }
+    pCorridor->pendingCount = remaining;
 }
 
 //-----------------------------------------------------------------------------
@@ -1275,6 +1480,21 @@ static SQRESULT ServerScript_NavMesh_CorridorMove(HSQUIRRELVM v)
     const rdVec3D pos(posVec->x, posVec->y, posVec->z);
 
     const bool success = pCorridor->corridor.movePosition(&pos, &pCorridor->query, &pCorridor->filter);
+
+    // Trip extension only when movePosition succeeded (corridor state is sane).
+    // Drip first to clear any pending stash into freed slots, then maybe refill
+    // pending if it ran dry and the corridor needs more polys.
+    if (success && pCorridor->tripActive)
+    {
+        Internal_Trip_Drip(pCorridor);
+
+        if (pCorridor->pendingCount == 0
+            && !pCorridor->tripComplete
+            && pCorridor->corridor.getPathCount() <= BOT_CORRIDOR_REFILL_THRESHOLD)
+        {
+            Internal_Trip_Refill(pCorridor);
+        }
+    }
 
     sq_pushbool(v, success);
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
@@ -2604,7 +2824,7 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "int handle", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_CorridorSetPath,
-        "Sets the path in the corridor from start to target. Returns true on success",
+        "Sets the path in the corridor from start to target. Returns true on success. For long paths, the corridor target may be an intermediate position toward the original target; brain re-evaluates on arrival",
         "bool",
         "int handle, vector startPos, vector targetPos", false);
 
