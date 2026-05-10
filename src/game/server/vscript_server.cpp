@@ -40,9 +40,12 @@
 #include "thirdparty/recast/DetourCrowd/Include/DetourPathCorridor.h"
 #include "public/game/server/ai_agent.h"  // g_traverseAnimDefaultCosts
 #include "public/game/server/ai_navmesh.h" // NavMesh_GetTraverseTableIndexForAnimType
+#include "engine/enginetrace.h"            // g_pEngineTraceServer (cover query LOS traces)
+#include "public/bspflags.h"               // TRACE_MASK_BLOCKLOS
 #include <unordered_map>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 
 //=============================================================================
 // Bot Navigation Corridor System
@@ -2642,6 +2645,993 @@ static SQRESULT ServerScript_NavMesh_GetPolyEdgeNeighbors(HSQUIRRELVM v)
 }
 
 //=============================================================================
+// Cover Query (NavMesh_QueryCoverCandidates)
+//=============================================================================
+// One-shot port of the script-side cover/peek query in
+// scripts/vscripts/botai/world/_cover_query.nut. The original ran the entire
+// candidate-generation + scoring + nav-reach + peek-classification pipeline
+// in Squirrel, marshalling thousands of poly verts and trace results across
+// the script ↔ C++ boundary per call. This native runs the same algorithm
+// in C++ memory and returns one ranked list — eliminating the per-poly,
+// per-trace, per-NavDist marshalling cost.
+//
+// Algorithm + tuning constants mirror the script implementation 1:1 so the
+// returned shape is interchangeable with the original CoverQuery_Find. See
+// the script comments for the design rationale (alignment gate, two-phase
+// sort, hideAnchor/exposeAnchor split, etc.) — they're not duplicated here.
+
+namespace {
+
+// --- Tuning constants -------------------------------------------------------
+// Mirror values in scripts/vscripts/botai/_constants.nut and the file-private
+// constants in scripts/vscripts/botai/world/_cover_query.nut. Update both
+// sides together if any of these change.
+constexpr float COVER_QUERY_RADIUS_DEFAULT   = 600.0f;
+constexpr float COVER_EDGE_PAD               = 4.0f;
+constexpr float COVER_HULL_RADIUS            = 18.0f;
+constexpr float COVER_EDGE_ALIGNMENT_MIN     = 0.87f;   // cos(30°)
+constexpr float COVER_W_LOS_CLEAR_OUT_OF_FOV = 0.4f;
+constexpr float COVER_W_COVER                = 0.75f;
+constexpr float COVER_W_REACH                = 0.25f;
+constexpr int   COVER_MAX_RESULTS            = 16;
+constexpr int   COVER_PRESCORE_TOP_K         = 32;
+constexpr float COVER_PEEK_STEP              = 30.0f;
+constexpr int   COVER_PEEK_MAX_STEPS         = 4;
+constexpr float COVER_EYE_STAND_Z            = 60.0f;
+constexpr float COVER_EYE_CROUCH_Z           = 32.0f;
+constexpr float COVER_LOS_SAMPLE_FEET_Z      = 4.0f;
+constexpr float COVER_LOS_SAMPLE_CENTER_Z    = 36.0f;
+constexpr float COVER_LOS_CLEAR_FRACTION     = 0.99f;
+constexpr float COVER_BOT_FOV_DEGREES        = 90.0f;
+constexpr float COVER_DEG_TO_RAD             = 0.01745329251994329577f;
+// Mirrored from script COVER_MIN_VIABLE — used only to gate `result.best`.
+constexpr float COVER_MIN_VIABLE             = 0.45f;
+// Tight bounds passed to NavMesh_GetNearestPosInBounds during SIDE peek
+// sweep (script: navBounds = <2, 2, 16>).
+constexpr float COVER_PEEK_NAV_BOUNDS_XY     = 2.0f;
+constexpr float COVER_PEEK_NAV_BOUNDS_Z      = 16.0f;
+
+// String labels — must match the constants in _constants.nut.
+constexpr const char* COVER_STATE_BLOCKED_STANDING_STR    = "BLOCKED_STANDING";
+constexpr const char* COVER_STATE_BLOCKED_CROUCH_ONLY_STR = "BLOCKED_CROUCH_ONLY";
+constexpr const char* COVER_STATE_EXPOSED_STR             = "EXPOSED";
+constexpr const char* COVER_PEEK_TYPE_DUCK_STR            = "DUCK";
+constexpr const char* COVER_PEEK_TYPE_SIDE_LEFT_STR       = "SIDE_LEFT";
+constexpr const char* COVER_PEEK_TYPE_SIDE_RIGHT_STR      = "SIDE_RIGHT";
+
+// Stance-aware LOS classification.
+enum class CoverBlockedState
+{
+    BlockedStanding   = 0,
+    BlockedCrouchOnly = 1,
+    Exposed           = 2,
+};
+
+const char* CoverQuery_BlockedStateStr(CoverBlockedState s)
+{
+    switch (s)
+    {
+    case CoverBlockedState::BlockedStanding:   return COVER_STATE_BLOCKED_STANDING_STR;
+    case CoverBlockedState::BlockedCrouchOnly: return COVER_STATE_BLOCKED_CROUCH_ONLY_STR;
+    case CoverBlockedState::Exposed:           return COVER_STATE_EXPOSED_STR;
+    }
+    return COVER_STATE_EXPOSED_STR;
+}
+
+// --- Internal candidate -----------------------------------------------------
+// Accumulates fields through phases. Mirrors the script-side cand table.
+struct Cover_Candidate
+{
+    rdVec3D pos;
+    rdVec3D inwardDir;
+    float   euclideanDist = 0.0f;   // tiebreak in phase-1 sort
+    float   coverScore    = 0.0f;   // min per-threat (phase 1)
+    float   minPerThreat  = 0.0f;
+    float   score         = 0.0f;   // final blended (phase 2)
+    bool    navUnreachable = false;
+
+    // Up to 3 peeks: DUCK, SIDE+, SIDE-.
+    struct Peek
+    {
+        rdVec3D     exposeAnchor;
+        const char* peekType;
+    };
+    Peek peeks[3];
+    int  peekCount = 0;
+
+    // Debug-only peek probe metadata (matches script cand.peekProbe).
+    bool              hasPeekProbe       = false;
+    CoverBlockedState targetBlockedState = CoverBlockedState::Exposed;
+    float             standShotFrac      = -1.0f;
+    const char*       peekDecision       = "NOT_COVER_FROM_TARGET";
+};
+
+struct Cover_Threat
+{
+    rdVec3D eyePos;
+    rdVec3D forward;
+};
+
+// --- Shared nav-distance scratch -------------------------------------------
+// One nav query + corridor reused across every NavDist probe in a single
+// cover query call. Lazy-init on first use; reattached when the navmesh
+// changes (level reload). Same single-shared-corridor pattern as the
+// script-side NavDistance system — safe because the server is single-threaded
+// and cover queries don't recurse.
+constexpr int COVER_NAV_MAX_PATH = 256;
+
+struct CoverNavScratch
+{
+    dtNavMeshQuery   query;
+    dtPathCorridor   corridor;
+    dtQueryFilter    filter;
+    bool             initialized   = false;
+    bool             filterReady   = false;
+    const dtNavMesh* attachedNav   = nullptr;
+};
+static CoverNavScratch g_coverNavScratch;
+
+bool CoverQuery_EnsureNavScratch(const dtNavMesh* nav)
+{
+    if (!g_coverNavScratch.initialized)
+    {
+        if (!g_coverNavScratch.corridor.init(COVER_NAV_MAX_PATH))
+            return false;
+        g_coverNavScratch.initialized = true;
+    }
+
+    // One-time filter setup — the configuration is fixed (PILOT traverse
+    // flags + per-type costs from g_traverseAnimDefaultCosts + zipline
+    // override). Mirrors NavMesh_CreateCorridor's filter setup
+    // (vscript_server.cpp:1091-1104) so reach distances align with what the
+    // script-side NavDistance corridor would have produced.
+    if (!g_coverNavScratch.filterReady)
+    {
+        dtQueryFilter& f = g_coverNavScratch.filter;
+        f.setIncludeFlags(0xFFFF);
+        f.setExcludeFlags(0);
+        f.setTraverseFlags(0x8013F); // ANIMTYPE_PILOT traverse types.
+        for (int i = 0; i < DT_MAX_TRAVERSE_TYPES; ++i)
+            f.setTraverseCost(i, g_traverseAnimDefaultCosts[ANIMTYPE_PILOT][i]);
+        f.setTraverseCost(19, 1294.07f); // zipline override (matches CreateCorridor).
+        g_coverNavScratch.filterReady = true;
+    }
+
+    if (g_coverNavScratch.attachedNav != nav)
+    {
+        if (dtStatusFailed(g_coverNavScratch.query.init(nav, 2048)))
+            return false;
+        g_coverNavScratch.attachedNav = nav;
+    }
+    return true;
+}
+
+// --- Trace + blocked state --------------------------------------------------
+float CoverQuery_TraceLOS(const rdVec3D& start, const rdVec3D& end)
+{
+    Vector3D s(start.x, start.y, start.z);
+    Vector3D e(end.x, end.y, end.z);
+    Ray_t ray(s, e);
+    trace_t tr;
+    g_pEngineTraceServer->TraceRay(ray, TRACE_MASK_BLOCKLOS, &tr);
+    return tr.fraction;
+}
+
+CoverBlockedState CoverQuery_GetBlockedState(const rdVec3D& fromEye, const rdVec3D& candidatePos)
+{
+    // Feet sanity check — typical floor-to-ceiling cover blocks all three.
+    rdVec3D feetTarget(candidatePos.x, candidatePos.y, candidatePos.z + COVER_LOS_SAMPLE_FEET_Z);
+    if (CoverQuery_TraceLOS(fromEye, feetTarget) >= COVER_LOS_CLEAR_FRACTION)
+        return CoverBlockedState::Exposed;
+
+    rdVec3D crouchTarget(candidatePos.x, candidatePos.y, candidatePos.z + COVER_EYE_CROUCH_Z);
+    if (CoverQuery_TraceLOS(fromEye, crouchTarget) >= COVER_LOS_CLEAR_FRACTION)
+        return CoverBlockedState::Exposed;
+
+    rdVec3D standTarget(candidatePos.x, candidatePos.y, candidatePos.z + COVER_EYE_STAND_Z);
+    if (CoverQuery_TraceLOS(fromEye, standTarget) >= COVER_LOS_CLEAR_FRACTION)
+        return CoverBlockedState::BlockedCrouchOnly;
+
+    return CoverBlockedState::BlockedStanding;
+}
+
+// --- Nav distance (mirrors script NavDistance_Get) --------------------------
+// Returns total walk distance along the corridor's findCorners output, or
+// -1.0f when unreachable (snap fail / not in reachability table / pathfind
+// fail / no corners). Reuses the file-static query+corridor; each call
+// fully overwrites prior state via setCorridor + setPos.
+float CoverQuery_NavDistance(
+    dtQueryFilter& filter,
+    const rdVec3D& halfExtents,
+    const rdVec3D& start,
+    const rdVec3D& target)
+{
+    dtNavMeshQuery& query    = g_coverNavScratch.query;
+    dtPathCorridor& corridor = g_coverNavScratch.corridor;
+
+    dtPolyRef startRef = 0, targetRef = 0;
+    rdVec3D nearestStart, nearestTarget;
+    if (!Internal_FindNearestPolyByHeight(&query, &start, &halfExtents, &filter, &startRef, &nearestStart))
+        return -1.0f;
+    if (!Internal_FindNearestPolyByHeight(&query, &target, &halfExtents, &filter, &targetRef, &nearestTarget))
+        return -1.0f;
+
+    const dtNavMesh* nav = query.getAttachedNavMesh();
+    const int traverseTableIndex = NavMesh_GetTraverseTableIndexForAnimType(ANIMTYPE_PILOT);
+    if (!nav->isGoalPolyReachable(startRef, targetRef, false, traverseTableIndex))
+        return -1.0f;
+
+    dtPolyRef     pathPolys[COVER_NAV_MAX_PATH];
+    unsigned char pathJumps[COVER_NAV_MAX_PATH];
+    int pathCount = 0;
+
+    dtStatus status = query.findPath(
+        startRef, targetRef, &nearestStart, &nearestTarget, &filter,
+        pathPolys, pathJumps, &pathCount, COVER_NAV_MAX_PATH);
+    if (dtStatusFailed(status) || pathCount == 0 || (status & DT_BUFFER_TOO_SMALL))
+        return -1.0f;
+
+    const bool isPartial = (status & DT_PARTIAL_RESULT) != 0;
+    if (isPartial && !(status & DT_OUT_OF_NODES))
+        return -1.0f;
+
+    rdVec3D corridorTarget = nearestTarget;
+    if (isPartial)
+    {
+        rdVec3D lastPolyPos;
+        float distUnused;
+        if (dtStatusSucceed(query.closestPointOnPolyBoundary(pathPolys[pathCount - 1], &nearestTarget, &lastPolyPos, &distUnused)))
+            corridorTarget = lastPolyPos;
+    }
+    corridor.setCorridor(&corridorTarget, pathPolys, pathJumps, pathCount);
+    corridor.setPos(&nearestStart);
+    corridor.movePosition(&nearestStart, &query, &filter);
+
+    // Script asks for 32 corners; the existing CorridorGetCorners native
+    // clamps to 8 (vscript_server.cpp:1538-1539), so script effectively
+    // sums up to 8. Match that ceiling here.
+    rdVec3D       cornerVerts[8];
+    unsigned char cornerFlags[8];
+    dtPolyRef     cornerPolys[8];
+    unsigned char cornerJumps[8];
+    const int cornerCount = corridor.findCorners(
+        cornerVerts, cornerFlags, cornerPolys, cornerJumps,
+        8, &query, &filter);
+    if (cornerCount == 0)
+        return -1.0f;
+
+    float total = 0.0f;
+    rdVec3D prev = nearestStart;
+    for (int i = 0; i < cornerCount; ++i)
+    {
+        const float dx = cornerVerts[i].x - prev.x;
+        const float dy = cornerVerts[i].y - prev.y;
+        const float dz = cornerVerts[i].z - prev.z;
+        total += sqrtf(dx*dx + dy*dy + dz*dz);
+        prev = cornerVerts[i];
+    }
+    return total;
+}
+
+// --- Argument parsing -------------------------------------------------------
+bool Internal_ReadVectorArray(HSQUIRRELVM v, SQInteger argIdx, std::vector<rdVec3D>& out)
+{
+    out.clear();
+    HSQOBJECT obj{};
+    if (SQ_FAILED(sq_getstackobj(v, argIdx, &obj)))
+    {
+        v_SQVM_ScriptError("NavMesh_QueryCoverCandidates: failed to read array argument at index %d", argIdx);
+        return false;
+    }
+    if (sq_type(obj) != OT_ARRAY)
+    {
+        v_SQVM_ScriptError("NavMesh_QueryCoverCandidates: expected array at argument %d", argIdx);
+        return false;
+    }
+    const SQArray* arr = _array(obj);
+    if (!arr)
+    {
+        v_SQVM_ScriptError("NavMesh_QueryCoverCandidates: invalid array at argument %d", argIdx);
+        return false;
+    }
+    out.reserve(arr->Size());
+    for (SQInteger i = 0; i < arr->Size(); ++i)
+    {
+        const SQObject& item = arr->_values[i];
+        if (sq_type(item) != OT_VECTOR)
+        {
+            v_SQVM_ScriptError("NavMesh_QueryCoverCandidates: array at argument %d must contain only vectors (item %lld)", argIdx, (long long)i);
+            return false;
+        }
+        const SQVector3D* vec = _vector(item);
+        out.emplace_back(vec->x, vec->y, vec->z);
+    }
+    return true;
+}
+
+// --- Result builders --------------------------------------------------------
+void Internal_PushVector(HSQUIRRELVM v, const rdVec3D& vec)
+{
+    SQVector3D sq(vec.x, vec.y, vec.z);
+    sq_pushvector(v, &sq);
+}
+
+void Internal_PushPeek(HSQUIRRELVM v, const Cover_Candidate::Peek& peek)
+{
+    sq_newtable(v);
+
+    sq_pushstring(v, "exposeAnchor", -1);
+    Internal_PushVector(v, peek.exposeAnchor);
+    sq_newslot(v, -3);
+
+    sq_pushstring(v, "peekType", -1);
+    sq_pushstring(v, peek.peekType, -1);
+    sq_newslot(v, -3);
+}
+
+void Internal_PushCandidate(HSQUIRRELVM v, const Cover_Candidate& cand, bool hasTarget)
+{
+    sq_newtable(v);
+
+    sq_pushstring(v, "pos", -1);
+    Internal_PushVector(v, cand.pos);
+    sq_newslot(v, -3);
+
+    // hideAnchor is an alias of pos (extended-cover-system.md naming).
+    sq_pushstring(v, "hideAnchor", -1);
+    Internal_PushVector(v, cand.pos);
+    sq_newslot(v, -3);
+
+    sq_pushstring(v, "inwardDir", -1);
+    Internal_PushVector(v, cand.inwardDir);
+    sq_newslot(v, -3);
+
+    sq_pushstring(v, "score", -1);
+    sq_pushfloat(v, cand.score);
+    sq_newslot(v, -3);
+
+    sq_pushstring(v, "peeks", -1);
+    sq_newarray(v, 0);
+    for (int i = 0; i < cand.peekCount; ++i)
+    {
+        Internal_PushPeek(v, cand.peeks[i]);
+        sq_arrayappend(v, -2);
+    }
+    sq_newslot(v, -3);
+
+    if (hasTarget && cand.hasPeekProbe)
+    {
+        sq_pushstring(v, "peekProbe", -1);
+        sq_newtable(v);
+
+        sq_pushstring(v, "targetBlockedState", -1);
+        const char* stateStr = CoverQuery_BlockedStateStr(cand.targetBlockedState);
+        sq_pushstring(v, stateStr, -1);
+        sq_newslot(v, -3);
+
+        sq_pushstring(v, "standShotFrac", -1);
+        sq_pushfloat(v, cand.standShotFrac);
+        sq_newslot(v, -3);
+
+        sq_pushstring(v, "decision", -1);
+        sq_pushstring(v, cand.peekDecision, -1);
+        sq_newslot(v, -3);
+
+        sq_newslot(v, -3);
+    }
+}
+
+} // anonymous namespace
+
+//-----------------------------------------------------------------------------
+// Purpose: builds a sorted list of cover candidates for a bot at originPos
+//          against the supplied threats. One-shot replacement for the
+//          script-side CoverQuery_Find pipeline (poly fan-out + per-candidate
+//          per-threat trace fan-out + per-survivor NavDistance + peek
+//          classification + sort) — collapses thousands of script ↔ C++
+//          marshalling crossings per call into one.
+//
+// Pipeline mirrors the script implementation 1:1 (see _cover_query.nut for
+// design rationale):
+//   1. Walk poly tiles whose any-vert is within `radius` of originPos.
+//   2. For each border edge (neis[i] == 0), place a candidate inside the
+//      walkable side, offset by hull radius + edge pad.
+//   3. Drop candidates "past" any threat (would force running through them).
+//   4. Phase 1 cheap: per-threat alignment + FOV. If no threat sees the
+//      candidate's wall as cover from itself (alignment gate), score 0 and
+//      skip the trace work. Otherwise compute stance-aware blocked state via
+//      3 LOS traces per threat (feet, crouch eye, stand eye).
+//   5. Sort by coverScore desc (tiebreak by euclidean dist asc), trim to
+//      COVER_PRESCORE_TOP_K survivors.
+//   6. Phase 2 heavy on survivors: nav-path distance for reach blend, and
+//      peek classification — DUCK probe (one trace) or SIDE sweep
+//      (NavMesh_GetNearestPosInBounds + 2 traces per step, both directions).
+//   7. Drop nav-unreachable. Sort by final blended score desc, trim to
+//      COVER_MAX_RESULTS.
+//   8. Return { candidates, best, stats } — same shape as script.
+//
+// `targetPos = <0,0,0>` disables peek classification (no target → no peek).
+// `radius = 0.0` falls back to COVER_QUERY_RADIUS_DEFAULT.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_QueryCoverCandidates(HSQUIRRELVM v)
+{
+    const SQVector3D* originVec = nullptr;
+    const SQVector3D* targetVec = nullptr;
+    SQFloat   radiusArg = 0.0f;
+    SQInteger hullIdx   = 0;
+
+    sq_getvector(v, 2, &originVec);
+    // Slots 3 and 4 are arrays — read via Internal_ReadVectorArray below.
+    sq_getvector(v, 5, &targetVec);
+    sq_getfloat(v, 6, &radiusArg);
+    sq_getinteger(v, 7, &hullIdx);
+
+    if (!Internal_ServerScript_ValidateHull(hullIdx))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const Hull_e hullType = Hull_e(hullIdx);
+    const NavMeshType_e navType = NAI_Hull::NavMeshType(hullType);
+    const dtNavMesh* const nav = Detour_GetNavMeshByType(navType);
+    if (!nav)
+    {
+        v_SQVM_ScriptError("NavMesh \"%s\" for hull \"%s\" hasn't been loaded!",
+            NavMesh_GetNameForType(navType), g_aiHullNames[hullType]);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    if (!CoverQuery_EnsureNavScratch(nav))
+    {
+        v_SQVM_ScriptError("NavMesh_QueryCoverCandidates: failed to initialize nav scratch");
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    std::vector<rdVec3D> threatEyes, threatForwards;
+    if (!Internal_ReadVectorArray(v, 3, threatEyes))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    if (!Internal_ReadVectorArray(v, 4, threatForwards))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    if (threatEyes.size() != threatForwards.size())
+    {
+        v_SQVM_ScriptError("NavMesh_QueryCoverCandidates: threat eye/forward arrays differ in length (%zu vs %zu)",
+            threatEyes.size(), threatForwards.size());
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    std::vector<Cover_Threat> threats;
+    threats.reserve(threatEyes.size());
+    for (size_t i = 0; i < threatEyes.size(); ++i)
+        threats.push_back({ threatEyes[i], threatForwards[i] });
+    const int threatCount = (int)threats.size();
+
+    const rdVec3D origin(originVec->x, originVec->y, originVec->z);
+    const rdVec3D targetPos(targetVec->x, targetVec->y, targetVec->z);
+    const bool hasTarget = (targetPos.x != 0.0f) || (targetPos.y != 0.0f) || (targetPos.z != 0.0f);
+
+    float radius = (float)radiusArg;
+    if (radius <= 0.0f)
+        radius = COVER_QUERY_RADIUS_DEFAULT;
+    const float radius2DSq = radius * radius;
+
+    // Hull half-extents for nav snaps (matches Internal_ServerScript_NavMesh_GetNavMesh).
+    const Vector3D& hullMaxs = NAI_Hull::Maxs(hullType);
+    const rdVec3D halfExtents(hullMaxs.x, hullMaxs.y, hullMaxs.z);
+
+    // Filter is owned by g_coverNavScratch — initialized once in
+    // CoverQuery_EnsureNavScratch above. Configuration matches NavDistance_Get's
+    // corridor filter so reach distances are identical.
+    dtQueryFilter& coverNavFilter = g_coverNavScratch.filter;
+
+    // -----------------------------------------------------------------------
+    // 1 + 2. Generate candidates by walking poly tiles, emitting one per
+    // border edge offset inward by HULL_RADIUS + EDGE_PAD.
+    // -----------------------------------------------------------------------
+    std::vector<Cover_Candidate> candidates;
+    candidates.reserve(512);
+    int generated = 0;
+
+    const int maxTiles = nav->getMaxTiles();
+    for (int t = 0; t < maxTiles; ++t)
+    {
+        const dtMeshTile* tile = nav->getTile(t);
+        if (!tile || !tile->header)
+            continue;
+
+        const int polyCount = tile->header->polyCount;
+        for (int pi = 0; pi < polyCount; ++pi)
+        {
+            const dtPoly* p = &tile->polys[pi];
+            if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
+                continue;
+
+            // Inclusion: any vert within horizontal radius of origin (matches
+            // NavMesh_QueryPolysInRadius's permissive criterion).
+            bool inRange = false;
+            for (int k = 0; k < p->vertCount; ++k)
+            {
+                const rdVec3D* vert = &tile->verts[p->verts[k]];
+                const float dx = vert->x - origin.x;
+                const float dy = vert->y - origin.y;
+                if (dx * dx + dy * dy <= radius2DSq)
+                {
+                    inRange = true;
+                    break;
+                }
+            }
+            if (!inRange)
+                continue;
+
+            const int vertCount = p->vertCount;
+            if (vertCount < 3)
+                continue;
+
+            // Centroid for inward-side discrimination.
+            rdVec3D centroid(0.0f, 0.0f, 0.0f);
+            for (int k = 0; k < vertCount; ++k)
+            {
+                const rdVec3D* vk = &tile->verts[p->verts[k]];
+                centroid.x += vk->x;
+                centroid.y += vk->y;
+                centroid.z += vk->z;
+            }
+            const float invCount = 1.0f / (float)vertCount;
+            centroid.x *= invCount;
+            centroid.y *= invCount;
+            centroid.z *= invCount;
+
+            for (int i = 0; i < vertCount; ++i)
+            {
+                // Border edge: neighbor value 0 means no walkable neighbor in
+                // this tile and not an external link — runs along obstacle.
+                if (p->neis[i] != 0)
+                    continue;
+
+                const int nextIdx = (i + 1) % vertCount;
+                const rdVec3D& a = tile->verts[p->verts[i]];
+                const rdVec3D& b = tile->verts[p->verts[nextIdx]];
+
+                const rdVec3D edgeMid(
+                    (a.x + b.x) * 0.5f,
+                    (a.y + b.y) * 0.5f,
+                    (a.z + b.z) * 0.5f);
+
+                // Edge perpendicular in XY, oriented toward poly interior.
+                rdVec3D edgeNormal(-(b.y - a.y), (b.x - a.x), 0.0f);
+                const float toCentroidX = centroid.x - edgeMid.x;
+                const float toCentroidY = centroid.y - edgeMid.y;
+                if (edgeNormal.x * toCentroidX + edgeNormal.y * toCentroidY < 0.0f)
+                {
+                    edgeNormal.x = -edgeNormal.x;
+                    edgeNormal.y = -edgeNormal.y;
+                }
+                const float inwardLen = sqrtf(edgeNormal.x * edgeNormal.x + edgeNormal.y * edgeNormal.y);
+                if (inwardLen < 0.001f)
+                    continue;
+                const float invInward = 1.0f / inwardLen;
+                rdVec3D inwardDir(edgeNormal.x * invInward, edgeNormal.y * invInward, 0.0f);
+
+                Cover_Candidate cand;
+                cand.pos.x = edgeMid.x + inwardDir.x * (COVER_HULL_RADIUS + COVER_EDGE_PAD);
+                cand.pos.y = edgeMid.y + inwardDir.y * (COVER_HULL_RADIUS + COVER_EDGE_PAD);
+                cand.pos.z = edgeMid.z;
+                cand.inwardDir = inwardDir;
+                candidates.push_back(cand);
+                ++generated;
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. Retreat-direction filter — drop candidates "past" any threat from
+    // origin's perspective (would force running into / past the threat).
+    // -----------------------------------------------------------------------
+    int rejectedByRetreat = 0;
+    if (threatCount > 0)
+    {
+        std::vector<Cover_Candidate> survivors;
+        survivors.reserve(candidates.size());
+        for (const Cover_Candidate& cand : candidates)
+        {
+            bool reject = false;
+            for (const Cover_Threat& threat : threats)
+            {
+                const float toEnemyX = threat.eyePos.x - origin.x;
+                const float toEnemyY = threat.eyePos.y - origin.y;
+                const float toEnemyZ = threat.eyePos.z - origin.z;
+                const float enemyDist = sqrtf(toEnemyX*toEnemyX + toEnemyY*toEnemyY + toEnemyZ*toEnemyZ);
+                if (enemyDist < 0.001f)
+                    continue;
+                const float invEnemyDist = 1.0f / enemyDist;
+                const float toEnemyDirX = toEnemyX * invEnemyDist;
+                const float toEnemyDirY = toEnemyY * invEnemyDist;
+                const float toEnemyDirZ = toEnemyZ * invEnemyDist;
+
+                const float toCandX = cand.pos.x - origin.x;
+                const float toCandY = cand.pos.y - origin.y;
+                const float toCandZ = cand.pos.z - origin.z;
+                const float projection = toCandX * toEnemyDirX + toCandY * toEnemyDirY + toCandZ * toEnemyDirZ;
+                if (projection >= enemyDist)
+                {
+                    reject = true;
+                    break;
+                }
+            }
+            if (reject)
+                ++rejectedByRetreat;
+            else
+                survivors.push_back(cand);
+        }
+        candidates = std::move(survivors);
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. Phase 1: per-candidate alignment + FOV per threat. Skip blocked-state
+    // traces unless at least one threat sees the candidate's wall as cover
+    // (alignment gate) — matches script behavior.
+    // -----------------------------------------------------------------------
+    const float fovMinDot = cosf(COVER_BOT_FOV_DEGREES * 0.5f * COVER_DEG_TO_RAD);
+
+    // Per-threat aligned/in-FOV scratch arrays — sized once per query.
+    std::vector<bool> alignedArr(threatCount, false);
+    std::vector<bool> inFovArr(threatCount, false);
+
+    for (Cover_Candidate& cand : candidates)
+    {
+        const float dxOrig = cand.pos.x - origin.x;
+        const float dyOrig = cand.pos.y - origin.y;
+        const float dzOrig = cand.pos.z - origin.z;
+        cand.euclideanDist = sqrtf(dxOrig*dxOrig + dyOrig*dyOrig + dzOrig*dzOrig);
+
+        if (threatCount == 0)
+        {
+            // No threats — degenerate "everything is cover" path (script
+            // initializes coverFraction=1 / coverScore=1 / minPerThreat=1).
+            cand.coverScore = 1.0f;
+            cand.minPerThreat = 1.0f;
+            continue;
+        }
+
+        bool hasAnyAligned = false;
+        for (int i = 0; i < threatCount; ++i)
+        {
+            const Cover_Threat& threat = threats[i];
+            const float toCandX = cand.pos.x - threat.eyePos.x;
+            const float toCandY = cand.pos.y - threat.eyePos.y;
+            const float toCandZ = cand.pos.z - threat.eyePos.z;
+            const float lenLen = sqrtf(toCandX*toCandX + toCandY*toCandY + toCandZ*toCandZ);
+
+            bool aligned = false;
+            bool inFov   = false;
+            if (lenLen >= 0.001f)
+            {
+                const float invLen = 1.0f / lenLen;
+                const float toCandDirX = toCandX * invLen;
+                const float toCandDirY = toCandY * invLen;
+                const float toCandDirZ = toCandZ * invLen;
+                const float alignDot = cand.inwardDir.x * toCandDirX + cand.inwardDir.y * toCandDirY + cand.inwardDir.z * toCandDirZ;
+                aligned = alignDot > COVER_EDGE_ALIGNMENT_MIN;
+                const float fovDot = toCandDirX * threat.forward.x + toCandDirY * threat.forward.y + toCandDirZ * threat.forward.z;
+                inFov = fovDot >= fovMinDot;
+            }
+            alignedArr[i] = aligned;
+            inFovArr[i]   = inFov;
+            if (aligned)
+                hasAnyAligned = true;
+        }
+
+        if (!hasAnyAligned)
+        {
+            cand.coverScore   = 0.0f;
+            cand.minPerThreat = 0.0f;
+            continue;
+        }
+
+        // Survivor: per-threat blocked-state traces + aggregation.
+        float minPerThreat = 1.0f;
+        for (int i = 0; i < threatCount; ++i)
+        {
+            const CoverBlockedState st = CoverQuery_GetBlockedState(threats[i].eyePos, cand.pos);
+            const bool blocked = (st != CoverBlockedState::Exposed);
+
+            float pt = 0.0f;
+            if (blocked && alignedArr[i])
+                pt = 1.0f;
+            else if (blocked && !alignedArr[i])
+                pt = 0.0f;
+            else if (inFovArr[i])
+                pt = 0.0f;
+            else
+                pt = COVER_W_LOS_CLEAR_OUT_OF_FOV;
+
+            if (pt < minPerThreat)
+                minPerThreat = pt;
+        }
+
+        cand.coverScore   = minPerThreat;
+        cand.minPerThreat = minPerThreat;
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. Sort by coverScore desc (tiebreak euclideanDist asc), trim to
+    // COVER_PRESCORE_TOP_K.
+    // -----------------------------------------------------------------------
+    std::sort(candidates.begin(), candidates.end(),
+        [](const Cover_Candidate& a, const Cover_Candidate& b) {
+            if (a.coverScore != b.coverScore)
+                return a.coverScore > b.coverScore;
+            return a.euclideanDist < b.euclideanDist;
+        });
+    if ((int)candidates.size() > COVER_PRESCORE_TOP_K)
+        candidates.resize(COVER_PRESCORE_TOP_K);
+
+    // -----------------------------------------------------------------------
+    // 6. Phase 2: NavDist + reach blend + peek classification on survivors.
+    // -----------------------------------------------------------------------
+    int safeFromAll     = 0;
+    int exposedInFov    = 0;
+    int exposedOutOfFov = 0;
+
+    const rdVec3D peekNavBounds(COVER_PEEK_NAV_BOUNDS_XY, COVER_PEEK_NAV_BOUNDS_XY, COVER_PEEK_NAV_BOUNDS_Z);
+
+    for (Cover_Candidate& cand : candidates)
+    {
+        const float dist = CoverQuery_NavDistance(coverNavFilter, halfExtents, origin, cand.pos);
+        if (dist < 0.0f)
+        {
+            cand.navUnreachable = true;
+            continue;
+        }
+        float reachScore = 1.0f - (dist / radius);
+        if (reachScore < 0.0f) reachScore = 0.0f;
+        cand.score = COVER_W_COVER * cand.coverScore + COVER_W_REACH * reachScore;
+
+        if (hasTarget)
+        {
+            cand.hasPeekProbe = true;
+            cand.standShotFrac = -1.0f;
+            cand.peekDecision = "NOT_COVER_FROM_TARGET";
+
+            const rdVec3D targetEye(targetPos.x, targetPos.y, targetPos.z + COVER_EYE_STAND_Z);
+            const CoverBlockedState targetBlockedState = CoverQuery_GetBlockedState(targetEye, cand.pos);
+            cand.targetBlockedState = targetBlockedState;
+
+            if (targetBlockedState == CoverBlockedState::BlockedCrouchOnly)
+            {
+                // DUCK candidate — verify standing shot is clear.
+                const rdVec3D standEye(cand.pos.x, cand.pos.y, cand.pos.z + COVER_EYE_STAND_Z);
+                const rdVec3D targetTorso(targetPos.x, targetPos.y, targetPos.z + COVER_LOS_SAMPLE_CENTER_Z);
+                const float standShotFrac = CoverQuery_TraceLOS(standEye, targetTorso);
+                cand.standShotFrac = standShotFrac;
+                if (standShotFrac >= COVER_LOS_CLEAR_FRACTION)
+                {
+                    cand.peeks[cand.peekCount++] = { cand.pos, COVER_PEEK_TYPE_DUCK_STR };
+                    cand.peekDecision = "DUCK";
+                }
+                else
+                {
+                    cand.peekDecision = "DUCK_BLOCKED_STANDING_SHOT";
+                }
+            }
+            else if (targetBlockedState == CoverBlockedState::BlockedStanding)
+            {
+                // SIDE peek — sweep ±tangent for a position with clear shot
+                // and an unobstructed bot-eye reach line.
+                const rdVec3D inward = cand.inwardDir;
+                rdVec3D edgeTangent(-inward.y, inward.x, 0.0f);
+                const float tlen = sqrtf(edgeTangent.x*edgeTangent.x + edgeTangent.y*edgeTangent.y);
+                if (tlen >= 0.001f)
+                {
+                    const float invTlen = 1.0f / tlen;
+                    edgeTangent.x *= invTlen;
+                    edgeTangent.y *= invTlen;
+
+                    const rdVec3D standEye(cand.pos.x, cand.pos.y, cand.pos.z + COVER_EYE_STAND_Z);
+                    const rdVec3D targetTorso(targetPos.x, targetPos.y, targetPos.z + COVER_LOS_SAMPLE_CENTER_Z);
+
+                    // Side label setup: rightVec relative to bot looking at target.
+                    const float facingX = targetPos.x - cand.pos.x;
+                    const float facingY = targetPos.y - cand.pos.y;
+                    const float bflen = sqrtf(facingX*facingX + facingY*facingY);
+                    rdVec3D rightVec(0.0f, 0.0f, 0.0f);
+                    if (bflen >= 0.001f)
+                    {
+                        const float invBflen = 1.0f / bflen;
+                        const float bf2DX = facingX * invBflen;
+                        const float bf2DY = facingY * invBflen;
+                        rightVec.x = bf2DY;
+                        rightVec.y = -bf2DX;
+                    }
+
+                    rdVec3D posPlusFound(0.0f, 0.0f, 0.0f);
+                    rdVec3D posMinusFound(0.0f, 0.0f, 0.0f);
+                    bool foundPlus  = false;
+                    bool foundMinus = false;
+
+                    for (int k = 1; k <= COVER_PEEK_MAX_STEPS && (!foundPlus || !foundMinus); ++k)
+                    {
+                        const float stepDist = (float)k * COVER_PEEK_STEP;
+
+                        if (!foundPlus)
+                        {
+                            const rdVec3D posPlus(
+                                cand.pos.x + edgeTangent.x * stepDist,
+                                cand.pos.y + edgeTangent.y * stepDist,
+                                cand.pos.z);
+                            // "Is there nav near this point?" — Internal_FindNearestPolyByHeight returns
+                            // a poly when one exists within the bounds.
+                            dtPolyRef navPolyPlus = 0;
+                            rdVec3D navPosPlus;
+                            const bool onNavPlus = Internal_FindNearestPolyByHeight(
+                                &g_coverNavScratch.query, &posPlus, &peekNavBounds, &coverNavFilter,
+                                &navPolyPlus, &navPosPlus);
+                            if (onNavPlus)
+                            {
+                                const rdVec3D eyePlus(posPlus.x, posPlus.y, posPlus.z + COVER_EYE_STAND_Z);
+                                const float shotFrac = CoverQuery_TraceLOS(eyePlus, targetTorso);
+                                if (shotFrac >= COVER_LOS_CLEAR_FRACTION)
+                                {
+                                    const float reachFrac = CoverQuery_TraceLOS(standEye, eyePlus);
+                                    if (reachFrac >= COVER_LOS_CLEAR_FRACTION)
+                                    {
+                                        posPlusFound = posPlus;
+                                        foundPlus = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!foundMinus)
+                        {
+                            const rdVec3D posMinus(
+                                cand.pos.x - edgeTangent.x * stepDist,
+                                cand.pos.y - edgeTangent.y * stepDist,
+                                cand.pos.z);
+                            dtPolyRef navPolyMinus = 0;
+                            rdVec3D navPosMinus;
+                            const bool onNavMinus = Internal_FindNearestPolyByHeight(
+                                &g_coverNavScratch.query, &posMinus, &peekNavBounds, &coverNavFilter,
+                                &navPolyMinus, &navPosMinus);
+                            if (onNavMinus)
+                            {
+                                const rdVec3D eyeMinus(posMinus.x, posMinus.y, posMinus.z + COVER_EYE_STAND_Z);
+                                const float shotFrac = CoverQuery_TraceLOS(eyeMinus, targetTorso);
+                                if (shotFrac >= COVER_LOS_CLEAR_FRACTION)
+                                {
+                                    const float reachFrac = CoverQuery_TraceLOS(standEye, eyeMinus);
+                                    if (reachFrac >= COVER_LOS_CLEAR_FRACTION)
+                                    {
+                                        posMinusFound = posMinus;
+                                        foundMinus = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (foundPlus)
+                    {
+                        const char* sideStr = COVER_PEEK_TYPE_SIDE_LEFT_STR;
+                        if (bflen >= 0.001f && (edgeTangent.x * rightVec.x + edgeTangent.y * rightVec.y) > 0.0f)
+                            sideStr = COVER_PEEK_TYPE_SIDE_RIGHT_STR;
+                        cand.peeks[cand.peekCount++] = { posPlusFound, sideStr };
+                    }
+                    if (foundMinus)
+                    {
+                        const char* sideStr = COVER_PEEK_TYPE_SIDE_LEFT_STR;
+                        if (bflen >= 0.001f && ((-edgeTangent.x) * rightVec.x + (-edgeTangent.y) * rightVec.y) > 0.0f)
+                            sideStr = COVER_PEEK_TYPE_SIDE_RIGHT_STR;
+                        cand.peeks[cand.peekCount++] = { posMinusFound, sideStr };
+                    }
+
+                    if (foundPlus && foundMinus)        cand.peekDecision = "SIDE_BOTH";
+                    else if (foundPlus)                  cand.peekDecision = "SIDE_PLUS_ONLY";
+                    else if (foundMinus)                 cand.peekDecision = "SIDE_MINUS_ONLY";
+                    else                                  cand.peekDecision = "FULL_COVER_NO_SIDE";
+                }
+                else
+                {
+                    cand.peekDecision = "FULL_COVER_NO_TANGENT";
+                }
+            }
+            // Exposed → leave default "NOT_COVER_FROM_TARGET" + no peeks.
+        }
+
+        // Stat tally — matches script ordering.
+        if (threatCount == 0 || cand.minPerThreat >= 1.0f)
+            ++safeFromAll;
+        else if (cand.minPerThreat <= 0.0f)
+            ++exposedInFov;
+        else
+            ++exposedOutOfFov;
+    }
+
+    // -----------------------------------------------------------------------
+    // 7. Drop nav-unreachable. Sort by score desc. Trim to COVER_MAX_RESULTS.
+    // -----------------------------------------------------------------------
+    int rejectedByUnreachable = 0;
+    {
+        std::vector<Cover_Candidate> reachable;
+        reachable.reserve(candidates.size());
+        for (const Cover_Candidate& cand : candidates)
+        {
+            if (cand.navUnreachable)
+                ++rejectedByUnreachable;
+            else
+                reachable.push_back(cand);
+        }
+        candidates = std::move(reachable);
+    }
+
+    std::sort(candidates.begin(), candidates.end(),
+        [](const Cover_Candidate& a, const Cover_Candidate& b) {
+            return a.score > b.score;
+        });
+    if ((int)candidates.size() > COVER_MAX_RESULTS)
+        candidates.resize(COVER_MAX_RESULTS);
+
+    // -----------------------------------------------------------------------
+    // 8. Build result table { candidates, best, stats }.
+    // -----------------------------------------------------------------------
+    sq_newtable(v);
+
+    // candidates
+    sq_pushstring(v, "candidates", -1);
+    sq_newarray(v, 0);
+    for (const Cover_Candidate& cand : candidates)
+    {
+        Internal_PushCandidate(v, cand, hasTarget);
+        sq_arrayappend(v, -2);
+    }
+    sq_newslot(v, -3);
+
+    // best
+    sq_pushstring(v, "best", -1);
+    bool haveBest = false;
+    if (!candidates.empty())
+    {
+        const float topScore = candidates[0].score;
+        if (topScore >= COVER_MIN_VIABLE)
+        {
+            sq_newtable(v);
+            sq_pushstring(v, "pos", -1);
+            Internal_PushVector(v, candidates[0].pos);
+            sq_newslot(v, -3);
+            sq_pushstring(v, "score", -1);
+            sq_pushfloat(v, topScore);
+            sq_newslot(v, -3);
+            haveBest = true;
+        }
+    }
+    if (!haveBest)
+        sq_pushnull(v);
+    sq_newslot(v, -3);
+
+    // stats
+    sq_pushstring(v, "stats", -1);
+    sq_newtable(v);
+    sq_pushstring(v, "generated", -1);
+    sq_pushinteger(v, generated);
+    sq_newslot(v, -3);
+    sq_pushstring(v, "rejectedByRetreat", -1);
+    sq_pushinteger(v, rejectedByRetreat);
+    sq_newslot(v, -3);
+    sq_pushstring(v, "rejectedByUnreachable", -1);
+    sq_pushinteger(v, rejectedByUnreachable);
+    sq_newslot(v, -3);
+    sq_pushstring(v, "safeFromAll", -1);
+    sq_pushinteger(v, safeFromAll);
+    sq_newslot(v, -3);
+    sq_pushstring(v, "exposedInFov", -1);
+    sq_pushinteger(v, exposedInFov);
+    sq_newslot(v, -3);
+    sq_pushstring(v, "exposedOutOfFov", -1);
+    sq_pushinteger(v, exposedOutOfFov);
+    sq_newslot(v, -3);
+    sq_newslot(v, -3);
+
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//=============================================================================
 // Bot Control API
 //=============================================================================
 
@@ -3060,6 +4050,13 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "Returns per-edge neighbor values. A value of 0 means the edge is a border edge (runs along obstacle geometry).",
         "array",
         "int polyRef, int hullType", false);
+
+    // Cover/peek query — full pipeline in C++ (replaces script-side CoverQuery_Find).
+    // Returns { candidates, best, stats } matching the original script result shape.
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_QueryCoverCandidates,
+        "Builds a sorted list of cover candidates around originPos against the supplied threats. Replaces the script-side CoverQuery_Find pipeline. Threat eyePos and forward arrays must be parallel. targetPos = <0,0,0> disables peek classification. radius = 0 uses the default.",
+        "table",
+        "vector originPos, array threatEyePositions, array threatForwards, vector targetPos, float radius, int hullType", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, Bot_Create,
         "Creates a bot player, returns edict index (-1 on failure). Use GetEntByIndex() to get entity",
