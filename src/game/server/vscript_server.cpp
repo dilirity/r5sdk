@@ -2458,10 +2458,6 @@ static SQRESULT ServerScript_NavMesh_FindClosestReachableInRing(HSQUIRRELVM v)
     if (!Internal_FindNearestPolyByHeight(&query, &searchOrigin, &halfExtents,
                                            &filter, &startRef, &nearestStart))
     {
-        // TEMP diagnostic — start-poly snap failed
-        Msg(eDLL_T::SERVER, "[FindClosestReachableInRing] NULL: start snap failed "
-            "(searchOrigin=%.1f,%.1f,%.1f hull=%d)\n",
-            searchOrigin.x, searchOrigin.y, searchOrigin.z, (int)hullIdx);
         v->PushNull();
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
@@ -2524,13 +2520,6 @@ static SQRESULT ServerScript_NavMesh_FindClosestReachableInRing(HSQUIRRELVM v)
 
     if (candidates.empty())
     {
-        // TEMP diagnostic — no in-ring verts (after inward filter)
-        Msg(eDLL_T::SERVER, "[FindClosestReachableInRing] NULL: no in-ring verts "
-            "(searchOrigin=%.1f,%.1f,%.1f center=%.1f,%.1f,%.1f radius=%.1f "
-            "buffer=%.1f effectiveInward=%.1f)\n",
-            searchOrigin.x, searchOrigin.y, searchOrigin.z,
-            center.x, center.y, center.z,
-            (float)radius, (float)inwardBuffer, effectiveInward);
         v->PushNull();
         SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
     }
@@ -2553,13 +2542,6 @@ static SQRESULT ServerScript_NavMesh_FindClosestReachableInRing(HSQUIRRELVM v)
     }
 
     // No reachable poly inside the ring.
-    // TEMP diagnostic — every candidate failed the reachability table check
-    Msg(eDLL_T::SERVER, "[FindClosestReachableInRing] NULL: no reachable "
-        "(searchOrigin=%.1f,%.1f,%.1f startRef=%llu candidates=%zu "
-        "closestDistSq=%.1f traverseTable=%d)\n",
-        searchOrigin.x, searchOrigin.y, searchOrigin.z,
-        (unsigned long long)startRef, candidates.size(),
-        candidates.front().distToBotSq, traverseTableIndex);
     v->PushNull();
     SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
 }
