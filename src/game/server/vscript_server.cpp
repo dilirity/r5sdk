@@ -42,6 +42,7 @@
 #include "public/game/server/ai_navmesh.h" // NavMesh_GetTraverseTableIndexForAnimType
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
 
 //=============================================================================
 // Bot Navigation Corridor System
@@ -2376,6 +2377,194 @@ static SQRESULT ServerScript_NavMesh_QueryPolysInRadius(HSQUIRRELVM v)
 }
 
 //-----------------------------------------------------------------------------
+// Purpose: returns the closest position inside a horizontal circle that is
+//          (a) on a walkable navmesh poly, (b) at least `inwardBuffer` units
+//          inside the circle's boundary, and (c) reachable from
+//          `searchOrigin`'s poly under the PILOT traverse table. Returns
+//          null when no candidate satisfies all three.
+//
+//          Internal flow:
+//          1. Snap searchOrigin to a start poly (Z-priority, hull extents).
+//          2. Walk every poly in every tile (same pattern as
+//             NavMesh_QueryPolysInRadius — see that function's comment for
+//             why we avoid dtNavMeshQuery::queryPolygons).
+//          3. For each poly: find its closest vertex to searchOrigin that is
+//             also at least inwardBuffer inside the circle. Skip if none.
+//          4. Sort candidates ascending by 2D distance to searchOrigin.
+//          5. First candidate whose poly is reachable wins; return its vert.
+//
+//          Reachability uses the same isGoalPolyReachable table check that
+//          NavMesh_CorridorSetPath uses internally — so a non-null result
+//          is guaranteed to be a target the corridor will accept.
+//
+//          Designed to replace a script-side workflow that called
+//          NavMesh_QueryPolysInRadius + NavMesh_GetPolyVerts (×N) +
+//          per-bot script sort + repeated CorridorSetPath probes. Keeping
+//          everything in C++ eliminates the marshaling and per-comparison
+//          VM overhead of doing this from Squirrel.
+//-----------------------------------------------------------------------------
+static SQRESULT ServerScript_NavMesh_FindClosestReachableInRing(HSQUIRRELVM v)
+{
+    const SQVector3D* searchOriginVec = nullptr;
+    const SQVector3D* centerVec = nullptr;
+    SQFloat radius;
+    SQFloat inwardBuffer;
+    SQInteger hullIdx;
+
+    sq_getvector(v, 2, &searchOriginVec);
+    sq_getvector(v, 3, &centerVec);
+    sq_getfloat(v, 4, &radius);
+    sq_getfloat(v, 5, &inwardBuffer);
+    sq_getinteger(v, 6, &hullIdx);
+
+    if (!Internal_ServerScript_ValidateHull(hullIdx))
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+
+    const Hull_e hullType = Hull_e(hullIdx);
+    const NavMeshType_e navType = NAI_Hull::NavMeshType(hullType);
+    const dtNavMesh* const nav = Detour_GetNavMeshByType(navType);
+
+    if (!nav)
+    {
+        v_SQVM_ScriptError("NavMesh \"%s\" for hull \"%s\" hasn't been loaded!",
+            NavMesh_GetNameForType(navType), g_aiHullNames[hullType]);
+        SCRIPT_CHECK_AND_RETURN(v, SQ_ERROR);
+    }
+
+    // Match the corridor's filter setup (vscript_server.cpp:1091-1104) so the
+    // start-poly snap resolves to the same poly NavMesh_CorridorSetPath would.
+    // Confirmed via [Nav] SetPath FAILED logs after [Rotate] Locked target —
+    // the helper's filter (excludes DISABLED) was snapping to a different poly
+    // than the corridor's filter (excludes nothing), causing isGoalPolyReachable
+    // to return true here but false in SetPath.
+    dtQueryFilter filter;
+    filter.setIncludeFlags(0xFFFF);
+    filter.setExcludeFlags(0);
+    filter.setTraverseFlags(0x8013F); // ANIMTYPE_PILOT traverse types
+
+    const Vector3D& maxs = NAI_Hull::Maxs(hullType);
+    const rdVec3D halfExtents(maxs.x, maxs.y, maxs.z);
+
+    const rdVec3D searchOrigin(searchOriginVec->x, searchOriginVec->y, searchOriginVec->z);
+    const rdVec3D center(centerVec->x, centerVec->y, centerVec->z);
+
+    // Snap searchOrigin to a start poly so we can run reachability checks
+    // from it. Off-mesh bots get null back.
+    dtNavMeshQuery query;
+    query.attachNavMeshUnsafe(nav);
+
+    dtPolyRef startRef = 0;
+    rdVec3D nearestStart;
+    if (!Internal_FindNearestPolyByHeight(&query, &searchOrigin, &halfExtents,
+                                           &filter, &startRef, &nearestStart))
+    {
+        // TEMP diagnostic — start-poly snap failed
+        Msg(eDLL_T::SERVER, "[FindClosestReachableInRing] NULL: start snap failed "
+            "(searchOrigin=%.1f,%.1f,%.1f hull=%d)\n",
+            searchOrigin.x, searchOrigin.y, searchOrigin.z, (int)hullIdx);
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    // Inward buffer clamps to zero so tiny rings still allow center-area verts.
+    float effectiveInward = (float)radius - (float)inwardBuffer;
+    if (effectiveInward < 0.0f)
+        effectiveInward = 0.0f;
+    const float inwardLimitSq = effectiveInward * effectiveInward;
+
+    struct Candidate
+    {
+        dtPolyRef polyRef;
+        rdVec3D   rep;
+        float     distToBotSq;
+    };
+
+    std::vector<Candidate> candidates;
+    candidates.reserve(512);
+
+    const int maxTiles = nav->getMaxTiles();
+    for (int t = 0; t < maxTiles; t++)
+    {
+        const dtMeshTile* tile = nav->getTile(t);
+        if (!tile || !tile->header)
+            continue;
+
+        const dtPolyRef base = nav->getPolyRefBase(tile);
+        const int polyCount = tile->header->polyCount;
+
+        for (int i = 0; i < polyCount; i++)
+        {
+            const dtPoly* p = &tile->polys[i];
+
+            if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION)
+                continue;
+
+            // Use the poly's precomputed center (middle of the tile) as the
+            // candidate target. Centers sit unambiguously inside one poly, so
+            // when CorridorSetPath later snaps this position to find a poly,
+            // it lands on the same poly we're checking reachability against.
+            // Picking a vertex (corner) caused snap ambiguity because corners
+            // are shared by adjacent polys.
+            const rdVec3D& polyCenter = p->center;
+
+            // Filter: poly center must be inside the buffered ring.
+            const float fcx = polyCenter.x - center.x;
+            const float fcy = polyCenter.y - center.y;
+            if (fcx * fcx + fcy * fcy > inwardLimitSq)
+                continue;
+
+            const float bx = polyCenter.x - searchOrigin.x;
+            const float by = polyCenter.y - searchOrigin.y;
+            const float distToBotSq = bx * bx + by * by;
+
+            const dtPolyRef ref = base | (dtPolyRef)i;
+            candidates.push_back({ref, polyCenter, distToBotSq});
+        }
+    }
+
+    if (candidates.empty())
+    {
+        // TEMP diagnostic — no in-ring verts (after inward filter)
+        Msg(eDLL_T::SERVER, "[FindClosestReachableInRing] NULL: no in-ring verts "
+            "(searchOrigin=%.1f,%.1f,%.1f center=%.1f,%.1f,%.1f radius=%.1f "
+            "buffer=%.1f effectiveInward=%.1f)\n",
+            searchOrigin.x, searchOrigin.y, searchOrigin.z,
+            center.x, center.y, center.z,
+            (float)radius, (float)inwardBuffer, effectiveInward);
+        v->PushNull();
+        SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+    }
+
+    std::sort(candidates.begin(), candidates.end(),
+        [](const Candidate& a, const Candidate& b) {
+            return a.distToBotSq < b.distToBotSq;
+        });
+
+    const int traverseTableIndex = NavMesh_GetTraverseTableIndexForAnimType(ANIMTYPE_PILOT);
+
+    for (const Candidate& c : candidates)
+    {
+        if (nav->isGoalPolyReachable(startRef, c.polyRef, false, traverseTableIndex))
+        {
+            const SQVector3D result(c.rep.x, c.rep.y, c.rep.z);
+            sq_pushvector(v, &result);
+            SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+        }
+    }
+
+    // No reachable poly inside the ring.
+    // TEMP diagnostic — every candidate failed the reachability table check
+    Msg(eDLL_T::SERVER, "[FindClosestReachableInRing] NULL: no reachable "
+        "(searchOrigin=%.1f,%.1f,%.1f startRef=%llu candidates=%zu "
+        "closestDistSq=%.1f traverseTable=%d)\n",
+        searchOrigin.x, searchOrigin.y, searchOrigin.z,
+        (unsigned long long)startRef, candidates.size(),
+        candidates.front().distToBotSq, traverseTableIndex);
+    v->PushNull();
+    SCRIPT_CHECK_AND_RETURN(v, SQ_OK);
+}
+
+//-----------------------------------------------------------------------------
 // Purpose: returns the world-space vertices of a navmesh polygon, in the
 //          polygon's native vertex order. Pair index i of this result with
 //          index i of NavMesh_GetPolyEdgeNeighbors to reason about edge i.
@@ -2874,6 +3063,11 @@ void Script_RegisterCoreServerFunctions(CSquirrelVM* s)
         "Returns polygon refs within a horizontal radius around a point. Z uses the hull's canonical height.",
         "array",
         "vector center, float radius, int hullType", false);
+
+    DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_FindClosestReachableInRing,
+        "Returns the closest position inside a horizontal circle that is on a walkable poly, at least inwardBuffer units inside the boundary, and reachable from searchOrigin's poly under the PILOT traverse table. Returns null when no candidate satisfies all three.",
+        "vector ornull",
+        "vector searchOrigin, vector center, float radius, float inwardBuffer, int hullType", false);
 
     DEFINE_SERVER_SCRIPTFUNC_NAMED(s, NavMesh_GetPolyVerts,
         "Returns the world-space vertices of a polygon in vertex order. Pair with NavMesh_GetPolyEdgeNeighbors to walk edges.",
